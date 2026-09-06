@@ -33,6 +33,7 @@ from app.models import (
 # is owned by the SPIKE INTELLIGENCE sheet tab (sheet_feed.upsert_spikes) and the
 # congress_trades table simply stops accruing rows until a real disclosure feed
 # is wired.
+from app.services.finnhub_feed import warm_factor_caches_from_db
 from app.services.mock_feed import (
     fetch_congress_trades,
     fetch_squeezes,
@@ -891,31 +892,69 @@ async def tick() -> None:
             stages (sector + market-cap backfill) converge towards no-ops as
             their columns fill. Key statistics runs last so it reads the
             /stock/metric blobs the fundamentals stage has already cached."""
-            # ORDER IS LOAD-BEARING — user-visible COLUMNS first, internal
-            # caches last.
+            # ORDER IS LOAD-BEARING — the two COMPOSITE FACTORS first, the
+            # display columns behind them.
             #
-            # These stages are serial and paced at ~1.1s/request against caps of
-            # 2,500, so the whole chain is roughly two hours. The latches above
-            # are in-memory globals, so every deploy resets them and the chain
-            # restarts from stage one. With the cache warmers running first, a
-            # day of active deploys meant stages four and five were NEVER
-            # reached: market_cap sat at 49 of 8,879 rows and pe_ttm / beta /
-            # eps_ttm / dividend_yield sat at zero, so the ticker page rendered
-            # em-dashes for every one of them.
+            # These stages are serial and paced at ~1.1s/request against per-run
+            # budgets of 2,500, so the whole chain is roughly two hours. The
+            # latches above are in-memory globals, so every deploy resets them
+            # and the chain restarts from stage one. On a deploy-heavy day the
+            # last stages are simply never reached.
             #
-            # Each backfill is self-gating (it queries `WHERE <col> IS NULL`), so
-            # a completed stage costs one query and falls straight through to the
-            # next — which is what makes restarting mid-chain cheap rather than
-            # wasteful. Putting the column backfills first means the fields a
-            # reader actually sees converge even if the process only ever gets an
-            # hour between deploys.
+            # The order used to be "user-visible COLUMNS first, internal caches
+            # last", on the reading that fundamentals and smart-money were
+            # internal caches. They are not. They are two of the six factors and
+            # they carry 30% of the composite between them, and a factor with no
+            # reading scores as NEUTRAL 50 by design (services/score.py) — which
+            # caps a both-missing row's composite at 85 no matter what the other
+            # four say.
             #
-            # Cost of the reorder is zero: key statistics reads the metric blob
-            # via _fetch_metric_all, which fetches on a cache miss, so running it
-            # before the fundamentals warmer just moves which stage pays for the
-            # call. The warmer then reads a hot cache for free. market_cap goes
-            # first of all because fetch_company_profile also fills sector, so it
-            # does part of the sector backfill's work on the way past.
+            # Measured on production 2026-09-07, with those two stages sitting
+            # at the back of a ~2h chain: 5,697 of 7,417 scored rows had BOTH
+            # factors NULL, including 1,001 of the 1,035 rows over $10B —
+            # NVDA, AAPL, MSFT, AMZN, META, TSLA and SPY among them. The best
+            # composite any both-null row had ever reached was 80.2 against a
+            # top-ten cutoff of 81.1, so the published record was drawn entirely
+            # from the covered minority. A stale key statistic renders an
+            # em-dash next to a number; a missing factor silently rewrites which
+            # names are published. The factors go first.
+            #
+            # Each stage is self-gating — the backfills query `WHERE <col> IS
+            # NULL`, the two factor passes select on their `last_*_at` stamp —
+            # so a completed stage costs one query and falls straight through to
+            # the next, and an interrupted one resumes. That is what makes
+            # restarting mid-chain cheap rather than wasteful.
+            #
+            # Cost of putting the factors first: `_backfill_key_statistics`
+            # reads the same /stock/metric blob via _fetch_metric_all (7-day
+            # disk cache), so when both stages walked the same top-of-book
+            # slice one of them rode the other's fetches for free. They no
+            # longer select the same slice — key statistics still ranks the
+            # whole table by dollar-volume while the fundamentals pass walks a
+            # frontier — so some metric calls get paid twice in a week. Small,
+            # and smaller than it looks: backend/.cache is on Fly's ephemeral
+            # disk, so a deploy already cost both stages that saving anyway.
+            # Either way it is wall time inside an already-paced loop, not
+            # budget — both stages sleep 1.1s per request independently, so
+            # neither can push the other over 60/min. market_cap keeps its
+            # place ahead of the sector backfill because fetch_company_profile
+            # also fills sector, so it does part of that stage's work on the
+            # way past.
+            #
+            # STILL UNCONVERGED, and the next thing to fix here:
+            # `_backfill_key_statistics` has no gap query and no stamp of its
+            # own, so it re-fetches one fixed top-of-book slice every single
+            # run — a full ~46 minutes of the chain, forever. It is behind the
+            # factor stages now, so it no longer starves them, but it is why
+            # `_backfill_sectors` sits at the end of a long chain.
+            try:
+                await _refresh_fundamentals_cache()
+            except Exception:
+                logger.exception("fundamentals.refresh_failed")
+            try:
+                await _refresh_insider_cache()
+            except Exception:
+                logger.exception("insider.refresh_failed")
             try:
                 await _backfill_market_cap()
             except Exception:
@@ -928,14 +967,6 @@ async def tick() -> None:
                 await _backfill_sectors()
             except Exception:
                 logger.exception("sectors.backfill_failed")
-            try:
-                await _refresh_fundamentals_cache()
-            except Exception:
-                logger.exception("fundamentals.refresh_failed")
-            try:
-                await _refresh_insider_cache()
-            except Exception:
-                logger.exception("insider.refresh_failed")
 
         asyncio.create_task(_serial_finnhub_refreshes())
 
@@ -1847,23 +1878,151 @@ async def _downgrade_expired_trials() -> None:
     # double-emailed every non-converting user within ~24h of expiry.
 
 
+#: Share of a factor pass's per-run budget HELD BACK for symbols it has already
+#: attempted (`last_*_at IS NOT NULL`), oldest stamp first. Everything else goes
+#: to gaps.
+#:
+#: Not zero, because a pass that spent 100% of every run on gaps would refresh
+#: nothing until the last gap closed — and universe discovery adds fresh NULL
+#: rows every week, so "the last gap" is not a moment that reliably arrives. A
+#: fifth bounds how stale a covered symbol can get however the gap set moves.
+#:
+#: Not more than a fifth, because filling gaps is the emergency: 77% of the
+#: scored universe had no reading for either of these two factors on
+#: 2026-09-07.
+#:
+#: It is a RESERVE, not a quota, in both directions. Budget the rotation cannot
+#: use — most obviously on the very first run, when nothing is stamped yet —
+#: goes straight back to gaps rather than being left unspent. And it is floored
+#: rather than rounded, so at a budget small enough that a fifth is less than
+#: one row the rotation simply waits: with one call to spend and a symbol never
+#: measured, measuring it is the right call. Production runs this at
+#: ACTIVE_UNIVERSE_SIZE, where the reserve is 500 rows.
+_FACTOR_ROTATION_RESERVE = 0.2
+
+#: Rows stamped per short-lived transaction inside a factor pass.
+#:
+#: Same size and same reason as _SECTOR_BACKFILL_BATCH — but here the batching
+#: is doing a second job. These passes run ~46 minutes and the process is
+#: restarted by every deploy, so stamping only at the END would throw away an
+#: interrupted run's entire progress and the pass would resume exactly where it
+#: started. Stamping as we go is what makes a restart cheap.
+_FACTOR_STAMP_BATCH = 20
+
+
+async def _select_factor_symbols(stamp_col: Any, cap: int) -> list[str]:
+    """Pick the symbols one factor pass should attempt this run.
+
+    GAPS FIRST, then oldest-attempted. Returns at most `cap` symbols.
+
+    The passes this serves used to select the top `cap` rows by
+    coalesce(volume * price, -1) DESC — a ranking over the WHOLE table, with no
+    reference to what was already known. Combined with in-memory completion
+    latches that every deploy resets, that meant each run re-fetched the same
+    top rows and the covered set could not grow. Measured on production
+    2026-09-07: sub_fundamentals present for 462/948 A-symbols, 427/749 B and
+    429/870 C, then 69/491 D, 3/368 H, 0/223 J, 6/917 S, 0/77 Y, 0/92 Z.
+
+    Selecting on `stamp_col IS NULL` is the same trick `_backfill_sectors`,
+    `_backfill_market_cap` and the aggregates explore slice already use: the
+    candidate set shrinks by exactly what the last run achieved, so an
+    interrupted chain RESUMES instead of repeating, and the frontier advances
+    `cap` rows per run until the universe is covered.
+
+    Ordering inside the gap set is dollar-volume DESC, market cap DESC, symbol
+    ASC:
+
+    * Dollar-volume first because it is the one liquidity read we actually
+      have, and it puts the names a reader looks at on day one — verified
+      against production, this ordering starts NVDA, SPY, QQQ, TSLA, AAPL,
+      AVGO, META, AMD, MSFT, AMZN, GOOGL.
+    * Market cap only as a tie-break, and never as the primary key: Finnhub
+      reports some foreign ADRs' caps in local currency, so a cap-first
+      ordering leads with arithmetic nonsense (an ADR at "$1.2 quadrillion")
+      rather than with the largest companies.
+    * Symbol last so the ordering is total. Two rows that tie on both numeric
+      keys must not be left to physical row order — that is precisely how the
+      aggregates pass ended up alphabetically frozen (migration 0062).
+
+    coalesce(..., -1) is the cross-dialect NULLS LAST used in
+    services/universe.py: Postgres sorts NULLs FIRST on a DESC order and SQLite
+    sorts them last, so relying on the dialect looks correct in dev and
+    inverts in production.
+    """
+    fill_cap = cap - int(cap * _FACTOR_ROTATION_RESERVE)
+    async with session_scope() as session:
+        # Ask for the full budget's worth of gaps, not just the fill share —
+        # the tail is what tops the run back up when the rotation has less to
+        # do than its share allows. Costs nothing extra: one query either way.
+        gaps = list((await session.execute(
+            select(Ticker.symbol)
+            .where(stamp_col.is_(None))
+            .order_by(
+                desc(func.coalesce(Ticker.volume * Ticker.price, -1)),
+                desc(func.coalesce(Ticker.market_cap, -1)),
+                Ticker.symbol.asc(),
+            )
+            .limit(cap)
+        )).scalars().all())
+
+        # Oldest attempt first — a plain staleness rotation. No coalesce needed:
+        # every row here carries a stamp by construction.
+        head = gaps[:fill_cap]
+        refresh = list((await session.execute(
+            select(Ticker.symbol)
+            .where(stamp_col.is_not(None))
+            .order_by(stamp_col.asc(), Ticker.symbol.asc())
+            .limit(cap - len(head))
+        )).scalars().all())
+
+    picked = [*head, *refresh]
+    if len(picked) < cap:
+        picked.extend(gaps[len(head):][: cap - len(picked)])
+
+    seen: set[str] = set()
+    return [s for s in picked if not (s in seen or seen.add(s))]
+
+
+async def _stamp_factor_attempts(
+    column: str, symbols: list[str], now: datetime,
+) -> None:
+    """Record that these symbols were ATTEMPTED, in one short transaction.
+
+    Written whether or not the vendor returned anything. A symbol Finnhub has
+    no fundamentals for — most ETFs — is a settled question, not an outstanding
+    one, and leaving it NULL would park it at the head of the gap query on
+    every future run. See the column comment on Ticker.last_fundamentals_at.
+    """
+    if not symbols:
+        return
+    try:
+        async with session_scope() as session:
+            await session.execute(
+                update(Ticker)
+                .where(Ticker.symbol.in_(symbols))
+                .values({column: now})
+            )
+    except Exception:
+        logger.exception("factor_stamp.failed column=%s size=%d", column, len(symbols))
+
+
 async def _refresh_fundamentals_cache() -> None:
     """
-    Daily pre-fetch of Finnhub fundamentals for the top-liquidity slice of
-    the universe. Populates finnhub_feed._FUND_SCORE_CACHE so
-    polygon_feed.fetch_snapshots can read real sub_fundamentals values
-    per tick (instead of random mock).
+    Daily pre-fetch of Finnhub fundamentals. Populates
+    finnhub_feed._FUND_SCORE_CACHE so polygon_feed.fetch_snapshots can read a
+    real sub_fundamentals per tick, and stamps `last_fundamentals_at` so the
+    next run starts where this one stopped.
 
-    LIQUIDITY CAP: Massive auto-discovers ~5700 tickers including thousands
-    of sub-$1 micro-caps no real user looks at. Cap matches the active
-    scoring universe (2,500) so every ticker we score has fresh
-    fundamentals — refresh takes ~42 min on Finnhub free tier (60/min),
-    well inside the 24h cycle.
+    PER-RUN BUDGET, not a universe cap. `ACTIVE_UNIVERSE_SIZE` rows at ~1.1s
+    each is ~46 min, which is what fits inside the daily serial Finnhub chain
+    without breaching the free tier's 60 calls/min. It is no longer the set of
+    symbols that can ever be covered: `_select_factor_symbols` spends the
+    budget on rows this pass has never attempted, so coverage advances by up to
+    a budget per run and converges over days across the ~11,800-row universe
+    rather than re-fetching one fixed slice forever.
     """
     from app.services.universe import ACTIVE_UNIVERSE_SIZE
     FUNDAMENTALS_CAP = ACTIVE_UNIVERSE_SIZE
-
-    from sqlalchemy import desc
 
     from app.services.finnhub_feed import (
         compute_fundamentals_score,
@@ -1872,24 +2031,14 @@ async def _refresh_fundamentals_cache() -> None:
         set_cached_score,
     )
 
-    async with session_scope() as session:
-        # Order by an approximation of $-volume, LIQUID FIRST. Newly discovered
-        # tickers have volume=price=NULL until they get a snapshot, and there
-        # are ~3200 of those vs a 2500 cap. Under a plain `desc(volume*price)`,
-        # Postgres (prod/Neon) sorts NULL FIRST — so the cap fills with illiquid
-        # NULL-volume names and the liquid universe never gets real sub-scores
-        # cached (leaving mock values in prod). SQLite (dev) sorts NULL last, so
-        # it looked fine locally. coalesce(..., -1) is the cross-dialect NULLS
-        # LAST used in services/universe.py — keep them in sync.
-        result = await session.execute(
-            select(Ticker.symbol, Ticker.volume, Ticker.price)
-            .order_by(desc(func.coalesce(Ticker.volume * Ticker.price, -1)))
-            .limit(FUNDAMENTALS_CAP)
-        )
-        symbols = [row[0] for row in result.all()]
+    symbols = await _select_factor_symbols(
+        Ticker.last_fundamentals_at, FUNDAMENTALS_CAP,
+    )
 
     logger.info("fundamentals.refresh_started count=%d", len(symbols))
     refreshed = 0
+    attempted = 0
+    pending: list[str] = []
     for sym in symbols:
         try:
             metrics = await fetch_basic_financials(sym)
@@ -1899,10 +2048,26 @@ async def _refresh_fundamentals_cache() -> None:
                 refreshed += 1
         except Exception:
             logger.exception("fundamentals.fetch_failed symbol=%s", sym)
+        # Stamped whether or not the vendor had anything — see
+        # _stamp_factor_attempts. Flushed as we go, not at the end, so a deploy
+        # mid-pass keeps the progress this run made.
+        pending.append(sym)
+        attempted += 1
         # Stay well under 60/min cap — sleep ~1.1s between calls
         await asyncio.sleep(1.1)
+        if len(pending) >= _FACTOR_STAMP_BATCH:
+            await _stamp_factor_attempts(
+                "last_fundamentals_at", pending, datetime.now(UTC),
+            )
+            pending = []
+    await _stamp_factor_attempts(
+        "last_fundamentals_at", pending, datetime.now(UTC),
+    )
 
-    logger.info("fundamentals.refreshed scored=%d cache_size=%d", refreshed, fund_cache_size())
+    logger.info(
+        "fundamentals.refreshed scored=%d attempted=%d cache_size=%d",
+        refreshed, attempted, fund_cache_size(),
+    )
 
 
 async def _run_aggregates_refresh() -> None:
@@ -2134,17 +2299,17 @@ async def _refresh_aggregates_cache() -> bool:
 
 async def _refresh_insider_cache() -> None:
     """
-    Daily pre-fetch of Finnhub insider Form 4 transactions for the
-    top-liquidity slice. Populates _SMART_MONEY_SCORE_CACHE so polygon_feed
-    reads real values per tick instead of random mock for sub_smart_money.
+    Daily pre-fetch of Finnhub insider Form 4 transactions. Populates
+    _SMART_MONEY_SCORE_CACHE so polygon_feed reads a real sub_smart_money per
+    tick, and stamps `last_smart_money_at` so the next run resumes.
 
-    Same liquidity cap as fundamentals — matches active scoring universe
-    (2,500) so every scored ticker has fresh insider transactions data.
+    Same per-run budget and the same gaps-first selection as
+    _refresh_fundamentals_cache — see `_select_factor_symbols` for why the old
+    "top 2,500 by dollar-volume, every run" ranking could never grow its
+    covered set.
     """
     from app.services.universe import ACTIVE_UNIVERSE_SIZE
     INSIDER_CAP = ACTIVE_UNIVERSE_SIZE
-
-    from sqlalchemy import desc
 
     from app.services.finnhub_feed import (
         compute_smart_money_score,
@@ -2155,17 +2320,14 @@ async def _refresh_insider_cache() -> None:
         smart_money_cache_size,
     )
 
-    async with session_scope() as session:
-        result = await session.execute(
-            select(Ticker.symbol)
-            # NULLS LAST across dialects — see _refresh_fundamentals_cache.
-            .order_by(desc(func.coalesce(Ticker.volume * Ticker.price, -1)))
-            .limit(INSIDER_CAP)
-        )
-        symbols = [row[0] for row in result.all()]
+    symbols = await _select_factor_symbols(
+        Ticker.last_smart_money_at, INSIDER_CAP,
+    )
 
     logger.info("insider.refresh_started count=%d", len(symbols))
     refreshed = 0
+    attempted = 0
+    pending: list[str] = []
     for sym in symbols:
         try:
             txns = await fetch_insider_transactions(sym, days_back=90)
@@ -2178,11 +2340,24 @@ async def _refresh_insider_cache() -> None:
                 refreshed += 1
         except Exception:
             logger.exception("insider.fetch_failed symbol=%s", sym)
+        # Stamped on ATTEMPT — a company with no Form 4 filings in the last 90
+        # days is a real answer, not an outstanding request.
+        pending.append(sym)
+        attempted += 1
         await asyncio.sleep(1.1)  # stay well under 60/min
+        if len(pending) >= _FACTOR_STAMP_BATCH:
+            await _stamp_factor_attempts(
+                "last_smart_money_at", pending, datetime.now(UTC),
+            )
+            pending = []
+    await _stamp_factor_attempts(
+        "last_smart_money_at", pending, datetime.now(UTC),
+    )
 
     logger.info(
-        "insider.refreshed scored=%d score_cache=%d feed_size=%d",
-        refreshed, smart_money_cache_size(), await insider_feed_size_db(),
+        "insider.refreshed scored=%d attempted=%d score_cache=%d feed_size=%d",
+        refreshed, attempted, smart_money_cache_size(),
+        await insider_feed_size_db(),
     )
 
 
@@ -2767,6 +2942,26 @@ async def main() -> None:
 
     # Seed universe on first boot (idempotent)
     await seed_universe()
+
+    # Restore the two Finnhub factor caches from the DB BEFORE the first tick.
+    #
+    # `_FUND_SCORE_CACHE` / `_SMART_MONEY_SCORE_CACHE` are process-local dicts
+    # refilled by a chain that takes hours and is restarted by every deploy, so
+    # for most of a deploy-heavy day this process holds no reading for two of
+    # the six factors — and a missing factor scores as NEUTRAL 50 by design.
+    #
+    # Be precise about what this does and does not rescue, because half of it
+    # is already handled: `_merged_factor_set` merges each incoming factor
+    # against the value on the row, so a cold cache does NOT blank a
+    # market-fed row's stored sub-scores. What the merge cannot cover is the
+    # SHEET refresh this same tick runs, which writes all six sub-scores
+    # unconditionally including None (deliberately — see
+    # finnhub_feed.warm_factor_caches_from_db). For those symbols the cache is
+    # the only thing standing between "measured yesterday" and NEUTRAL.
+    #
+    # Before the first tick rather than lazily, because the first tick is
+    # where both of those writes happen.
+    await warm_factor_caches_from_db()
 
     # Watchdog: a healthy tick completes in ~6s. If one ever stalls past
     # TICK_TIMEOUT_SECONDS we kill it and continue — better to drop one

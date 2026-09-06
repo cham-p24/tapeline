@@ -165,6 +165,81 @@ def smart_money_cache_size() -> int:
     return len(_SMART_MONEY_SCORE_CACHE)
 
 
+async def warm_factor_caches_from_db() -> tuple[int, int]:
+    """Refill `_FUND_SCORE_CACHE` and `_SMART_MONEY_SCORE_CACHE` from the values
+    already stored on the Ticker rows.
+
+    Both dicts are process-local and both are filled ONLY by the worker's daily
+    Finnhub chain, so every process starts with no reading for either of the two
+    factors they back — and `app.services.score` treats a cache miss as NEUTRAL
+    50 by design. The Ticker table has persisted both sub-scores all along;
+    nothing ever read them back. This is that read.
+
+    "We measured this yesterday and then forgot" is not the same claim as "we
+    have never measured this", and only the second is honestly NEUTRAL.
+
+    WHO ACTUALLY NEEDS THIS — the two composite write paths differ, so be
+    precise before deleting either caller:
+
+    * The WORKER's tick is already half-protected. `_merged_factor_set` merges
+      each incoming factor against the value on the row (incoming-or-previous)
+      and recomputes the composite from the merged set, so a cold cache there
+      preserves a stored sub-score rather than erasing it. What it does NOT do
+      is help a row the tick has never seen before, and it does nothing at all
+      for sheet-governed symbols, whose factors the tick deliberately leaves
+      alone.
+    * The SHEET path has no such protection, on purpose. `sheet_feed`'s
+      `upsert_tickers` writes all six sub-scores unconditionally INCLUDING None
+      — because writing only non-None values would leave a stale 70 printed
+      beside a composite computed as if that factor were 50, and the displayed
+      numbers would not add up (PRs #225/#226). Correct, and it means a cold
+      cache blanks both factors for every sheet-governed row and recomputes
+      those composites with NEUTRAL twice over. The cache is therefore the only
+      place this can be fixed.
+
+    That second path runs in the API process (`routers/internal.py`'s
+    sheet-changed webhook), where the daily Finnhub chain never runs at all, so
+    there the caches are not merely cold after a deploy — they are empty for the
+    life of the process.
+
+    Returns (fundamentals_loaded, smart_money_loaded). Never raises: a warm that
+    fails leaves the caches exactly as cold as they were, which is the
+    pre-existing behaviour.
+    """
+    from sqlalchemy import select
+
+    from app.db import session_scope
+    from app.models import Ticker
+
+    funds = 0
+    smart = 0
+    try:
+        async with session_scope() as session:
+            rows = (await session.execute(
+                select(
+                    Ticker.symbol, Ticker.sub_fundamentals, Ticker.sub_smart_money,
+                ).where(
+                    Ticker.sub_fundamentals.is_not(None)
+                    | Ticker.sub_smart_money.is_not(None)
+                )
+            )).all()
+        for sym, fund, sm in rows:
+            if fund is not None:
+                set_cached_score(sym, float(fund))
+                funds += 1
+            if sm is not None:
+                set_cached_smart_money_score(sym, float(sm))
+                smart += 1
+    except Exception:
+        logger.exception("factor_cache.warm_failed")
+        return funds, smart
+
+    logger.info(
+        "factor_cache.warmed fundamentals=%d smart_money=%d", funds, smart,
+    )
+    return funds, smart
+
+
 # ---- Recent insider transactions — DB-backed, cross-process ---------------
 # Powers /app/holdings ("Recent Insider Buys") and the per-ticker InsiderTab.
 # Before 2026-05-16 this was an in-process `_INSIDER_FEED` list — the worker
