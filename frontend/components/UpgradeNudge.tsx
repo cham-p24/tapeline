@@ -25,6 +25,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useFirstRunTip } from "@/components/FirstRunTip";
+import { PRICING, usd } from "@/lib/pricing";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 const STORAGE_KEY = "tapeline_upgrade_nudge_dismissed_at";
@@ -39,6 +40,13 @@ type Nudge = {
   scanner_cap: number;
   delayed_hours: number;
   watchlist_cap: number;
+  /**
+   * The date a finished trial ended, or null. Server-decided: it requires
+   * BOTH trial_started_at and an elapsed trial_ends_at, because trial_ends_at
+   * alone cannot tell "trial over" from "never trialled" (see the column
+   * comment in models/user.py). Null for everyone who has not had one.
+   */
+  trial_ended_on?: string | null;
 };
 
 export function UpgradeNudge() {
@@ -92,6 +100,42 @@ export function UpgradeNudge() {
   // Value before ask: don't upsell over the first-run welcome. The nudge
   // returns once the OnboardingTip is dismissed.
   if (tipVisible || suppressedHere || dismissed || !nudge) return null;
+
+  // POST-TRIAL. A free user who has already run a 30-day Premium trial is not
+  // a prospect who needs the features explained — they used them. Selling to
+  // them as though they had never seen the product is the surest way to be
+  // ignored. So this states the two things they do not already know: that they
+  // are back on Free and what specifically stopped, and what it costs to
+  // restart. No urgency, no "your access expired!!" theatre: they cancelled or
+  // let it lapse on purpose and are entitled to be talked to like an adult.
+  if (nudge.trial_ended_on) {
+    return (
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
+        <span className="text-fg">
+          Your Premium trial ended, so you&apos;re back on <strong>Free</strong> — the
+          top {nudge.scanner_cap} rows of any scan, and prices {nudge.delayed_hours}h
+          behind. What stopped: every matching row instead of the top{" "}
+          {nudge.scanner_cap}, alerts when a screen changes, and CSV export.{" "}
+          <strong>{usd(PRICING.premium.monthly)}/month</strong>, cancel in one click.
+        </span>
+        <span className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/app/billing"
+            className="rounded-md border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/20"
+          >
+            See plans
+          </Link>
+          <button
+            onClick={dismiss}
+            aria-label="Dismiss upgrade nudge"
+            className="rounded-md px-2 py-1.5 text-xs text-muted hover:text-fg"
+          >
+            Not now
+          </button>
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
