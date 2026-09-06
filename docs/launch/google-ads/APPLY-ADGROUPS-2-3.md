@@ -15,6 +15,14 @@
 >
 > **Do NOT re-import `tapeline-adgroups-2-3-import.csv`** — it would create
 > duplicate ad groups + keywords. Nothing in this file is still pending.
+>
+> **The import CSVs this handoff names were DELETED on 2026-09-05 (#747)** —
+> `tapeline-adgroups-2-3-import.csv`, `tapeline-search-test.csv` and
+> `tapeline-rsa-improved.csv`. Every ad in them pointed at `/compare/finviz`,
+> removed in #718; they carried 16 banned-vocabulary hits and a trial length
+> Tapeline no longer offers. They are recoverable from git history, and that
+> is not an invitation: see `README.md` in this folder before restoring any
+> of them.
 
 **Status (2026-06-01):** Campaign **"Tapeline - Search Test (Jun 2026)"** (ID `23891985522`)
 is **LIVE / Enabled / Eligible**, bid strategy still **learning**, **A$0.00 spent**.
@@ -36,7 +44,7 @@ reloads on 2026-06-01, while `/aw/overview` rendered live data normally.
 - **`tapeline-negative-keywords.csv`** — 28 campaign-level Phrase negatives.
 - `tapeline-search-test.csv` — full source of truth (all 3 ad groups), for reference only.
 
-## How to apply (pick one)
+## How to apply (choose one)
 
 ### Option A — Web bulk upload (once the grid loads again)
 1. Google Ads → **Tools** (wrench) → **Bulk actions** → **Uploads**.

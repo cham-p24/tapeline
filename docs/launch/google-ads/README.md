@@ -48,6 +48,14 @@ site; only `--ads` treats them as banned:
 node scripts/lint-copy-compliance.mjs --ads <file>
 ```
 
-CI now runs that over `docs/launch/google-ads/**` as well as `docs/ads/**`, so a
-new CSV dropped in here is checked on the next push. A clean run means nothing
-was *caught*, not that the copy is compliant — a named human still signs off.
+CI runs that over the `.csv`, `.md` and `.txt` files in this folder and the
+`.md`, `.txt` and `.json` files under `docs/ads/`, so a new import file *or a new
+runbook* dropped in here is checked on the next push. Between 2026-09-05 and
+2026-09-06 that claim was only two-thirds true: the step's file list ended a line
+with a literal `\n` where a continuation was meant, bash read it as the filename
+`n`, and the `.md`/`.txt` files here were never opened while the step reported
+success. The linter now exits non-zero on a path it was handed and could not
+read, so that failure cannot repeat silently.
+
+A clean run means nothing was *caught*, not that the copy is compliant — a named
+human still signs off.
