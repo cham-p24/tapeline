@@ -149,10 +149,24 @@ def _ensure_baseline(sym: str) -> None:
     _DRIFT[sym] = rng.uniform(-0.0002, 0.0002)
 
 
-def universe() -> list[dict[str, str]]:
-    """Return the master ticker list for initial DB seed."""
+def universe() -> list[dict[str, object]]:
+    """Return the master ticker list for initial DB seed.
+
+    `is_leveraged` is derived here rather than left to the column default, for
+    the same reason every other writer of `name`/`asset_class` derives it: the
+    flag is a function of those two fields, and a seed row that skipped it
+    would be the one place in the codebase where they disagree.
+    """
+    from app.services.leverage import is_leveraged_fund
+
     return [
-        {"symbol": sym, "name": name, "sector": sector, "asset_class": "etf" if sector == "ETF" else "equity"}
+        {
+            "symbol": sym,
+            "name": name,
+            "sector": sector,
+            "asset_class": (ac := "etf" if sector == "ETF" else "equity"),
+            "is_leveraged": is_leveraged_fund(name, ac),
+        }
         for sym, name, sector in TICKER_UNIVERSE
     ]
 

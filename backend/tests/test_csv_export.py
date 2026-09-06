@@ -28,7 +28,7 @@ from app.models import Ticker, User, WatchlistItem
 _SYMBOLS = ["CSVX1", "CSVX2"]
 
 _SCANNER_HEADER = (
-    "symbol,name,sector,asset_class,score,signal,price,"
+    "symbol,name,sector,asset_class,is_leveraged,score,signal,price,"
     "change_pct_1d,change_pct_5d,change_pct_1m,volume,"
     "confidence_pct,sub_trend,sub_rs,sub_fundamentals,"
     "sub_momentum,sub_macro,sub_smart_money,reason,updated_at"

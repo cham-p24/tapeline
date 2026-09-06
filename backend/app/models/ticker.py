@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Date, DateTime, Float, String, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -16,6 +16,30 @@ class Ticker(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     sector: Mapped[str | None] = mapped_column(String(80), nullable=True)
     asset_class: Mapped[str] = mapped_column(String(20), default="equity", nullable=False)
+    # Whether this row is a leveraged or inverse FUND — a 2x/3x daily-reset
+    # product, an inverse (-1x/-2x/-3x) product, or a short-only fund.
+    #
+    # DERIVED FROM THE NAME, not from the vendor: neither Massive's reference
+    # data nor Finnhub's profile carries a gearing field, so
+    # services/leverage.py reads the fund name and every writer of `name` /
+    # `asset_class` recomputes this alongside it. NOT NULL with a False
+    # default, because "we have not decided yet" is not a state any query
+    # wants to handle — an unclassified row reads as an ordinary fund, which
+    # is what it was before this column existed.
+    #
+    # It exists because the anonymous top 10 — the first thing a visitor sees,
+    # and the artefact the public MCP server republishes — held CONX
+    # ("Direxion Daily COIN Bull 2X ETF") and BIB ("ProShares Ultra NASDAQ
+    # Biotechnology") as ordinary ranked results on 2026-09-07. The scanner
+    # now excludes these by default and takes `include_leveraged=true` to put
+    # them back; the flag ships on the row payload so the client and the MCP
+    # server can state the fact rather than silently dropping rows.
+    #
+    # It is a FACT about fund structure, in the same register as asset_class —
+    # never a warning, never a risk rating. See services/leverage.py.
+    is_leveraged: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False,
+    )
 
     # Latest score snapshot (denormalized for fast scanner reads)
     score: Mapped[float | None] = mapped_column(Float, nullable=True)

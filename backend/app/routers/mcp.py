@@ -58,6 +58,11 @@ from app.models import McpToolCall, Ticker
 from app.services.symbols import clean_symbol
 
 logger = logging.getLogger(__name__)
+
+#: Most JSON-RPC messages one POST may carry. See the note in the batch branch:
+#: the endpoint is deliberately open, so the cap is on work rather than identity.
+MAX_BATCH_SIZE = 50
+
 router = APIRouter()
 
 SITE = "https://tapeline.io"
@@ -214,7 +219,11 @@ async def _tool_ticker_score(args: dict, session: AsyncSession) -> dict:
 
 
 async def _tool_daily_picks(args: dict, session: AsyncSession) -> dict:
-    from app.routers.scanner import SCANNER_MIN_DOLLAR_VOLUME, list_scanner
+    from app.routers.scanner import (
+        SCANNER_INCLUDE_LEVERAGED_DEFAULT,
+        SCANNER_MIN_DOLLAR_VOLUME,
+        list_scanner,
+    )
 
     try:
         limit = int(args.get("limit") or 10)
@@ -243,6 +252,12 @@ async def _tool_daily_picks(args: dict, session: AsyncSession) -> dict:
         signal=None,
         sector=None,
         asset_class=None,
+        # Leveraged/inverse funds stay out, exactly as they do for the
+        # anonymous web top 10 this tool republishes. Passed explicitly for
+        # the reason stated in note 1 above — omitting it would hand the
+        # handler the Query object, which is truthy, and the assistant would
+        # be citing "today's picks" that the website does not show.
+        include_leveraged=SCANNER_INCLUDE_LEVERAGED_DEFAULT,
         q=None,
         sort="score",
         order="desc",
@@ -493,6 +508,30 @@ async def mcp_endpoint(
         return JSONResponse(_error(None, -32700, "Parse error"), status_code=400)
 
     if isinstance(body, list):
+        # BOUND THE WORK ONE REQUEST CAN BUY.
+        #
+        # This comprehension used to run the whole array. `tools/call` dispatches
+        # are DB-backed — get_daily_picks runs the full list_scanner query and
+        # _record_tool_call opens its own session and commits an upsert — so a
+        # single anonymous POST carrying a 10,000-element array bought 10,000
+        # sequential queries on the one 2-CPU api machine (fly.toml runs no
+        # second one, deliberately). Verified live on 2026-09-06: a 5-element
+        # batch returned 5 replies, and nothing looked at the length.
+        #
+        # The endpoint stays UNAUTHENTICATED on purpose — every tool returns
+        # what an anonymous visitor already sees, and gating the top of the
+        # funnel is the opposite of the point. So the limit is on WORK, not on
+        # identity. Real MCP clients batch in single digits; 50 is generous and
+        # still bounds the blast radius at ~50x rather than unbounded.
+        if len(body) > MAX_BATCH_SIZE:
+            return JSONResponse(
+                _error(
+                    None,
+                    -32600,
+                    f"Batch too large: {len(body)} messages, limit {MAX_BATCH_SIZE}",
+                ),
+                status_code=413,
+            )
         replies = [r for r in [await _dispatch(m, session) for m in body] if r is not None]
         # An all-notification batch gets 202 with no body, per the spec.
         if not replies:

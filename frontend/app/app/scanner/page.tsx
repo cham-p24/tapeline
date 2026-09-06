@@ -36,6 +36,7 @@ import { useUser } from "@/components/UserContext";
 import { canUse } from "@/lib/auth";
 import {
   FilterBar,
+  ToggleFilter,
   SearchBox,
   SelectFilter,
   NumberFilter,
@@ -55,6 +56,10 @@ type ScannerFilters = {
   sector: string;
   signal?: string;
   assetClass?: AssetBucket;
+  // Leveraged/inverse funds are excluded server-side by default; a preset
+  // saved before this filter existed simply lacks the key and falls through
+  // to that default, which is what it was showing when it was saved.
+  includeLeveraged?: boolean;
   search: string;
 };
 
@@ -158,6 +163,10 @@ export default function ScannerPage() {
   // Asset-class is filtered client-side (no backend param), so it does not
   // belong in the server query and never triggers a refetch.
   const [assetClass, setAssetClass] = useState<AssetBucket>("");
+  // Leveraged & inverse funds. Defaults to false to match the server's own
+  // default (backend SCANNER_INCLUDE_LEVERAGED_DEFAULT) — the param is only
+  // ever sent when the user has ticked it on, so the two cannot drift.
+  const [includeLeveraged, setIncludeLeveraged] = useState(false);
   const [loading, setLoading] = useState(true);
   // Distinct from the warming-up/empty state: true only when the last load()
   // actually threw (network/500). Without this, a failed fetch fell through to
@@ -261,6 +270,7 @@ export default function ScannerPage() {
     if (typeof f.sector === "string") changeSector(f.sector);
     if (typeof f.signal === "string") setSignal(f.signal);
     if (typeof f.assetClass === "string") setAssetClass(f.assetClass as AssetBucket);
+    if (typeof f.includeLeveraged === "boolean") setIncludeLeveraged(f.includeLeveraged);
     if (typeof f.search === "string") setSearch(f.search);
   }, [changeSector]);
 
@@ -321,6 +331,11 @@ export default function ScannerPage() {
         src,
       };
       if (assetClass) params.asset_class = assetClass;
+      // Only sent when ticked on. The server excludes these by default, so an
+      // absent param and include_leveraged=false mean the same thing — and
+      // the default lives in exactly one place (the backend) rather than
+      // being restated here where it could drift.
+      if (includeLeveraged) params.include_leveraged = "true";
       if (sector) params.sector = sector;
       if (signal) params.signal = signal;
       if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
@@ -340,7 +355,7 @@ export default function ScannerPage() {
       });
     } catch (e) { console.error(e); setLoadError(true); }
     finally { setLoading(false); }
-  }, [minScore, maxScore, sort, order, sector, signal, assetClass, debouncedSearch]);
+  }, [minScore, maxScore, sort, order, sector, signal, assetClass, includeLeveraged, debouncedSearch]);
 
   useEffect(() => { load(); }, [load]);
   // Inline arrow rather than passing `load` directly, so the automatic
@@ -370,6 +385,9 @@ export default function ScannerPage() {
         order,
       };
       if (assetClass) params.asset_class = assetClass;
+      // Must mirror `load` exactly. The asset_class bug was precisely this:
+      // the on-screen scanner filtered one way and Export downloaded another.
+      if (includeLeveraged) params.include_leveraged = "true";
       if (sector) params.sector = sector;
       if (signal) params.signal = signal;
       if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
@@ -383,7 +401,7 @@ export default function ScannerPage() {
     } finally {
       setExporting(false);
     }
-  }, [canExportCsv, minScore, maxScore, sort, order, sector, signal, assetClass, debouncedSearch]);
+  }, [canExportCsv, minScore, maxScore, sort, order, sector, signal, assetClass, includeLeveraged, debouncedSearch]);
 
   // EVERY filter is server-side now, asset class included, so what came back
   // is exactly what to show. Post-filtering here would spend the tier's row
@@ -492,6 +510,7 @@ export default function ScannerPage() {
     !!sector ||
     !!signal ||
     !!assetClass ||
+    includeLeveraged ||
     !!search.trim();
 
   const resetFilters = () => {
@@ -500,6 +519,7 @@ export default function ScannerPage() {
     changeSector("");
     setSignal("");
     setAssetClass("");
+    setIncludeLeveraged(false);
     setSearch("");
   };
 
@@ -688,6 +708,22 @@ export default function ScannerPage() {
           onChange={(v) => setAssetClass(v as AssetBucket)}
           options={ASSET_OPTIONS}
         />
+        {/*
+         * Leveraged & inverse funds. Off by default, matching the server
+         * (SCANNER_INCLUDE_LEVERAGED_DEFAULT) — the ranked view is not the
+         * place a visitor meets a 2x daily-reset product unannounced.
+         *
+         * COPY RULE: this states a FACT about how a fund is built, in the
+         * same register as "ETFs & funds" above. It is never a judgement —
+         * no "risky", no "avoid", no warning. Same reason the signal labels
+         * are descriptive; see CLAUDE.md.
+         */}
+        <ToggleFilter
+          label="Leveraged & inverse funds"
+          checked={includeLeveraged}
+          onChange={setIncludeLeveraged}
+          hint="Funds built to deliver a multiple (2x, 3x) or the opposite (inverse, short) of an index's daily move. Left out of the ranked list unless included here."
+        />
         <SelectFilter
           label="Sort by"
           value={sort}
@@ -719,7 +755,7 @@ export default function ScannerPage() {
           currentFilters={{
             minScore: minScore === "" ? 0 : minScore,
             maxScore: maxScore === "" ? 100 : maxScore,
-            sort, order, sector, signal, assetClass, search,
+            sort, order, sector, signal, assetClass, includeLeveraged, search,
           }}
           onApply={applyPreset}
         />
@@ -916,6 +952,19 @@ export default function ScannerPage() {
                           the next week. Descriptive ("Reports in 3d"), never
                           prescriptive. */}
                       <EarningsPill reportDate={earningsBySymbol.get(r.symbol)} />
+                      {/* A leveraged/inverse row can only appear here when
+                          the user asked for one, so this labels rather than
+                          warns: a plain structural fact, same register as
+                          the asset class. No colour coding, deliberately —
+                          red would read as a judgement. */}
+                      {r.is_leveraged && (
+                        <span
+                          className="rounded-full border border-border px-1.5 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted"
+                          title="Built to deliver a multiple (2x, 3x) or the opposite (inverse, short) of an index's daily move"
+                        >
+                          Leveraged / inverse
+                        </span>
+                      )}
                     </div>
                     {/* Company name. `name` ships on the scanner row but was
                         previously unused, so the name column read blank. Fall

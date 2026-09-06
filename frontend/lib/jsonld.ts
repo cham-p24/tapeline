@@ -494,16 +494,36 @@ export function scorecardDatasetJsonLd() {
       "public scorecard",
       "stock picking accountability",
     ],
+    // variableMeasured must describe THIS dataset — the rows in the two
+    // DataDownload distributions below — not the product in general.
+    //
+    // It used to list the signal label and all six factor sub-scores. None of
+    // them are in the record: DailyScorecardEntry stores ten columns
+    //   date, rank, symbol, score_at_flag, price_at_flag, price_next_day,
+    //   change_pct_1d_after, spy_change_pct_1d, alpha_vs_spy,
+    //   excluded_from_summary
+    // and `Ticker.reason`, `Ticker.signal` and the six `sub_*` columns are
+    // overwritten every tick and were never copied into it. So there is
+    // nothing to backfill and the claim cannot be made true retroactively —
+    // only the copy can change.
+    //
+    // That mattered more here than in ordinary marketing copy: this block is
+    // what the AEO strategy points at, and AI citation is the only channel
+    // that has produced revenue. An engine ingesting the old version would
+    // tell a reader the scorecard carries a per-factor breakdown for every
+    // historical pick; a reader who downloaded the CSV to check found ten
+    // columns and no factors.
+    //
+    // The six sub-scores ARE public — live, on every ticker page. That claim
+    // is true and stays; it just does not belong in this dataset's schema.
     variableMeasured: [
-      { "@type": "PropertyValue", name: "Tapeline Score", description: "Composite 0–100 score from six named factors", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Signal label", description: "HIGH CONVICTION / STRONG SETUP / CONSTRUCTIVE / NEUTRAL / CAUTION / WEAK" },
-      { "@type": "PropertyValue", name: "Trend factor", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Relative Strength factor", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Fundamentals factor", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Smart Money factor", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Macro factor", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Momentum factor", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Realised 1-day return vs SPY", description: "Pick performance one trading session forward, benchmarked against SPY", unitText: "percent" },
+      { "@type": "PropertyValue", name: "Rank", description: "Position 1-10 in that session's published top ten", minValue: 1, maxValue: 10 },
+      { "@type": "PropertyValue", name: "Tapeline Score", description: "Composite 0-100 score, frozen at publication", minValue: 0, maxValue: 100 },
+      { "@type": "PropertyValue", name: "Price at flag", description: "Official close on the session the pick was published", unitText: "USD" },
+      { "@type": "PropertyValue", name: "Price next day", description: "Official close one trading session later", unitText: "USD" },
+      { "@type": "PropertyValue", name: "Realised 1-day return", description: "Close-to-close price change one session forward", unitText: "percent" },
+      { "@type": "PropertyValue", name: "SPY 1-day return", description: "The same session's SPY close-to-close change, the benchmark leg", unitText: "percent" },
+      { "@type": "PropertyValue", name: "Alpha vs SPY", description: "Realised 1-day return minus the SPY return for the same session", unitText: "percent" },
     ],
     // DataDownload distributions are what makes this eligible for Google
     // Dataset Search and citable by AI crawlers: the machine-readable raw

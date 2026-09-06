@@ -90,15 +90,28 @@ describe("auth pages server-render their heading", () => {
   // prerendering the subtree. With `fallback={null}` the server sent 570
   // bytes and ZERO headings: a blank page on slow connections, and nothing
   // for a screen reader to announce, on the two highest-intent routes.
+  //
+  // /signup has since been fixed properly — its route is rendered per request
+  // so the real form reaches the HTML, not just a heading. See
+  // signupFormIsServerRendered.test.tsx. The fallback below is the remaining
+  // belt-and-braces path, so these assertions stay; they just have to read the
+  // file the form actually lives in now.
+  // Both routes now render per request from a thin server component, so the
+  // form each one owns lives in a sibling file.
+  const formFile = (page: string) =>
+    page === "signup"
+      ? join(APP, "signup", "SignUpForm.tsx")
+      : join(APP, "signin", "SignInForm.tsx");
+
   for (const page of ["signin", "signup"]) {
     it(`/${page} has a non-null Suspense fallback`, () => {
-      const src = readFileSync(join(APP, page, "page.tsx"), "utf8");
+      const src = readFileSync(formFile(page), "utf8");
       expect(src).not.toMatch(/<Suspense fallback=\{null\}>/);
       expect(src).toMatch(/<Suspense fallback=\{<\w+Skeleton\s*\/>\}>/);
     });
 
     it(`/${page} skeleton renders an h1`, () => {
-      const src = readFileSync(join(APP, page, "page.tsx"), "utf8");
+      const src = readFileSync(formFile(page), "utf8");
       const skeleton = src.slice(src.indexOf("Skeleton()"));
       expect(skeleton).toMatch(/<h1/);
     });
@@ -107,7 +120,7 @@ describe("auth pages server-render their heading", () => {
   it("the signup skeleton reads FROM_COPY rather than duplicating the string", () => {
     // A hand-copied headline would drift from the CARD HONESTY block, which
     // is the one piece of copy on this page that must not drift.
-    const src = readFileSync(join(APP, "signup", "page.tsx"), "utf8");
+    const src = readFileSync(formFile("signup"), "utf8");
     const skeleton = src.slice(src.indexOf("function SignUpSkeleton"));
     expect(skeleton).toMatch(/FROM_COPY\._default/);
   });

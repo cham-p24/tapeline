@@ -205,8 +205,13 @@ async def log_and_rate_limit(request: Request, call_next):
     # global-write-volume buckets instead, which is the limit that's actually
     # meaningful here.
     path = request.url.path
+    # `/mcp` is included deliberately. It is mounted OUTSIDE /api/ (main.py's
+    # include_router uses prefix="/mcp"), so for as long as this condition read
+    # `/api/` alone the public MCP server sat outside the limiter entirely —
+    # verified live on 2026-09-06 with 12 rapid anonymous POSTs, all 200. It is
+    # the one unauthenticated, DB-backed write-and-read surface on the box.
     if (
-        path.startswith("/api/")
+        (path.startswith("/api/") or path.startswith("/mcp"))
         and not path.startswith("/api/health")
         and not path.startswith("/api/webhooks/")
         and not path.startswith("/api/embed/")

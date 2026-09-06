@@ -38,21 +38,38 @@ jobs:
       # until 2026-09-05 it never executed in CI even once. A "pick" burned
       # into three ad images ran live for three days behind that gap.
       #
-      # `|| true` on the glob: docs/ads/ may legitimately be empty.
+      # `nullglob` on the globs: an ad-copy directory may legitimately be
+      # empty, and the empty-array branch below says so out loud rather than
+      # letting an unexpanded glob reach the linter as a literal path.
       - name: Copy-compliance lint (ad creative)
         run: |
           shopt -s nullglob globstar
-          # docs/launch/google-ads/ holds paste-ready Google Ads import CSVs.
-          # It was outside this glob until 2026-09-05, and three files in it
-          # carried 16 banned-vocabulary hits and a stale trial length while
-          # pointing every ad at a page removed in #718. Import files are the
-          # highest-consequence copy in the repo: one upload publishes them.
-          # CSV only, NOT the .md runbooks beside them. The runbooks are prose
-          # ABOUT ads: they say "pick one" in ordinary English and quote banned
-          # phrases in order to forbid them. Running the ad-creative ruleset over
-          # them produces pure false positives, and a noisy linter gets disabled.
-          # The CSVs are the hazard class: one upload publishes them verbatim.
-          files=(docs/ads/**/*.md docs/ads/**/*.txt docs/ads/**/*.json \n                 docs/launch/google-ads/**/*.csv)
+          # Every ad-copy directory, one glob per line. NO line continuations:
+          # this list previously ended a line with a literal `\n` where a `\`
+          # was meant, which bash read as the filename `n`. The array became
+          # three entries — one of them nonexistent — the linter skipped the
+          # missing path without a word, and the step exited 0 while
+          # docs/launch/google-ads/*.md and *.txt had never been opened. A
+          # multi-line array literal cannot fail that way.
+          #
+          # docs/launch/google-ads/ holds paste-ready Google Ads import CSVs
+          # AND the runbooks that tell an operator what to paste. Both are the
+          # hazard class: #747 found 16 banned-vocabulary hits, a stale trial
+          # length and a destination removed in #718 in the CSVs, and the same
+          # sweep over the .md/.txt beside them turned up an urgency line
+          # drafted as retargeting creative, a "free trial" merge, and a §3
+          # that still described the card wall #683 removed. Prose that quotes
+          # a banned phrase in order to forbid it carries an inline
+          # `copy-compliance-allow <rule> -- <reason>` marker, which is the
+          # documented escape hatch — silence is not.
+          files=(
+            docs/ads/**/*.md
+            docs/ads/**/*.txt
+            docs/ads/**/*.json
+            docs/launch/google-ads/**/*.csv
+            docs/launch/google-ads/**/*.md
+            docs/launch/google-ads/**/*.txt
+          )
           if [ ${#files[@]} -eq 0 ]; then
             echo "no ad creative files to lint"
           else

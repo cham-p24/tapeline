@@ -43,6 +43,14 @@ type LogEntry = {
 const METHODOLOGY_LOG: LogEntry[] = [
   {
     date: "2026-09-06",
+    kind: "scope",
+    title: "Leveraged and inverse funds no longer qualify for the daily record",
+    body:
+      "The scorecard freezes each day's ten highest-scoring names and back-checks them against SPY. From this date a geared fund — a 2x, 3x, Ultra, inverse or otherwise multiplied ETF — is no longer eligible to be frozen, and is excluded by default from the ranked scanner and its CSV export. It can still be browsed: the scanner carries a control that includes them, and every row states whether the fund is geared. The reason is that a geared fund's one-day move is a multiple of something else's, so comparing it to SPY measures the multiplier rather than the ranking, which is what the record exists to measure. Detection is by fund name, because no vendor field states gearing; the rule is written to under-claim rather than over-claim, so a fund whose name does not disclose its gearing will not be caught. Entries frozen before this date remain exactly as recorded — the archive is append-only and nothing was recomputed or removed — which means a comparison spanning this date crosses two definitions of what could enter the record, and should say so.",
+    ref: "#761",
+  },
+  {
+    date: "2026-09-06",
     kind: "methodology",
     title: "Most tickers were being scored on four of the six factors, and now are not",
     body:
