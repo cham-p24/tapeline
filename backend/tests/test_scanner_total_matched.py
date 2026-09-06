@@ -147,9 +147,20 @@ async def test_total_matched_equals_count_when_under_cap(client):
 
 
 @pytest.mark.asyncio
-async def test_premium_total_matched_is_null(client, monkeypatch):
-    """Premium pages the whole universe — no cap to describe, so total_matched
-    is null rather than a redundant count."""
+async def test_premium_is_told_the_total_too(client, monkeypatch):
+    """Premium gets the real count, not null.
+
+    This test used to assert the opposite, on the stated reasoning that
+    "Premium pages the whole universe — no cap to describe". The endpoint did
+    support paging for paid tiers; the scanner page never used it. It sent a
+    hardcoded ``limit: 100`` and no ``offset``, so a Premium user saw 100 rows,
+    was told nothing about how many matched, and had no control to go further —
+    while the page sold their tier as unlocking "every matching row".
+
+    Withholding the count is only harmless if the client really can walk the
+    whole result. Now that it paginates (PAGE_SIZE in app/app/scanner/page.tsx),
+    the total is what tells the user a second page exists at all.
+    """
     _patch_signup_gates(monkeypatch)
     await _insert(_SECTOR_MANY, _SYMBOLS_MANY)
     try:
@@ -162,8 +173,45 @@ async def test_premium_total_matched_is_null(client, monkeypatch):
             )
             assert r.status_code == 200, r.text
             body = r.json()
-            # Premium sees all 15 rows unpaged, and total_matched is null.
             assert body["count"] == _MANY
-            assert body["total_matched"] is None
+            assert body["total_matched"] == _MANY, (
+                "a paying user was not told how many rows matched, so nothing "
+                "in the response distinguishes 'this is everything' from "
+                "'this is the first page of many'"
+            )
+    finally:
+        await _delete(_SYMBOLS_MANY)
+
+
+@pytest.mark.asyncio
+async def test_premium_can_actually_page_past_the_first_screen(client, monkeypatch):
+    """The paging the tier is sold on, exercised end to end.
+
+    Free/anonymous callers are pinned to offset 0 by the scrape guard; a paid
+    tier must genuinely get different rows at a different offset. Without this,
+    "Pro unlocks every matching row" is a claim nothing tests.
+    """
+    _patch_signup_gates(monkeypatch)
+    await _insert(_SECTOR_MANY, _SYMBOLS_MANY)
+    try:
+        async with client:
+            cookies, uid = await _signup(client)
+            await _set_tier(uid, "premium")
+            first = await client.get(
+                f"/api/scanner?sector={_SECTOR_MANY}&min_score=0&limit=5&offset=0",
+                cookies=cookies,
+            )
+            second = await client.get(
+                f"/api/scanner?sector={_SECTOR_MANY}&min_score=0&limit=5&offset=5",
+                cookies=cookies,
+            )
+            assert first.status_code == second.status_code == 200
+            a = [row["symbol"] for row in first.json()["items"]]
+            b = [row["symbol"] for row in second.json()["items"]]
+            assert len(a) == len(b) == 5
+            assert not set(a) & set(b), (
+                f"offset=5 returned overlapping rows {sorted(set(a) & set(b))} — "
+                f"paging does not advance, so the later rows are unreachable"
+            )
     finally:
         await _delete(_SYMBOLS_MANY)
