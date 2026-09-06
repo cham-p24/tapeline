@@ -91,6 +91,22 @@ export const FREE_LIMITS = {
 } as const;
 
 /**
+ * What a visitor with NO account gets. Mirrors backend/app/services/tier.py
+ * `ANON_DAILY_LOOKUPS`.
+ *
+ * Separate from FREE_LIMITS on purpose — anonymous is not the Free tier, it is
+ * the state before one — but it lives here for the same reason FREE_LIMITS
+ * does: `lib/pricing.ts` is the only place on the client a cap may be written
+ * down (see __tests__/freeCapsComeFromOneSource.test.tsx). A surface that
+ * names the free allowance and the no-account allowance in the same breath —
+ * the look-up meter does — must read both from here, not restate either.
+ */
+export const ANON_LIMITS = {
+  /** Ticker-detail look-ups per UTC day, per IP, with no account. */
+  dailyLookups: 2,
+} as const;
+
+/**
  * Open-access month — mirrors backend tier.py `PROMO_OPEN_ACCESS_UNTIL` +
  * `free_open_access()`, which explicitly asks to be kept in lock-step with this
  * file. Founder experiment (2026-08-08): the Free tier's scanner ROW cap lifts

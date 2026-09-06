@@ -24,6 +24,7 @@ import { SECTORS } from "@/app/sector/sectors";
 import { relatedMatchups, canonicalMatchup } from "@/lib/comparePairs";
 import { useTheme } from "@/components/ThemeProvider";
 import { useUser } from "@/components/UserContext";
+import { ANON_LIMITS } from "@/lib/pricing";
 
 /**
  * In-app scanner, pre-filtered to this sector, if it maps to a known GICS
@@ -60,13 +61,6 @@ export type LookupMeter = {
 };
 
 /**
- * Show the meter once this few look-ups remain. Chosen so a 12/day free user
- * sees it on look-ups 9-12 — enough runway to understand the limit and decide,
- * rather than meeting it for the first time as a 402 wall.
- */
-export const LOOKUP_METER_REMAINING_THRESHOLD = 3;
-
-/**
  * Calm, factual statement of the user's OWN look-up usage.
  *
  * Compliance (docs/COMPLIANCE_COPY_RULES.md R6): this is permitted because it
@@ -77,8 +71,18 @@ export const LOOKUP_METER_REMAINING_THRESHOLD = 3;
  * what the plans do (R1: describes the product, never a market outcome), and
  * stops.
  *
- * Renders nothing when the caller is unmetered or still has runway, so the
- * page is unchanged for everyone except a free user approaching the cap.
+ * IT COUNTS UP FROM LOOK-UP 1 (changed 2026-09-07). It used to appear only
+ * once three or fewer look-ups remained, which meant a free user's first nine
+ * look-ups carried no evidence that an allowance existed at all, and the meter
+ * — introduced precisely so metering wouldn't arrive as a surprise — arrived
+ * as a small surprise of its own. A cap you can see from the start is a
+ * described product; a cap that materialises near the end is a trap. It also
+ * names the no-account allowance, so the value of having signed up is legible
+ * next to the value of paying.
+ *
+ * Renders nothing for an unmetered caller (paid, active trial, or a brand-new
+ * account inside its first-session grace window) — `limit: null` is that
+ * sentinel — and nothing when the backend sent no remaining count.
  */
 export function LookupMeterPill({
   used,
@@ -91,7 +95,6 @@ export function LookupMeterPill({
 }) {
   // Unmetered caller (paid / trial / first-session grace) — nothing to report.
   if (limit == null || remaining == null) return null;
-  if (remaining > LOOKUP_METER_REMAINING_THRESHOLD) return null;
 
   return (
     <div
@@ -106,7 +109,8 @@ export function LookupMeterPill({
       <span aria-hidden="true">·</span>
       <span>
         The free plan includes {limit} detailed look-ups a day, and the count
-        resets tomorrow. Paid plans are not metered.
+        resets tomorrow. Without an account it is {ANON_LIMITS.dailyLookups} a
+        day. Paid plans are not metered.
       </span>
       <Link href="/pricing" className="text-accent hover:underline">
         Compare plans
@@ -436,9 +440,9 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         );
       })()}
 
-      {/* Daily look-up meter — self-hiding unless a metered (free) caller is
-          within LOOKUP_METER_REMAINING_THRESHOLD of the cap. Sits above the
-          fold so the count is seen BEFORE the wall, never as a surprise. */}
+      {/* Daily look-up meter — shown to every metered (free) caller from
+          look-up 1, and to nobody else. Sits above the fold so the allowance
+          is legible before it runs out, never only as it does. */}
       {lookups && (
         <LookupMeterPill
           used={lookups.used}
