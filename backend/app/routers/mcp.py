@@ -242,6 +242,7 @@ async def _tool_daily_picks(args: dict, session: AsyncSession) -> dict:
         min_dollar_volume=SCANNER_MIN_DOLLAR_VOLUME,
         signal=None,
         sector=None,
+        asset_class=None,
         q=None,
         sort="score",
         order="desc",
