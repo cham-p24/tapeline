@@ -25,16 +25,42 @@ import time
 logger = logging.getLogger(__name__)
 
 # Default size of the active scoring universe. Tunable via the env var
-# ACTIVE_UNIVERSE_SIZE (read at module import). 2,500 covers everything
-# liquid down to mid-/small-cap territory; below that the bid-ask spreads
-# make any score non-actionable.
+# ACTIVE_UNIVERSE_SIZE (read at module import).
 #
-# Finnhub fundamentals refresh on the free tier (60 calls/min) takes
-# ~42 minutes for 2,500 names — well under the daily refresh cycle.
-# Bump to 5,000 needs paid Finnhub or a cached-fundamentals approach.
+# 2026-09-07: raised 2,500 -> 12,000, which is above the whole tickers table,
+# so in practice NOTHING scored is cut. It stays an env var as an emergency
+# brake, not as a product decision.
+#
+# The old comment here read: "Finnhub fundamentals refresh on the free tier
+# (60 calls/min) takes ~42 minutes for 2,500 names. Bump to 5,000 needs paid
+# Finnhub or a cached-fundamentals approach." That was true about FUNDAMENTALS
+# and false about this constant, and the confusion cost us most of the product.
+# This list feeds exactly ONE consumer — polygon_feed.fetch_snapshots, which
+# batches 250 symbols per `/v3/snapshot` request. The fundamentals / insider /
+# key-stats passes run DAILY on their own 20-symbol batches and never read this
+# list at all (grep: active_universe has one non-test caller). So the cost of
+# this number is (size / 250) HTTP requests per 60s tick: 2,500 was 11 requests
+# taking ~3s, and the whole scored universe is ~30 requests taking ~8s.
+#
+# What the 2,500 cutoff actually did, measured in production on 2026-09-07:
+# the selection below ranks by `coalesce(volume * price, -1)`, so a row with no
+# volume reading sorts LAST. Below the cutoff it got no snapshot; with no
+# snapshot it never got a volume reading; so it sorted last forever. 3,633
+# scored rows were stuck in that loop, and because the honesty gate in
+# ticker_freshness requires `change_pct_1d IS NOT NULL` (a snapshot field),
+# every one of them was hidden from the scanner. Among them: TSM, Toyota,
+# Sony, Mitsubishi UFJ, HubSpot, Qiagen — 1,389 companies above $2B. Searching
+# "TSM" on Tapeline returned nothing.
+#
+# It was never a data problem. Asked directly, the provider returns all of
+# them, complete, in one batched call (TSM: $427.88, -0.24%, 12.3M shares).
+# We had simply stopped asking.
+#
+# If you lower this again, read test_universe_covers_what_we_score.py first —
+# it fails on exactly the regression described above.
 import os as _os
 
-ACTIVE_UNIVERSE_SIZE = int(_os.environ.get("ACTIVE_UNIVERSE_SIZE", "2500"))
+ACTIVE_UNIVERSE_SIZE = int(_os.environ.get("ACTIVE_UNIVERSE_SIZE", "12000"))
 
 # Extra slots handed to NEVER-SCORED tickers on every refresh, on top of
 # ACTIVE_UNIVERSE_SIZE.
@@ -67,6 +93,11 @@ BOOTSTRAP_SLOTS = int(_os.environ.get("UNIVERSE_BOOTSTRAP_SLOTS", "250"))
 # Module-level cache of (symbol, name, sector) tuples.
 _active_universe: list[tuple[str, str, str]] = []
 _refreshed_at: float = 0.0
+
+# Rotating offset into the never-scored backlog. See the bootstrap block in
+# refresh_active_universe: without it the intake window is pinned to the front
+# of the alphabet and unscoreable symbols block everything behind them.
+_bootstrap_cursor: int = 0
 
 
 async def refresh_active_universe(target_size: int | None = None) -> int:
@@ -119,23 +150,75 @@ async def refresh_active_universe(target_size: int | None = None) -> int:
                 if row[0]
             ]
 
+            # A binding cap is the failure mode that hid TSM, Toyota and Sony
+            # for months, and it hid them SILENTLY — the universe simply
+            # stopped at 2,500 and nothing said so. If the limit ever bites
+            # again, say it loudly and name what fell off the end, because the
+            # rows it drops are the ones with no volume reading and they can
+            # never climb back into range on their own.
+            if len(rows) >= size:
+                total_scored = (
+                    await session.execute(
+                        select(func.count())
+                        .select_from(Ticker)
+                        .where(Ticker.score.is_not(None))
+                    )
+                ).scalar_one()
+                if total_scored > size:
+                    logger.warning(
+                        "universe.capped size=%d scored=%d hidden=%d — %d scored "
+                        "tickers get no snapshot, so no change_pct_1d, so the "
+                        "scanner cannot show them. Raise ACTIVE_UNIVERSE_SIZE.",
+                        size, total_scored, total_scored - size, total_scored - size,
+                    )
+
             # Bootstrap slots for never-scored tickers. See BOOTSTRAP_SLOTS —
             # without this the `score IS NOT NULL` predicate above makes the
             # universe unable to grow, because a ticker needs a snapshot to
             # earn a score and needs a score to be snapshotted.
             #
-            # Ordered by symbol so the intake is deterministic and every
-            # discovered ticker gets its turn: once a symbol is scored it
+            # Ordered by symbol so the intake is deterministic, and WINDOWED by
+            # a rotating cursor so it actually drains.
+            #
+            # The original comment here claimed "once a symbol is scored it
             # drops out of this query, so the next refresh picks up where this
-            # one left off rather than re-offering the same names.
+            # one left off". That only holds for symbols that CAN be scored. A
+            # symbol the provider has no data for never scores, never drops
+            # out, and — being alphabetically early — occupies the same slot on
+            # every refresh, forever. Verified in production on 2026-09-07:
+            # 4,414 unscored rows, and the worker log showed the same window
+            # (ACQQ, ACRT, ACSP, ADAMK, ADBT, ADIGW, ...) going out tick after
+            # tick. The intake was pinned to the front of the alphabet and the
+            # other ~4,150 had never once been looked at.
+            #
+            # The cursor advances a window per refresh and wraps, so every
+            # unscored ticker gets its turn regardless of whether the ones
+            # ahead of it are scoreable. At 250 slots on the hourly refresh the
+            # whole backlog is offered inside a day.
             if BOOTSTRAP_SLOTS > 0:
+                global _bootstrap_cursor
                 seen = {row[0] for row in rows}
+                unscored_total = (
+                    await session.execute(
+                        select(func.count())
+                        .select_from(Ticker)
+                        .where(Ticker.score.is_(None))
+                    )
+                ).scalar_one()
+                # Wrap before use so the offset can never run past the end and
+                # return an empty window (which would stall intake silently).
+                if unscored_total:
+                    _bootstrap_cursor %= unscored_total
+                else:
+                    _bootstrap_cursor = 0
                 b = await session.execute(
                     select(Ticker.symbol, Ticker.name, Ticker.sector)
                     .where(Ticker.score.is_(None))
                     .order_by(Ticker.symbol.asc())
+                    .offset(_bootstrap_cursor)
                     .limit(BOOTSTRAP_SLOTS)
                 )
+                _bootstrap_cursor += BOOTSTRAP_SLOTS
                 added = [
                     (row[0], row[1] or row[0], row[2] or "Unknown")
                     for row in b.all()

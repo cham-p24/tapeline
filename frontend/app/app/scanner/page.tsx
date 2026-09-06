@@ -138,9 +138,24 @@ const TUNE_DISMISSED_KEY = "tapeline_scanner_sector_tune_dismissed";
 // live in lib/gtag.ts as trackFirstTickerAdded(), shared with the watchlist
 // and ticker pages — adds from those two surfaces used to go uncounted.)
 
+// Rows fetched per request. 200 is /api/scanner's hard `le=200` ceiling.
+//
+// This was a hardcoded `limit: 100` with no `offset` ever sent, which meant no
+// user on any tier could see past row 100 — while the copy below sold Pro as
+// unlocking "every matching row" of a universe the same page called ~2,500.
+// The endpoint had supported `offset` for paying tiers the whole time; the page
+// simply never asked. Paging (rather than appending) keeps this compatible with
+// useLiveStream, which refetches on every SSE tick: the refetch re-reads the
+// page the user is actually looking at.
+const PAGE_SIZE = 200;
+
 export default function ScannerPage() {
   const { user } = useUser();
   const [rows, setRows] = useState<ScannerRow[]>([]);
+  // 0-based page index. Free/anonymous callers are pinned to page 0 server-side
+  // (the offset scrape guard in routers/scanner.py), so the controls below only
+  // render for tiers that can actually paginate.
+  const [page, setPage] = useState(0);
   // Server-computed gating facts from /api/scanner. Free users come back
   // capped to the top rows (row_cap) with live scores (data_delayed_minutes
   // is 0); Pro/Premium get the full universe. Drives the inline upgrade hint
@@ -150,8 +165,11 @@ export default function ScannerPage() {
     rowCap: number;
     delayMinutes: number;
     // Real count of ALL rows matching the current filters, before the Free row
-    // cap (server-reported; null for Pro/Premium and until the first load
-    // resolves). Drives the locked-remainder band below the table.
+    // cap. Server-reported for EVERY tier since 2026-09-07 (it used to be null
+    // for Pro/Premium, on the reasoning that they paginate the whole universe
+    // — which was untrue while this page sent a fixed `limit: 100` and no
+    // `offset`). Null only until the first load resolves. Drives both the
+    // "of N" total beside the row count and the locked-remainder band below.
     totalMatched: number | null;
   } | null>(null);
   const [minScore, setMinScore] = useState<number | "">(0);
@@ -327,7 +345,8 @@ export default function ScannerPage() {
         max_score: maxScore === "" ? 100 : maxScore,
         sort,
         order,
-        limit: 100,
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
         src,
       };
       if (assetClass) params.asset_class = assetClass;
@@ -355,7 +374,26 @@ export default function ScannerPage() {
       });
     } catch (e) { console.error(e); setLoadError(true); }
     finally { setLoading(false); }
-  }, [minScore, maxScore, sort, order, sector, signal, assetClass, includeLeveraged, debouncedSearch]);
+  }, [minScore, maxScore, sort, order, sector, signal, assetClass, includeLeveraged, debouncedSearch, page]);
+
+  // Any change to the filters invalidates the page number: narrowing a 3,000-row
+  // result to 40 rows while sitting on page 5 would otherwise fetch offset 1000
+  // and render an empty table that reads as "no matches" rather than "you are
+  // past the end".
+  //
+  // Adjusted during render rather than in an effect — React's documented
+  // pattern for state derived from other state. An effect would commit the
+  // stale page first, fire a fetch for it, then reset and fetch again: two
+  // requests and a visible flash of the wrong page.
+  const filterKey = JSON.stringify([
+    minScore, maxScore, sort, order, sector, signal, assetClass,
+    includeLeveraged, debouncedSearch,
+  ]);
+  const [lastFilterKey, setLastFilterKey] = useState(filterKey);
+  if (filterKey !== lastFilterKey) {
+    setLastFilterKey(filterKey);
+    setPage(0);
+  }
 
   useEffect(() => { load(); }, [load]);
   // Inline arrow rather than passing `load` directly, so the automatic
@@ -599,6 +637,22 @@ export default function ScannerPage() {
   // stay consistent and don't suppress the band.)
   const showLockedRemainder = lockedRemainder > 0;
 
+  // Pagination. Free/anonymous are pinned to offset 0 by the server's scrape
+  // guard, so offering them Next would silently re-serve page 1 — the locked
+  // remainder band below is their honest affordance instead.
+  const canPaginate = meta?.tier === "pro" || meta?.tier === "premium";
+  const totalPages =
+    meta?.totalMatched != null
+      ? Math.max(1, Math.ceil(meta.totalMatched / PAGE_SIZE))
+      : null;
+  // Trust the row count over the total when deciding whether a next page
+  // exists: a full page means there is more to fetch even if total_matched is
+  // momentarily stale between ticks.
+  const hasNextPage =
+    canPaginate &&
+    (rows.length >= PAGE_SIZE ||
+      (totalPages != null && page + 1 < totalPages));
+
   // Funnel: the locked-remainder band IS an upgrade prompt becoming visible.
   // Fire upgrade_prompt_shown when it first appears (keyed on the boolean so a
   // 60s refresh that keeps it up doesn't re-fire), closing the chain
@@ -679,7 +733,26 @@ export default function ScannerPage() {
           client-side post-filter. */}
       <FilterBar
         trailing={
-          <>Showing <strong className="text-fg">{visibleRows.length}</strong> · updates live</>
+          <>
+            Showing{" "}
+            <strong className="text-fg">
+              {canPaginate && page > 0
+                ? `${(page * PAGE_SIZE + 1).toLocaleString()}–${(
+                    page * PAGE_SIZE + visibleRows.length
+                  ).toLocaleString()}`
+                : visibleRows.length.toLocaleString()}
+            </strong>
+            {/* The total is now reported to every tier. It was withheld from
+                Pro/Premium on the reasoning that they "page the whole
+                universe" — which this page made false by never paginating.
+                Every filter this page applies is a server-side param, so
+                total_matched reflects all of them and cannot disagree with
+                the count on its left. */}
+            {meta?.totalMatched != null && (
+              <> of <strong className="text-fg">{meta.totalMatched.toLocaleString()}</strong></>
+            )}{" "}
+            · updates live
+          </>
         }
       >
         {/* Symbol/name search — widest, primary. Server-side substring match. */}
@@ -1033,6 +1106,34 @@ export default function ScannerPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Pager. Only for tiers the server lets paginate — Free/anon are pinned
+          to offset 0 by the scrape guard, and their honest affordance is the
+          locked-remainder band below, not a Next button that re-serves page 1. */}
+      {canPaginate && (page > 0 || hasNextPage) && (
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            className="btn btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={page === 0 || loading}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+          >
+            ← Previous
+          </button>
+          <span className="text-sm text-muted">
+            Page <strong className="text-fg">{page + 1}</strong>
+            {totalPages != null && <> of {totalPages.toLocaleString()}</>}
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost text-sm disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!hasNextPage || loading}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next →
+          </button>
+        </div>
+      )}
 
       {/* "Show don't hide" locked remainder — Free users see the shape of the
           rest of the ranked universe (locked/blurred factor columns) plus the

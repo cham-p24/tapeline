@@ -65,16 +65,37 @@ describe("the scanner universe size is single-sourced", () => {
     }
   });
 
-  it("the constant still matches the backend it mirrors", () => {
-    // lib/universe.ts documents itself as mirroring ACTIVE_UNIVERSE_SIZE. If
-    // the backend default moves and this does not, every public surface is
-    // wrong together — which is tidier than today but no more true.
+  it("copy never claims more tickers than the backend can snapshot", () => {
+    // This asserted EQUALITY with ACTIVE_UNIVERSE_SIZE while that constant was
+    // the number of tickers the worker scored each tick, so the two genuinely
+    // were the same quantity.
+    //
+    // Since #763 it is not. ACTIVE_UNIVERSE_SIZE is now a snapshot CEILING set
+    // deliberately above the whole tickers table, so that no scored row can
+    // fall below the cut and get stranded without the volume reading it needs
+    // to climb back (that loop is what hid TSM, Toyota and Sony). A ceiling is
+    // not a count, and equality would now force copy to claim 12,000 tickers
+    // we do not score — the exact "6,600+ scored tickers" mistake this file's
+    // header describes shipping and reverting on 2026-09-01, one order of
+    // magnitude worse.
+    //
+    // What survives is the one-directional invariant, which is the half that
+    // was ever load-bearing: we cannot score more than we snapshot, so the copy
+    // number must never exceed the ceiling. Being UNDER it is safe — it
+    // understates the product, and understating is the right direction to be
+    // wrong in. The honest figure is measured against production and written
+    // into ACTIVE_SCORED_TICKERS deliberately, not derived from a config knob.
     const py = readFileSync(
       join(ROOT, "..", "backend", "app", "services", "universe.py"),
       "utf8",
     );
     const m = /ACTIVE_UNIVERSE_SIZE\s*=\s*int\(\s*_os\.environ\.get\(\s*"ACTIVE_UNIVERSE_SIZE"\s*,\s*"(\d+)"/.exec(py);
     expect(m, "could not read ACTIVE_UNIVERSE_SIZE from universe.py").toBeTruthy();
-    expect(Number(m![1])).toBe(ACTIVE_SCORED_TICKERS);
+    expect(
+      ACTIVE_SCORED_TICKERS,
+      `copy claims ${ACTIVE_SCORED_TICKERS} actively scored tickers but the ` +
+        `worker only snapshots ${m![1]} — the extra ones cannot be scored, ` +
+        `so the claim is false`,
+    ).toBeLessThanOrEqual(Number(m![1]));
   });
 });

@@ -342,19 +342,27 @@ async def list_scanner(
     # leaking any of the held-back symbols or scores (it's a COUNT of existing
     # data, never new rows; the offset scrape guard stays fully intact).
     #
-    # Only computed for the non-paginating (Free/anon) tiers — Pro/Premium page
-    # the whole universe and have no cap to describe. And skipped entirely when
-    # the page wasn't even full: len(rows) < limit at offset 0 means we've
-    # already returned every matching row, so total_matched == len(rows) with no
-    # extra COUNT query. The COUNT only fires on a genuinely capped page (the
-    # same condition that records the durable cap-hit below).
+    # 2026-09-07: now computed for EVERY tier, not just the capped ones.
+    #
+    # The old restriction reasoned that "Pro/Premium page the whole universe and
+    # have no cap to describe". True of this endpoint, false of the product: the
+    # scanner page sent a hardcoded `limit: 100` and never sent `offset` at all,
+    # so nobody on any tier ever saw more than 100 rows, while the page copy
+    # sold Pro as unlocking "every matching row". Withholding the count from the
+    # tier that pays for the full universe also left them no way to know a
+    # second page existed.
+    #
+    # Still skipped when the page wasn't even full: len(rows) < limit means we
+    # already returned every matching row from this offset, so the count is
+    # known without a COUNT query. On a paginating tier that shortcut is only
+    # valid at offset 0 — deeper in, a short page means we reached the END, and
+    # the total is offset + len(rows), not len(rows).
     total_matched: int | None = None
-    if not is_paginating_tier:
-        if len(rows) < limit:
-            total_matched = len(rows)
-        else:
-            count_stmt = select(func.count()).select_from(filtered_stmt.subquery())
-            total_matched = int((await session.execute(count_stmt)).scalar_one())
+    if len(rows) < limit:
+        total_matched = offset + len(rows)
+    else:
+        count_stmt = select(func.count()).select_from(filtered_stmt.subquery())
+        total_matched = int((await session.execute(count_stmt)).scalar_one())
 
     # ── Cap-hit instrumentation (free tier only) ─────────────────────────────
     # A logged-in FREE user whose result FILLED the row cap is being refused the
