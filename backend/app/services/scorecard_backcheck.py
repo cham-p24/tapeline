@@ -35,6 +35,8 @@ Two design decisions worth knowing:
 from __future__ import annotations
 
 import logging
+import os as _os
+import time
 from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
@@ -445,7 +447,34 @@ async def backcheck_yesterday(session: AsyncSession, as_of_override: date | None
     return scored
 
 
-async def backcheck_all_pending(session: AsyncSession, max_dates: int = 60) -> int:
+#: Wall-clock budget for one drain, in seconds.
+#:
+#: `max_dates` bounds DATES, not TIME, and the two came apart badly. Each date
+#: costs an SPY fetch plus a per-symbol fetch for every entry, many of which
+#: come back empty and are retried across the following dates
+#: (`backcheck.fetch_close_empty`). With `max_attempts = max_dates * 3`, one
+#: drain can spend 180 sequential HTTP round-trips — minutes — inside a tick
+#: the worker kills at 60 seconds.
+#:
+#: Observed in production 2026-09-07: `tick.timeout consecutive=5` and
+#: `tick.timeout_streak`, with 23 `/v2/aggs/ticker/` fetches in a three-minute
+#: window. The tick was being killed before anything below the back-check ran,
+#: which included the sheet refresh — so a fix to the sheet parser deployed
+#: and then simply never executed. The snapshots at the top of the tick kept
+#: working, so from the outside the worker looked alive.
+#:
+#: Stopping early is safe by construction and is what this function already
+#: promises: unfinished dates keep `price_next_day IS NULL` and are picked up
+#: on the next run. 20s leaves the rest of a 60s tick room to finish.
+BACKCHECK_BUDGET_SECONDS = float(_os.environ.get("BACKCHECK_BUDGET_SECONDS", "20"))
+
+
+async def backcheck_all_pending(
+    session: AsyncSession,
+    max_dates: int = 60,
+    *,
+    budget_seconds: float | None = None,
+) -> int:
     """Drain the back-check backlog: score every prior date that still has
     entries without a next-day price.
 
@@ -461,6 +490,11 @@ async def backcheck_all_pending(session: AsyncSession, max_dates: int = 60) -> i
     fetch) so a large backlog can't stall the worker loop; remaining dates are
     picked up on subsequent runs. Dates whose next trading day hasn't happened
     yet are skipped cheaply inside `backcheck_yesterday` (returns 0).
+
+    `budget_seconds` caps the same work by WALL CLOCK, which is the bound that
+    actually protects the caller — see BACKCHECK_BUDGET_SECONDS. A date cap
+    cannot know how many fetches a date will cost, and this runs inside a tick
+    that is killed at 60 seconds.
 
     Structurally-unscorable dates (see `_TERMINAL_DATES`) are the reason the
     candidate query is no longer `LIMIT max_dates`. Those dates sort oldest and
@@ -480,9 +514,12 @@ async def backcheck_all_pending(session: AsyncSession, max_dates: int = 60) -> i
     if not pending_dates:
         return 0
 
+    budget = BACKCHECK_BUDGET_SECONDS if budget_seconds is None else budget_seconds
+    started = time.monotonic()
     max_attempts = max_dates * 3
     total = 0
     attempts = 0
+    budget_hit = False
     scorable_attempts = 0
     skipped_terminal = 0
     newly_terminal = 0
@@ -492,6 +529,13 @@ async def backcheck_all_pending(session: AsyncSession, max_dates: int = 60) -> i
             skipped_terminal += 1
             continue
         if scorable_attempts >= max_dates or attempts >= max_attempts:
+            break
+        # Checked BEFORE starting a date, never mid-date: a date is scored as a
+        # unit and abandoning one part-way would leave some of its entries
+        # scored and the rest not, which the pending-date query reads as "still
+        # pending" and would re-fetch from scratch every run.
+        if budget > 0 and time.monotonic() - started >= budget:
+            budget_hit = True
             break
         attempts += 1
         total += await backcheck_yesterday(session, as_of_override=d)
@@ -504,7 +548,8 @@ async def backcheck_all_pending(session: AsyncSession, max_dates: int = 60) -> i
 
     logger.info(
         "backcheck.drain pending_dates=%d attempted=%d scored=%d "
-        "skipped_terminal=%d newly_terminal=%d",
+        "skipped_terminal=%d newly_terminal=%d elapsed=%.1fs budget_hit=%s",
         len(pending_dates), attempts, total, skipped_terminal, newly_terminal,
+        time.monotonic() - started, budget_hit,
     )
     return total
