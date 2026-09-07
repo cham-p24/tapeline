@@ -3,6 +3,29 @@
 **Status: DRAFTED, NOT SENT.** Nothing in this document has been emailed to anyone.
 Five decisions in §7 are the founder's and are not made here.
 
+> ## ⚠️ THE INSTRUMENT IN §2 IS SUPERSEDED — read `SURVEY_METHODOLOGY.md` first
+>
+> This draft was optimised for response rate before anyone did the sample-size
+> arithmetic. Done properly (2026-09-07, from primary sources), it changes the
+> conclusion rather than refining it:
+>
+> - **~6 responses expected** (80% interval 3–9). At n=8 only nine percentages
+>   exist and each respondent is worth 12.5 points. A 95% Wilson interval on
+>   "5 of 8" is 31–86%. **Even a 100% response rate from all 22 gives ±19 points.**
+> - **The Sean Ellis PMF item cannot be run at all** — its own screen (used the core
+>   product twice, in the last two weeks) leaves a qualifying frame of 4–6 people.
+>   The missing frame *is* the finding.
+> - **Van Westendorp is 6–50× below every published floor.** Its "optimal price"
+>   would literally be one respondent's typed number.
+> - **The survey is demoted to a recruiting instrument**: one tap, two open boxes,
+>   and an ask for a 20-minute call. The interview gate is 0 of 6, and that — not
+>   measurement — is the bottleneck.
+> - **The three cancellations and two live trials get phone calls, not a form.**
+>   They are five named people with dates, inside the 30–90 day memory window.
+>
+> §1 (audience), §3 (mechanism), §5 (results protocol) and §7 (founder decisions)
+> below all still stand. §2 and §4 do not.
+
 Designed 2026-09-07 by a three-way design bake-off scored by three independent
 judges (research rigour, founder pragmatism, legal). All three picked the same
 design: the short one. The long ones scored equally on decision value and half as
@@ -17,11 +40,18 @@ Measured against the live database, 2026-09-07.
 
 | | |
 |---|---|
-| All accounts | 34 |
-| − internal (`owner@tapeline.io`, the founder's personal gmail, the ads contractor who signed up 2026-09-07) | 31 |
-| − `re_sunset` (8) | **23** |
-| − one duplicate (`waadrabeemm@` / `waadrabeema@`, registered 36 seconds apart) | **22 people** |
+| All accounts | 35 |
+| − internal (`owner@tapeline.io`, the founder's personal gmail, the ads contractor who signed up 2026-09-07) | 32 |
+| − `re_sunset` (8) | **24** |
+| − one duplicate (`waadrabeemm@` / `waadrabeema@`, registered 36 seconds apart) | **23 people** |
 | of whom have ever put a card down | **5** |
+| of whom are paying or trialing *right now* | **2** — both trials, charging 12 and 14 Sep |
+
+Recounted at 2026-09-07 07:51 UTC; one new signup landed during the day. The numbers
+that matter more than the headline: **8** accounts have ever performed a real product
+action, and **22 of 32** never came back after their signup day. Most of this list
+cannot answer a question about using the product, because they never used it twice.
+That is an activation problem, not a retention one, and it bounds what any survey can ask.
 
 **Why the 8 sunset accounts are excluded.** `services/lifecycle.py:107` — a user who
 received two re-engagement touches and stayed dormant is stamped `re_sunset`, and
