@@ -3135,7 +3135,7 @@ async def _seed_calendar() -> None:
     refresh so stale events drop off naturally — Finnhub returns the rolling
     window, no need to track which rows were inserted previously.
     """
-    from sqlalchemy import delete
+    from sqlalchemy import delete, insert
 
     from app.models import EarningsEvent, IPOEvent
     from app.services.calendar_feed import upcoming_earnings, upcoming_ipos
@@ -3152,18 +3152,31 @@ async def _seed_calendar() -> None:
     ipos = await upcoming_ipos()
     earnings = await upcoming_earnings()
 
+    # BULK insert, not `session.add()` per row.
+    #
+    # Finnhub returns ~3,400 earnings events and the ORM emits one INSERT per
+    # added instance, so this was ~3,400 sequential round-trips to a remote
+    # database inside a 60s tick. It never finished: `calendar.refreshed`
+    # appears nowhere in the production logs, and on 2026-09-07 the worker was
+    # reporting `tick.timeout ... stage=calendar_seed` with a climbing
+    # consecutive count.
+    #
+    # #777 fixed the CONSEQUENCE — stamping the cadence before the work, so a
+    # cancelled job costs one cycle instead of wedging every job behind it
+    # forever. It did not make this job finish. Left alone, the calendar seed
+    # would still be killed at 60s on each daily attempt and the earnings
+    # window would never refresh again; the failure just stops being other
+    # jobs' problem. One executemany per table is what makes it complete.
     async with session_scope() as session:
         if ipos:
             await session.execute(delete(IPOEvent))
-            for row in ipos:
-                session.add(IPOEvent(**row))
+            await session.execute(insert(IPOEvent), ipos)
         else:
             logger.warning("calendar.ipos_empty — keeping the previous window")
 
         if earnings:
             await session.execute(delete(EarningsEvent))
-            for row in earnings:
-                session.add(EarningsEvent(**row))
+            await session.execute(insert(EarningsEvent), earnings)
         else:
             logger.warning("calendar.earnings_empty — keeping the previous window")
 
