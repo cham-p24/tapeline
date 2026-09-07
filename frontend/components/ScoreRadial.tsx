@@ -35,18 +35,47 @@ type Props = {
   showCenter?: boolean;
   /** Show factor labels around the outside. Default true. */
   showLabels?: boolean;
+  /**
+   * Asset class of the row, e.g. "equity" | "etf" | "crypto".
+   *
+   * Drives the "cannot exist" wording on absent spokes. Without it every gap
+   * reads as "no reading held", which is wrong for a fund or a coin and makes
+   * the product look short of data where it is simply telling the truth about
+   * the instrument.
+   */
+  assetClass?: string | null;
 };
 
 // Descending weight order (Trend heaviest through Momentum lightest); exact
 // weights are intentionally not encoded here.
+//
+// `short` is what a READER sees. It used to be the internal shorthand — RS,
+// Fund, SM, Mom — which is precise to us and opaque to everyone else, on a
+// public page whose whole job is making a company legible at a glance. The
+// comparison that prompted this: Simply Wall St labels its five axes Value,
+// Future, Past, Health, Dividend. Plain words, no glossary.
+//
+// `full` is the exact factor name, kept for the tooltip and the accessible
+// label so nothing is lost — a reader who wants "Relative Strength" can still
+// get it, they just are not required to know it first.
 const FACTORS = [
-  { key: "trend",        short: "Trend" },
-  { key: "rs",           short: "RS" },
-  { key: "fundamentals", short: "Fund" },
-  { key: "smart_money",  short: "SM" },
-  { key: "macro",        short: "Macro" },
-  { key: "momentum",     short: "Mom" },
+  { key: "trend",        short: "Trend",      full: "Trend" },
+  { key: "rs",           short: "Strength",   full: "Relative Strength" },
+  { key: "fundamentals", short: "Financials", full: "Fundamentals" },
+  { key: "smart_money",  short: "Insiders",   full: "Smart Money" },
+  { key: "macro",        short: "Market",     full: "Macro" },
+  { key: "momentum",     short: "Momentum",   full: "Momentum" },
 ] as const;
+
+//: Factors that cannot exist for an instrument, as opposed to ones we merely
+//: failed to read. A token has no revenue and no directors filing with the
+//: SEC; an index fund has no revenue either. "We have no reading" and "there
+//: is nothing to read" are different facts and a picture that renders them
+//: identically is hiding one of them.
+const NOT_APPLICABLE_BY_CLASS: Record<string, readonly string[]> = {
+  crypto: ["fundamentals", "smart_money"],
+  etf: ["fundamentals", "smart_money"],
+};
 
 export function ScoreRadial({
   trend, rs, fundamentals, smart_money, macro, momentum,
@@ -54,7 +83,11 @@ export function ScoreRadial({
   size = 220,
   showCenter = true,
   showLabels = true,
+  assetClass = null,
 }: Props) {
+  const inapplicable = new Set(
+    NOT_APPLICABLE_BY_CLASS[(assetClass ?? "").trim().toLowerCase()] ?? [],
+  );
   const values: Record<string, Sub> = {
     trend, rs, fundamentals, smart_money, macro, momentum,
   };
@@ -201,7 +234,13 @@ export function ScoreRadial({
             data-missing={missing ? "true" : undefined}
             className="text-muted"
           >
-            {missing && <title>{`${f.short}: no reading held`}</title>}
+            {missing && (
+              <title>
+                {inapplicable.has(f.key)
+                  ? `${f.full}: does not apply to this asset class`
+                  : `${f.full}: no reading held`}
+              </title>
+            )}
           </line>
         );
       })}
@@ -255,6 +294,13 @@ export function ScoreRadial({
               : anchor === "start"
                 ? Math.min(p.x, size - approxWidth - 2)
                 : p.x;
+          // A gap you have to hover to notice is a gap the picture is hiding.
+          // The dashed spoke already carries the fact; dimming the label puts
+          // it where the eye lands, and the title says WHICH kind of gap —
+          // "we hold no reading" and "this cannot exist for a fund" are
+          // different statements about the product.
+          const isMissing = values[f.key] == null;
+          const cannotExist = isMissing && inapplicable.has(f.key);
           return (
             <text
               key={f.key}
@@ -263,9 +309,18 @@ export function ScoreRadial({
               textAnchor={anchor}
               dominantBaseline="middle"
               className="fill-current text-muted"
-              style={{ fontSize }}
+              style={{ fontSize, opacity: isMissing ? 0.45 : undefined }}
+              data-missing={isMissing ? "true" : undefined}
+              data-not-applicable={cannotExist ? "true" : undefined}
             >
               {f.short}
+              {isMissing && (
+                <title>
+                  {cannotExist
+                    ? `${f.full}: does not apply to this asset class`
+                    : `${f.full}: no reading held`}
+                </title>
+              )}
             </text>
           );
         })}
