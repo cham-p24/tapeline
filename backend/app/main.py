@@ -42,6 +42,7 @@ from app.routers import (
     search,
     squeeze,
     stream,
+    survey,
     ticker,
     watchlist,
     webhooks,
@@ -1079,6 +1080,11 @@ app.include_router(export.router, prefix="/api/export", tags=["export"])
 app.include_router(inbox.router, prefix="/api/inbox", tags=["inbox"])
 app.include_router(briefing.router, prefix="/api/briefing", tags=["briefing"])
 app.include_router(contact.router, prefix="/api/contact", tags=["contact"])
+# Customer survey. PUBLIC and unauthenticated on purpose: 22 of 32 external
+# accounts never returned after signup day, so a sign-in wall in front of the
+# ask would be asking a dormant user to do two things — and the email promises
+# the link does not identify them. See routers/survey.py.
+app.include_router(survey.router, prefix="/api", tags=["survey"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])
 app.include_router(internal.router, prefix="/api/internal", tags=["internal"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])

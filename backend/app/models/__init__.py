@@ -21,6 +21,7 @@ from app.models.score_snapshot import ScoreSnapshot
 from app.models.scorecard import DailyScorecardEntry
 from app.models.signin_code import SigninCode
 from app.models.squeeze import SqueezeSetup
+from app.models.survey import SurveyResponse
 from app.models.telegram_token import TelegramLinkToken
 from app.models.ticker import Ticker
 from app.models.user import AlertEvent, AlertRule, MfaRecoveryCode, Subscription, User
@@ -60,6 +61,7 @@ __all__ = [
     "SqueezeSetup",
     "StripeWebhookEvent",
     "Subscription",
+    "SurveyResponse",
     "TelegramLinkToken",
     "Ticker",
     "User",
