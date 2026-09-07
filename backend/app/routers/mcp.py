@@ -184,7 +184,7 @@ TOOLS: list[dict[str, Any]] = [
 # ── tool implementations ────────────────────────────────────────────────────
 
 async def _tool_ticker_score(args: dict, session: AsyncSession) -> dict:
-    symbol = clean_symbol(args.get("symbol"))
+    symbol = clean_symbol(args.get("symbol"), allow_crypto=True)
     if symbol is None:
         return {"error": "That is not a valid ticker symbol."}
     ticker = (
@@ -332,7 +332,7 @@ async def _tool_track_record(_args: dict, session: AsyncSession) -> dict:
 async def _tool_ticker_record(args: dict, session: AsyncSession) -> dict:
     from app.routers.scorecard import get_scorecard_for_symbol
 
-    symbol = clean_symbol(args.get("symbol"))
+    symbol = clean_symbol(args.get("symbol"), allow_crypto=True)
     if symbol is None:
         return {"error": "That is not a valid ticker symbol."}
     record = await get_scorecard_for_symbol(

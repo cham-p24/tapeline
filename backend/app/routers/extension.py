@@ -108,7 +108,7 @@ async def ticker(
     _user: User = Depends(extension_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    cleaned = clean_symbol(symbol)
+    cleaned = clean_symbol(symbol, allow_crypto=True)
     if cleaned is None:
         raise HTTPException(404, "Not a valid ticker symbol.")
     row = (
@@ -142,7 +142,7 @@ async def record(
     """This ticker's history in the published record — losses included."""
     from app.routers.scorecard import get_scorecard_for_symbol
 
-    cleaned = clean_symbol(symbol)
+    cleaned = clean_symbol(symbol, allow_crypto=True)
     if cleaned is None:
         raise HTTPException(404, "Not a valid ticker symbol.")
     # `user`, not None. This endpoint is already authenticated, and passing

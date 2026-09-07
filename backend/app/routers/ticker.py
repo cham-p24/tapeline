@@ -525,7 +525,14 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
     # fabricated page + a duplicate-content /t/🏆 IVV URL for Google.
     # clean_symbol also strips + uppercases. Mirrors the ingestion chokepoint in
     # sheet_feed. (Re-applied after a concurrent ticker.py revert dropped it.)
-    cleaned = clean_symbol(symbol)
+    #
+    # allow_crypto: SERVING a namespaced pair is not the risk the opt-in
+    # guards against. That guard exists so a human-typed sheet cell cannot
+    # INGEST "SOL" as a coin and overwrite Emeren Group; a lookup of the
+    # already-namespaced "X:BTCUSD" cannot collide with anything, because the
+    # prefix is exactly what makes it distinct. Without this the coins were
+    # scored, searchable, in the scanner — and every one of their pages 404'd.
+    cleaned = clean_symbol(symbol, allow_crypto=True)
     if cleaned is None:
         raise HTTPException(404, f"Ticker {symbol!r} is not a valid symbol")
     symbol = cleaned
@@ -893,7 +900,7 @@ async def ticker_financials(symbol: str) -> dict:
     # /{symbol} — which this docstring calls the same access surface — already
     # 404s an unknown symbol without any upstream call. Matching it caps both the
     # vendor calls and the cache files at the size of the scored universe.
-    cleaned = clean_symbol(symbol)
+    cleaned = clean_symbol(symbol, allow_crypto=True)
     if cleaned is None:
         raise HTTPException(404, f"Ticker {symbol!r} is not a valid symbol")
     sym = cleaned
