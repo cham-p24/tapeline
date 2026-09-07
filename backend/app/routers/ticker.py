@@ -179,6 +179,19 @@ async def _fetch_ticker_news(symbol: str) -> list[dict]:
                     text(f"SET LOCAL statement_timeout = '{NEWS_QUERY_TIMEOUT_MS}ms'")
                 )
             cutoff = datetime.now(UTC) - timedelta(days=NEWS_LOOKBACK_DAYS)
+            # A crypto pair is stored namespaced (X:BTCUSD) but the vendor tags
+            # its news with the bare base symbol. Verified 2026-09-07:
+            # ?ticker=X:BTCUSD returns nothing, ?ticker=BTC returns "Bitcoin
+            # Leads Crypto Surge on Tuesday".
+            #
+            # Translated through an ALLOWLIST, never by stripping the prefix.
+            # "SOL" in a news feed could be Solana or Emeren Group, a real NYSE
+            # solar company — the same collision that put a token's price on
+            # four companies' pages. A coin absent from the list shows no news,
+            # which is honest; guessing is not.
+            from app.services.crypto_feed import crypto_news_tag
+
+            news_symbol = crypto_news_tag(symbol) or symbol
             rows = (
                 await session.execute(
                     select(NewsItem)
@@ -188,7 +201,7 @@ async def _fetch_ticker_news(symbol: str) -> list[dict]:
                         exclude_mock_clause(),
                         # Exact comma-delimited token match: 'GM' must NOT match
                         # a 'GME'-only row. See models.news.tickers_match_clause.
-                        tickers_match_clause(symbol),
+                        tickers_match_clause(news_symbol),
                         NewsItem.published_at >= cutoff,
                     )
                     .order_by(desc(NewsItem.published_at))
