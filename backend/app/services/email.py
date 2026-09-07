@@ -5871,9 +5871,7 @@ def render_free_month_offer_email(
         + card(
             '<ul style="margin:0;padding:0 0 0 20px;">'
             '<li style="margin:0 0 8px;font-size:15px;line-height:1.55;">'
-            "Congressional trades — disclosed House and Senate buys and sells, by ticker</li>"
-            '<li style="margin:0 0 8px;font-size:15px;line-height:1.55;">'
-            "Recent insider buys — SEC Form 4 filings: date, insider, shares, value</li>"
+                        "Recent insider buys — SEC Form 4 filings: date, insider, shares, value</li>"
             '<li style="margin:0 0 8px;font-size:15px;line-height:1.55;">'
             "The full scored universe, plus squeeze, regime and the sector heatmap</li>"
             '<li style="margin:0 0 8px;font-size:15px;line-height:1.55;">'
@@ -5893,3 +5891,80 @@ def render_free_month_offer_email(
             "any account at all."
         )
     )
+
+
+# ── Customer survey, September 2026 ─────────────────────────────────────────
+
+#: Q1's four options, as (query value, label). The values match STATUS_OPTIONS
+#: in routers/survey.py and the radio list in frontend/app/survey/SurveyForm.tsx.
+SURVEY_STATUS_LINKS = (
+    ("using_it", "I'm using it"),
+    ("signed_up_not_used", "I signed up but haven't really used it"),
+    ("used_then_stopped", "I used it for a bit and stopped"),
+    ("dont_remember", "I don't remember signing up"),
+)
+
+
+def render_customer_survey_email(user_name: str, *, survey_url: str) -> str:
+    """The September 2026 survey invitation.
+
+    WHY THE FIRST QUESTION IS IN THE EMAIL BODY
+    The four options are links, not a "take the survey" button. This is the
+    best-evidenced tactic in the research behind the instrument: a randomised
+    trial (n = 4,333 vs 4,347) embedding the first question in the invitation
+    raised COMPLETED surveys from 24.4% to 29.1% — +19% relative, p<0.001 — and
+    did not distort the answer distribution. Each link carries `?a=<value>`,
+    which the page pre-selects, so the first click is also the first answer.
+
+    WHY "OR JUST HIT REPLY" IS IN HERE
+    At 23 reachable people the reply IS the payload and the form is the pretext.
+    Some of the best respondents will never click a link, and one line of copy
+    recovers them.
+
+    WHAT IS DELIBERATELY ABSENT
+    No offer, no price, no upgrade ask, no deadline, no incentive. Three
+    reasons, all binding:
+      - the Spam Act basis for sending this at all is an existing account
+        relationship plus a message that promotes nothing (see
+        docs/growth/CUSTOMER_SURVEY_2026_09.md section 7.1);
+      - a manufactured deadline is banned by the house copy rules and by
+        scripts/lint-copy-compliance.mjs;
+      - an incentive would lift response (OR ~1.88) while recruiting
+        reward-motivated respondents over topic-interested ones, and for a
+        financial product an incentivised answer that reads as a testimonial
+        engages FTC 16 CFR 465, the ACL, and ASIC RG 234 at once.
+
+    NO QUESTION TOUCHES MONEY. Not account size, not holdings, not experience.
+    Collecting someone's financial circumstances is the step that converts
+    general information into personal advice, and the publisher exemption
+    depends on never taking it.
+    """
+    options = "".join(
+        f'<p style="margin:0 0 10px;font-size:16px;line-height:1.5;">'
+        f'<a href="{survey_url}?a={value}" '
+        f'style="color:#4F8DF7;text-decoration:underline;">{label}</a></p>'
+        for value, label in SURVEY_STATUS_LINKS
+    )
+    return shell(
+        lead(f"Hi {user_name},")
+        + paragraph(
+            "I'm Christian — I built Tapeline. I'm trying to understand what "
+            "people were actually looking for when they signed up, and I'd "
+            "rather ask than guess."
+        )
+        + paragraph("Which of these is closest to true for you right now?")
+        + card(options)
+        + paragraph(
+            "Two short questions after that. About ninety seconds all up, and "
+            "nothing is required. Or just hit reply and tell me — that comes "
+            "straight to me and works just as well."
+        )
+        + paragraph(
+            "There's no pitch at the end, and nothing you say changes your "
+            "account or what you pay. I've got about one day a week to build "
+            "things, and right now I'd be choosing what to build by guessing."
+        )
+        + paragraph("Thanks for signing up in the first place."),
+        preheader="Four questions about what you were looking for. About ninety seconds.",
+    )
+
