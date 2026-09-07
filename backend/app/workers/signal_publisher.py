@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from datetime import UTC, date, datetime
 from time import monotonic
 from typing import Any
@@ -595,14 +596,35 @@ async def tick() -> None:
     # the once-per-day semantics.
 
     # Refresh news feed: on first tick after boot + every ~5 minutes thereafter
-    _set_stage("news_refresh+backcheck")
+    _set_stage("news_refresh")
     global _last_news_refresh, _last_backcheck
     if _last_news_refresh is None or (started - _last_news_refresh).total_seconds() > 300:
+        # Cadence stamped BEFORE the work, not after.
+        #
+        # It used to be stamped after, which quietly turned "one slow job" into
+        # "a permanently wedged worker". When the 60s watchdog kills the cycle
+        # mid-job the assignment below never runs, so the next tick sees the
+        # same stale timestamp, starts the same expensive job, and is killed in
+        # the same place. Nothing downstream ever runs again.
+        #
+        # That is exactly what production did on 2026-09-07:
+        #   tick.timeout ... consecutive=1 stage=news_refresh+backcheck
+        #   tick.timeout ... consecutive=2 stage=news_refresh+backcheck
+        #   tick.timeout ... consecutive=3 stage=news_refresh+backcheck
+        # every cycle, while the sheet refresh below it never ran once — so a
+        # parser fix deployed and then sat there doing nothing.
+        #
+        # Stamping first means a failed or cut-short run costs ONE cycle and
+        # the job is retried on its normal cadence. For a 5-minute periodic
+        # refresh that is the correct trade: news being 5 minutes stale is a
+        # non-event, and a worker that does nothing else for hours is not.
+        _last_news_refresh = started
         await _refresh_news()
         # SEC EDGAR 8-K direct — runs alongside the wire-news refresh so material
         # filings hit the news bar ~5-30 min earlier than they would via the
         # Massive/Finnhub wires. Free + zero-API-key. Idempotent (uses EDGAR accession number
         # as the NewsItem.id PK) so re-runs don't duplicate rows.
+        _set_stage("edgar_8k")
         try:
             from app.services.edgar_feed import refresh_8k_into_news_items
             counts = await refresh_8k_into_news_items()
@@ -613,7 +635,6 @@ async def tick() -> None:
                 )
         except Exception:
             logger.exception("edgar.8k_tick_failed")
-        _last_news_refresh = started
 
     # Scorecard back-check: drain the pending backlog on a real daily cadence.
     # BUG FIX (2026-06-01): this was `if _last_backcheck is None`, which fired
@@ -624,9 +645,11 @@ async def tick() -> None:
     # sample. Mirror the calendar-seed cadence below: re-run every 6h. The job
     # itself now drains ALL pending dates (see _run_backcheck), so a day the
     # worker happened to miss is retried on the next run instead of stranded.
+    _set_stage("backcheck")
     if _last_backcheck is None or (started - _last_backcheck).total_seconds() >= 6 * 3600:
-        await _run_backcheck()
+        # Stamped first, for the reason spelled out above the news refresh.
         _last_backcheck = started
+        await _run_backcheck()
 
     # Calendar refresh (IPOs + earnings) — daily cadence. Finnhub-aware
     # via calendar_feed.upcoming_*; mock fallback when no FINNHUB_API_KEY.
@@ -636,10 +659,19 @@ async def tick() -> None:
         # Isolated: a calendar-feed failure must not abort the rest of the tick.
         # Latch only on success so a transient failure retries next tick rather
         # than burning the 24h window.
+        # Slot claimed BEFORE the work and rolled back only on a CAUGHT
+        # failure. Latch-on-success protects against a transient error; it
+        # does not protect against a HANG, because a cycle killed by the 60s
+        # watchdog never reaches the except clause either — so the stale
+        # timestamp survives, the next tick restarts the same job, and the
+        # worker wedges. Rolling back inside `except` keeps the retry for the
+        # case it was written for and removes the case it never covered.
+        _calendar_seed_before = _last_calendar_seed
+        _last_calendar_seed = started
         try:
             await _seed_calendar()
-            _last_calendar_seed = started
         except Exception:
+            _last_calendar_seed = _calendar_seed_before
             logger.exception("calendar.seed_failed")
 
     # Hourly trial-expiry enforcement: drop unpaid expired-trial users to Free.
@@ -649,10 +681,19 @@ async def tick() -> None:
     if _last_trial_check is None or (started - _last_trial_check).total_seconds() >= 3600:
         # Isolated + latch-on-success. The downgrade is idempotent, so a retry
         # on the next tick after a transient DB failure is safe.
+        # Slot claimed BEFORE the work and rolled back only on a CAUGHT
+        # failure. Latch-on-success protects against a transient error; it
+        # does not protect against a HANG, because a cycle killed by the 60s
+        # watchdog never reaches the except clause either — so the stale
+        # timestamp survives, the next tick restarts the same job, and the
+        # worker wedges. Rolling back inside `except` keeps the retry for the
+        # case it was written for and removes the case it never covered.
+        _trial_check_before = _last_trial_check
+        _last_trial_check = started
         try:
             await _downgrade_expired_trials()
-            _last_trial_check = started
         except Exception:
+            _last_trial_check = _trial_check_before
             logger.exception("trial.downgrade_failed")
 
     # Hourly per-watchlisted-ticker news refresh (Premium tier feature).
@@ -701,6 +742,10 @@ async def tick() -> None:
     _set_stage("checkout_recovery")
     global _last_checkout_recovery
     if _last_checkout_recovery is None or (started - _last_checkout_recovery).total_seconds() >= 3600:
+        # Stamped before the work — see the news refresh. This job already
+        # latched unconditionally, so this changes nothing on failure and
+        # stops a hang from restarting it every tick.
+        _last_checkout_recovery = started
         try:
             from app.services.email import run_checkout_abandonment_recovery
             from app.services.lifecycle import worker_governor
@@ -712,7 +757,6 @@ async def tick() -> None:
                 logger.info("drip.checkout_recovery_sent abandon1=%d", rec_counts["abandon1"])
         except Exception:
             logger.exception("checkout_recovery.run_failed")
-        _last_checkout_recovery = started
 
     # Activation nudge — HOURLY, for the same reason as checkout recovery: the
     # first stage fires ~6h after signup and a daily cadence would land it
@@ -727,6 +771,10 @@ async def tick() -> None:
     _set_stage("activation_nudge")
     global _last_activation_nudge
     if _last_activation_nudge is None or (started - _last_activation_nudge).total_seconds() >= 3600:
+        # Stamped before the work — see the news refresh. This job already
+        # latched unconditionally, so this changes nothing on failure and
+        # stops a hang from restarting it every tick.
+        _last_activation_nudge = started
         try:
             from app.services.email import run_activation_nudge_drip
             from app.services.lifecycle import worker_governor
@@ -743,7 +791,6 @@ async def tick() -> None:
                 )
         except Exception:
             logger.exception("activation_nudge.run_failed")
-        _last_activation_nudge = started
 
     # Signal-system Google Sheet refresh — pulls ALL SIGNALS + the Phase 2
     # intelligence tabs (SPIKE / MARKET / SMART MONEY / ETF) and upserts to
@@ -899,12 +946,13 @@ async def tick() -> None:
         started - _last_active_universe_refresh
     ).total_seconds() >= 3600:
         from app.services.universe import refresh_active_universe
+        # Stamped before the work — see the news refresh.
+        _last_active_universe_refresh = started
         try:
             n = await refresh_active_universe()
             logger.info("active_universe.refreshed count=%d", n)
         except Exception:
             logger.exception("active_universe.refresh_failed")
-        _last_active_universe_refresh = started
 
     # Daily Finnhub refreshes (fundamentals, insider Form 4, sector backfill,
     # market-cap backfill, key statistics). All of them hit the same Finnhub
@@ -1608,6 +1656,16 @@ async def _ensure_daily_scorecard(today: date) -> None:
 _news_cache_wiped: bool = False
 
 
+#: Wall-clock ceiling for the per-article insert loop in _refresh_news.
+#:
+#: The loop opens one transaction per article (see the comment at the loop) and
+#: runs inside a tick the watchdog kills at 60 seconds. 40 round-trips to a
+#: remote Postgres is normally a couple of seconds and occasionally is not.
+#: Articles past the budget are simply picked up on the next 5-minute refresh —
+#: the loop already skips duplicates by primary key, so nothing is lost.
+NEWS_INSERT_BUDGET_SECONDS = float(os.environ.get("NEWS_INSERT_BUDGET_SECONDS", "10"))
+
+
 async def _refresh_news() -> None:
     """Pull latest news into local cache. Real source = Massive (formerly Polygon).
 
@@ -1642,7 +1700,18 @@ async def _refresh_news() -> None:
     inserted = 0
     skipped_dup = 0
     failed = 0
+    # Each article gets its OWN transaction — deliberately, after the
+    # 2026-05-09 incident where one over-wide row rolled back the whole batch
+    # and left the news bar 14h stale. That isolation is worth keeping, but it
+    # means 40 sequential round-trips to a remote Postgres, and this runs
+    # inside a tick the watchdog kills at 60 seconds. Bounded so a slow
+    # database costs the tail of one refresh rather than every job below it.
+    _started_at = monotonic()
+    _budget_hit = False
     for it in items:
+        if monotonic() - _started_at >= NEWS_INSERT_BUDGET_SECONDS:
+            _budget_hit = True
+            break
         # Defense-in-depth: a mock row must never be persisted in prod. The
         # boot wipe + news_feed's vendor guard should already prevent this,
         # but belt-and-suspenders here too.
@@ -1662,8 +1731,10 @@ async def _refresh_news() -> None:
             failed += 1
             logger.exception("news.insert_failed id=%s title=%s", it.get("id"), str(it.get("title", ""))[:50])
     logger.info(
-        "news.refreshed fetched=%d inserted=%d duplicate=%d failed=%d",
+        "news.refreshed fetched=%d inserted=%d duplicate=%d failed=%d "
+        "elapsed=%.1fs budget_hit=%s",
         len(items), inserted, skipped_dup, failed,
+        monotonic() - _started_at, _budget_hit,
     )
 
 
