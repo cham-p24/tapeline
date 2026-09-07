@@ -226,6 +226,42 @@ Seven exposures found independently across four sessions. The Massive vendor key
   it are not held off. Guard: `backend/tests/test_factor_stage_alternation.py`
   (watched red on the reverted worker — all 6).
 
+# 9i — Shipped 2026-09-07: the tick had been wedged, which is why nothing ran
+
+- [x] **`calendar_seed` had been consuming every tick, permanently** — found by
+  watching production after shipping the alternation fix above, because the
+  factor stamps did not move. The worker logs read
+  `tick.timeout elapsed=60.0s limit=60s consecutive=4 stage=calendar_seed`,
+  with the count climbing.
+
+  `_seed_calendar` replaces the earnings table with Finnhub's window — 3,362
+  rows — using one ORM `session.add()` per row, i.e. one INSERT per row. Over
+  the Neon pooler that never finished inside the 60s tick watchdog, so the
+  coroutine was cancelled every time it ran; `calendar.refreshed` appears
+  nowhere in the logs.
+
+  The cancellation is what made it permanent rather than merely slow.
+  `asyncio.wait_for` raises `CancelledError`, which is a **BaseException**, so
+  the stage's `except Exception` never saw it — and the 24h latch was written
+  on the line AFTER the await. It was therefore never written at all: the stage
+  re-ran on the very next tick, timed out again, and **every job scheduled
+  after it in `tick()` was skipped forever.** That includes the Finnhub factor
+  chain, so the two fixes shipped before this one (#762, #775) were correct and
+  could not execute. It also includes the hourly trial-expiry downgrade, the
+  aggregates refresh and the universe refreshes.
+
+  Two fixes, because either alone leaves half the bug: the inserts are now one
+  `executemany` per table, and the latch is written BEFORE the await and
+  cleared in the `except` handler. "Latch on success" and "latch first, clear
+  on caught failure" are identical for a transient error and differ only for a
+  watchdog cancellation — so the latch goes first. The same ordering was
+  applied to `_run_backcheck`, which is also unbounded and had wedged the tick
+  earlier in the same log.
+
+  Guard: `backend/tests/test_tick_stage_cannot_wedge.py`, watched red on the
+  pre-fix worker (all 4). Structural, not end-to-end — the file says why, and
+  says what that does not cover.
+
 # 9f — Shipped 2026-09-06, third pass: the three fixes
 
 Founder said fix them. All three merged and deployed. Written in parallel

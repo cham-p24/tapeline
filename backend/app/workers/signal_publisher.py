@@ -593,21 +593,41 @@ async def tick() -> None:
     # sample. Mirror the calendar-seed cadence below: re-run every 6h. The job
     # itself now drains ALL pending dates (see _run_backcheck), so a day the
     # worker happened to miss is retried on the next run instead of stranded.
+    # Latched BEFORE the await, for the reason spelled out on the calendar seed
+    # below: this drain is long and unbounded, and if the tick watchdog cancels
+    # it mid-pass an after-the-await latch is never written, so it restarts from
+    # the top on every tick and nothing behind it in tick() ever runs.
+    # `_run_backcheck` already swallows its own exceptions and the drain is
+    # resumable, so a cancelled pass simply continues on the next 6h run.
     if _last_backcheck is None or (started - _last_backcheck).total_seconds() >= 6 * 3600:
-        await _run_backcheck()
         _last_backcheck = started
+        await _run_backcheck()
 
     # Calendar refresh (IPOs + earnings) — daily cadence. Finnhub-aware
     # via calendar_feed.upcoming_*; mock fallback when no FINNHUB_API_KEY.
     global _last_calendar_seed
     if _last_calendar_seed is None or (started - _last_calendar_seed).total_seconds() >= 86400:
         # Isolated: a calendar-feed failure must not abort the rest of the tick.
-        # Latch only on success so a transient failure retries next tick rather
-        # than burning the 24h window.
+        #
+        # LATCH FIRST, then CLEAR on a caught failure — not "latch on success".
+        # Those are identical for a transient error (both retry next tick) and
+        # they differ in exactly one case: a stage that cannot finish inside the
+        # 60s tick watchdog. That raises CancelledError, which is a
+        # BaseException and so is NOT caught here; under "latch on success" the
+        # latch was therefore never written, the stage re-ran on the very next
+        # tick, and every job behind it in tick() was skipped forever. Measured
+        # in production on 2026-09-07 as `tick.timeout ... stage=calendar_seed`
+        # with a climbing consecutive count, starving the Finnhub factor chain
+        # (among others) that runs later in this same function.
+        #
+        # Latching first makes an overrun cost 24h of THIS stage instead of
+        # permanent starvation of every stage behind it, and the clear-on-Exception
+        # keeps the transient-failure retry that the original comment wanted.
+        _last_calendar_seed = started
         try:
             await _seed_calendar()
-            _last_calendar_seed = started
         except Exception:
+            _last_calendar_seed = None
             logger.exception("calendar.seed_failed")
 
     # Hourly trial-expiry enforcement: drop unpaid expired-trial users to Free.
@@ -2999,7 +3019,7 @@ async def _seed_calendar() -> None:
     refresh so stale events drop off naturally — Finnhub returns the rolling
     window, no need to track which rows were inserted previously.
     """
-    from sqlalchemy import delete
+    from sqlalchemy import delete, insert
 
     from app.models import EarningsEvent, IPOEvent
     from app.services.calendar_feed import upcoming_earnings, upcoming_ipos
@@ -3016,18 +3036,26 @@ async def _seed_calendar() -> None:
     ipos = await upcoming_ipos()
     earnings = await upcoming_earnings()
 
+    # BULK insert, not `session.add()` per row. Finnhub returns ~3,400 earnings
+    # events, and adding them one at a time makes the ORM emit one INSERT per
+    # row. Over the Neon pooler that never finished inside the 60s tick
+    # watchdog, so this coroutine was cancelled every single time it ran —
+    # `calendar.refreshed` appears nowhere in the production logs. Because the
+    # 24h latch was only written AFTER a successful return, it was never
+    # written at all, so the stage re-ran on every tick and every job behind it
+    # in tick() was skipped forever (measured 2026-09-07: `tick.timeout ...
+    # stage=calendar_seed` climbing consecutively, with the Finnhub factor
+    # chain among the jobs it was starving). One executemany per table instead.
     async with session_scope() as session:
         if ipos:
             await session.execute(delete(IPOEvent))
-            for row in ipos:
-                session.add(IPOEvent(**row))
+            await session.execute(insert(IPOEvent), ipos)
         else:
             logger.warning("calendar.ipos_empty — keeping the previous window")
 
         if earnings:
             await session.execute(delete(EarningsEvent))
-            for row in earnings:
-                session.add(EarningsEvent(**row))
+            await session.execute(insert(EarningsEvent), earnings)
         else:
             logger.warning("calendar.earnings_empty — keeping the previous window")
 
