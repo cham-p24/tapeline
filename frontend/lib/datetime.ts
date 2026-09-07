@@ -86,3 +86,19 @@ export function userTimezone(): string {
 export function userLocale(): string {
   return resolveLocale();
 }
+
+/**
+ * "4 September 2026" — the long form used wherever a BILLING date is stated.
+ *
+ * Lives here because several surfaces quote the same first-charge date (the
+ * billing page, /app/start, the signup form and now the trial offer panel
+ * wherever it renders), and a date meaning "the day your card is charged"
+ * should not be formatted by four private copies of the same function.
+ */
+export function longDate(d: Date, locale?: string): string {
+  return d.toLocaleDateString(resolveLocale(locale), {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}

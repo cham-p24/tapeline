@@ -13,7 +13,14 @@ import {
   testWebPush,
   unsubscribeFromWebPush,
 } from "@/lib/webPush";
-import { userLocale } from "@/lib/datetime";
+import { userLocale, longDate } from "@/lib/datetime";
+// The trial offer panel and its sessionStorage record both moved out of this
+// file (2026-09-07) because a SECOND surface now starts the same trial: the
+// scanner, where a new account now lands instead of here. Both starters must
+// render identical disclosure text and both must write the same
+// trial-vs-purchase record, since the return from Stripe only ever lands here.
+import { TrialOfferPanel } from "@/components/TrialOfferPanel";
+import { rememberTrialCheckout, takeTrialCheckoutIntent } from "@/lib/trialCheckout";
 import { handle401, errorMessage } from "@/lib/api";
 import { PRICING, FREE_LIMITS, REFUND, usd, usdCompact, annualSaving, DEFAULT_BILLING_PERIOD, freeHasWatchlist, freeScannerRows } from "@/lib/pricing";
 // The ONE source of truth for the trial length. This page used to carry its
@@ -65,58 +72,6 @@ type TierKey = keyof typeof TIER_META;
  * (`subscription_data.trial_end = now + TRIAL_DAYS`).
  */
 
-/**
- * Local record that the checkout we are about to leave for is a TRIAL start,
- * not a purchase.
- *
- * The primary signal is `trial=1` on the success_url, which the backend owns.
- * This is the belt-and-braces half, and it exists because the failure mode is
- * expensive and silent: if a $0 trial start comes back looking like an ordinary
- * success, the page fires `subscribe` with the full plan price, booking revenue
- * nobody paid and feeding Google Ads Smart Bidding a conversion worth $199 for
- * a customer who has been charged nothing. Written immediately before the
- * redirect, read once on the way back, and cleared either way.
- *
- * Scoped tightly so it cannot mislabel a later real purchase: it carries the
- * tier it was minted for and expires after two hours.
- */
-const TRIAL_CHECKOUT_INTENT_KEY = "tapeline_trial_checkout_intent";
-const TRIAL_INTENT_TTL_MS = 2 * 3_600_000;
-
-function rememberTrialCheckout(tier: string) {
-  try {
-    window.sessionStorage.setItem(
-      TRIAL_CHECKOUT_INTENT_KEY,
-      JSON.stringify({ tier, at: Date.now() }),
-    );
-  } catch {
-    // Storage blocked — we simply fall back to the `trial=1` URL param.
-  }
-}
-
-/** Consume the flag. Returns true only for a fresh, tier-matching record. */
-function takeTrialCheckoutIntent(tier: string): boolean {
-  try {
-    const raw = window.sessionStorage.getItem(TRIAL_CHECKOUT_INTENT_KEY);
-    window.sessionStorage.removeItem(TRIAL_CHECKOUT_INTENT_KEY);
-    if (!raw) return false;
-    const rec = JSON.parse(raw) as { tier?: string; at?: number };
-    if (rec.tier !== tier) return false;
-    return typeof rec.at === "number" && Date.now() - rec.at < TRIAL_INTENT_TTL_MS;
-  } catch {
-    return false;
-  }
-}
-
-/** Long-form date for the disclosure, e.g. "4 September 2026". */
-function longDate(d: Date): string {
-  return d.toLocaleDateString(userLocale(), {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
 export default function BillingPage() {
   const { user, refresh, mustAddCard } = useUser();
   const [busy, setBusy] = useState<string | null>(null);
@@ -157,6 +112,15 @@ export default function BillingPage() {
   // into Stripe on its own: the panel's button is the only thing that starts a
   // checkout, exactly like every other plan CTA on this page.
   const [trialIntent, setTrialIntent] = useState(false);
+  // DIRECT-PURCHASE INTENT (?buy=now). Set by the "Or skip the trial and
+  // subscribe" link under each paid card on /pricing, carried through signup.
+  // Tapeline's one and only payer bought outright rather than trialling, and
+  // Danelfin puts "Try Free for 14 Days" and "Or skip trial and Buy …" side by
+  // side on every paid card. This is that second door: the reader has already
+  // decided, so the trial offer panel stands down and the Premium CTA becomes a
+  // straight subscription. It does NOT auto-fire a checkout — the user still
+  // clicks, and money moving today is stated on the button's own disclosure.
+  const [directBuy, setDirectBuy] = useState(false);
   // The date Stripe will take the first charge if the trial starts right now.
   // Computed once per mount so it can't drift mid-session, and mirrors the
   // trial_end the backend sets on the Checkout session.
@@ -196,7 +160,13 @@ export default function BillingPage() {
   // Render the offer when it was asked for AND the account can actually take
   // it. An already-trialled or paying account that lands on ?trial=start just
   // sees the normal billing page rather than an offer it cannot accept.
-  const showTrialOffer = trialIntent && trialEligible;
+  // `directBuy` stands it down: someone who followed "skip the trial and
+  // subscribe" has already answered the question the panel asks.
+  const showTrialOffer = trialIntent && trialEligible && !directBuy;
+  // Whether the Premium card should sell the TRIAL or a straight subscription.
+  // Trial-eligible accounts get the trial by default — except the ones who
+  // arrived saying they'd rather just buy.
+  const premiumSellsTrial = trialEligible && !directBuy;
 
   // Stripe defers the first charge to the trial-end date ONLY when that date is
   // >= 48h out (backend routers/billing.py); inside 48h it falls back to a
@@ -418,6 +388,12 @@ export default function BillingPage() {
       const period = (qp.get("billing") || "").toLowerCase();
       if (period === "monthly" || period === "annual") setBillingPeriod(period);
     }
+    // Direct-purchase intent (?buy=now) — "Or skip the trial and subscribe".
+    // Opens the picker on the chosen plan with the trial offer stood down.
+    if (qp.get("buy") === "now") {
+      setDirectBuy(true);
+      setShowPlans(true);
+    }
     // Win-back landing — the day-90 cancellation email links here with
     // ?winback=1. Surface the returning-customer banner + open the plan
     // picker. The 40%-off coupon itself is minted server-side at checkout,
@@ -574,7 +550,30 @@ export default function BillingPage() {
   function changePlan(target: "pro" | "premium") {
     const subscriber = hasBilling === true && (tier === "pro" || tier === "premium");
     if (subscriber) return openPortal();
-    return startCheckout(target, target === "premium" ? { startTrial: trialEligible } : undefined);
+    return startCheckout(target, target === "premium" ? { startTrial: premiumSellsTrial } : undefined);
+  }
+
+  /**
+   * "Or skip the trial and subscribe" — the decided buyer's door.
+   *
+   * Same endpoint, same session shape, `start_trial` simply false: the backend
+   * has always accepted that (routers/billing.py, `start_trial: bool = False`),
+   * it was just unreachable from the Premium card once the trial became the
+   * only CTA on it. Tapeline's one and only payer bought outright rather than
+   * trialling, so the path existed in the data before it existed in the UI.
+   *
+   * ONE extra event, so the two doors are distinguishable in the funnel:
+   * `begin_checkout` already carries `start_trial: false`, but it also carries
+   * false for every ordinary Pro upgrade, so it cannot answer "did anyone
+   * choose to skip the trial?" on its own.
+   */
+  function skipTrialAndSubscribe(target: "pro" | "premium") {
+    trackEvent("skip_trial_selected", {
+      tier: target,
+      billing_period: billingPeriod,
+      surface: "app",
+    });
+    return startCheckout(target, { startTrial: false });
   }
 
   async function openPortal() {
@@ -1024,19 +1023,38 @@ export default function BillingPage() {
               // disclosure below the button carries the same four facts the
               // panel does, because this card is reachable without it.
               cta={
-                trialEligible
+                premiumSellsTrial
                   ? `Start the ${TRIAL_DAYS}-day trial`
                   : isCardlessTrial
                   ? "Keep Premium — add a card"
                   : "Upgrade to Premium"
               }
               disclosure={
-                trialEligible
+                premiumSellsTrial
                   ? `$0 today · first charge ${longDate(trialFirstCharge)} (${
                       billingPeriod === "annual"
                         ? `${usdCompact(TIER_META.premium.annual)}/yr`
                         : `${usd(TIER_META.premium.monthly)}/mo`
                     }) · cancel in one click before then and you are never charged`
+                  : undefined
+              }
+              // The second door, and the reason it needs its own words: on this
+              // route money moves TODAY. The trial's disclosure above says "$0
+              // today"; restating that here would be false, so the direct path
+              // states the amount and the date plainly instead. Offered only
+              // where a trial is actually being interposed — the Pro card is
+              // already a straight purchase, so it has nothing to skip.
+              secondaryCta={
+                premiumSellsTrial
+                  ? {
+                      label: "Or skip the trial and subscribe",
+                      note: `Charged ${
+                        billingPeriod === "annual"
+                          ? `${usdCompact(TIER_META.premium.annual)} today for the year`
+                          : `${usd(TIER_META.premium.monthly)} today for the month`
+                      } · no trial · ${REFUND.short.toLowerCase()}`,
+                      onClick: () => skipTrialAndSubscribe("premium"),
+                    }
                   : undefined
               }
               highlight={tier === "premium" && !isCardlessTrial}
@@ -1164,187 +1182,6 @@ export default function BillingPage() {
         tier={tier}
       />
     </div>
-  );
-}
-
-/**
- * The 30-day Premium trial offer — the ONE surface that asks for a card in
- * exchange for a trial, and therefore the one that has to be beyond reproach.
- *
- * NON-NEGOTIABLES, all enforced by __tests__/TrialStartOffer.test.tsx:
- *
- *   1. FULL DISCLOSURE BEFORE THE CARD. Four facts as real body text (not an
- *      image, not a tooltip, not behind a <details>): $0 charged today, the
- *      exact calendar date of the first charge, the amount that will be
- *      charged, and that one click cancels before then. If the user only reads
- *      the buttons they have still been told the price and the date.
- *   2. THE DECLINE IS EQUAL, AND TRUE. The decline is the same size and the
- *      same typographic weight as the trial button, sits beside it, is not a
- *      greyed-out afterthought, and is not preceded by a guilt line.
- *
- *      It must also DESCRIBE WHAT ACTUALLY HAPPENS. This has been wrong in
- *      both directions, so the history is worth keeping:
- *
- *      The panel shipped with one unconditional decline reading "Continue on
- *      the Free plan → /app/scanner", promising "live scores, top-N scanner, N
- *      look-ups a day". From CARD_GATE_START (2026-08-22) every word of that
- *      was false for a new account: /app/scanner was not in
- *      CARD_GATE_PASSTHROUGH, so app/app/layout.tsx replaced it with the card
- *      wall the instant they clicked. So the decline was FORKED on
- *      `cardRequired` (the server's `must_add_card`): a gated account was told
- *      the signed-in app stays locked without a card and was pointed at the
- *      public record instead.
- *
- *      #683 (2026-08-30) removed the wall, which made the FORK the lie — it
- *      was telling every card-free account the app was locked when the free
- *      scanner was one click away, and routing them off the product to say so.
- *      The fork is gone and the decline is unconditional again: everyone
- *      continues on the Free plan, to /app/scanner, which is now true for
- *      every account that can see this panel.
- *
- *      THE RULE, which outlived both mistakes: the decline must describe the
- *      destination it actually leads to. Never promise a Free tier the reader
- *      cannot reach, and never withhold one they can.
- *   3. NO DARK PATTERNS. No auto-redirect into Stripe (the button is the only
- *      thing that navigates), nothing pre-ticked, no countdown, no scarcity,
- *      no "N spots left", no fake discount. Compliance rule 6 — and the copy
- *      linter (scripts/lint-copy-compliance.mjs) will fail the build for most
- *      of them anyway.
- *   4. KEYBOARD OPERABLE. Everything interactive is a real <button> or <a>,
- *      in reading order, with the global :focus-visible ring plus an explicit
- *      focus ring here so it stays visible on the tinted panel.
- *
- * The billing-period choice lives inside the panel because the AMOUNT in the
- * disclosure has to be the amount for the period actually selected. It shares
- * state with the plan picker's toggle below, so the two can never disagree.
- */
-function TrialOfferPanel({
-  billingPeriod,
-  onBillingPeriod,
-  firstCharge,
-  busy,
-  onStartTrial,
-}: {
-  billingPeriod: "monthly" | "annual";
-  onBillingPeriod: (p: "monthly" | "annual") => void;
-  firstCharge: Date;
-  busy: boolean;
-  onStartTrial: () => void;
-}) {
-  const chargeDate = longDate(firstCharge);
-  const amount =
-    billingPeriod === "annual"
-      ? `${usdCompact(PRICING.premium.annual)} for the year`
-      : `${usd(PRICING.premium.monthly)} for the month`;
-  const FOCUS =
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-
-  return (
-    <section
-      data-testid="trial-offer"
-      aria-labelledby="trial-offer-heading"
-      className="rounded-2xl border border-border bg-panel p-6"
-    >
-      <h2 id="trial-offer-heading" className="text-xl font-semibold">
-        Start your {TRIAL_DAYS}-day Premium trial &mdash; or don&rsquo;t
-      </h2>
-      <p className="mt-1.5 text-sm text-muted">
-        Every Premium feature for {TRIAL_DAYS} days: the full ~{ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker live
-        universe, score breakdowns, Congressional trades and insider buys,
-        watchlist of 200 and unlimited email alerts. Starting the trial takes a
-        card, because it becomes a paid subscription if you keep it. Here is
-        exactly what that means.
-      </p>
-
-      {/* Billing period — nothing is pre-ticked beyond the site-wide default,
-          and switching it rewrites the amount in the disclosure below. */}
-      <div className="mt-5">
-        <div id="trial-period-label" className="text-[11px] uppercase tracking-wider text-muted">
-          Plan after the trial
-        </div>
-        <div
-          role="group"
-          aria-labelledby="trial-period-label"
-          className="mt-2 inline-flex rounded-full border border-border bg-surface p-1"
-        >
-          {(["annual", "monthly"] as const).map((p) => (
-            <button
-              key={p}
-              type="button"
-              aria-pressed={billingPeriod === p}
-              onClick={() => onBillingPeriod(p)}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${FOCUS} ${
-                billingPeriod === p ? "bg-fg text-background" : "text-muted hover:text-fg"
-              }`}
-            >
-              {p === "annual"
-                ? `Annual · ${usdCompact(PRICING.premium.annual)}/yr`
-                : `Monthly · ${usd(PRICING.premium.monthly)}/mo`}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* THE DISCLOSURE. Plain text, always visible, never collapsed. */}
-      <ul data-testid="trial-disclosure" className="mt-5 space-y-2 text-sm text-fg">
-        <li className="flex gap-2">
-          <span aria-hidden="true" className="text-muted">·</span>
-          <span>
-            <strong className="font-semibold">$0 today.</strong> Starting the
-            trial charges you nothing now.
-          </span>
-        </li>
-        <li className="flex gap-2">
-          <span aria-hidden="true" className="text-muted">·</span>
-          <span>
-            <strong className="font-semibold">Your first charge is on {chargeDate}</strong>{" "}
-            &mdash; {amount}, and then {billingPeriod === "annual" ? "every year" : "every month"}{" "}
-            until you cancel.
-          </span>
-        </li>
-        <li className="flex gap-2">
-          <span aria-hidden="true" className="text-muted">·</span>
-          <span>
-            <strong className="font-semibold">Cancel in one click</strong> from this
-            page any time before {chargeDate} and you are never charged.
-          </span>
-        </li>
-        <li className="flex gap-2">
-          <span aria-hidden="true" className="text-muted">·</span>
-          <span>
-            Card details are entered on Stripe&rsquo;s own checkout page. Your
-            card number never reaches a Tapeline server.
-          </span>
-        </li>
-      </ul>
-
-      {/* THE FORK. Same height, same width behaviour, same font weight. */}
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={onStartTrial}
-          disabled={busy}
-          className={`flex h-11 flex-1 items-center justify-center rounded-md border border-accent bg-accent/15 px-4 text-sm font-medium text-fg transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`}
-        >
-          {busy ? "Opening Stripe…" : `Start the ${TRIAL_DAYS}-day trial`}
-        </button>
-        <Link
-          href="/app/scanner"
-          className={`flex h-11 flex-1 items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-medium text-fg transition-colors hover:bg-panel2 ${FOCUS}`}
-        >
-          Continue on the Free plan
-        </Link>
-      </div>
-
-      <p className="mt-4 text-xs text-muted leading-relaxed">
-        Declining costs you nothing: you stay on the Free plan &mdash; live scores,
-        top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups a day
-        {freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}, and
-        {" "}{FREE_LIMITS.savedScans}{" "}saved screen &mdash; and no further charge is made. The
-        public record stays open too, with no account at all. You can start the trial later from
-        this page &mdash; it is here whenever you want it.
-      </p>
-    </section>
   );
 }
 
@@ -1498,7 +1335,7 @@ function WebPushCard() {
 
 
 function Plan({
-  name, price, items, note, cta, disclosure, highlight, intent, disabled, busy, onUpgrade, proPlus,
+  name, price, items, note, cta, disclosure, secondaryCta, highlight, intent, disabled, busy, onUpgrade, proPlus,
 }: {
   name: string; price: string; items: string[]; note?: string;
   cta?: string;
@@ -1509,6 +1346,17 @@ function Plan({
    * reached this card without passing the offer panel.
    */
   disclosure?: string;
+  /**
+   * A second, quieter way to buy this plan — today "Or skip the trial and
+   * subscribe". A plain text button, deliberately NOT a second primary: it is
+   * a mechanism for a reader who has already decided, not a push.
+   *
+   * `note` is mandatory rather than optional because this path charges TODAY,
+   * which is a different fact from the trial's "$0 today" sitting directly
+   * above it. A skip link without its own charge line would inherit the
+   * trial's disclosure and be false.
+   */
+  secondaryCta?: { label: string; note: string; onClick: () => void };
   highlight?: boolean; intent?: boolean; disabled?: boolean; busy?: boolean;
   onUpgrade?: () => void; proPlus?: boolean;
 }) {
@@ -1548,6 +1396,20 @@ function Plan({
       )}
       {cta && disclosure && !disabled && (
         <p className="mt-2 text-[11px] leading-relaxed text-muted">{disclosure}</p>
+      )}
+      {secondaryCta && !disabled && (
+        <div className="mt-3">
+          <button
+            type="button"
+            data-testid="skip-trial-subscribe"
+            disabled={busy}
+            onClick={secondaryCta.onClick}
+            className="text-xs font-medium text-accent underline underline-offset-2 hover:no-underline disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {secondaryCta.label}
+          </button>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted">{secondaryCta.note}</p>
+        </div>
       )}
     </div>
   );
