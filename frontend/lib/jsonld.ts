@@ -266,11 +266,22 @@ export function organizationJsonLd() {
     url: "https://tapeline.io",
     logo: "https://tapeline.io/favicon.svg",
     foundingDate: "2026",
-    // Country-only address — full street suppressed per founder privacy.
-    // Country signal alone is enough to help Google localise the brand entity
-    // vs the UK/AU "tapeline" measuring-tool sellers.
+    // City-level address — full STREET is still suppressed per founder
+    // privacy (Tapeline is a sole trader working from home, so the street
+    // address is a private residence). The locality was added 2026-09-07
+    // alongside the visible publisher line in GeneralInformationNotice: a
+    // machine-readable address that disagrees with the one printed on the
+    // page is worse than either alone, and Google's financial-services ad
+    // policy has a manual-review step that cross-checks them.
+    //
+    // Matches pressContactPageJsonLd()'s foundingLocation below and the
+    // /press fact sheet ("Melbourne, Victoria, Australia") — keep all three
+    // in sync. Locality also sharpens the entity disambiguation this block
+    // exists for, vs the UK/AU "tapeline" measuring-tool sellers.
     address: {
       "@type": "PostalAddress",
+      addressLocality: "Melbourne",
+      addressRegion: "VIC",
       addressCountry: "AU",
     },
     // knowsAbout teaches the Knowledge Graph what topics this entity is about
