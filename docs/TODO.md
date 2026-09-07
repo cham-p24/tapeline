@@ -226,6 +226,45 @@ Seven exposures found independently across four sessions. The Massive vendor key
   it are not held off. Guard: `backend/tests/test_factor_stage_alternation.py`
   (watched red on the reverted worker — all 6).
 
+# 9i — Shipped 2026-09-07: the tick was wedged, so none of the above was running
+
+Found by checking the factor stamps in production after shipping 9h, instead of
+trusting the merge. They had not moved. The worker logs read
+`tick.timeout elapsed=60.0s limit=60s consecutive=4 stage=calendar_seed`, with
+the count climbing.
+
+- [x] **Every cadenced job in `tick()` stamped its latch AFTER the work** (#777,
+  written by a parallel session). Under a 60s watchdog that is a trap: the kill
+  means the assignment never runs, the next tick sees the same stale timestamp,
+  starts the same expensive job and dies in the same place. Not one missed cycle
+  — every cycle, permanently, with every job below it starved. `CancelledError`
+  is a **BaseException**, so an `except Exception` never sees it either. Seven
+  jobs fixed to stamp first; the two that deliberately latch-on-success claim the
+  slot up front and roll it back inside `except`.
+
+- [x] **The calendar seed still could not finish** (#780). #777 fixed the
+  consequence, not the job: `_seed_calendar` rewrote the 3,362-row earnings table
+  with one ORM `session.add()` per row — ~3,400 sequential round-trips to a
+  remote database inside a 60s tick. `calendar.refreshed` appeared nowhere in the
+  logs. Left alone it would still be killed on each daily attempt and the
+  earnings window would never refresh again: silent permanent staleness instead
+  of a loud permanent wedge. Now one `executemany` per table.
+
+**What this had been starving:** the Finnhub factor chain (so 9h and #762 were
+both correct and could not execute), the hourly trial-expiry downgrade, the daily
+aggregates refresh, and the universe refreshes. Meanwhile the snapshot pass at
+the TOP of the tick kept writing thousands of rows a cycle, so every external
+signal said the worker was healthy.
+
+**Verified live 2026-09-07 02:45 UTC**, which is the only verification that
+counted here: `earnings_events` refreshed for the first time, fundamentals
+stamps moving again (1,320 → 1,840), and smart-money stamps **off zero
+(0 → 100)** with real Form 4 pulls for META/AMD/MU in the worker logs.
+
+**Worth keeping:** a fix can merge, deploy, and pass every test while never
+executing. Three correct fixes stacked up behind one job that silently ate the
+whole tick. Check the outcome in the database, not the merge.
+
 # 9f — Shipped 2026-09-06, third pass: the three fixes
 
 Founder said fix them. All three merged and deployed. Written in parallel
