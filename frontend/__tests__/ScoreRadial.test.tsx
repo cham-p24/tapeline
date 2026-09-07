@@ -140,7 +140,15 @@ describe("ScoreRadial label placement", () => {
       <ScoreRadial trend={88} rs={81} fundamentals={34} smart_money={52} macro={61} momentum={70} score={71} />,
     );
     const labels = [...container.querySelectorAll("text")].filter((t) =>
-      ["Trend", "RS", "Fund", "SM", "Macro", "Mom"].includes(t.textContent ?? ""),
+      // The plain-English labels. This list used to read RS / Fund / SM / Mom,
+      // the internal shorthand, which was renamed because a public page whose
+      // job is one-glance legibility cannot require a glossary. The names are
+      // LONGER now ("Financials" against "Fund"), which is exactly why this
+      // clipping guard matters more than it did — "Macro" once shipped as
+      // "lacro" in a press screenshot.
+      ["Trend", "Strength", "Financials", "Insiders", "Market", "Momentum"].includes(
+        t.textContent ?? "",
+      ),
     );
     expect(labels).toHaveLength(6);
 
@@ -162,8 +170,10 @@ describe("ScoreRadial label placement", () => {
     const { container } = render(
       <ScoreRadial trend={88} rs={81} fundamentals={34} smart_money={52} macro={61} momentum={70} score={71} />,
     );
-    const macro = [...container.querySelectorAll("text")].find((t) => t.textContent === "Macro")!;
-    expect(Math.abs(Number(macro.getAttribute("x")) - SIZE / 2)).toBeGreaterThan(SIZE * 0.25);
+    const market = [...container.querySelectorAll("text")].find(
+      (t) => t.textContent === "Market",
+    )!;
+    expect(Math.abs(Number(market.getAttribute("x")) - SIZE / 2)).toBeGreaterThan(SIZE * 0.25);
   });
 });
 

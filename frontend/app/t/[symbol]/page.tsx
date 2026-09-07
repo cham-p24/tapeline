@@ -904,6 +904,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
                 macro={b.macro?.value ?? null}
                 momentum={b.momentum?.value ?? null}
                 score={data.score ?? null}
+                assetClass={data.asset_class ?? null}
                 size={220}
               />
             </div>
@@ -919,6 +920,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
               macro={b.macro?.value ?? null}
               momentum={b.momentum?.value ?? null}
               score={data.score ?? null}
+              assetClass={data.asset_class ?? null}
               size={200}
             />
           </div>

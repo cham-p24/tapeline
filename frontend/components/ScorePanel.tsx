@@ -74,6 +74,7 @@ export function ScorePanel({
   percentiles,
   reason,
   displayScore,
+  assetClass = null,
 }: {
   symbol: string;
   score: number | null;
@@ -85,6 +86,13 @@ export function ScorePanel({
   percentiles: unknown;
   /** The API's own one-line note on the score. Rendered verbatim, or not at all. */
   reason?: string | null;
+  /**
+   * Asset class, so an absent spoke can say whether the reading is MISSING or
+   * whether it cannot exist for this kind of instrument. A fund has no revenue
+   * and a coin has no insider filings; rendering those identically to a
+   * genuine gap makes the product look short of data where it is being exact.
+   */
+  assetClass?: string | null;
   /**
    * Optional pre-formatted composite, so the page can keep its count-up
    * animation. Presentation only: every decision below reads `score`.
@@ -125,6 +133,7 @@ export function ScorePanel({
             macro={sub("macro")}
             momentum={sub("momentum")}
             score={score}
+            assetClass={assetClass}
             size={104}
             showCenter={false}
             showLabels={false}
