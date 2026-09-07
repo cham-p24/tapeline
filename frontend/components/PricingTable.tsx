@@ -114,7 +114,6 @@ const PLANS = [
     // Styled as the power tier (darker, quieter) — no popularity badge.
     proPlus: true,
     highlights: [
-      "Congressional trades feed (House + Senate)",
       `Recent insider buys — live SEC Form 4 across ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} tickers`,
       "Email alerts · unlimited (Pro: 10/day)",
       "Public API access · 1,000 requests/day",

@@ -26,7 +26,7 @@ Tapeline uses descriptive labels — not buy/sell calls — to maintain the publ
 - **Public record** (free, no account, no card) — the daily Top 10 at /daily-picks, the complete scorecard at /scorecard, a page per scored ticker at /t/{TICKER}, and the raw record as CSV and JSON at /api/scorecard.csv and /api/scorecard.json. Open to everyone, including AI crawlers. This is not a trial and does not expire.
 - **Free account** ($0 — an email and a password, nothing else) — the live scanner at the top 10 scored rows of any scan with no delay, one saved screen (re-run when the user opens it), a 5-ticker watchlist, and 12 detailed ticker look-ups a day. No alerts on any channel.
 - **Pro** — $9.99/mo OR $8.25/mo billed annually ($99/yr) — full universe live, squeeze + regime + heatmap, watchlist (50), email alerts (10/day), CSV, browser push.
-- **Premium** — $19.99/mo OR $16.58/mo billed annually ($199/yr) — everything in Pro plus Congressional trades, recent insider buys (SEC Form 4), unlimited email alerts, public API (1,000/day), priority support.
+- **Premium** — $19.99/mo OR $16.58/mo billed annually ($199/yr) — everything in Pro plus recent insider buys (SEC Form 4), unlimited email alerts, public API (1,000/day), priority support.
 
 **Signing up and starting a trial are two different steps, and a card is the only thing that separates them. State both requirements together or neither.**
 
