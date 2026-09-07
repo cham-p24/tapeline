@@ -16,6 +16,7 @@ from app.models.password_reset_token import PasswordResetToken
 from app.models.regime import RegimeState
 from app.models.roadmap_vote import RoadmapVote
 from app.models.scan_log import SCAN_LOG_TOP_N, ScanLog
+from app.models.survey import SurveyResponse
 from app.models.scanner_preset import ScannerPreset
 from app.models.score_snapshot import ScoreSnapshot
 from app.models.scorecard import DailyScorecardEntry
@@ -54,6 +55,7 @@ __all__ = [
     "RegimeState",
     "RoadmapVote",
     "ScanLog",
+    "SurveyResponse",
     "ScannerPreset",
     "ScoreSnapshot",
     "SigninCode",
