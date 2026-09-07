@@ -55,7 +55,22 @@ from app.models import Ticker
 ASSET_CLASS_SYNONYMS: dict[str, frozenset[str]] = {
     "equity": frozenset({"equity", "stock"}),
     "etf": frozenset({"etf", "fund"}),
+    "crypto": frozenset({"crypto"}),
 }
+
+#: Classes held OUT of an unfiltered scan, and why that is not a hidden filter.
+#:
+#: A coin and a stock scoring 70 do not mean the same thing. Two of the six
+#: factors — company fundamentals and insider filings — cannot exist for a
+#: token, so they fall back to NEUTRAL and a coin's number is built from four
+#: readings where a stock's is built from six. Listing them together implies a
+#: comparison the arithmetic does not support.
+#:
+#: So the default view is equities and funds, and crypto is one click away as
+#: its own bucket rather than mixed in. Asking for `asset_class=crypto`
+#: returns them; asking for nothing does not. `total_matched` is built from
+#: this same predicate, so the count a user sees always matches the list.
+DEFAULT_EXCLUDED_CLASSES: frozenset[str] = frozenset({"crypto"})
 
 #: Everything the two named buckets claim. "other" is the complement of this,
 #: restricted to rows that actually state a class.
@@ -65,7 +80,7 @@ _NAMED: frozenset[str] = frozenset().union(*ASSET_CLASS_SYNONYMS.values())
 #: pattern so an unknown bucket is a 422 rather than a silently empty result —
 #: a filter that returns nothing is indistinguishable from "no matches", which
 #: is the worst possible failure for a screener.
-ASSET_BUCKETS: tuple[str, ...] = ("equity", "etf", "other")
+ASSET_BUCKETS: tuple[str, ...] = ("equity", "etf", "crypto", "other")
 
 #: Ready-made regex for Query(pattern=...) on both the scanner and the export.
 ASSET_CLASS_PATTERN = f"^({'|'.join(ASSET_BUCKETS)})$"
@@ -84,17 +99,22 @@ def asset_bucket_clause(bucket: str | None) -> ColumnElement[bool] | None:
     change must not silently empty a bucket. Keeping the SQL and `bucket_of`
     literally equivalent is what lets the tests assert one against the other.
     """
-    if not bucket:
-        return None
-
     col = func.trim(func.lower(Ticker.asset_class))
+
+    if not bucket:
+        # Not "no filter" any more — see DEFAULT_EXCLUDED_CLASSES. An
+        # unfiltered scan is still the whole ranked universe of things that
+        # are comparable to each other, which is what a screener's default
+        # list means.
+        return col.not_in(sorted(DEFAULT_EXCLUDED_CLASSES))
     synonyms = ASSET_CLASS_SYNONYMS.get(bucket)
     if synonyms is not None:
         return col.in_(sorted(synonyms))
 
     if bucket == "other":
         # Stated, but not one of the named buckets. A blank value is excluded
-        # on purpose — see the module docstring.
+        # on purpose — see the module docstring. Crypto is a NAMED bucket now,
+        # so it is not swept in here as a leftover.
         return and_(col != "", col.not_in(sorted(_NAMED)))
 
     # Unreachable while the endpoints validate against ASSET_CLASS_PATTERN.

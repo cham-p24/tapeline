@@ -379,11 +379,37 @@ def test_bucket_of_matches_the_frontend_mapping():
     assert bucket_of("  ETF  ") == "etf"
 
 
-def test_no_bucket_asked_for_means_no_clause():
-    """None, not a true-clause: the WHERE stack must be byte-identical to the
-    unfiltered query so total_matched and the page agree."""
-    assert asset_bucket_clause(None) is None
-    assert asset_bucket_clause("") is None
+def test_an_unfiltered_scan_still_excludes_crypto():
+    """This used to assert `asset_bucket_clause(None) is None`.
+
+    The stated reason was that the WHERE stack must be identical between the
+    ranked page and total_matched, so the count always matches the list. That
+    property is unchanged — both are still built from this one function — but
+    the clause is no longer empty, because "no filter" and "everything in one
+    list" stopped meaning the same thing when crypto arrived.
+
+    A coin and a stock scoring 70 do not mean the same thing: two of the six
+    factors cannot exist for a token, so a coin's number is built from four
+    readings and a stock's from six. Listing them together implies a
+    comparison the arithmetic does not support. Crypto is one click away as
+    its own bucket instead.
+    """
+    for empty in (None, ""):
+        clause = asset_bucket_clause(empty)
+        assert clause is not None, (
+            "an unfiltered scan applies no asset-class predicate, so coins "
+            "appear in the equity leaderboard ranked against stocks"
+        )
+        rendered = str(clause.compile(compile_kwargs={"literal_binds": True}))
+        assert "crypto" in rendered, f"default clause does not exclude crypto: {rendered}"
+
+
+def test_asking_for_crypto_returns_crypto():
+    """The other half: excluded by default must still mean reachable."""
+    clause = asset_bucket_clause("crypto")
+    assert clause is not None
+    rendered = str(clause.compile(compile_kwargs={"literal_binds": True}))
+    assert "crypto" in rendered
 
 
 @pytest.mark.asyncio

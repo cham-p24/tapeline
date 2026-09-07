@@ -147,6 +147,7 @@ def test_every_cadenced_job_in_the_tick_stamps_before_its_work():
 SLOW_JOBS_THAT_MUST_BE_DETACHED = [
     ("_refresh_watchlisted_news", "two live HTTP calls per symbol across hundreds of symbols"),
     ("_refresh_workbook_tabs", "five CSV fetches plus a ~4,100-row upsert"),
+    ("_refresh_crypto_universe", "~120 per-pair history requests plus the grouped call"),
 ]
 
 
@@ -179,6 +180,7 @@ def test_a_detached_job_still_latches_before_dispatch():
     for stamp, fn in (
         ("_last_watchlisted_news_refresh", "_refresh_watchlisted_news"),
         ("_last_sheet_refresh", "_refresh_workbook_tabs"),
+        ("_last_crypto_refresh", "_refresh_crypto_universe"),
     ):
         assign_at = src.index(f"{stamp} = started")
         spawn_at = src.index(f"_spawn({fn}(")
