@@ -1550,3 +1550,75 @@ async def refresh_all_tabs(session: AsyncSession) -> dict[str, dict[str, int]]:
         "market":      await refresh_market_from_workbook(session),
         "smart_money": await refresh_smart_money_from_workbook(session),
     }
+
+
+#: Most rows a single repair pass will touch. A ceiling, not a target: 14 today,
+#: and a sudden jump means the sheet started emitting a shape the normaliser
+#: does not know, which is worth seeing in the log rather than silently fixing
+#: ten thousand rows.
+ASSET_CLASS_REPAIR_LIMIT = 500
+
+
+async def repair_dirty_asset_classes(session: AsyncSession) -> dict[str, int]:
+    """Re-normalise stored asset_class values that no longer pass the gate.
+
+    `normalize_asset_class` strips the sheet's emoji decoration at WRITE time,
+    but it was added after rows had already been written with values like
+    "📈 stock" and "🏛 holding co" — and nothing ever revisited them. Those
+    rows are PERMANENTLY unservable, because `valid_composite_clauses` requires
+    a clean single-token asset_class on every ranked surface.
+
+    Measured in production 2026-09-07: 14 rows, and not obscure ones —
+    BRK-A and BRK-B (Berkshire Hathaway) as "🏛 holding co", SPLG (the SPDR
+    S&P 500 ETF) as "🏦 index etf", plus ASGN, CIVI, SPR, TGI, VSCO, VTLE, VRE,
+    NXDT, SIXG, ENDV and FFH.TO. Scored, priced, and invisible on every surface.
+
+    They are no longer sheet-governed, so the write-time normaliser never sees
+    them again. A repair pass is the only thing that can reach them, and making
+    it a standing job means the next format change self-heals instead of
+    stranding another set of names.
+
+    A value the normaliser cannot classify is LEFT ALONE. "We do not understand
+    this" is not licence to guess a class — the same rule the ingest guard
+    follows.
+    """
+    # Targets exactly the rows the GATE rejects, by negating the gate's own
+    # clauses rather than restating the rule. A second copy of "clean" would be
+    # free to drift, and a repair pass that disagrees with the predicate it
+    # exists to satisfy is worse than none.
+    from sqlalchemy import and_, not_
+
+    from app.services.ticker_freshness import asset_class_clean_clauses
+
+    rows = (
+        await session.execute(
+            select(Ticker)
+            .where(not_(and_(*asset_class_clean_clauses())))
+            .limit(ASSET_CLASS_REPAIR_LIMIT)
+        )
+    ).scalars().all()
+
+    repaired, unclassifiable = 0, []
+    for t in rows:
+        clean = normalize_asset_class(t.asset_class)
+        if clean is None:
+            unclassifiable.append(t.symbol)
+            continue
+        if clean != t.asset_class:
+            t.asset_class = clean
+            repaired += 1
+
+    if repaired or unclassifiable:
+        logger.info(
+            "asset_class.repaired fixed=%d unclassifiable=%d%s",
+            repaired, len(unclassifiable),
+            f" ({', '.join(unclassifiable[:8])})" if unclassifiable else "",
+        )
+    if len(rows) >= ASSET_CLASS_REPAIR_LIMIT:
+        logger.warning(
+            "asset_class.repair_at_cap rows=%d — more dirty values than one "
+            "pass repairs; the sheet may have changed shape",
+            len(rows),
+        )
+    return {"scanned": len(rows), "repaired": repaired,
+            "unclassifiable": len(unclassifiable)}

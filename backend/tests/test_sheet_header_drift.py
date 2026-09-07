@@ -337,3 +337,74 @@ def test_every_column_the_parser_reads_is_registered():
         "parse_all_signals_csv still reads a column via raw.get(); use "
         "_cell(raw, ...) so the alias table and the audit both see it"
     )
+
+
+# ── stranded asset_class values ─────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_a_stranded_emoji_asset_class_is_repaired():
+    """These rows are permanently unservable until something revisits them.
+
+    `normalize_asset_class` strips the sheet's decoration at WRITE time, but it
+    was added after rows had already been stored as "<icon> stock" and
+    "<icon> holding co" — and nothing ever went back. Measured in production
+    2026-09-07: 14 rows, including BRK-A and BRK-B (Berkshire Hathaway) and
+    SPLG (the SPDR S&P 500 ETF). Scored, priced, and invisible everywhere,
+    because `valid_composite_clauses` requires a clean single-token class.
+
+    They are no longer sheet-governed, so the write-time normaliser will never
+    see them again.
+    """
+    import uuid
+
+    from sqlalchemy import delete, select
+
+    from app.db import session_scope
+    from app.models import Ticker
+    from app.services.sheet_feed import repair_dirty_asset_classes
+
+    sym = f"ZR{uuid.uuid4().hex[:5].upper()}"
+    async with session_scope() as s:
+        s.add(Ticker(symbol=sym, name="Stranded", sector="Financials",
+                     asset_class="\U0001F3DB holding co", score=56.2, price=500.0))
+    try:
+        async with session_scope() as s:
+            await repair_dirty_asset_classes(s)
+        async with session_scope() as s:
+            row = (await s.execute(select(Ticker).where(Ticker.symbol == sym))).scalar_one()
+        assert row.asset_class == "equity", (
+            f"a stranded row kept asset_class={row.asset_class!r}, so it stays "
+            f"invisible on every ranked surface"
+        )
+    finally:
+        async with session_scope() as s:
+            await s.execute(delete(Ticker).where(Ticker.symbol == sym))
+
+
+@pytest.mark.asyncio
+async def test_a_value_the_normaliser_cannot_read_is_left_alone():
+    """"We do not understand this" is not licence to guess a class."""
+    import uuid
+
+    from sqlalchemy import delete, select
+
+    from app.db import session_scope
+    from app.models import Ticker
+    from app.services.sheet_feed import repair_dirty_asset_classes
+
+    sym = f"ZS{uuid.uuid4().hex[:5].upper()}"
+    async with session_scope() as s:
+        s.add(Ticker(symbol=sym, name="Unknown", sector="?",
+                     asset_class="\U0001F4A0 quantum widget", score=50.0, price=1.0))
+    try:
+        async with session_scope() as s:
+            out = await repair_dirty_asset_classes(s)
+        assert out["unclassifiable"] >= 1
+        async with session_scope() as s:
+            row = (await s.execute(select(Ticker).where(Ticker.symbol == sym))).scalar_one()
+        assert row.asset_class == "\U0001F4A0 quantum widget", (
+            "the repair invented a class for a value it cannot read"
+        )
+    finally:
+        async with session_scope() as s:
+            await s.execute(delete(Ticker).where(Ticker.symbol == sym))
