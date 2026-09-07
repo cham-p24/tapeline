@@ -178,18 +178,54 @@ Seven exposures found independently across four sessions. The Massive vendor key
   agent did not take it. Either purge them or leave them suppressed — but do not
   leave the question open indefinitely, because the next person to read the table
   will see 338,015 rows and assume a populated feed.
-- [ ] **Wire real congressional data, or leave the feature retired.** The
-  `SMART MONEY & CONGRESS` sheet tab is already parsed and its URL is already a
-  Fly secret — but `sheet_feed` only increments `sub_smart_money` by per-ticker
-  appearance count and never stores the individual trades as `CongressTrade`
-  rows. Storing them is what makes the Premium claim true again and lets the
-  marketing line come back. Until then Premium is one bullet shorter, which is
-  the honest state.
-- [ ] **`sub_smart_money` partly derives from that same tab.** The individual
-  trades were fabricated; the per-ticker appearance COUNT that feeds the score
-  comes from the sheet and is presumably real. Worth confirming that the score
-  input was never contaminated by the mock generator — it is a different code
-  path, but nobody has checked it.
+- [ ] **Wire real congressional data, or leave the feature retired.** CORRECTED
+  2026-09-07 — an earlier version of this item (and a summary given to the
+  founder) said the sheet already carries the real trades and only needs
+  "wiring up". It does not. `parse_smart_money_csv`'s own docstring is explicit:
+  the `SMART MONEY & CONGRESS` tab is free text, not structured rows, which is
+  precisely why it boosts `sub_smart_money` by per-ticker appearance count
+  instead of building `CongressTrade` rows. A real feed therefore needs a real
+  SOURCE — House/Senate disclosure filings, or a licensed vendor — not a
+  parser change. That is a build, not a repair, and it is what the Premium
+  claim would cost to bring back. Until then Premium is one bullet shorter,
+  which is the honest state.
+- [x] **`sub_smart_money` was NOT contaminated by the mock generator** —
+  checked 2026-09-07, clean. `CongressTrade` appears in exactly seven modules
+  (`models/`, `routers/{alerts,congress}.py`, `services/{alerts,
+  congress_integrity,sheet_feed}.py`, `workers/signal_publisher.py`) and in
+  none of them on a scoring path; `sheet_feed.py`'s only mention of the model
+  is inside a docstring. The factor has two inputs — the sheet's appearance
+  count and the Finnhub Form 4 cache — and neither reads the `congress_trades`
+  table. So the fabricated rows were a SERVING defect only; no published score
+  was ever computed from them, and no score needs restating.
+# 9h — Shipped 2026-09-07: the factor fix was only half a fix
+
+- [x] **The insider pass had never run once** — found while verifying yesterday's
+  coverage fix (#762) against production. `last_fundamentals_at` was stamped on
+  1,320 rows and climbing; `last_smart_money_at` was stamped on **0 of 11,781**.
+  Not lagging — never executed since the column shipped, so `sub_smart_money`
+  (15% of the composite) was NEUTRAL 50 universe-wide and the "check on
+  2026-09-13" note would have half-failed.
+
+  The cause was a budget, not an ordering. Both passes ran to a per-run budget
+  of `ACTIVE_UNIVERSE_SIZE` = 12,000, which at the mandatory 1.1s Finnhub pacing
+  is **3.7 hours for the first pass alone** — so the second only began on a
+  process that had already survived 3.7 uninterrupted hours, and production
+  restarts on every deploy. Moving the factors to the front (#762) was necessary
+  but not sufficient: whichever pass ran second was starved at any position, so
+  swapping them would only have moved the hole onto fundamentals.
+
+  Two comment blocks had also under-counted the chain by 5x ("roughly two hours"
+  off "per-run budgets of 2,500"), which is how a total starvation read as a
+  queue. Both corrected.
+
+  Fix: the passes now ALTERNATE in `_FACTOR_SLICE` (400-row, ~7min) slices under
+  a shared phase budget, so one round advances both and a restart leaves them
+  within a slice of each other. When both frontiers close, the loop drops to one
+  rotation slice each and falls through, so the display-column backfills behind
+  it are not held off. Guard: `backend/tests/test_factor_stage_alternation.py`
+  (watched red on the reverted worker — all 6).
+
 # 9f — Shipped 2026-09-06, third pass: the three fixes
 
 Founder said fix them. All three merged and deployed. Written in parallel

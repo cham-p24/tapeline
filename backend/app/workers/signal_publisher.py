@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, date, datetime
+from time import monotonic
 from typing import Any
 
 from sqlalchemy import bindparam, delete, desc, func, select, update
@@ -897,11 +898,15 @@ async def tick() -> None:
             # ORDER IS LOAD-BEARING — the two COMPOSITE FACTORS first, the
             # display columns behind them.
             #
-            # These stages are serial and paced at ~1.1s/request against per-run
-            # budgets of 2,500, so the whole chain is roughly two hours. The
-            # latches above are in-memory globals, so every deploy resets them
-            # and the chain restarts from stage one. On a deploy-heavy day the
-            # last stages are simply never reached.
+            # These stages are serial and paced at ~1.1s/request. The latches
+            # above are in-memory globals, so every deploy resets them and the
+            # chain restarts from stage one. On a deploy-heavy day the last
+            # stages are simply never reached — which is a scheduling fact to
+            # design around, not a bug to be fixed by reordering. (The earlier
+            # note here put the chain at "roughly two hours" off a per-run
+            # budget of 2,500. The budget was ACTIVE_UNIVERSE_SIZE = 12,000,
+            # i.e. 3.7 hours PER factor stage. Under-counting it by 5x is how
+            # the stage-two starvation below went unnoticed.)
             #
             # The order used to be "user-visible COLUMNS first, internal caches
             # last", on the reading that fundamentals and smart-money were
@@ -912,7 +917,7 @@ async def tick() -> None:
             # four say.
             #
             # Measured on production 2026-09-07, with those two stages sitting
-            # at the back of a ~2h chain: 5,697 of 7,417 scored rows had BOTH
+            # at the back of the chain: 5,697 of 7,417 scored rows had BOTH
             # factors NULL, including 1,001 of the 1,035 rows over $10B —
             # NVDA, AAPL, MSFT, AMZN, META, TSLA and SPY among them. The best
             # composite any both-null row had ever reached was 80.2 against a
@@ -943,20 +948,49 @@ async def tick() -> None:
             # also fills sector, so it does part of that stage's work on the
             # way past.
             #
+            # The factor passes above alternate in slices rather than running
+            # in turn — moving them to the front was necessary but not
+            # sufficient, because at a full-universe budget the SECOND factor
+            # pass never ran at any position. See _FACTOR_SLICE.
+            #
             # STILL UNCONVERGED, and the next thing to fix here:
             # `_backfill_key_statistics` has no gap query and no stamp of its
             # own, so it re-fetches one fixed top-of-book slice every single
             # run — a full ~46 minutes of the chain, forever. It is behind the
             # factor stages now, so it no longer starves them, but it is why
             # `_backfill_sectors` sits at the end of a long chain.
-            try:
-                await _refresh_fundamentals_cache()
-            except Exception:
-                logger.exception("fundamentals.refresh_failed")
-            try:
-                await _refresh_insider_cache()
-            except Exception:
-                logger.exception("insider.refresh_failed")
+            # The two factor passes ALTERNATE in slices; they do not run one
+            # to completion and then the other. Running them in turn at a
+            # full-universe budget meant the second one never started at all —
+            # see _FACTOR_SLICE for the measurement. Ordering cannot fix that,
+            # because whichever pass is second is the one that starves.
+            factor_deadline = monotonic() + _FACTOR_PHASE_BUDGET_SECONDS
+            while True:
+                fundamentals_gap, smart_money_gap = await _factor_gap_counts()
+                gaps_remain = bool(fundamentals_gap or smart_money_gap)
+                # A pass runs if it still has gaps to close. When neither does,
+                # both run exactly one slice — that is the daily staleness
+                # rotation — and the loop exits so the display-column backfills
+                # behind it are not held off for the full phase budget.
+                if fundamentals_gap or not gaps_remain:
+                    try:
+                        await _refresh_fundamentals_cache(limit=_FACTOR_SLICE)
+                    except Exception:
+                        logger.exception("fundamentals.refresh_failed")
+                if smart_money_gap or not gaps_remain:
+                    try:
+                        await _refresh_insider_cache(limit=_FACTOR_SLICE)
+                    except Exception:
+                        logger.exception("insider.refresh_failed")
+                if not gaps_remain:
+                    break
+                if monotonic() >= factor_deadline:
+                    logger.info(
+                        "factor_phase.budget_exhausted fundamentals_gap=%d "
+                        "smart_money_gap=%d",
+                        fundamentals_gap, smart_money_gap,
+                    )
+                    break
             try:
                 await _backfill_market_cap()
             except Exception:
@@ -1957,11 +1991,62 @@ _FACTOR_ROTATION_RESERVE = 0.2
 #: Rows stamped per short-lived transaction inside a factor pass.
 #:
 #: Same size and same reason as _SECTOR_BACKFILL_BATCH — but here the batching
-#: is doing a second job. These passes run ~46 minutes and the process is
+#: is doing a second job. These passes run for many minutes and the process is
 #: restarted by every deploy, so stamping only at the END would throw away an
 #: interrupted run's entire progress and the pass would resume exactly where it
 #: started. Stamping as we go is what makes a restart cheap.
 _FACTOR_STAMP_BATCH = 20
+
+#: Rows one factor pass attempts before handing the Finnhub budget to the other.
+#:
+#: WHY A SLICE AND NOT THE WHOLE BUDGET, measured 2026-09-07
+#: --------------------------------------------------------
+#: The two factor passes used to run one after the other, each with a per-run
+#: budget of ACTIVE_UNIVERSE_SIZE (12,000). At the mandatory 1.1s pacing that
+#: is 3.7 HOURS for stage one alone — so stage two only began on a process that
+#: had already survived 3.7 uninterrupted hours. Production restarts on every
+#: deploy and did not. The result was absolute, not partial: across all 11,781
+#: rows, `last_smart_money_at` was NULL on every single one. The insider pass
+#: had never completed a symbol since the stamp column shipped, so
+#: sub_smart_money — 15% of the composite — was NEUTRAL 50 universe-wide.
+#:
+#: Ordering the stages could not fix this. Whichever pass runs second is
+#: starved whenever the first one's budget exceeds the process lifetime, so
+#: putting insider first would only have moved the hole onto fundamentals.
+#: The passes alternate in slices instead: after one round both have advanced,
+#: and a restart at any point leaves them within a slice of each other.
+#:
+#: 400 rows is ~7.3 min per slice, ~15 min per round. Small enough that an
+#: ordinary deploy cadence still lands several rounds; large enough that the
+#: per-slice gap COUNT and the two selection queries stay noise.
+_FACTOR_SLICE = 400
+
+#: Wall-clock the alternating factor phase may hold before the display-column
+#: backfills get their turn. Reached only while gaps remain — once both stamp
+#: columns are fully populated the loop drops to one rotation slice each and
+#: falls through, so this is a starvation ceiling on the REST of the chain,
+#: not a target.
+_FACTOR_PHASE_BUDGET_SECONDS = 3 * 3600
+
+
+async def _factor_gap_counts() -> tuple[int, int]:
+    """Rows never attempted by (fundamentals, smart-money), respectively.
+
+    Drives the alternating loop's exit: while either is non-zero the phase is
+    still CLOSING A GAP and keeps the budget; when both hit zero it has
+    converged and the remaining work is staleness rotation, which must not
+    hold the chain open against the display-column backfills behind it.
+    """
+    async with session_scope() as session:
+        fundamentals = await session.scalar(
+            select(func.count()).select_from(Ticker)
+            .where(Ticker.last_fundamentals_at.is_(None))
+        )
+        smart_money = await session.scalar(
+            select(func.count()).select_from(Ticker)
+            .where(Ticker.last_smart_money_at.is_(None))
+        )
+    return int(fundamentals or 0), int(smart_money or 0)
 
 
 async def _select_factor_symbols(stamp_col: Any, cap: int) -> list[str]:
@@ -2060,23 +2145,27 @@ async def _stamp_factor_attempts(
         logger.exception("factor_stamp.failed column=%s size=%d", column, len(symbols))
 
 
-async def _refresh_fundamentals_cache() -> None:
+async def _refresh_fundamentals_cache(limit: int | None = None) -> None:
     """
-    Daily pre-fetch of Finnhub fundamentals. Populates
+    Pre-fetch of Finnhub fundamentals. Populates
     finnhub_feed._FUND_SCORE_CACHE so polygon_feed.fetch_snapshots can read a
     real sub_fundamentals per tick, and stamps `last_fundamentals_at` so the
     next run starts where this one stopped.
 
-    PER-RUN BUDGET, not a universe cap. `ACTIVE_UNIVERSE_SIZE` rows at ~1.1s
-    each is ~46 min, which is what fits inside the daily serial Finnhub chain
-    without breaching the free tier's 60 calls/min. It is no longer the set of
-    symbols that can ever be covered: `_select_factor_symbols` spends the
-    budget on rows this pass has never attempted, so coverage advances by up to
-    a budget per run and converges over days across the ~11,800-row universe
-    rather than re-fetching one fixed slice forever.
+    PER-CALL BUDGET, not a universe cap. `_select_factor_symbols` spends it on
+    rows this pass has never attempted, so coverage advances by up to a budget
+    per call and converges over days across the ~11,800-row universe rather
+    than re-fetching one fixed slice forever.
+
+    `limit` is the budget. The chain passes `_FACTOR_SLICE` so this pass and
+    the insider pass can alternate; see that constant for why running either
+    one to a full-universe budget starved the other completely. It defaults to
+    ACTIVE_UNIVERSE_SIZE for callers that want a single exhaustive pass —
+    which at 1.1s/request is ~3.7 hours, so nothing on the daily chain should
+    ask for it.
     """
     from app.services.universe import ACTIVE_UNIVERSE_SIZE
-    FUNDAMENTALS_CAP = ACTIVE_UNIVERSE_SIZE
+    FUNDAMENTALS_CAP = ACTIVE_UNIVERSE_SIZE if limit is None else limit
 
     from app.services.finnhub_feed import (
         compute_fundamentals_score,
@@ -2351,19 +2440,20 @@ async def _refresh_aggregates_cache() -> bool:
     return refreshed > 0
 
 
-async def _refresh_insider_cache() -> None:
+async def _refresh_insider_cache(limit: int | None = None) -> None:
     """
-    Daily pre-fetch of Finnhub insider Form 4 transactions. Populates
+    Pre-fetch of Finnhub insider Form 4 transactions. Populates
     _SMART_MONEY_SCORE_CACHE so polygon_feed reads a real sub_smart_money per
     tick, and stamps `last_smart_money_at` so the next run resumes.
 
-    Same per-run budget and the same gaps-first selection as
+    Same per-call budget and the same gaps-first selection as
     _refresh_fundamentals_cache — see `_select_factor_symbols` for why the old
     "top 2,500 by dollar-volume, every run" ranking could never grow its
-    covered set.
+    covered set, and `_FACTOR_SLICE` for why this pass in particular must be
+    sliced: behind a full-universe fundamentals budget it never ran at all.
     """
     from app.services.universe import ACTIVE_UNIVERSE_SIZE
-    INSIDER_CAP = ACTIVE_UNIVERSE_SIZE
+    INSIDER_CAP = ACTIVE_UNIVERSE_SIZE if limit is None else limit
 
     from app.services.finnhub_feed import (
         compute_smart_money_score,

@@ -77,8 +77,13 @@ test-results/
 backend/.cache/
 frontend/tsconfig.tsbuildinfo
 
-# Claude Code worktrees — local agent-managed branches, never tracked
+# Claude Code worktrees — local agent-managed branches, never tracked.
+# Both locations: agents have used .worktrees/ as well, and because a worktree
+# is a git repo of its own, `git add -A` stages it as an embedded repository
+# (a bare gitlink) rather than as files. That nearly landed in the commit that
+# added this line.
 .claude/worktrees/
+.worktrees/
 
 # One-shot local deploy helpers — fly/gh CLI orchestration scripts the
 # founder uses interactively. Specific to a single deploy event; commit
