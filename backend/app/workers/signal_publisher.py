@@ -49,6 +49,29 @@ from app.services.universe import refresh_active_universe
 logger = logging.getLogger(__name__)
 
 
+#: What tick() is doing right now, for the watchdog to name on a timeout.
+#:
+#: tick() runs ~25 distinct jobs under a single 60-second watchdog, most of
+#: them cadence-gated, and when it is killed the log said only
+#: `tick.timeout elapsed=60.0s`. That is the least useful possible sentence
+#: about a worker that has stopped doing most of its work: everything BELOW
+#: the slow job is skipped, and on 2026-09-07 what got skipped included the
+#: sheet refresh, so a parser fix deployed and then never executed while the
+#: snapshot pass at the top kept writing 7,667 rows a cycle and made the
+#: worker look healthy.
+#:
+#: Diagnosing that took a stream of vendor URLs out of the logs and a hand-run
+#: timing harness on the box. A string assignment per stage means the next one
+#: reads `tick.timeout stage=aggregates_refresh` and is over.
+_tick_stage: str = "idle"
+
+
+def _set_stage(name: str) -> None:
+    """Record the tick's current stage. Deliberately trivial and never raises."""
+    global _tick_stage
+    _tick_stage = name
+
+
 #: Columns the tick writes from IN-MEMORY caches, COALESCE'd on update so a
 #: cold cache preserves the last good value instead of erasing it.
 #:
@@ -289,9 +312,11 @@ async def tick() -> None:
     # mock_feed.fetch_squeezes / fetch_congress_trades are sync.
     # Await the async ones so we get actual data instead of a coroutine object.
     import inspect
+    _set_stage("snapshots")
     snapshots = await fetch_snapshots() if inspect.iscoroutinefunction(fetch_snapshots) else fetch_snapshots()
     # Pass this tick's snapshots so fetch_regime derives REAL market breadth
     # (advancers vs decliners from change_pct_1d) instead of a placeholder.
+    _set_stage("regime")
     regime = (
         await fetch_regime(snapshots)
         if inspect.iscoroutinefunction(fetch_regime)
@@ -304,6 +329,7 @@ async def tick() -> None:
     mock_writes = _mock_writes_enabled()
     squeezes: list[dict] = []
     new_trades: list[dict] = []
+    _set_stage("mock_writes")
     if mock_writes:
         squeezes = await fetch_squeezes() if inspect.iscoroutinefunction(fetch_squeezes) else fetch_squeezes()
         new_trades = (
@@ -319,6 +345,7 @@ async def tick() -> None:
     # Live sector_leaders: top 3 sectors ranked by average composite score.
     # Replaces the second hardcoded regime placeholder. Joins each snapshot to
     # its Ticker.sector by walking the universe() helper rather than hitting DB.
+    _set_stage("sheet_governed")
     try:
         sector_map = {row["symbol"]: row.get("sector") for row in universe()}
         sector_scores: dict[str, list[float]] = {}
@@ -346,6 +373,7 @@ async def tick() -> None:
     # only market-feed fields for those (see _sheet_is_scoring_source).
     sheet_owned = _sheet_governed_symbols if _sheet_is_scoring_source() else frozenset()
 
+    _set_stage("score_upsert")
     async with session_scope() as session:
         # --- Update ticker snapshots (dialect-neutral upsert) ---
         # Only the PK is selected: loading full ORM Ticker objects for the whole
@@ -531,6 +559,7 @@ async def tick() -> None:
                 session.add(CongressTrade(**t))
 
     # Publish to SSE
+    _set_stage("publish")
     await broker.publish("scores_updated", {"ts": started.isoformat(), "count": len(snapshots)})
     await broker.publish("regime_updated", regime)
     if mock_writes:
@@ -540,6 +569,7 @@ async def tick() -> None:
 
     # Evaluate alert rules against the freshly-updated state.
     # Each evaluator is debounced internally (15min), safe to run every tick.
+    _set_stage("alerts")
     async with session_scope() as alert_session:
         try:
             from app.services.alerts import evaluate_all_rules
@@ -564,6 +594,7 @@ async def tick() -> None:
     # the once-per-day semantics.
 
     # Refresh news feed: on first tick after boot + every ~5 minutes thereafter
+    _set_stage("news_refresh+backcheck")
     global _last_news_refresh, _last_backcheck
     if _last_news_refresh is None or (started - _last_news_refresh).total_seconds() > 300:
         await _refresh_news()
@@ -598,6 +629,7 @@ async def tick() -> None:
 
     # Calendar refresh (IPOs + earnings) — daily cadence. Finnhub-aware
     # via calendar_feed.upcoming_*; mock fallback when no FINNHUB_API_KEY.
+    _set_stage("calendar_seed")
     global _last_calendar_seed
     if _last_calendar_seed is None or (started - _last_calendar_seed).total_seconds() >= 86400:
         # Isolated: a calendar-feed failure must not abort the rest of the tick.
@@ -611,6 +643,7 @@ async def tick() -> None:
 
     # Hourly trial-expiry enforcement: drop unpaid expired-trial users to Free.
     # Without this the trial converts to free Premium forever (zero conversion).
+    _set_stage("trial_check")
     global _last_trial_check
     if _last_trial_check is None or (started - _last_trial_check).total_seconds() >= 3600:
         # Isolated + latch-on-success. The downgrade is idempotent, so a retry
@@ -627,6 +660,7 @@ async def tick() -> None:
     # etc.), niche names where the broad sweep doesn't surface anything.
     # Quota math: 200 unique tickers × 1/hour = 4.8k calls/day across
     # Massive + Finnhub (60/min), comfortably within the rate limits.
+    _set_stage("watchlisted_news_refresh")
     global _last_watchlisted_news_refresh
     if _last_watchlisted_news_refresh is None or (started - _last_watchlisted_news_refresh).total_seconds() >= 3600:
         # Latch BEFORE dispatch, then run detached — same pattern as the daily
@@ -654,6 +688,7 @@ async def tick() -> None:
     # fully successful run, so a transient failure (Neon cold-start, DB blip)
     # retries after a short backoff instead of silently skipping a whole day
     # of stage windows.
+    _set_stage("daily_drips")
     await _maybe_run_daily_drips(started)
 
     # Checkout abandonment recovery — HOURLY (not daily like the drips above):
@@ -662,6 +697,7 @@ async def tick() -> None:
     # checkout_started_at is the abandonment signal (cleared by the
     # checkout.session.completed webhook); the "abandon1" drip_state token makes
     # each attempt a one-shot. No-op without RESEND_API_KEY.
+    _set_stage("checkout_recovery")
     global _last_checkout_recovery
     if _last_checkout_recovery is None or (started - _last_checkout_recovery).total_seconds() >= 3600:
         try:
@@ -687,6 +723,7 @@ async def tick() -> None:
     # trial-drip email this morning will NOT also get an activation nudge this
     # afternoon — the cross-flow gap is enforced even though the two run on
     # different schedules. No-op without RESEND_API_KEY.
+    _set_stage("activation_nudge")
     global _last_activation_nudge
     if _last_activation_nudge is None or (started - _last_activation_nudge).total_seconds() >= 3600:
         try:
@@ -712,6 +749,7 @@ async def tick() -> None:
     # the matching Tapeline tables. Each tab is gated by its own env var so
     # the user can light them up independently. Same 5-min throttle for all.
     # Bypasses cleanly when no URLs are set (worker continues with mock_feed).
+    _set_stage("sheet_refresh")
     global _last_sheet_refresh
     if (
         settings.signal_sheet_csv_url
@@ -785,6 +823,7 @@ async def tick() -> None:
     # as_of session's close. Freezing at the top of the UTC day (the old
     # behaviour) captured the PREVIOUS session's close, making every published
     # "1-day" move actually span 2 sessions — and 4 across a long weekend.
+    _set_stage("scorecard_freeze")
     if (started.hour, started.minute) >= (
         _SCORECARD_FREEZE_UTC_HOUR,
         _SCORECARD_FREEZE_UTC_MINUTE,
@@ -836,6 +875,7 @@ async def tick() -> None:
     # Weekly universe refresh from Massive's reference API.
     # Only fires when a vendor key is set — discovers new IPOs and ETF
     # listings without needing manual ticker-list maintenance.
+    _set_stage("universe_refresh")
     global _last_universe_refresh
     if (settings.massive_api_key or settings.polygon_api_key) and (
         _last_universe_refresh is None
@@ -852,6 +892,7 @@ async def tick() -> None:
     # Hourly active-scoring-universe refresh (top-N by daily $-volume from
     # the DB-tracked 5,757). Cheap query — keeps the cache that
     # polygon_feed.fetch_snapshots reads each tick within an hour of fresh.
+    _set_stage("active_universe_refresh")
     global _last_active_universe_refresh
     if _last_active_universe_refresh is None or (
         started - _last_active_universe_refresh
@@ -873,6 +914,7 @@ async def tick() -> None:
     # working. The two backfills added for key statistics share the existing
     # latches rather than adding their own: they are stages of this one daily
     # chain, not independently schedulable jobs.
+    _set_stage("fundamentals_refresh+insider_refresh+sector_backfill")
     global _last_fundamentals_refresh, _last_insider_refresh, _last_sector_backfill
     needs_finnhub = settings.finnhub_api_key and (
         _last_fundamentals_refresh is None
@@ -975,6 +1017,7 @@ async def tick() -> None:
     # Daily Massive aggregates refresh — pre-fetches 250 days of OHLC bars per
     # ticker, computes trend/RS/momentum, populates the in-memory caches that
     # polygon_feed.fetch_snapshots reads per tick.
+    _set_stage("aggregates_refresh+aggregates_failed_at")
     global _last_aggregates_refresh, _last_aggregates_failed_at
     aggregates_due = (
         _last_aggregates_refresh is None
@@ -1002,6 +1045,7 @@ async def tick() -> None:
     # Trading days only — on Sat/Sun/market holidays there's no fresh close to
     # report, so a digest is pure noise (and shows stale prices). Reuses the
     # same market calendar the scorecard freeze + back-check run on.
+    _set_stage("eod_digest_date")
     global _last_eod_digest_date
     today_str = started.strftime("%Y-%m-%d")
     if (
@@ -1029,6 +1073,7 @@ async def tick() -> None:
     # is also enforced inside run_weekly_newsletter via User.drip_state, so
     # the process-level token here is a cheap short-circuit — DB stays
     # the source of truth for "did THIS user get THIS week's edition".
+    _set_stage("weekly_newsletter_token")
     global _last_weekly_newsletter_token
     iso_year, iso_week, iso_dow = started.isocalendar()
     weekly_token = f"weekly_{iso_year}W{iso_week:02d}"
@@ -1057,6 +1102,7 @@ async def tick() -> None:
     # DB-side `last_sent_at` give us two layers of dedupe so a worker
     # restart can't double-send. Only US weekdays — Sat/Sun there's no
     # fresh tape to send, so we skip cleanly.
+    _set_stage("daily_newsletter_date")
     global _last_daily_newsletter_date
     if (
         started.hour >= 13                                # 13:00 UTC onward
@@ -1080,6 +1126,7 @@ async def tick() -> None:
     # Bing + Yandex + DuckDuckGo + Seznam in one batch — they pick up
     # new content within hours instead of waiting on Googlebot's crawl
     # schedule. Free, no auth, gracefully no-ops if endpoint is down.
+    _set_stage("indexnow_date")
     global _last_indexnow_date
     if started.hour >= 6 and _last_indexnow_date != today_str:
         # Latch BEFORE spawning so this fires at most once per UTC day even if
@@ -1114,6 +1161,7 @@ async def tick() -> None:
     # to the founder's Telegram: sitemap size, broken-URL count,
     # ticker-universe stats, and suggested next steps. Process-level
     # token + Telegram-side dedupe make double-fires harmless.
+    _set_stage("seo_digest_token")
     global _last_seo_digest_token
     seo_digest_token = f"seo_{iso_year}W{iso_week:02d}"
     if (
@@ -1139,6 +1187,7 @@ async def tick() -> None:
     # No-op when GROWTH_BOT_ENABLED is false (default — opt-in).
     # Weekdays only — no growth tick on Sat/Sun so the founder's inbox
     # doesn't ping at 8am on the weekend.
+    _set_stage("growth_tick_date")
     global _last_growth_tick_date
     if (
         settings.growth_bot_enabled
@@ -1167,6 +1216,7 @@ async def tick() -> None:
     # alerts are dispatched at classification time). Cadence: 5 min
     # during US market hours (more chatter), 15 min off-hours. No-ops
     # cleanly when REDDIT_* credentials are unset.
+    _set_stage("inbox_tick")
     global _last_inbox_tick
     is_inbox_market_hours = (
         started.weekday() < 5 and 13 <= started.hour < 21  # 9am-5pm ET ≈ 13-21 UTC
@@ -3090,13 +3140,16 @@ async def main() -> None:
         try:
             await asyncio.wait_for(tick(), timeout=TICK_TIMEOUT_SECONDS)
             consecutive_timeouts = 0
+            _set_stage("idle")
         except TimeoutError:
             consecutive_timeouts += 1
             elapsed = (datetime.now(UTC) - cycle_started).total_seconds()
             logger.error(
-                "tick.timeout elapsed=%.1fs limit=%ds consecutive=%d — "
-                "killing this cycle and moving on",
+                "tick.timeout elapsed=%.1fs limit=%ds consecutive=%d "
+                "stage=%s — killing this cycle and moving on. Every job "
+                "after this stage was skipped.",
                 elapsed, TICK_TIMEOUT_SECONDS, consecutive_timeouts,
+                _tick_stage,
             )
             # If we're racking up timeouts something is fundamentally
             # broken — surface to Sentry so it pages instead of silently
