@@ -201,3 +201,63 @@ async def test_the_cursor_wraps_rather_than_running_off_the_end():
         "the bootstrap cursor was not wrapped back into range, so the intake "
         "window fell off the end of the table and admitted nobody"
     )
+
+
+# ── crypto belongs to a different feed ──────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_crypto_never_enters_the_equity_snapshot_list():
+    """A coin handed to the equity snapshot does not just waste a request.
+
+    The vendor answers NOT_ENTITLED for a pair on that endpoint, and the tick
+    upserts from the empty result — NULLing the price, volume and daily move
+    the crypto feed had just written. `live_clauses` requires change_pct_1d, so
+    the coin then vanishes from every surface.
+
+    Observed in production within minutes of the first crypto deploy: 66 of 67
+    pairs lost their price and became unfindable. Nothing about crypto changed
+    to cause it — giving those rows a SCORE is what let them into a pass whose
+    only predicate was `score IS NOT NULL`.
+    """
+    sym = f"X:ZZ{uuid.uuid4().hex[:4].upper()}USD"
+    async with session_scope() as s:
+        s.add(Ticker(
+            symbol=sym, name=f"{sym} pair", sector="Crypto",
+            asset_class="crypto", score=68.8, price=1234.5, volume=99,
+        ))
+    try:
+        await refresh_active_universe()
+        listed = {row[0] for row in universe_mod.active_universe()}
+        assert sym not in listed, (
+            f"{sym} was handed to the equity snapshot pass; that pass will "
+            f"overwrite its price and daily move with nulls and the coin will "
+            f"disappear from search, the scanner and its own ticker page"
+        )
+    finally:
+        await _cleanup(sym)
+
+
+@pytest.mark.asyncio
+async def test_an_unscored_crypto_pair_is_excluded_from_bootstrap_too():
+    """The bootstrap window has its own query and needs the same exclusion."""
+    sym = f"X:YY{uuid.uuid4().hex[:4].upper()}USD"
+    async with session_scope() as s:
+        s.add(Ticker(symbol=sym, name=f"{sym} pair", sector="Crypto",
+                     asset_class="crypto", score=None, price=1.0))
+    try:
+        await refresh_active_universe()
+        assert sym not in {row[0] for row in universe_mod.active_universe()}
+    finally:
+        await _cleanup(sym)
+
+
+@pytest.mark.asyncio
+async def test_equities_are_still_included_after_the_exclusion():
+    """The exclusion must be on asset class, not an accidental catch-all."""
+    sym = f"ZQ{uuid.uuid4().hex[:5].upper()}"
+    await _ticker(symbol=sym, score=70.0, price=10.0, volume=1_000_000)
+    try:
+        await refresh_active_universe()
+        assert sym in {row[0] for row in universe_mod.active_universe()}
+    finally:
+        await _cleanup(sym)
