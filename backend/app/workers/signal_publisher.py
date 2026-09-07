@@ -809,68 +809,15 @@ async def tick() -> None:
         _last_sheet_refresh is None
         or (started - _last_sheet_refresh).total_seconds() >= settings.signal_sheet_refresh_seconds
     ):
-        try:
-            from app.services.sheet_feed import (
-                refresh_etfs_from_workbook,
-                refresh_from_workbook,
-                refresh_market_from_workbook,
-                refresh_smart_money_from_workbook,
-                refresh_spikes_from_workbook,
-            )
-            async with session_scope() as sheet_session:
-                if settings.signal_sheet_csv_url:
-                    counts = await refresh_from_workbook(sheet_session)
-                    # Which symbols the sheet owns — consumed by the snapshot
-                    # upsert so the market feed can't clobber their composite.
-                    await _refresh_sheet_governed_symbols()
-                    if counts.get("total"):
-                        logger.info(
-                            "sheet_feed.tick rows=%d ins=%d upd=%d",
-                            counts["total"], counts["inserted"], counts["updated"],
-                        )
-                if settings.spike_intelligence_csv_url:
-                    spike_counts = await refresh_spikes_from_workbook(sheet_session)
-                    if spike_counts.get("total"):
-                        logger.info(
-                            "sheet_feed.spikes_tick rows=%d ins=%d upd=%d",
-                            spike_counts["total"], spike_counts["inserted"], spike_counts["updated"],
-                        )
-                if settings.etf_benchmarks_csv_url:
-                    etf_counts = await refresh_etfs_from_workbook(sheet_session)
-                    if etf_counts.get("total"):
-                        logger.info(
-                            "sheet_feed.etfs_tick rows=%d ins=%d upd=%d",
-                            etf_counts["total"], etf_counts["inserted"], etf_counts["updated"],
-                        )
-                if settings.market_intelligence_csv_url:
-                    market_counts = await refresh_market_from_workbook(sheet_session)
-                    if market_counts.get("total"):
-                        logger.info("sheet_feed.market_tick total=%d", market_counts["total"])
-                if settings.smart_money_congress_csv_url:
-                    smart_counts = await refresh_smart_money_from_workbook(sheet_session)
-                    if smart_counts.get("total"):
-                        logger.info(
-                            "sheet_feed.smart_money_tick rows=%d (skipped=%d)",
-                            smart_counts["total"], smart_counts.get("skipped", 0),
-                        )
-        except Exception:
-            logger.exception("sheet_feed.tick_failed")
+        # Latch BEFORE dispatch, then run detached — the same pattern, and the
+        # same reason, as the watchlisted-news fan-out above. Five CSV fetches
+        # plus a ~4,100-row upsert does not fit in a 60s tick, and awaiting it
+        # inline meant the watchdog killed the cycle mid-refresh
+        # (`stage=sheet_refresh`), so the parse never finished and every job
+        # below it was skipped too.
         _last_sheet_refresh = started
+        _spawn(_refresh_workbook_tabs())
 
-    # Snapshot today's top-10 for the public scorecard (once per day).
-    # Runs AFTER the sheet refresh so the macro gate + concentration filter
-    # operate on the Tapeline composite's sub_macro / sector values, not
-    # the polygon_feed mock values that fetch_snapshots wrote earlier in
-    # this tick. Idempotent: returns early when today's row already exists.
-    # Isolated so a freeze failure can't abort every stage below it; the
-    # once-per-day semantics are enforced in-DB, so a retry next tick is safe.
-    #
-    # Only AFTER the as_of session's close (see _SCORECARD_FREEZE_UTC_*): the
-    # back-check computes `change_pct_1d_after` as
-    # close(next trading day) / price_at_flag, so price_at_flag has to BE the
-    # as_of session's close. Freezing at the top of the UTC day (the old
-    # behaviour) captured the PREVIOUS session's close, making every published
-    # "1-day" move actually span 2 sessions — and 4 across a long weekend.
     _set_stage("scorecard_freeze")
     if (started.hour, started.minute) >= (
         _SCORECARD_FREEZE_UTC_HOUR,
@@ -1664,6 +1611,87 @@ _news_cache_wiped: bool = False
 #: Articles past the budget are simply picked up on the next 5-minute refresh —
 #: the loop already skips duplicates by primary key, so nothing is lost.
 NEWS_INSERT_BUDGET_SECONDS = float(os.environ.get("NEWS_INSERT_BUDGET_SECONDS", "10"))
+
+
+async def _refresh_workbook_tabs() -> None:
+    """Pull every configured workbook tab and upsert it.
+
+    Runs DETACHED from tick(), like _refresh_watchlisted_news, and for exactly
+    the reason spelled out at that dispatch site: it is far slower than the 60s
+    tick watchdog. Five CSV fetches from Google plus a ~4,100-row upsert against
+    a remote Postgres.
+
+    Awaiting it inline meant the watchdog killed the cycle mid-refresh —
+    `stage=sheet_refresh` in the logs on 2026-09-07 — so the parse never
+    completed, the score corrections it carries never landed, and every job
+    below it in the tick was skipped as well.
+
+    Detaching is safe here for the same reasons as the news fan-out: the work is
+    idempotent (upserts keyed by symbol), it holds nothing the current cycle
+    needs, and the caller latches the cadence before dispatch so a slow run
+    cannot pile up behind itself.
+    """
+    try:
+        from app.services.sheet_feed import (
+            refresh_etfs_from_workbook,
+            refresh_from_workbook,
+            refresh_market_from_workbook,
+            refresh_smart_money_from_workbook,
+            refresh_spikes_from_workbook,
+        )
+        async with session_scope() as sheet_session:
+            if settings.signal_sheet_csv_url:
+                counts = await refresh_from_workbook(sheet_session)
+                # Which symbols the sheet owns — consumed by the snapshot
+                # upsert so the market feed can't clobber their composite.
+                await _refresh_sheet_governed_symbols()
+                if counts.get("total"):
+                    logger.info(
+                        "sheet_feed.tick rows=%d ins=%d upd=%d",
+                        counts["total"], counts["inserted"], counts["updated"],
+                    )
+            if settings.spike_intelligence_csv_url:
+                spike_counts = await refresh_spikes_from_workbook(sheet_session)
+                if spike_counts.get("total"):
+                    logger.info(
+                        "sheet_feed.spikes_tick rows=%d ins=%d upd=%d",
+                        spike_counts["total"], spike_counts["inserted"], spike_counts["updated"],
+                    )
+            if settings.etf_benchmarks_csv_url:
+                etf_counts = await refresh_etfs_from_workbook(sheet_session)
+                if etf_counts.get("total"):
+                    logger.info(
+                        "sheet_feed.etfs_tick rows=%d ins=%d upd=%d",
+                        etf_counts["total"], etf_counts["inserted"], etf_counts["updated"],
+                    )
+            if settings.market_intelligence_csv_url:
+                market_counts = await refresh_market_from_workbook(sheet_session)
+                if market_counts.get("total"):
+                    logger.info("sheet_feed.market_tick total=%d", market_counts["total"])
+            if settings.smart_money_congress_csv_url:
+                smart_counts = await refresh_smart_money_from_workbook(sheet_session)
+                if smart_counts.get("total"):
+                    logger.info(
+                        "sheet_feed.smart_money_tick rows=%d (skipped=%d)",
+                        smart_counts["total"], smart_counts.get("skipped", 0),
+                    )
+    except Exception:
+        logger.exception("sheet_feed.tick_failed")
+
+# Snapshot today's top-10 for the public scorecard (once per day).
+# Runs AFTER the sheet refresh so the macro gate + concentration filter
+# operate on the Tapeline composite's sub_macro / sector values, not
+# the polygon_feed mock values that fetch_snapshots wrote earlier in
+# this tick. Idempotent: returns early when today's row already exists.
+# Isolated so a freeze failure can't abort every stage below it; the
+# once-per-day semantics are enforced in-DB, so a retry next tick is safe.
+#
+# Only AFTER the as_of session's close (see _SCORECARD_FREEZE_UTC_*): the
+# back-check computes `change_pct_1d_after` as
+# close(next trading day) / price_at_flag, so price_at_flag has to BE the
+# as_of session's close. Freezing at the top of the UTC day (the old
+# behaviour) captured the PREVIOUS session's close, making every published
+# "1-day" move actually span 2 sessions — and 4 across a long weekend.
 
 
 async def _refresh_news() -> None:
