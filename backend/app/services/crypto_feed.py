@@ -345,7 +345,27 @@ async def build_crypto_rows(client: httpx.AsyncClient) -> list[dict[str, Any]]:
             "smart_money": None,
         }
         composite = composite_from_factors(subs)
+
+        # Same seven-signal definition the equity path uses (polygon_feed:
+        # six factors plus a live price read), so one number means one thing
+        # across the whole product rather than two scales that look alike.
+        #
+        # This is not cosmetic. `ticker_freshness.live_clauses` requires
+        # `confidence_pct IS NOT NULL` on every ranked surface, so a row
+        # without it is invisible everywhere — scanner, search, ticker page.
+        # The first crypto deploy landed 67 correctly-scored pairs into the
+        # database and NONE of them could be found, because this one column
+        # was never set. Measured: every other gate passed; this one dropped
+        # all 66.
+        #
+        # A coin holds four of the six factors, so it lands near 71% — a
+        # visibly lower confidence than a fully-covered equity, which is the
+        # honest reading rather than a penalty.
+        sourced = sum(1 for v in subs.values() if v is not None)
+        confidence = round(100.0 * (sourced + (1 if row.get("price") is not None else 0)) / 7)
+
         rows.append({
+            "confidence_pct": confidence,
             **row,
             "score": composite,
             "signal": score_to_signal(composite) if composite is not None else None,
