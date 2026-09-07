@@ -90,7 +90,6 @@ const SECTIONS: Section[] = [
   {
     name: "Pro intelligence",
     rows: [
-      { label: "Congressional trades feed", free: "—", pro: "—", premium: "✓" },
       { label: "Recent insider buys (SEC Form 4)", free: "—", pro: "—", premium: "✓" },
       // Public API shipped 2026-06-01 (PR8): key-authenticated /api/v1/* with a
       // 1,000 req/day Premium quota. Backed by services/api_keys + routers/api_v1.

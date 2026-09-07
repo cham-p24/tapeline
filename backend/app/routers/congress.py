@@ -22,13 +22,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import CongressTrade, User
 from app.services.auth import current_user_required
+from app.services.congress_integrity import is_publishable
 from app.services.tier import Tier, has_feature
 
 router = APIRouter()
 
 # How many disclosures the FREE preview returns. Deliberately tiny — enough to
-# prove the feed is real and populated, nowhere near enough to replace the
-# Premium feed.
+# show the shape of the feed, nowhere near enough to replace the Premium one.
+#
+# This comment used to say the preview existed "to prove the feed is real and
+# populated". It was serving three fabricated rows to make that point. Every
+# query below now filters through services/congress_integrity.is_publishable().
 FREE_CONGRESS_PREVIEW_LIMIT = 3
 
 
@@ -63,12 +67,18 @@ async def congress_preview(
     """
     stmt = (
         select(CongressTrade)
+        .where(is_publishable())
         .order_by(desc(CongressTrade.disclosed_at))
         .limit(FREE_CONGRESS_PREVIEW_LIMIT)
     )
     rows = (await session.execute(stmt)).scalars().all()
+    # The count is filtered too. A total that includes fabricated rows is as
+    # much a false claim as returning them — it tells the reader how much real
+    # disclosure data is being held back, and the honest answer is none of it.
     total_disclosures = (
-        await session.execute(select(func.count()).select_from(CongressTrade))
+        await session.execute(
+            select(func.count()).select_from(CongressTrade).where(is_publishable())
+        )
     ).scalar_one()
     return {
         "count": len(rows),
@@ -89,6 +99,7 @@ async def list_congress(
         raise HTTPException(403, "Congressional trades are a Premium feature")
     stmt = (
         select(CongressTrade)
+        .where(is_publishable())
         .order_by(desc(CongressTrade.disclosed_at))
         .limit(limit)
     )

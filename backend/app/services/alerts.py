@@ -37,6 +37,7 @@ from app.models import (
     WatchlistItem,
 )
 from app.models.news import exclude_mock_clause
+from app.services.congress_integrity import is_publishable
 from app.services.email import render_alert_email, render_watchlist_alert_email, send_email
 
 logger = logging.getLogger(__name__)
@@ -410,9 +411,13 @@ async def evaluate_congress_rules(session: AsyncSession) -> int:
         return 0
 
     cutoff = now - CONGRESS_FRESHNESS
+    # is_publishable() keeps fabricated rows out of the OUTBOUND path too. An
+    # email asserting that a named politician traded a named stock is the worst
+    # place for invented data to surface — see services/congress_integrity.
     trades_r = await session.execute(
         select(CongressTrade)
         .where(CongressTrade.disclosed_at >= cutoff)
+        .where(is_publishable())
         .order_by(desc(CongressTrade.disclosed_at))
     )
     recent_trades = trades_r.scalars().all()
