@@ -160,6 +160,27 @@ def _composite_from_subs(r: dict[str, Any]) -> float | None:
     )
 
 
+#: Symbols per `/v3/snapshot` request. The endpoint takes a comma-separated
+#: `ticker.any_of`, so this is bounded by URL length rather than by policy.
+SNAPSHOT_BATCH_SIZE = 250
+
+#: How many of those requests may be in flight at once.
+#:
+#: They were sequential, which was invisible while the universe was 2,750
+#: symbols (11 batches, ~7s). #763 widened it to everything we score — 7,667
+#: symbols, 31 batches — and measured on the worker each request takes ~0.67s,
+#: so the pass went to 21.3s of a tick the watchdog kills at 60. Combined with
+#: the rest of the tick that was enough to wedge it: `tick.timeout
+#: consecutive=7`, and every job below the snapshot stopped running, including
+#: the sheet refresh.
+#:
+#: The batches are independent reads of one endpoint, so the wall clock was
+#: pure waiting. 6 is deliberately modest — enough to bring the pass back under
+#: ~5s, small enough to stay well inside vendor rate limits and to keep a
+#: retry storm from turning into a thundering herd.
+SNAPSHOT_CONCURRENCY = int(os.environ.get("SNAPSHOT_CONCURRENCY", "6"))
+
+
 async def fetch_snapshots(
     symbols: list[str] | None = None,
     macro_score: float | None = None,
@@ -244,22 +265,39 @@ async def fetch_snapshots(
             return []
         return base_rows
 
-    # Pull real prices + volumes from Massive in one batched call
+    # Pull real prices + volumes from Massive in batched calls.
     syms = [r["symbol"] for r in base_rows] if symbols is None else symbols
     real_by_sym: dict[str, dict[str, Any]] = {}
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            for i in range(0, len(syms), 250):
-                batch = syms[i : i + 250]
-                # Massive's v3 snapshot endpoint (the v2 path returned the
-                # legacy {day,prevDay,lastTrade} shape that parsed to zeros
-                # after the 2026-Q1 schema migration to {session,last_minute}).
-                body = await _request(
-                    client,
-                    "/v3/snapshot",
-                    params={"ticker.any_of": ",".join(batch), "limit": len(batch)},
-                )
+            batches = [
+                syms[i : i + SNAPSHOT_BATCH_SIZE]
+                for i in range(0, len(syms), SNAPSHOT_BATCH_SIZE)
+            ]
+            sem = asyncio.Semaphore(SNAPSHOT_CONCURRENCY)
+
+            async def _one(batch: list[str]) -> dict[str, Any]:
+                async with sem:
+                    # Massive's v3 snapshot endpoint (the v2 path returned the
+                    # legacy {day,prevDay,lastTrade} shape that parsed to zeros
+                    # after the 2026-Q1 schema migration to
+                    # {session,last_minute}).
+                    return await _request(
+                        client,
+                        "/v3/snapshot",
+                        params={
+                            "ticker.any_of": ",".join(batch),
+                            "limit": len(batch),
+                        },
+                    )
+
+            # gather, not as_completed: one failing batch must abort the whole
+            # fetch so the handler below can publish NOTHING rather than a
+            # partial universe. A partial result would look like a normal tick
+            # and quietly leave the missing names on yesterday's prices.
+            bodies = await asyncio.gather(*(_one(b) for b in batches))
+            for body in bodies:
                 for t in body.get("results", []):
                     naive = _to_scanner_row(t)
                     if naive is not None:
