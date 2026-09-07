@@ -14,12 +14,14 @@ from statistics import median
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import desc, select, text
+from sqlalchemy import func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import SessionLocal, get_session, is_sqlite
 from app.models import (
     DailyScorecardEntry,
     EarningsEvent,
+    InsiderTransaction,
     NewsItem,
     SqueezeSetup,
     Ticker,
@@ -326,6 +328,11 @@ _FLAG_ROWS_READ_CAP = 365
 # /scorecard; this block is a decision aid, not an archive. Truncation is
 # disclosed (`flags_truncated`) rather than silent.
 _FLAG_ROWS_SERIALISED_CAP = 60
+
+# Lookback for the Premium Form 4 COUNT in `gated_counts`. Matches the default
+# window of GET /api/ticker/{symbol}/insider (days_back=90), so the number a
+# locked visitor is shown is the number of rows the unlocked tab would open on.
+_INSIDER_COUNT_WINDOW_DAYS = 90
 
 
 def _flag_record_payload(
@@ -700,6 +707,42 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         except Exception:
             logger.warning("ticker.percentiles_degraded symbol=%s", symbol)
 
+        # How much Premium-gated material this ticker actually holds. COUNTS
+        # ONLY — never a row, a filer name, a date or a size — so this stays a
+        # description of the lock and not a way around it.
+        #
+        # Why it exists: a bare padlock tells a visitor nothing about what a
+        # subscription would buy on THIS symbol, and the answer is wildly
+        # uneven across the universe (CRWV has 1,071 Form 4 lines in 90 days;
+        # most tickers have none). A count is the honest version of the tease.
+        #
+        # Form 4 ONLY. congress_trades is deliberately absent: in production
+        # that table is a FABRICATED backlog from mock_feed.fetch_congress_trades
+        # (see the "_mock_writes_enabled" gate in workers/signal_publisher.py,
+        # whose own comment calls purging it an operator decision). Publishing a
+        # count over invented rows on an anonymous, indexable page would be a
+        # false claim about what Premium contains. Add it here only once a real
+        # disclosure feed is wired.
+        gated_counts: dict | None = None
+        try:
+            insider_cutoff = (
+                datetime.now(UTC).date() - timedelta(days=_INSIDER_COUNT_WINDOW_DAYS)
+            ).isoformat()
+            insider_form4 = (
+                await session.execute(
+                    select(sa_func.count(InsiderTransaction.id)).where(
+                        InsiderTransaction.symbol == symbol,
+                        InsiderTransaction.transaction_date >= insider_cutoff,
+                    )
+                )
+            ).scalar_one()
+            gated_counts = {
+                "insider_form4": int(insider_form4 or 0),
+                "insider_form4_window_days": _INSIDER_COUNT_WINDOW_DAYS,
+            }
+        except Exception:
+            logger.warning("ticker.gated_counts_degraded symbol=%s", symbol)
+
         # News is fetched separately, AFTER this core read txn closes (see
         # _fetch_ticker_news) — its own bounded session so a slow/timed-out
         # headline scan can never hold THIS pooled connection or affect the
@@ -741,6 +784,14 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         # whole block is null if the aggregate failed; the page still renders
         # the raw values.
         "peer_percentiles": percentiles,
+        # How much Premium material this symbol holds, as a COUNT and nothing
+        # else. Lets a locked surface say "N Form 4 filings in the last 90
+        # days — Premium" instead of showing a padlock with no price attached.
+        # None when the count read failed; a present block with 0 means "we
+        # looked and there are none". The renderer must show the line only
+        # where the count is above zero, and must never put it where a factor's
+        # em-dash goes — that dash means MISSING DATA, not a paywall.
+        "gated_counts": gated_counts,
         # What our own calls on this ticker did next — wins and losses, never
         # filtered, next-session horizon only. See _flag_record_payload. Null
         # here means the read failed, NOT "never flagged" (that is a present

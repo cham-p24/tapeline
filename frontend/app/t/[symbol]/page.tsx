@@ -31,6 +31,13 @@ import {
 import { SECTORS } from "@/app/sector/sectors";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
+import {
+  buildScoreRestatement,
+  countedLocks,
+  formatUpdatedDay,
+  headingFor,
+  type GatedCounts,
+} from "./citation";
 
 // ISR: regenerate at most hourly. This route has ~8,400 ticker pages and is
 // the site's biggest crawl surface; without a page-level revalidate it
@@ -107,6 +114,14 @@ type TickerData = {
   // honest, MIN_PEERS-floored source for the rank line. `unknown` because
   // components/percentiles.ts owns validation; nothing here reads it raw.
   peer_percentiles?: unknown;
+  // When the SCORE was last computed (Ticker.updated_at, ISO-8601). This is
+  // the ONLY freshness stamp this page may print or emit — see citation.ts.
+  // Optional and nullable: a frontend deploy can land ahead of the backend,
+  // and every consumer degrades to saying nothing about freshness.
+  updated_at?: string | null;
+  // Per-symbol counts of the Premium-gated datasets. COUNTS ONLY — the rows
+  // themselves stay behind their own authenticated, tier-gated endpoints.
+  gated_counts?: GatedCounts;
 };
 
 /**
@@ -547,7 +562,13 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
       site: "@tapeline_io",
     },
     other: {
-      "article:modified_time": new Date().toISOString(),
+      // The SCORE's own stamp, never render time. This route is ISR'd hourly
+      // across ~3,500 pages, so `new Date()` here (what shipped originally)
+      // told every crawler each page had been freshly measured whenever the
+      // CACHE happened to turn over — a claim about our data derived from a
+      // fact about our cache. Omitted entirely when the ticker row carries no
+      // stamp: no freshness claim is better than a false one.
+      ...(data.updated_at ? { "article:modified_time": data.updated_at } : {}),
       "article:section": "Stocks",
     },
   };
@@ -723,7 +744,26 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
     score: data.score,
     signal: data.signal,
     why: data.reason,
+    updatedAt: data.updated_at ?? null,
   });
+
+  // ── Citation furniture (see ./citation.ts) ────────────────────────────────
+  // The heading, the dated prose restatement and the freshness stamp all come
+  // from one place so the h1, the sentence, the visible "Updated …" line and
+  // the JSON-LD `dateModified` can never state three different things.
+  const heading = headingFor(data.symbol, data.name);
+  const updatedDay = formatUpdatedDay(data.updated_at);
+  const restatement = buildScoreRestatement({
+    symbol: data.symbol,
+    name: data.name,
+    score: data.score,
+    signal: data.signal,
+    updatedAt: data.updated_at ?? null,
+  });
+  // Premium datasets that actually hold rows for THIS ticker. Empty for most
+  // symbols, and empty is the correct render — a lock over nothing is worse
+  // than no lock at all.
+  const locks = countedLocks(data.gated_counts ?? null);
 
   return (
     <main id="main" className="min-h-screen">
@@ -753,9 +793,16 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
         {/* Header row */}
         <div className="flex flex-wrap items-baseline justify-between gap-4">
           <div className="min-w-0 flex-1">
+            {/* The h1 carries the COMPANY NAME as well as the ticker.
+                It used to be the bare symbol with the name demoted to a muted
+                span beside it, which makes the page's own title unquotable:
+                "AAPL" identifies nothing to a reader who searched for Apple,
+                and a heading is the string an answer engine reaches for first
+                when it attributes a figure. headingFor() falls back to the
+                bare symbol when the name we hold is still a placeholder, so
+                this never renders "AAPL (AAPL)". */}
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight nums">{data.symbol}</h1>
-              <span className="text-sm sm:text-base text-muted truncate max-w-full">{data.name}</span>
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">{heading}</h1>
             </div>
             <div className="mt-2 flex items-center gap-3 text-xs sm:text-sm text-muted">
               {data.sector &&
@@ -816,6 +863,36 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
                   prose with an always-printed denominator. */}
               {rankLine && (
                 <p className="mt-3 max-w-xl text-xs sm:text-sm text-subtle">{rankLine}</p>
+              )}
+
+              {/* THE CITABLE SENTENCE.
+                  The score above is a numeral in a box: legible to a human,
+                  unquotable by anything else. This restates the same reading
+                  in prose — company, ticker, number, denominator, band, the
+                  range that band names, and the date it was measured — so a
+                  model summarising the page has one self-contained, still-true
+                  passage to lift instead of having to reassemble it from a
+                  layout. Descriptive throughout: it reports a measurement and
+                  says so. Built in ./citation.ts. */}
+              <p
+                data-testid="score-restatement"
+                className="mt-5 max-w-xl text-sm leading-relaxed text-muted"
+              >
+                {restatement}
+              </p>
+
+              {/* Freshness, stated once and honestly. `updatedDay` is the
+                  SCORE's own updated_at — the same value the Dataset JSON-LD
+                  emits as dateModified — so the human line and the machine
+                  line cannot drift. Absent entirely when the ticker row has no
+                  stamp: this page is ISR'd hourly, so a render-time date would
+                  be a freshness claim about the cache, not the data. */}
+              {updatedDay && (
+                <p className="mt-3 text-xs text-subtle">
+                  Updated{" "}
+                  <time dateTime={data.updated_at ?? undefined}>{updatedDay}</time>
+                  {" · "}scores re-tick during US market hours
+                </p>
               )}
             </div>
             <div className="hidden sm:block flex-shrink-0">
@@ -887,6 +964,52 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
           The six factors are public and never change without a changelog entry.
           Read the full methodology on <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>.
         </p>
+
+        {/* COUNTED LOCKS — what a subscription actually buys ON THIS TICKER.
+            A bare padlock tells a visitor nothing, and the answer is wildly
+            uneven across the universe: a handful of symbols carry hundreds of
+            Form 4 lines in ninety days and most carry none. So we print the
+            count. Rendered only where the count is above zero — advertising an
+            empty drawer is what made the old locked surfaces read as dishonest.
+
+            THIS IS A SEPARATE BLOCK, AND MUST STAY ONE. It must never move into
+            the factor table above or replace a factor's em-dash. Those dashes
+            mean the factor has NO DATA (two of the six are unfilled for most
+            tickers — docs/TODO.md 9e/9f), not that the value is behind a
+            paywall. Conflating a data gap with a lock would claim we hold
+            something we do not, which is a worse lie than the padlock was.
+
+            Counts only. Every row itself stays behind its own authenticated,
+            tier-gated endpoint. */}
+        {locks.length > 0 && (
+          <section className="mt-8 rounded-lg border border-border/60 bg-panel/30 p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
+              Premium data held for {data.symbol}
+            </h2>
+            <ul className="mt-3 space-y-2">
+              {locks.map((lock) => (
+                <li
+                  key={lock.key}
+                  data-testid="counted-lock"
+                  className="flex flex-wrap items-baseline gap-x-2 text-sm text-fg"
+                >
+                  <span>{lock.text}</span>
+                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted">
+                    Premium
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-subtle">
+              Counts of rows Tapeline holds for {data.symbol}. A dash in the factor
+              table above means that factor has no data for this ticker &mdash; it is
+              not a locked value.{" "}
+              <Link href="/pricing" className="text-accent hover:underline">
+                Compare plans
+              </Link>
+            </p>
+          </section>
+        )}
 
         {/* Mid-page email capture — placed right after the factor breakdown,
             the moment the visitor has just understood what the score means.

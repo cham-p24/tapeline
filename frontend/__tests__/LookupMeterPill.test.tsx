@@ -1,26 +1,32 @@
 /**
  * LookupMeterPill is the pre-cap half of the freemium look-up meter.
  *
- * The failure it exists to prevent: the backend computed used/limit/remaining
- * on every free look-up and discarded them, so a free user's FIRST contact
- * with metering was the hard 402 wall at 12/12 — no warning at 9, 10 or 11.
- * That turns a normal limit into a punishment.
+ * The failure it originally exists to prevent: the backend computed
+ * used/limit/remaining on every free look-up and discarded them, so a free
+ * user's FIRST contact with metering was the hard 402 wall at 12/12 — no
+ * warning at 9, 10 or 11. That turns a normal limit into a punishment.
+ *
+ * THE SECOND HALF OF THAT BUG, FIXED 2026-09-07. The first fix only showed the
+ * meter once three or fewer look-ups remained, so look-ups 1-8 still carried no
+ * evidence an allowance existed and the meter itself appeared out of nowhere at
+ * nine. A cap you can see from the start is a described product; a cap that
+ * materialises near the end is a trap. It now counts up from look-up 1, and
+ * names the no-account allowance so the value of having signed up is legible
+ * next to the value of paying.
  *
  * The risk in fixing it is over-correcting into a growth-dark-pattern. So the
  * assertions here are two-sided:
- *   - it must APPEAR near the cap and state the real count, and
- *   - it must stay invisible with runway / for unmetered callers, and carry
- *     NO alarm styling and NO urgency language (COMPLIANCE_COPY_RULES R6:
- *     a factual statement of the user's own usage is permitted, manufactured
- *     pressure is not), and no market/performance claims (R1).
+ *   - it must APPEAR from the first look-up and state the real count, and
+ *   - it must stay invisible for unmetered callers, and carry NO alarm styling
+ *     and NO urgency language (COMPLIANCE_COPY_RULES R6: a factual statement of
+ *     the user's own usage is permitted, manufactured pressure is not), and no
+ *     market/performance claims (R1).
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 
-import {
-  LookupMeterPill,
-  LOOKUP_METER_REMAINING_THRESHOLD,
-} from "@/app/app/ticker/[symbol]/page";
+import { LookupMeterPill } from "@/app/app/ticker/[symbol]/page";
+import { ANON_LIMITS, FREE_LIMITS } from "@/lib/pricing";
 
 const CAP = 12;
 
@@ -36,15 +42,19 @@ describe("LookupMeterPill", () => {
       expect(screen.getByText(/look-up 12 of 12 today/i)).toBeInTheDocument();
     });
 
-    it("stays hidden while the caller has runway", () => {
-      const { container } = render(
-        <LookupMeterPill
-          used={CAP - LOOKUP_METER_REMAINING_THRESHOLD - 1}
-          limit={CAP}
-          remaining={LOOKUP_METER_REMAINING_THRESHOLD + 1}
-        />,
+    it("counts from the FIRST look-up, not only once the cap is close", () => {
+      // The regression: with the old remaining>3 early-return this rendered
+      // nothing, so a free user saw no allowance at all for eight look-ups.
+      render(
+        <LookupMeterPill used={1} limit={CAP} remaining={CAP - 1} />,
       );
-      expect(container).toBeEmptyDOMElement();
+      expect(screen.getByText(/look-up 1 of 12 today/i)).toBeInTheDocument();
+    });
+
+    it("is visible right through the middle of the allowance", () => {
+      render(<LookupMeterPill used={3} limit={CAP} remaining={9} />);
+      expect(screen.getByTestId("lookup-meter")).toBeInTheDocument();
+      expect(screen.getByText(/look-up 3 of 12 today/i)).toBeInTheDocument();
     });
 
     it("stays hidden for unmetered callers (paid / trial / grace)", () => {
@@ -108,5 +118,38 @@ describe("LookupMeterPill", () => {
     expect(
       screen.getByRole("link", { name: /compare plans/i }),
     ).toHaveAttribute("href", "/pricing");
+  });
+
+  describe("it names the no-account allowance too", () => {
+    // Someone reading this meter is signed in and metered. Naming what a
+    // visitor with no account gets is what makes the account itself legible as
+    // a step that already bought them something — and it comes from
+    // lib/pricing.ts, the only place on the client a cap may be written down
+    // (see freeCapsComeFromOneSource.test.tsx).
+    it("states the anonymous daily allowance", () => {
+      const text =
+        render(<LookupMeterPill used={2} limit={CAP} remaining={10} />)
+          .container.textContent ?? "";
+      expect(text).toMatch(
+        new RegExp(`without an account it is ${ANON_LIMITS.dailyLookups} a day`, "i"),
+      );
+    });
+
+    it("reads both allowances out of lib/pricing rather than restating them", () => {
+      // Discriminating: the anonymous cap (2) and the free cap (12) are
+      // different numbers, so a page that printed one where the other belongs
+      // fails here rather than passing by coincidence.
+      expect(ANON_LIMITS.dailyLookups).not.toBe(FREE_LIMITS.dailyLookups);
+      const text =
+        render(
+          <LookupMeterPill
+            used={1}
+            limit={FREE_LIMITS.dailyLookups}
+            remaining={FREE_LIMITS.dailyLookups - 1}
+          />,
+        ).container.textContent ?? "";
+      expect(text).toContain(`of ${FREE_LIMITS.dailyLookups} today`);
+      expect(text).toContain(`${ANON_LIMITS.dailyLookups} a day`);
+    });
   });
 });

@@ -120,6 +120,17 @@ export type TickerDatasetArgs = {
   signal: string | null;
   /** Plain-English why sentence; falls back to a default. */
   why: string | null;
+  /**
+   * When the SCORE was last computed, ISO-8601, from the ticker row's own
+   * `updated_at`. Omitted (and no `dateModified` is emitted) when we hold no
+   * stamp.
+   *
+   * It must never be filled with render time. A crawler treats `dateModified`
+   * as a freshness claim, and a render-time stamp would assert that every one
+   * of ~3,500 ticker pages was re-measured the instant it happened to be
+   * regenerated — a claim about our data made from a fact about our cache.
+   */
+  updatedAt?: string | null;
 };
 
 /**
@@ -156,6 +167,12 @@ export function tickerDatasetJsonLd(a: TickerDatasetArgs) {
       name: "Tapeline",
       url: "https://tapeline.io",
     },
+    // Machine-readable freshness. `dateModified` is what an AI answer engine
+    // and Google both read to decide whether a quoted figure is current — the
+    // visible "Updated …" line on the page is the human half of the same
+    // statement, and the two come from this one value so they cannot disagree.
+    // Absent rather than guessed when the ticker row carries no stamp.
+    ...(a.updatedAt ? { dateModified: a.updatedAt } : {}),
     variableMeasured: [
       "Trend",
       "Relative strength",
