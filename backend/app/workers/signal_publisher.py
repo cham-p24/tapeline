@@ -1769,6 +1769,7 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
             run_activation_drip,
             run_annual_nudge_drip,
             run_annual_renewal_reminder_drip,
+            run_carded_trial_drip,
             run_daily_drip,
             run_founder_touch_drip,
             run_free_trial_invite_drip,
@@ -1794,6 +1795,15 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
             re_counts = await run_re_engagement_drip(drip_session, governor=governor)
             wb_counts = await run_winback_drip(drip_session, governor=governor)
             act_counts = await run_activation_drip(drip_session, governor=governor)
+            # Nurture for CARD-REQUIRED trials. run_daily_drip's six stages
+            # exclude anyone with a Stripe customer (its copy says "add a
+            # card"), so before this every modern trial's only contact was
+            # the seven-day pre-charge notice - a bill, to someone who in
+            # practice had not opened the product. Sits clear of that
+            # notice's window on purpose; see run_carded_trial_drip.
+            carded_counts = await run_carded_trial_drip(
+                drip_session, governor=governor,
+            )
             annual_counts = await run_annual_nudge_drip(drip_session, governor=governor)
             renewal_counts = await run_annual_renewal_reminder_drip(
                 drip_session, governor=governor,
@@ -1842,6 +1852,11 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
             )
         if any(wb_counts.values()):
             logger.info("drip.winback_sent wb30=%d wb60=%d wb90=%d", wb_counts["wb30"], wb_counts["wb60"], wb_counts["wb90"])
+        if any(carded_counts.values()):
+            logger.info(
+                "drip.carded_trial_sent ct_setup=%d ct_value=%d",
+                carded_counts["ct_setup"], carded_counts["ct_value"],
+            )
         if any(act_counts.values()):
             logger.info(
                 "drip.activation_sent act_wl=%d act_alert=%d act_arm=%d",
