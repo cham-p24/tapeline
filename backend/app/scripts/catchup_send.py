@@ -130,7 +130,7 @@ async def collect(session, *, limit: int | None = None) -> dict[str, list]:
         if getattr(u, "email_undeliverable_at", None) is not None:
             buckets["skipped"].append((u, "undeliverable"))
             continue
-        if not wants(u.email_prefs, EmailPref.TRIAL_DRIP):
+        if not wants(u, EmailPref.TRIAL_DRIP):
             buckets["skipped"].append((u, "opted_out_of_trial_drip"))
             continue
 
