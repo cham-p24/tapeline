@@ -141,3 +141,48 @@ def test_every_cadenced_job_in_the_tick_stamps_before_its_work():
         f"{offenders}. A cycle killed by the 60s watchdog will restart them "
         f"every tick forever and starve every job below them."
     )
+
+# ── jobs too slow for a 60-second tick must be dispatched, not awaited ──────
+
+SLOW_JOBS_THAT_MUST_BE_DETACHED = [
+    ("_refresh_watchlisted_news", "two live HTTP calls per symbol across hundreds of symbols"),
+    ("_refresh_workbook_tabs", "five CSV fetches plus a ~4,100-row upsert"),
+]
+
+
+@pytest.mark.parametrize("fn,why", SLOW_JOBS_THAT_MUST_BE_DETACHED)
+def test_the_slow_jobs_are_spawned_not_awaited(fn, why):
+    """Bounding a job that cannot fit only shortens the damage; detaching ends it.
+
+    Stamping the cadence first (above) stops a slow job wedging the worker
+    FOREVER, but it still costs a whole cycle every time the job runs, and the
+    job itself never gets to finish. The sheet refresh showed exactly that: with
+    the cadence fixed it stopped repeating, and instead was killed mid-refresh
+    once per cadence — so the score corrections it carries never landed at all.
+
+    A job that genuinely cannot fit in 60 seconds belongs off the tick.
+    """
+    src = _tick_source()
+    assert f"_spawn({fn}(" in src, (
+        f"{fn} is awaited inline in tick(), but it does {why} — the 60s "
+        f"watchdog will kill the cycle mid-job, so the work never completes "
+        f"and every job below it is skipped"
+    )
+    assert f"await {fn}(" not in src, (
+        f"{fn} is still awaited inline somewhere in tick()"
+    )
+
+
+def test_a_detached_job_still_latches_before_dispatch():
+    """Dispatch without latching would spawn a new copy every single tick."""
+    src = _tick_source()
+    for stamp, fn in (
+        ("_last_watchlisted_news_refresh", "_refresh_watchlisted_news"),
+        ("_last_sheet_refresh", "_refresh_workbook_tabs"),
+    ):
+        assign_at = src.index(f"{stamp} = started")
+        spawn_at = src.index(f"_spawn({fn}(")
+        assert assign_at < spawn_at, (
+            f"{stamp} is latched after {fn} is dispatched, so every tick "
+            f"spawns another copy of a job that takes minutes"
+        )
