@@ -137,10 +137,26 @@ async def refresh_active_universe(target_size: int | None = None) -> int:
             # express NULLS LAST in DESC order: NULL → -1 → sorts last.
             from sqlalchemy import func
 
+            # Crypto is EXCLUDED. This list feeds the equity snapshot pass,
+            # and the vendor answers NOT_ENTITLED for a pair on that endpoint.
+            #
+            # It is not merely wasted requests. A crypto row that reaches the
+            # equity tick gets upserted from a snapshot that carries no data,
+            # which NULLs the price, volume and daily move the crypto feed had
+            # just written. Observed within minutes of the first crypto deploy:
+            # 66 of 67 pairs lost price/volume/change_pct_1d, and because
+            # `live_clauses` requires change_pct_1d they became invisible on
+            # every surface — the second time in one day that correctly-scored
+            # coins were in the table and unfindable.
+            #
+            # The predicate is `score IS NOT NULL`, so this only started once
+            # crypto rows HAD scores. Nothing about crypto changed; giving them
+            # a score is what let them into a pass that was never for them.
             sort_key = func.coalesce(Ticker.volume * Ticker.price, -1)
             r = await session.execute(
                 select(Ticker.symbol, Ticker.name, Ticker.sector)
                 .where(Ticker.score.is_not(None))
+                .where(func.coalesce(Ticker.asset_class, "") != "crypto")
                 .order_by(desc(sort_key))
                 .limit(size)
             )
@@ -214,6 +230,9 @@ async def refresh_active_universe(target_size: int | None = None) -> int:
                 b = await session.execute(
                     select(Ticker.symbol, Ticker.name, Ticker.sector)
                     .where(Ticker.score.is_(None))
+                    # Same exclusion as above: a never-scored crypto pair must
+                    # not be handed to the equity snapshot either.
+                    .where(func.coalesce(Ticker.asset_class, "") != "crypto")
                     .order_by(Ticker.symbol.asc())
                     .offset(_bootstrap_cursor)
                     .limit(BOOTSTRAP_SLOTS)
