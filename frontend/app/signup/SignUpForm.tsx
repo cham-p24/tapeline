@@ -220,22 +220,41 @@ function SignUpForm() {
   const planIntent = planRaw === "pro" || planRaw === "premium" ? planRaw : null;
   const billingRaw = (qp.get("billing") || "").toLowerCase();
   const billingIntent = billingRaw === "monthly" || billingRaw === "annual" ? billingRaw : "annual";
+  // Direct-purchase intent: /pricing's "Or skip the trial and subscribe" links
+  // carry ?buy=now alongside the plan. Forwarded verbatim to /app/billing,
+  // which stands the trial offer down and turns the Premium CTA into a straight
+  // subscription. Only meaningful with a plan intent — a bare ?buy=now names
+  // nothing to buy.
+  const buyNow = qp.get("buy") === "now";
   // Post-auth destination, in precedence order:
   //   1. an explicit ?next= (deep link the visitor came in on)
   //   2. a /pricing plan CTA → the billing page with that plan pre-selected
-  //   3. otherwise → the TRIAL OFFER, /app/billing?trial=start
+  //   3. otherwise → THE PRODUCT, /app/scanner
   //
-  // (3) is new. Signup no longer starts a trial, so if nothing presented the
-  // choice the Premium trial would simply never be offered to anyone.
-  // The offer screen is a two-option fork — start the trial (card, disclosed
-  // in full, user clicks) or continue on the Free plan (one click to the
-  // scanner, no card, nothing lost). It is NOT an auto-redirect into Stripe:
-  // nothing leaves the site until the user presses the trial button.
+  // (3) CHANGED 2026-09-07. It used to be the trial offer,
+  // `/app/billing?trial=start`, so the journey for a brand-new account was
+  // signup → /app/onboarding → a payment decision → and only then a scored
+  // row. Stock Rover, Simply Wall St, Stock Unlock, Koyfin, Danelfin and
+  // TradingView all land a new account in the product; none interposes a
+  // payment decision before the first result. The founder's own data agrees:
+  // while a card wall briefly stood at /app/start (#548 → #683), three accounts
+  // hit it, none added a card, none ran a single scan, and two never opened the
+  // payment page.
+  //
+  // The trial is NOT dropped, and its disclosure is not softened by a word: the
+  // same <TrialOfferPanel> now renders as a dismissible panel above the scanner
+  // table (components/ScannerTrialOffer.tsx), where it yields to the first-run
+  // welcome through the shared FirstRunTip context. So the offer still reaches
+  // every new account — after the product, not instead of it.
+  //
+  // (1) and (2) are untouched, deliberately: a visitor who arrived from
+  // /pricing having already picked a plan still lands on billing with that pick
+  // pre-selected, and an explicit ?next= deep link still wins over everything.
   const postAuthNext = qp.get("next")
     ? next
     : planIntent
-    ? `/app/billing?intent=${planIntent}&billing=${billingIntent}`
-    : "/app/billing?trial=start";
+    ? `/app/billing?intent=${planIntent}&billing=${billingIntent}${buyNow ? "&buy=now" : ""}`
+    : "/app/scanner";
   // Referral code from /signup?ref=ABCDEFGH. Backend grants both parties
   // 1 free month of Premium when this resolves to a valid existing user.
   const refCode = (qp.get("ref") || "").trim().toUpperCase();
@@ -513,7 +532,7 @@ function SignUpForm() {
       // size, capital, risk tolerance, holdings, goals) — those questions
       // went 2026-07-18 under compliance Rule 8, and this signup form has
       // never collected any of them. Do not reintroduce them here or there.
-      // The destination it forwards to is the trial offer by default, or
+      // The destination it forwards to is the SCANNER by default, or
       // /app/billing with the plan intent restated when the visitor arrived
       // from a /pricing plan CTA, or an explicit ?next= — see postAuthNext.
       // Existing users (signin) never pass through here.

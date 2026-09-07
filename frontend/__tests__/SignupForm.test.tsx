@@ -278,16 +278,23 @@ describe("SignUpPage", () => {
     fillAndSubmit(container);
     await waitFor(() => expect(authApi.signup).toHaveBeenCalled());
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
-    // CHANGED: the default destination is now the trial OFFER rather than the
-    // scanner. Signup no longer starts a trial, so if nothing presented the
-    // choice the trial would never be offered to anyone. The offer is a
-    // two-button fork, and since #683 the decline is unconditional again:
-    // every account continues on the Free plan into /app/scanner, because
-    // /app/scanner no longer bounces anyone to a card wall. (#684 had split
-    // that button on must_add_card — a gated account was sent to /scorecard
-    // instead — which was the honest branch while the wall stood.)
+    // CHANGED BACK, 2026-09-07: the default destination is the PRODUCT again.
+    // It was `/app/billing?trial=start` — a payment decision standing between
+    // signup and the first scored row. Every comparable product (Stock Rover,
+    // Simply Wall St, Stock Unlock, Koyfin, Danelfin, TradingView) lands a new
+    // account in the product instead, and the founder's own data agrees: while
+    // a card wall briefly stood at /app/start (#548 → #683), three accounts hit
+    // it, none added a card, none ran a single scan, and two never opened the
+    // payment page.
+    //
+    // The trial did not vanish — the same <TrialOfferPanel> now renders as a
+    // dismissible panel above the scanner table
+    // (components/ScannerTrialOffer.tsx), with its disclosure unchanged. So
+    // this assertion is not "the offer was dropped", it is "the offer stopped
+    // being a toll gate". __tests__/ScannerTrialOffer.test.tsx holds the other
+    // half of that claim.
     expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/billing?trial=start")}`,
+      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
     );
   });
 
@@ -514,12 +521,28 @@ describe("SignUpPage", () => {
     );
   });
 
-  it("falls back to the trial offer when no plan intent is present", async () => {
+  it("falls back to the PRODUCT when no plan intent is present", async () => {
     const { container } = render(<SignUpPage />);
     fillAndSubmit(container);
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
     expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/billing?trial=start")}`,
+      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
+    );
+  });
+
+  it("carries ?buy=now through, so a decided buyer skips the trial", async () => {
+    // /pricing's "Or skip the trial and subscribe" link. The plan intent still
+    // routes to billing; the extra param tells that page to stand the trial
+    // offer down and sell a straight subscription instead. It does NOT fire a
+    // checkout — /app/billing still waits for a click.
+    nav.search = new URLSearchParams("plan=premium&billing=annual&buy=now");
+    const { container } = render(<SignUpPage />);
+    fillAndSubmit(container);
+    await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
+    expect(routerSpies.push).toHaveBeenCalledWith(
+      `/app/onboarding?next=${encodeURIComponent(
+        "/app/billing?intent=premium&billing=annual&buy=now",
+      )}`,
     );
   });
 
@@ -529,11 +552,11 @@ describe("SignUpPage", () => {
     fillAndSubmit(container);
     await waitFor(() => expect(routerSpies.push).toHaveBeenCalled());
     expect(routerSpies.push).toHaveBeenCalledWith(
-      `/app/onboarding?next=${encodeURIComponent("/app/billing?trial=start")}`,
+      `/app/onboarding?next=${encodeURIComponent("/app/scanner")}`,
     );
   });
 
-  it("still honours an explicit ?next= deep link over the trial offer", async () => {
+  it("still honours an explicit ?next= deep link over the default destination", async () => {
     nav.search = new URLSearchParams("next=/app/watchlist");
     const { container } = render(<SignUpPage />);
     fillAndSubmit(container);

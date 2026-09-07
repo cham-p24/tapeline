@@ -14,7 +14,10 @@ import {
   freeOpenAccess,
   PRO_SCANNER_ROWS,
   FREE_LIMITS,
+  usd,
+  usdCompact,
 } from "@/lib/pricing";
+import { trackEvent } from "@/lib/gtag";
 import { BillingToggle, useBillingPeriod } from "@/components/BillingToggle";
 import { BestValueBadge } from "@/components/BestValueBadge";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
@@ -88,6 +91,8 @@ const PLANS = [
     ],
     cta: "Start 30-day Premium trial",
     ctaHref: "/signup?plan=pro",
+    // The second door — see SKIP_TRIAL below.
+    skipTrial: true,
     // Pro is the highlighted protagonist — the realistic first purchase.
     // "Best value" is a factual framing (cheapest paid tier per feature),
     // not manufactured social proof; with zero customers a "Most popular"
@@ -119,6 +124,7 @@ const PLANS = [
     cta: "Start 30-day Premium trial",
     ctaHref: "/signup?plan=premium",
     highlight: false,
+    skipTrial: true,
   },
   {
     name: "Trader",
@@ -291,6 +297,53 @@ export function PricingTable({ now }: { now?: Date } = {}) {
               >
                 {p.cta}
               </Button>
+              {/* ── SKIP_TRIAL: the decided buyer's door ────────────────────
+                  Both paid cards sell the card-required trial, which until now
+                  was the ONLY way in. Tapeline's one and only payer bought
+                  outright rather than trialling, and Danelfin puts "Try Free
+                  for 14 Days" and "Or skip trial and Buy Plus/Pro/Elite" side
+                  by side on every paid card (danelfin.com/pricing/monthly). So
+                  the second door exists here too.
+
+                  A plain text link, deliberately quieter than the CTA above it:
+                  a mechanism for someone who has already decided, not a push.
+                  No badge, no urgency, no countdown.
+
+                  It carries ?buy=now through /signup to /app/billing, which
+                  stands the trial offer down and POSTs the same
+                  /api/billing/checkout WITHOUT start_trial. It cannot POST from
+                  here: this page is public and an anonymous visitor has no
+                  session for that endpoint to charge.
+
+                  THE NOTE IS MANDATORY. On this route money moves TODAY, which
+                  is the opposite of the "$0 today" the trial paragraph below
+                  states. Naming the amount and the day is the whole difference
+                  between the two paths. */}
+              {(p as { skipTrial?: boolean }).skipTrial && (
+                <div className="mt-3 text-center">
+                  <Link
+                    href={`${ctaHref}${ctaHref.includes("?") ? "&" : "?"}buy=now`}
+                    data-testid={`skip-trial-${p.name.toLowerCase()}`}
+                    onClick={() =>
+                      trackEvent("skip_trial_selected", {
+                        tier: p.name.toLowerCase(),
+                        billing_period: billing,
+                        surface: "marketing",
+                      })
+                    }
+                    className="text-xs font-medium text-accent underline underline-offset-2 hover:no-underline"
+                  >
+                    Or skip the trial and subscribe
+                  </Link>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                    Charged{" "}
+                    {billing === "annual"
+                      ? `${usdCompact(p.prices.annual)} today for the year`
+                      : `${usd(p.prices.monthly)} today for the month`}
+                    {" "}&mdash; no trial. {REFUND.short} either way.
+                  </p>
+                </div>
+              )}
             </div>
           );
         })}
