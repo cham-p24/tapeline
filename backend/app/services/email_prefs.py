@@ -61,11 +61,30 @@ DEFAULT_PREFS: int = int(
 def wants(user: User, category: EmailPref) -> bool:
     """True if the user opts in to this email category.
 
+    Takes the USER, not the prefs int. Passing `user.email_prefs` type-checks
+    at a glance, reads correctly, and silently returns True for everyone —
+    see the TypeError below for why that is now an error rather than a
+    default.
+
     Defensive default: if `user.email_prefs` is unset (e.g. an in-memory
     User created in tests without the DB-side default firing), assume
     opted in. Better to send a relevant email than to silently suppress
     because of a column-default oddity.
     """
+    # A primitive here means the caller passed `user.email_prefs` instead of
+    # `user`. That is not a hypothetical: BOTH ad-hoc broadcast scripts
+    # (scripts/catchup_send.py, scripts/free_month_offer.py) did it, and the
+    # `getattr` default below turned it into `getattr(15, "email_prefs", None)
+    # is None` -> True. The per-category opt-out branch was unreachable in both,
+    # so the gate they appear to apply was doing nothing at all. Nobody had
+    # actually cleared the TRIAL_DRIP bit, so no real opt-out was overridden —
+    # but the next broadcast cloned from either script would have been the one
+    # that did. Fail loudly in a dry run rather than quietly in a send.
+    if user is None or isinstance(user, (bool, int, float, complex, str, bytes)):
+        raise TypeError(
+            f"wants() takes the User, not {type(user).__name__} — "
+            f"pass `user`, not `user.email_prefs`"
+        )
     prefs = getattr(user, "email_prefs", None)
     if prefs is None:
         return True

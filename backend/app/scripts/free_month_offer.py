@@ -112,7 +112,7 @@ async def collect(
             skipped.append((u, "undeliverable"))
         elif OFFER_TOKEN in _tokens(u):
             skipped.append((u, "already_offered"))
-        elif not wants(u.email_prefs, EmailPref.TRIAL_DRIP):
+        elif not wants(u, EmailPref.TRIAL_DRIP):
             skipped.append((u, "opted_out"))
         else:
             recipients.append(u)

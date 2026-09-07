@@ -32,7 +32,27 @@ Subscriptions: 1 `active` with `cancel_at_period_end = True`, 2 `trialing`.
 # 1 — Blocking everything
 
 - [ ] **Read `tapeline.inbox@gmail.com`.** 10+ unread, including replies to the 2026-08-11 email to 17 users. The cheapest path to the interview gate. No agent can reach this mailbox.
-- [ ] **Re-arm the open feedback session for a new date.** The 2026-08-29 session went out **unannounced** — the reminder task fired 2026-08-28T13:01, began its guard check, called PowerShell once and stopped. No `SENT.flag`, no send. Its own rule now refuses a retry after the session start time.
+- [x] **The standing weekly feedback session is retired** (2026-09-07). The recurring
+  "Tapeline — open feedback session (drop in any time)", 09:00-09:30 Melbourne every
+  Thursday on the founder's calendar, was deleted at the founder's request — all
+  occurrences. It was safe to remove: the guest list was empty (so no cancellation
+  notices went out) and the Meet link appears in no email, page or doc, because the
+  one session ever scheduled (2026-08-29) went out **unannounced** — the reminder task
+  fired 2026-08-28T13:01, began its guard check, called PowerShell once and stopped.
+  No `SENT.flag`, no send. So no user was ever told the weekly slot existed, and
+  nothing published now points at a session that will not happen.
+  Replaced by a one-off "Pick My Brain recording", Thu 2026-09-17 10:00 Melbourne
+  (already accepted), plus the customer survey below.
+- [ ] **The exit survey has a 0-for-3 completion rate.** All three accounts with
+  `canceled_at` set have `cancellation_reason` NULL **and** `cancellation_feedback` NULL.
+  This is NOT a plumbing bug — `routers/billing.py:/cancel` stores both when supplied, and
+  `CancelInterceptModal.tsx` does render the reason radio list plus a free-text box. It is
+  optional and shown AFTER the cancellation is already scheduled, at the moment the user
+  has finished and left. So the highest-signal event the product generates is recorded as
+  a bare timestamp, three times out of three. Either move the ask in front of the
+  cancellation or accept that it has to be reconstructed later, from memory, by asking —
+  which is what the customer survey now has to do. Two live trials charge 12 and 14 Sep,
+  so there is a deadline on deciding.
 - [ ] **Ask the one payer why they cancelled.** Paid $9.99 on 2026-08-29, set `cancel_at_period_end` the same day. This is the highest-signal data point the product has ever produced.
 
 # 2 — Decisions only the founder can make
