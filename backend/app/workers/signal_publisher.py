@@ -208,6 +208,7 @@ _last_drip_check: datetime | None = None  # set ONLY after a fully successful dr
 _last_drip_failed_at: datetime | None = None  # last failed drip attempt (1h retry backoff)
 _last_universe_refresh: datetime | None = None
 _last_sheet_refresh: datetime | None = None
+_last_crypto_refresh: datetime | None = None
 _last_active_universe_refresh: datetime | None = None
 _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run (UTC)
 _last_weekly_newsletter_token: str | None = None  # "weekly_YYYYWww" of last newsletter run
@@ -797,6 +798,18 @@ async def tick() -> None:
     # the matching Tapeline tables. Each tab is gated by its own env var so
     # the user can light them up independently. Same 5-min throttle for all.
     # Bypasses cleanly when no URLs are set (worker continues with mock_feed).
+    _set_stage("crypto_refresh")
+    global _last_crypto_refresh
+    if (settings.massive_api_key or settings.polygon_api_key) and (
+        _last_crypto_refresh is None
+        or (started - _last_crypto_refresh).total_seconds() >= 86400
+    ):
+        # Latch BEFORE dispatch, then run detached — the pattern every slow job
+        # in this file uses, for the reason documented at the watchlisted-news
+        # dispatch.
+        _last_crypto_refresh = started
+        _spawn(_refresh_crypto_universe())
+
     _set_stage("sheet_refresh")
     global _last_sheet_refresh
     if (
@@ -1692,6 +1705,70 @@ async def _refresh_workbook_tabs() -> None:
 # as_of session's close. Freezing at the top of the UTC day (the old
 # behaviour) captured the PREVIOUS session's close, making every published
 # "1-day" move actually span 2 sessions — and 4 across a long weekend.
+
+
+async def _refresh_crypto_universe() -> None:
+    """Ingest and score the liquid crypto pairs. DAILY, and detached.
+
+    Detached for the same reason as the workbook refresh: it makes ~120
+    per-pair history requests plus the grouped call, which is minutes, and the
+    tick watchdog kills a cycle at 60 seconds.
+
+    Daily because that is genuinely all we can see. The vendor's real-time
+    crypto snapshot returns 403 and `/v3/snapshot` on a pair returns
+    NOT_ENTITLED on the current plan; only the grouped daily bars are
+    entitled. Equities stay sub-60s. The difference is stated on the surface
+    rather than smoothed over — presenting a daily close as a live price is
+    the failure this codebase keeps having.
+    """
+    import httpx
+
+    from app.services.crypto_feed import build_crypto_rows
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            rows = await build_crypto_rows(client)
+    except Exception:
+        logger.exception("crypto.build_failed — leaving existing rows untouched")
+        return
+
+    if not rows:
+        # Same rule as the equity feed: a vendor outage must go STALE, which is
+        # visible and self-heals, never blank.
+        logger.warning("crypto.no_rows — leaving existing rows untouched")
+        return
+
+    # Plain read-then-write rather than a dialect-specific ON CONFLICT: 120
+    # rows once a day is not worth a Postgres-only code path that the SQLite
+    # test database cannot exercise.
+    written = 0
+    async with session_scope() as session:
+        for row in rows:
+            values = {k: v for k, v in row.items() if k != "dollar_volume"}
+            values["updated_at"] = datetime.now(UTC)
+            values.setdefault("name", _crypto_name(row["symbol"]))
+            values.setdefault("sector", "Crypto")
+            existing = await session.get(Ticker, row["symbol"])
+            if existing is None:
+                session.add(Ticker(**values))
+            else:
+                for key, val in values.items():
+                    if key != "symbol":
+                        setattr(existing, key, val)
+            written += 1
+    logger.info("crypto.upserted rows=%d", written)
+
+
+def _crypto_name(symbol: str) -> str:
+    """"X:BTCUSD" -> "BTC / USD". A placeholder until a name feed exists.
+
+    Deliberately NOT "Bitcoin": inventing a full name we were not given is how
+    a display string becomes a fact nobody checked.
+    """
+    from app.services.symbols import crypto_display_symbol
+
+    base = crypto_display_symbol(symbol)
+    return f"{base} / USD" if base else symbol
 
 
 async def _refresh_news() -> None:

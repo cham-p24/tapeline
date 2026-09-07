@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import Ticker
+from app.services.symbols import crypto_display_symbol, is_crypto_symbol
 from app.services.ticker_freshness import live_clauses
 
 router = APIRouter()
@@ -44,7 +45,9 @@ async def search(
     sym_like = f"%{_escape_like(sym_needle)}%"
     name_like = f"%{_escape_like(needle)}%"
 
-    stmt = select(Ticker.symbol, Ticker.name, Ticker.sector, Ticker.score).where(
+    stmt = select(
+        Ticker.symbol, Ticker.name, Ticker.sector, Ticker.score, Ticker.asset_class
+    ).where(
         or_(
             Ticker.symbol.like(sym_like, escape="\\"),
             Ticker.name.ilike(name_like, escape="\\"),
@@ -76,11 +79,24 @@ async def search(
     #
     # Same four tiers as the old Python rank(), evaluated by the database
     # BEFORE the limit, so the exact match cannot be cut.
+    # A crypto pair is stored namespaced (X:BTCUSD) so it can never be written
+    # over a real company of the same name — "SOL" is both Solana and Emeren
+    # Group, and conflating them published a token's price on a solar company's
+    # page. The prefix means a search for "BTC" matches the pair only as a
+    # substring, i.e. tier 2, below every ETF merely STARTING with those
+    # letters: searching BTC returned BTCO, BTCW and BTCU and no Bitcoin.
+    #
+    # This tier restores the intent of the exact-match rule without giving up
+    # the namespace. Ranked just behind a true exact symbol, so the Bitcoin ETF
+    # a user typed exactly still wins, and the coin sits with it rather than
+    # behind twenty funds named after it.
+    crypto_exact = f"X:{_escape_like(sym_needle)}USD"
     relevance = case(
         (Ticker.symbol == sym_needle, 0),
-        (Ticker.symbol.like(f"{_escape_like(sym_needle)}%", escape="\\"), 1),
-        (Ticker.symbol.like(sym_like, escape="\\"), 2),
-        else_=3,  # name-only match
+        (Ticker.symbol == crypto_exact, 1),
+        (Ticker.symbol.like(f"{_escape_like(sym_needle)}%", escape="\\"), 2),
+        (Ticker.symbol.like(sym_like, escape="\\"), 3),
+        else_=4,  # name-only match
     )
     # nullslast on the score tiebreak. Search deliberately has NO scored-row
     # floor — an unscored ETF must stay findable — but Postgres sorts NULLs
@@ -95,7 +111,20 @@ async def search(
     # The database already applied the ordering above; no Python re-rank.
     return {
         "results": [
-            {"symbol": r.symbol, "name": r.name, "sector": r.sector, "score": r.score}
+            {
+                "symbol": r.symbol,
+                "name": r.name,
+                "sector": r.sector,
+                "score": r.score,
+                # Returned so a caller can LABEL the row. A coin and a stock
+                # scoring 70 are not comparable — two of the six factors cannot
+                # exist for a token — so a result list that shows both must say
+                # which is which.
+                "asset_class": r.asset_class,
+                "is_crypto": is_crypto_symbol(r.symbol),
+                # "X:BTCUSD" -> "BTC", for display only. Never a key.
+                "display_symbol": crypto_display_symbol(r.symbol) or r.symbol,
+            }
             for r in rows
         ]
     }
