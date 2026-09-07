@@ -1651,8 +1651,20 @@ async def _refresh_workbook_tabs() -> None:
             refresh_market_from_workbook,
             refresh_smart_money_from_workbook,
             refresh_spikes_from_workbook,
+            repair_dirty_asset_classes,
         )
         async with session_scope() as sheet_session:
+            # Re-normalise any stored asset_class the gate would reject. The
+            # write-time normaliser only ever sees rows the sheet still
+            # governs; rows written before it existed — BRK-A and BRK-B as
+            # "<icon> holding co", SPLG as "<icon> index etf" — are stranded
+            # and invisible on every ranked surface until something revisits
+            # them. Runs first so a repaired row is servable the same cycle.
+            try:
+                await repair_dirty_asset_classes(sheet_session)
+            except Exception:
+                logger.exception("asset_class.repair_failed")
+
             if settings.signal_sheet_csv_url:
                 counts = await refresh_from_workbook(sheet_session)
                 # Which symbols the sheet owns — consumed by the snapshot
