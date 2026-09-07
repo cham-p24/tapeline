@@ -400,3 +400,47 @@ def _near_high_pct(bars: list[dict[str, Any]]) -> float | None:
     if not peak:
         return None
     return (closes[-1] - peak) / peak * 100.0
+
+
+#: Coins whose vendor NEWS tag is verified to mean the coin, not a listed company.
+#:
+#: The vendor tags crypto news with the bare base symbol — "BTC", not
+#: "X:BTCUSD". Verified 2026-09-07: `?ticker=X:BTCUSD` returns 0 items while
+#: `?ticker=BTC` returns "Bitcoin Leads Crypto Surge on Tuesday". So reading
+#: crypto news at all means querying the bare form.
+#:
+#: That is the SOL/Emeren collision again, one layer up. "SOL" in a news feed
+#: could be Solana or Emeren Group, a real NYSE solar company; "EOS" could be
+#: the token or Eaton Vance; "LEO" the token or BNY Mellon. Attaching the wrong
+#: company's headlines to a coin's page is the same class of false statement as
+#: attaching the wrong price, and it is not made safe by being "only news".
+#:
+#: So this is an ALLOWLIST, not a transformation. A coin absent from it simply
+#: shows no news — which is honest — rather than showing headlines that may be
+#: about somebody else. Add a symbol only after checking the vendor's articles
+#: for that tag are actually about the asset.
+#:
+#: Deliberately excluded despite being liquid: SOL, EOS, LEO, BGB — the four
+#: symbols from the 2026-09-03 incident.
+CRYPTO_NEWS_TAGS: dict[str, str] = {
+    "X:BTCUSD": "BTC",
+    "X:ETHUSD": "ETH",
+    "X:XRPUSD": "XRP",
+    "X:DOGEUSD": "DOGE",
+    "X:LTCUSD": "LTC",
+    "X:ADAUSD": "ADA",
+    "X:LINKUSD": "LINK",
+    "X:XMRUSD": "XMR",
+    "X:ZECUSD": "ZEC",
+    "X:DASHUSD": "DASH",
+}
+
+
+def crypto_news_tag(symbol: str) -> str | None:
+    """The vendor's news tag for a pair, or None if we will not guess.
+
+    None is a deliberate outcome, not a gap to be filled by falling back to
+    `crypto_display_symbol`. That fallback is exactly what would put Emeren
+    Group's headlines on Solana's page.
+    """
+    return CRYPTO_NEWS_TAGS.get((str(symbol) if symbol else "").strip().upper())
