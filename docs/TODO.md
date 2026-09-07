@@ -136,6 +136,60 @@ Seven exposures found independently across four sessions. The Massive vendor key
 - [ ] `RESEND_WEBHOOK_SECRET` unset — the bounce/complaint webhook silently returns `{"ok": true, "skipped": ...}`
 - [ ] Public-repo decision: go private, or stop treating the scoring weights as a boundary
 
+# 9g — 2026-09-06, fourth pass: adopt-now, and the thing found underneath it
+
+- [x] **A new account never saw the product** (#767) — signup defaulted to
+  `/app/billing?trial=start`, so a brand-new account met a payment decision
+  before its first result, on both the email and Google paths. Every free-plan
+  competitor checked does the opposite. The founder's own card-wall data already
+  said so: three accounts, none carded, none scanned, two never opened the
+  payment page. Default is now the scanner; the trial offer moved to a
+  dismissible panel above the table with the disclosure wording unchanged. Also
+  adds "Or skip the trial and subscribe" on the paid cards, hitting the existing
+  checkout without `start_trial` — the one payer bought outright.
+  Latent bug found on the way: `app/app/layout.tsx` wrapped only the banners in
+  `FirstRunTipProvider`, not `{children}`, so page content read the no-op default
+  and no page-level banner could ever yield to the welcome.
+- [x] **3,516 ticker pages that no AI could quote** (#768) — they are 91% of the
+  sitemap and produce ZERO unbranded AI discovery, while eleven
+  `/best-stocks-for/` pages produce all of it. The h1 was a bare symbol, the
+  numbers sat in tables, and `article:modified_time` was `new Date()` — render
+  time, a lie about freshness. Now: company name in the h1, a dated prose
+  restatement of the score, a visible "Updated" line and a real `dateModified`,
+  all from the row's own stamp. Plus counted Premium locks ("128 SEC Form 4
+  filings in the last 90 days") that are a SEPARATE block and never replace a
+  factor's em-dash — those mean missing data, not a paywall, and the page now
+  says which is which. Look-up meter counts up from look-up 1.
+- [x] **338,015 fabricated congressional disclosures were being served** (#770) —
+  found while building those counted locks, because a congressional count could
+  not honestly be built. Eight politicians, ~42,000 invented trades each, all
+  written 2026-05-03 to 2026-07-18, attributed to real named living people. The
+  WRITE path was already gated (`_mock_writes_enabled`); the SERVING path never
+  was. Premium got them as disclosures, the free preview served three to every
+  signed-in account under a comment saying it existed "to prove the feed is real
+  and populated", and the alert evaluator could EMAIL a user that a named
+  politician traded a named stock. `congress_integrity.is_publishable()` now
+  filters every path including the counts. Suppressed, not deleted.
+- [x] **The Premium "Congressional trades feed" claim is removed** (#770) — false
+  while the data was fabricated, false again once the feed is honestly empty.
+
+- [ ] **Decide what to do with the 338,015 fabricated rows.** They are suppressed,
+  not purged. Deleting them is an operator decision with no undo, which is why an
+  agent did not take it. Either purge them or leave them suppressed — but do not
+  leave the question open indefinitely, because the next person to read the table
+  will see 338,015 rows and assume a populated feed.
+- [ ] **Wire real congressional data, or leave the feature retired.** The
+  `SMART MONEY & CONGRESS` sheet tab is already parsed and its URL is already a
+  Fly secret — but `sheet_feed` only increments `sub_smart_money` by per-ticker
+  appearance count and never stores the individual trades as `CongressTrade`
+  rows. Storing them is what makes the Premium claim true again and lets the
+  marketing line come back. Until then Premium is one bullet shorter, which is
+  the honest state.
+- [ ] **`sub_smart_money` partly derives from that same tab.** The individual
+  trades were fabricated; the per-ticker appearance COUNT that feeds the score
+  comes from the sheet and is presumably real. Worth confirming that the score
+  input was never contaminated by the mock generator — it is a different code
+  path, but nobody has checked it.
 # 9f — Shipped 2026-09-06, third pass: the three fixes
 
 Founder said fix them. All three merged and deployed. Written in parallel
