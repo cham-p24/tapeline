@@ -3011,6 +3011,124 @@ def render_trial_precharge_reminder_email(
     )
 
 
+# -- Card-required trial nurture ---------------------------------------------
+#
+# WHY THESE EXIST, AND WHY THEY ARE NOT THE day3/day7/day11/day13 SERIES
+# ----------------------------------------------------------------------
+# `run_daily_drip` above filters on `User.stripe_customer_id.is_(None)`. That
+# is deliberate and must stay: its emails say "add a card" and "your account
+# drops to Free at expiry", which are the right words for the auto-granted,
+# card-free trials that series was written for.
+#
+# Since #536 the trial is card-REQUIRED, so every trial user now has a Stripe
+# customer and is excluded from all six of those stages. What a carded trialist
+# actually receives is: the activation nudges, and `run_trial_precharge_drip`'s
+# payment notice at seven days out. That notice is correct, required (Visa
+# wants >=7 days, Mastercard 3-7) and is the disclosure we owe -- but it is a
+# message about money. For someone who has not opened the product since the day
+# they signed up, a bill is the only thing we ever send, and the reasonable
+# response to a bill for something you have not used is to cancel.
+#
+# Measured 2026-09-06: of five accounts that ever added a card, three
+# cancelled, and the two still running had not returned since the day they
+# signed up.
+#
+# So these two stages fill the gap between signup and T-3 with something worth
+# coming back for. Every sentence has to be true for a reader who ALREADY has a
+# card on file:
+#   * never "add a card" -- they have one
+#   * never "you'll drop to Free" -- they will be CHARGED, and saying otherwise
+#     would remove the very warning the T-3 notice exists to give
+#   * the first-charge date appears exactly once, factually, via
+#     `_calm_trial_note`, which reads the user's OWN trial_ends_at. That matters
+#     beyond tidiness: trials created before #737 really are 14 days, so a
+#     duration computed from TRIAL_DAYS would misstate the charge date to the
+#     only people currently near one.
+# No urgency, no countdown, no performance figure -- Rule 6 and the ad-copy
+# rules apply here exactly as they do on a landing page.
+
+
+def render_carded_trial_setup_email(
+    user_name: str, *, trial_ends_at: datetime | None = None,
+) -> str:
+    """Early in a card-required trial: what Premium adds, and where it is.
+
+    Deliberately feature-and-location, not persuasion. The reader has already
+    decided to try it; the job is to remove the "what do I do with this" gap
+    that turns a paid trial into a dormant one.
+    """
+    return shell(
+        h1(f"Your Premium trial is open, {user_name}.")
+        + lead(
+            "Three things it unlocks that the free plan does not, and where "
+            "each one lives."
+        )
+        + card(
+            f"""
+            <ul style="margin:0;padding-left:18px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.75;">
+              <li><strong>The whole scored universe</strong> &mdash; not the top ten. Sort and filter it on the scanner.</li>
+              <li><strong>Congressional trades and SEC Form 4 insider filings</strong> &mdash; by ticker, under Holdings.</li>
+              <li><strong>Alerts and CSV export</strong> &mdash; a rule re-runs after each close and tells you what changed.</li>
+            </ul>
+            """
+        )
+        + paragraph(
+            "If you only do one thing: put five tickers you already follow on "
+            "your watchlist. Every one of them is scored after each close, and "
+            "the watchlist view shows how each has moved since you added it."
+        )
+        + button(
+            "Open the scanner",
+            "https://tapeline.io/app/scanner?utm_source=email&utm_campaign=carded_trial_setup&utm_medium=transactional",
+        )
+        + _calm_trial_note(trial_ends_at)
+        + footnote(
+            "Tapeline reports what the factors measure. It doesn't tell you "
+            "what to buy. \u2014 Christian, founder."
+        ),
+        preheader="Where the three Premium surfaces are, and the one thing to do first.",
+    )
+
+
+def render_carded_trial_value_email(
+    user_name: str, *, trial_ends_at: datetime | None = None,
+) -> str:
+    """Mid-to-late in a card-required trial, before the T-3 charge notice.
+
+    This is the last touch that is about the PRODUCT rather than the payment.
+    It states the charge date once -- a reader must never be surprised -- and
+    otherwise spends its space on what is actually there to use.
+    """
+    return shell(
+        h1(f"The part people miss, {user_name}.")
+        + lead(
+            "One number and one sentence per ticker is the surface. The record "
+            "underneath it is the reason to trust the number."
+        )
+        + paragraph(
+            "Every day Tapeline writes down its top ten and never edits the "
+            "row again. The next session it records what each pick did and "
+            "what SPY did. That whole history is public, and your watchlist "
+            "has its own version of it: how each name you saved has scored "
+            "since the day you added it."
+        )
+        + button(
+            "See your watchlist's record",
+            "https://tapeline.io/app/watchlist?utm_source=email&utm_campaign=carded_trial_value&utm_medium=transactional",
+        )
+        + muted_paragraph(
+            "Premium also carries the full scored universe, congressional and "
+            "insider filings, alerts on every rule you set, and CSV export."
+        )
+        + _calm_trial_note(trial_ends_at)
+        + footnote(
+            "Tapeline reports what the factors measure. It doesn't tell you "
+            "what to buy. \u2014 Christian, founder."
+        ),
+        preheader="Your watchlist keeps its own scored record. Here is where to read it.",
+    )
+
+
 def render_card_expiring_email(
     user_name: str,
     *,
@@ -4392,6 +4510,120 @@ async def run_winback_drip(
 
     if any_sent:
         await session.commit()
+    return counts
+
+
+async def run_carded_trial_drip(
+    session, *, governor: FrequencyGovernor | None = None,
+) -> dict[str, int]:
+    """Nurture for CARD-REQUIRED trials. Returns per-stage counts.
+
+    The population is the exact inverse of `run_daily_drip`'s: a live trial
+    WITH a Stripe customer. That series excludes them on purpose (its copy says
+    "add a card" and "you drop to Free", both false here), which left every
+    modern trial with one touch in its whole life -- Stripe's T-3 pre-charge
+    notice. See the block comment above `render_carded_trial_setup_email`.
+
+    Stages, dedup'd via `User.drip_state` tokens, keyed on DAYS REMAINING
+    rather than days elapsed:
+
+      "ct_setup" -- trial_ends_at in (now+10d, now+21d). Early orientation.
+      "ct_value" -- trial_ends_at in (now+3d,  now+5d ). The last product-first
+                    touch, deliberately AFTER the payment notice.
+
+    Both windows sit clear of `run_trial_precharge_drip`'s (now+6d, now+8d).
+    That gap is the point: the seven-day notice is a legally-shaped message
+    about a charge, and putting a marketing email beside it would bury the one
+    thing that must be read. So the cadence is orientation, then the notice,
+    then one last product-first touch while there is still time to act on it.
+
+    Days-remaining is what makes this correct for BOTH trial lengths. Trials
+    created before #737 are 14 days and the ones created after are 30; keying
+    on elapsed time would fire the "early" email at the wrong point in a short
+    trial, and keying on a constant would misstate the charge date to exactly
+    the users nearest one. Every window reads the user's own `trial_ends_at`.
+
+    A long trial therefore sees all three touches in order: orientation, the
+    payment notice, then the last product-first email. A short one skips
+    ct_setup entirely, because it is never far enough from its end date to
+    enter that window. That is the correct behaviour rather than a gap -- there
+    is no room for orientation in a trial that short, and the notice matters
+    more. Both cases fall out of the day-remaining windows on their own; no
+    branch reads the trial's length, which is what keeps this correct if the
+    length ever changes again.
+
+    Cancelled trials are excluded. A user who has already chosen to stop still
+    has `trial_ends_at` in the future, and selling to them after they decided
+    is the wrong note -- the win-back path handles that case separately.
+
+    Gated on `EmailPref.TRIAL_DRIP` (the suppressable early-lifecycle bucket)
+    and the lifecycle frequency governor, like every other lifecycle send.
+    No-ops when RESEND_API_KEY is unset: `send_email` returns skipped:True, so
+    the token is never stamped and the stage re-runs once mail is configured.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.models import User
+    from app.services.email_prefs import EmailPref, wants
+
+    now = datetime.now(UTC)
+    counts = {"ct_setup": 0, "ct_value": 0}
+
+    windows = [
+        ("ct_setup", now + timedelta(days=10), now + timedelta(days=21),
+         render_carded_trial_setup_email,
+         "Tapeline - what your Premium trial unlocks"),
+        ("ct_value", now + timedelta(days=3), now + timedelta(days=5),
+         render_carded_trial_value_email,
+         "Tapeline - the record under the score"),
+    ]
+
+    for token, lower, upper, renderer, subject in windows:
+        result = await session.execute(select(User).where(
+            User.trial_ends_at.isnot(None),
+            User.trial_ends_at >= lower,
+            User.trial_ends_at < upper,
+            User.stripe_customer_id.isnot(None),
+            User.tier.in_(["pro", "premium"]),
+            User.canceled_at.is_(None),
+        ))
+        for user in result.scalars().all():
+            sent_tokens = set((user.drip_state or "").split(",")) - {""}
+            if token in sent_tokens:
+                continue
+            if not wants(user, EmailPref.TRIAL_DRIP):
+                continue
+            if governor is not None and not governor.allows(
+                user, SendClass.LIFECYCLE, token=token,
+            ):
+                continue
+            try:
+                html = renderer(
+                    user.name or "trader", trial_ends_at=user.trial_ends_at,
+                )
+                res = await send_email(
+                    user.email, subject, html, persona="default",
+                    unsubscribe_user_id=user.id,
+                    unsubscribe_category="trial_drip",
+                )
+                if not res.get("skipped", False):
+                    sent_tokens.add(token)
+                    user.drip_state = ",".join(sorted(sent_tokens))
+                    # Commit per user, inside the try: a write that fails on one
+                    # row must not roll back tokens for users Resend has ALREADY
+                    # delivered to, which would duplicate-send on the next run.
+                    await session.commit()
+                    counts[token] += 1
+                    if governor is not None:
+                        governor.record(user, SendClass.LIFECYCLE)
+            except Exception:
+                logger.exception(
+                    "carded_trial_drip.send_failed user=%s stage=%s",
+                    user.id, token,
+                )
+
     return counts
 
 
