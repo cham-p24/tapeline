@@ -46,7 +46,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What's the difference between this and your live scanner?",
-        a: "This page is a SEO-friendly opinionated view: top 30 by today's move, filtered to score 60+. The live scanner at /app/scanner is the full ~2,500-ticker universe with every filter exposed (sort by any factor, threshold any sub-score, filter by sector or signal label). This page is for surfacing candidates; the scanner is for working through them.",
+        a: "This page is a SEO-friendly opinionated view: top 30 by today's move, filtered to score 60+. The live scanner at /app/scanner is the full ~6,900-ticker universe with every filter exposed (sort by any factor, threshold any sub-score, filter by sector or signal label). This page is for surfacing candidates; the scanner is for working through them.",
       },
       {
         q: "Why filter to score 60+ rather than just 'biggest movers'?",

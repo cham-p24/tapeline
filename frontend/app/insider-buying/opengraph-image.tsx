@@ -10,6 +10,6 @@ export default async function OG() {
     eyebrow: "FEATURE",
     title: "Insider Buying Stocks.",
     subtitle:
-      "Live SEC Form 4 open-market buys across ~2,500 tickers, ranked by transaction value with the full Tapeline score in context. Premium.",
+      "Live SEC Form 4 open-market buys across ~6,900 tickers, ranked by transaction value with the full Tapeline score in context. Premium.",
   });
 }

@@ -264,7 +264,7 @@ export default async function SectorsIndexPage() {
             Drill from any sector into its top-scoring names on the live scanner.
             An account takes an email and a password; the free plan returns the
             top ten scored rows of any scan. A card starts the 30-day Premium
-            trial — every matching row across the full ~2,500-ticker universe,
+            trial — every matching row across the full ~6,900-ticker universe,
             $0 charged that day, first charge on day 30, one click to cancel.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
