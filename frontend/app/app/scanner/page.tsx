@@ -143,7 +143,7 @@ const TUNE_DISMISSED_KEY = "tapeline_scanner_sector_tune_dismissed";
 //
 // This was a hardcoded `limit: 100` with no `offset` ever sent, which meant no
 // user on any tier could see past row 100 — while the copy below sold Pro as
-// unlocking "every matching row" of a universe the same page called ~2,500.
+// unlocking "every matching row" of a universe the same page called ~6,900.
 // The endpoint had supported `offset` for paying tiers the whole time; the page
 // simply never asked. Paging (rather than appending) keeps this compatible with
 // useLiveStream, which refetches on every SSE tick: the refetch re-reads the
@@ -890,7 +890,7 @@ export default function ScannerPage() {
           <span className="text-muted">
             Free plan — showing live scores for the top{" "}
             <strong className="text-fg">{meta.rowCap}</strong> rows.
-            Pro unlocks the full ~2,500-ticker universe, real-time.
+            Pro unlocks the full ~6,900-ticker universe, real-time.
             {/* The row cap this line quotes CHANGES ON ITS OWN. Open-access
                 month lifts a signed-in Free account to the Pro cap and reverts
                 with no deploy, so on the revert date this same sentence goes

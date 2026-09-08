@@ -64,7 +64,7 @@ export const POST_100_PICKS_IN_PUBLIC: BlogPost = {
     </ul>
 
     <p>If you're new here: each evening Tapeline auto-publishes the day's
-    top-10 highest-scoring tickers from a universe of ~2,500 active US
+    top-10 highest-scoring tickers from a universe of ~6,900 active US
     names. The six factors are named on
     <a href="/how-it-works">/how-it-works</a>, along with which carry the most
     weight — most toward Trend and Relative Strength, least toward Momentum;
@@ -102,7 +102,7 @@ export const POST_100_PICKS_IN_PUBLIC: BlogPost = {
       100 picks span a single market regime — broadly trending up with VIX
       mostly under 20. The model has not yet been tested in a 2022-style
       rate-shock or a sustained correction."}}</li>
-      <li><strong>Survivorship.</strong> The universe is the top ~2,500 by
+      <li><strong>Survivorship.</strong> The universe is the top ~6,900 by
       daily dollar-volume. Names that fell out of liquidity mid-period got
       dropped from new picks but their already-logged picks remain in the
       record — see the scorecard for the full list.</li>

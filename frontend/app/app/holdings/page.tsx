@@ -178,7 +178,7 @@ export default function HoldingsPage() {
               <tr><td colSpan={7} className="px-4 py-10 text-center text-muted">
                 <p className="text-sm font-medium text-fg">Backfilling insider feed…</p>
                 <p className="mt-2 text-xs max-w-md mx-auto">
-                  The worker fetches SEC Form 4 filings across the top ~2,500 most-liquid
+                  The worker fetches SEC Form 4 filings across the top ~6,900 most-liquid
                   US tickers — first run after a deploy takes about 20 minutes. Refresh in
                   a few minutes and rows will start appearing. The same data feeds the Smart
                   Money pillar of every Tapeline Score.
@@ -254,7 +254,7 @@ export default function HoldingsPage() {
       )}
 
       <p className="mt-4 text-xs text-subtle">
-        Source: SEC Form 4 filings. Updated daily for the top ~2,500 most-liquid US
+        Source: SEC Form 4 filings. Updated daily for the top ~6,900 most-liquid US
         tickers. Codes: P = open-market buy, S = open-market sale, A = grant/award,
         M = option exercise, G = gift, F = payment of tax via shares.
       </p>

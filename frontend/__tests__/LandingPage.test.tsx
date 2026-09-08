@@ -137,15 +137,21 @@ describe("LandingPage hero fold", () => {
     ).toHaveAttribute("href", "/daily-picks");
   });
 
-  it("states the terms plainly: what a card buys, \$0 that day, day-14 charge, one-click exit", async () => {
+  it("states the terms plainly: what a card buys, \$0 that day, first charge on the last trial day, one-click exit", async () => {
     const { container } = render(await LandingPage());
     const text = (container.textContent ?? "").replace(/\s+/g, " ");
-    // CHANGED TWICE. #548 replaced "no credit card, no payment details" with
-    // "your card goes on at first sign-in"; #683 (2026-08-30) took the wall
-    // that sentence described back out. Signing up is an email and a password
-    // and the new account can scan immediately — the card is what buys the
-    // trial, and the TRIAL's terms below are exactly as they were.
-    expect(text).toMatch(/no card/i);
+    // CHANGED THREE TIMES. #548 replaced "no credit card, no payment details"
+    // with "your card goes on at first sign-in"; #683 (2026-08-30) took the
+    // wall that sentence described back out; and the copy then dropped the
+    // literal phrase "no card" for something plainer.
+    //
+    // This assertion used to be /no card/i and went red when that phrase left,
+    // even though the FACT it was guarding is still stated — and stated
+    // better: "Signing up takes an email and a password, and lands on the free
+    // plan". Pinning a phrase rather than the substance made a copy
+    // improvement look like a regression, so it now asserts the substance.
+    expect(text).toMatch(/email and a password/i);
+    expect(text).toMatch(/lands on the free plan/i);
     expect(text).toMatch(new RegExp(`${TRIAL_DAYS} days of Premium`, "i"));
     expect(text).toMatch(/nothing is charged/i);
     expect(text).toMatch(new RegExp(`first charge is on day ${TRIAL_DAYS}`, "i"));

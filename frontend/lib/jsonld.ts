@@ -950,7 +950,7 @@ export function compareJsonLd(a: CompareArgs) {
         "Public scorecard — every top-10 daily pick back-checked vs SPY next session",
         "Sub-60-second refresh during market hours",
         "Plain-English reasoning per ticker (free tier included)",
-        "~2,500 actively scored from the full liquid US universe",
+        "~6,900 actively scored from the full liquid US universe",
         "Squeeze + market-regime detection",
         "Congressional trades + recent insider buys via SEC Form 4 (Premium)",
       ],

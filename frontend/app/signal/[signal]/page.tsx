@@ -100,7 +100,7 @@ function signalFaq(display: string, range: string, blurb: string) {
     },
     {
       q: `How is the ${display} list calculated?`,
-      a: `Every US ticker in the active scanner universe (~2,500 by daily dollar-volume) is scored sub-60s using the same six named factors — weighted most toward Trend and Relative Strength and least toward Momentum. Names whose composite score falls in the ${range} band get the ${display} label automatically. The list above shows the top names currently in this tier, sorted by score.`,
+      a: `Every US ticker in the active scanner universe (~6,900 by daily dollar-volume) is scored sub-60s using the same six named factors — weighted most toward Trend and Relative Strength and least toward Momentum. Names whose composite score falls in the ${range} band get the ${display} label automatically. The list above shows the top names currently in this tier, sorted by score.`,
     },
     {
       q: `Should I buy ${display} stocks?`,

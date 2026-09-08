@@ -18,13 +18,37 @@
  *   - it date-gates itself on the exact backend boundary (`d < UNTIL`:
  *     7 September is the last open day) so it auto-disappears with no deploy.
  */
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { OpenAccessBanner } from "@/components/OpenAccessBanner";
 
 const DURING = new Date("2026-08-23T12:00:00Z");
 const LAST_OPEN_INSTANT = new Date("2026-09-07T23:59:59Z");
 const CUTOFF = new Date("2026-09-08T00:00:00Z");
+
+/**
+ * The clock is MOVED, not injected.
+ *
+ * These four tests pass `now={DURING}` to the component, which is enough for
+ * its own date gate — but the strip is wrapped in `HideAfter`, which reads the
+ * REAL clock on purpose (it exists to blank a page that was CACHED during the
+ * promo and served after it). So once 8 September 2026 actually arrived, the
+ * wrapper blanked the children regardless of the date passed in, and all four
+ * went red on a calendar boundary with no code change.
+ *
+ * Threading `now` into HideAfter was tried and reverted: it defeats the stale-
+ * cache protection, which has its own test. Faking the system clock is the
+ * correct lever — it makes the suite deterministic without weakening the thing
+ * being tested.
+ */
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(DURING);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("OpenAccessBanner", () => {
   it("states the promo factually: end date, signed-in requirement, both row numbers", () => {

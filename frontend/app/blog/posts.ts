@@ -923,6 +923,25 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
     publishedAt: "2026-05-03",
     author: "Tapeline",
     body: `
+      <div class="card border-l-4 border-accent p-4 mb-6">
+        <p class="text-sm"><strong>Update, 7 September 2026 — we were wrong,
+        and the number is now ~6,900.</strong></p>
+        <p class="text-sm">The argument below defends a 2,500-ticker cutoff on
+        liquidity grounds. The cutoff was real, but it was not the liquidity
+        filter this post describes. It was a configuration limit on how many
+        symbols our worker refreshed each cycle — and because a ticker with no
+        price refresh has no daily move, and every ranked view requires one, it
+        quietly became a limit on what we could <em>show</em>.</p>
+        <p class="text-sm">That stranded 3,633 already-scored tickers,
+        including TSM, Toyota, Sony and HubSpot. Searching "TSM" on Tapeline
+        returned nothing. It is fixed; an unfiltered scan now returns ~6,900.</p>
+        <p class="text-sm">This post stays up unedited below, because a
+        published argument we have since disproved is exactly the sort of thing
+        we would want to read on someone else's site. The liquidity reasoning
+        still holds for the default view, which applies a $1M/day floor you can
+        switch off.</p>
+      </div>
+
       <p>The data feed (a third-party market-data feed) gives us coverage of
       every listed US security — the full liquid US universe, after filtering
       out OTC. We actively score the top ~2,500 by daily dollar-volume.
@@ -1505,7 +1524,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
         <li>Stock Rover free: end-of-day. Essentials: 15-minute delay.</li>
         <li>Zacks free: 20-minute delay. Premium: real-time on most exchanges.</li>
         <li>Tapeline free: live scores (no delay) on the top 10 scanner rows;
-        full ~2,500-ticker universe at ~60-second freshness on Pro+.</li>
+        full ~6,900-ticker universe at ~60-second freshness on Pro+.</li>
       </ul>
 
       <p>Tapeline gates on breadth rather than freshness — Free is live, just

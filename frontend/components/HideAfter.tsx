@@ -39,6 +39,16 @@ export function HideAfter({
 }) {
   const [expired, setExpired] = useState(false);
 
+  // Deliberately reads the REAL clock and takes no injectable `now`.
+  //
+  // That was tried and reverted: threading a caller's date in here defeats the
+  // entire point of the component, which is to blank content on a page that was
+  // CACHED while the promo was live and is being served after it ended. The
+  // server's render date is exactly the stale value we must not trust.
+  // `test_hides_itself_when_the_page_was_cached_during_the_promo` catches it.
+  //
+  // A test that needs this component past its deadline should move the clock
+  // (vi.useFakeTimers + vi.setSystemTime), not hand it a date.
   useEffect(() => {
     const deadline = new Date(at).getTime();
     // A malformed `at` must not blank live content — fail toward showing it.

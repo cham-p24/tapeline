@@ -83,7 +83,7 @@ export default async function StockMarketHeatmapPage() {
           <>
             <p>
               The data spine is the same live ticker universe powering the
-              scanner: ~2,500 US equities + ETFs, scored sub-60 seconds during
+              scanner: ~6,900 US equities + ETFs, scored sub-60 seconds during
               market hours. Each ticker is grouped under one of the 11 GICS
               top-level sectors (plus three Tapeline buckets for Commodities,
               Funds &amp; ETFs, and Uncategorized) via{" "}

@@ -46,7 +46,7 @@ const FACT_SHEET = [
   // "Premium trial", never "Free trial": the trial is the one thing that takes a card,
   // and its length comes from lib/trial.ts so this line cannot say two numbers at once again.
   { label: "Premium trial",   value: `${TRIAL_DAYS}-day Premium; card required, $0 charged today, first charge on day ${TRIAL_DAYS}` },
-  { label: "Universe scored", value: "~2,500 active US tickers (top by daily $-volume, from the full liquid US universe)" },
+  { label: "Universe scored", value: "~6,900 active US tickers (top by daily $-volume, from the full liquid US universe)" },
   { label: "Update cadence",  value: "Sub-60 seconds during US market hours" },
   { label: "Data categories", value: "Live market data, fundamentals, macro indicators, SEC filings, news wire" },
   { label: "Integrations",    value: "Public MCP server for AI assistants (tapeline.io/mcp) · CSV export · API (tapeline.io/developers)" },
@@ -59,7 +59,7 @@ const ONE_LINER =
 
 // Prices interpolate from lib/pricing.ts so a future reprice can't strand a
 // stale figure in the most-copied paragraph on the site.
-const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every ticker in the active US universe (~2,500, selected by daily dollar volume) gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — updated sub-60s during US market hours. Every top-10 daily pick auto-publishes to a public scorecard with the realized next-day return vs SPY, immutable and back-checked. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin, priced annual-first at Pro ${usdCompact(PRICING.pro.annual)}/yr and Premium ${usdCompact(PRICING.premium.annual)}/yr, with a concierge Trader tier at ${usdCompact(PRICING.trader.annual)}/yr.`;
+const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every ticker in the active US universe (~6,900, selected by daily dollar volume) gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — updated sub-60s during US market hours. Every top-10 daily pick auto-publishes to a public scorecard with the realized next-day return vs SPY, immutable and back-checked. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin, priced annual-first at Pro ${usdCompact(PRICING.pro.annual)}/yr and Premium ${usdCompact(PRICING.premium.annual)}/yr, with a concierge Trader tier at ${usdCompact(PRICING.trader.annual)}/yr.`;
 
 const PULL_QUOTES = [
   {
@@ -428,7 +428,7 @@ export default function PressPage() {
             </li>
             <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
               <strong className="text-fg">Not crypto, not options, not futures.</strong>{" "}
-              US equities and ETFs only (~2,500 actively scored). The
+              US equities and ETFs only (~6,900 actively scored). The
               underlying data feed supports broader asset classes but
               Tapeline&rsquo;s scoring model is calibrated for cash equities.
             </li>

@@ -309,7 +309,7 @@ export default async function DoStockScreenersWorkPage() {
             than with a remembered one. */}
         <h2 className="mt-12 text-2xl font-semibold tracking-tight">A worked example: one screener that shows its record</h2>
         <p className="mt-3 leading-relaxed text-muted">
-          Tapeline was built around the check above. A six-factor composite scores ~2,500 US stocks daily; the top 10
+          Tapeline was built around the check above. A six-factor composite scores ~6,900 US stocks daily; the top 10
           are frozen the moment they print, and each pick&rsquo;s next-session result versus SPY is recorded 24 hours
           later. Nothing is edited or removed, and the full archive downloads as CSV and JSON. The newest picks are
           logged the day they print and back-checked one session later, so the back-checked count below always trails
