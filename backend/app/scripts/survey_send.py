@@ -11,6 +11,20 @@ account relationship plus a message that promotes nothing (see
 `docs/growth/CUSTOMER_SURVEY_2026_09.md` §7.1). Put a price in it and that
 argument collapses.
 
+TWO AUDIENCES
+-------------
+`--audience accounts` (default) mails rows in `users`. `--audience newsletter`
+mails confirmed `newsletter_subscribers` who have NO account -- 14 of the 46
+reachable addresses, and a population the account survey previously ignored
+entirely. `--audience all` does both.
+
+They get DIFFERENT copy and a different Q1 option list. Every account-holder
+option presupposes a signup ("I signed up but haven't really used it"), so
+sending that list to someone who never made an account asks a question with no
+true answer. The newsletter variant also uses the newsletter list's own
+unsubscribe token and headers, because those people are not `users` rows and
+the shared user-keyed unsubscribe cannot address them.
+
 AUDIENCE, AND WHY IT IS SMALLER THAN THE ACCOUNT COUNT
 ------------------------------------------------------
 Excluded, in this order, each for a stated reason:
@@ -243,6 +257,131 @@ async def run(
     return counts
 
 
+async def collect_newsletter(
+    session, *, limit: int | None = None, only: str | None = None,
+) -> tuple[list, list]:
+    """(recipients, skipped) -- confirmed subscribers with NO user account.
+
+    Anyone who also has an account is excluded here and reached through the
+    account audience instead, so nobody is mailed twice. The join is on
+    lowercased email because the two tables are populated by different code
+    paths and neither normalises the other's casing.
+    """
+    from app.models import User
+    from app.models.newsletter import NewsletterSubscriber
+
+    stmt = select(NewsletterSubscriber)
+    if only:
+        stmt = stmt.where(NewsletterSubscriber.email == only)
+    rows = (await session.execute(stmt)).scalars().all()
+
+    accounts = {
+        (e or "").lower()
+        for e in (await session.execute(select(User.email))).scalars().all()
+    }
+
+    recipients, skipped = [], []
+    for sub in rows:
+        email = (sub.email or "").lower()
+        if not email:
+            skipped.append((sub, "no_email"))
+        elif sub.status != "confirmed":
+            skipped.append((sub, "status_" + str(sub.status)))
+        elif email in accounts:
+            skipped.append((sub, "has_account"))
+        elif not sub.unsubscribe_token:
+            # No token means no working opt-out for this list, and shipping a
+            # non-transactional email without one is the thing the Spam Act is
+            # actually about. Skip rather than send.
+            skipped.append((sub, "no_unsubscribe_token"))
+        else:
+            recipients.append(sub)
+
+    if limit is not None:
+        recipients = recipients[:limit]
+    return recipients, skipped
+
+
+async def run_newsletter(
+    *, send: bool, limit: int | None, only: str | None = None,
+) -> dict:
+    from app.config import get_settings
+    from app.db import session_scope
+    from app.services.email import render_customer_survey_email, send_email
+    from app.services.newsletter import _list_unsubscribe_headers, _unsubscribe_url
+
+    settings = get_settings()
+    base = (settings.app_url or "https://tapeline.io").rstrip("/")
+    survey_url = base + "/survey"
+    if send and not base.startswith("https://"):
+        raise SystemExit(
+            "refusing to send: survey link is " + repr(base)
+            + ", which is not a public https URL."
+        )
+
+    counts = {"sent": 0, "would_send": 0, "skipped": 0, "failed": 0}
+
+    async with session_scope() as session:
+        recipients, skipped = await collect_newsletter(session, limit=limit, only=only)
+        counts["skipped"] = len(skipped)
+
+        print("\n--- newsletter subscribers (no account) ---")
+        if skipped:
+            tally: dict[str, int] = {}
+            for _r, reason in skipped:
+                tally[reason] = tally.get(reason, 0) + 1
+            print("skipped: " + ", ".join(k + "=" + str(v) for k, v in sorted(tally.items())))
+        print("recipients: " + str(len(recipients)))
+
+        for sub in recipients:
+            if not send:
+                counts["would_send"] += 1
+                print("  WOULD SEND  " + sub.email)
+                continue
+
+            # The shared footer placeholder is only resolved for `users` rows,
+            # so a newsletter recipient would otherwise get NO visible opt-out.
+            # Append this list's own link, and ship its List-Unsubscribe header.
+            unsub = _unsubscribe_url(sub.unsubscribe_token)
+            html = render_customer_survey_email(
+                "there", survey_url=survey_url, audience="newsletter",
+            ) + (
+                '<p style="margin:0;padding:0 24px 24px;font-size:11px;'
+                'line-height:1.6;color:#8a8f98;font-family:-apple-system,'
+                'BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">'
+                '<a href="' + unsub + '" style="color:#8a8f98;'
+                'text-decoration:underline;">Unsubscribe</a>'
+                " \u2014 one click, no sign-in needed.</p>"
+            )
+            try:
+                res = await send_email(
+                    to=sub.email,
+                    subject="Tapeline \u2014 four questions",
+                    html=html,
+                    persona="sales",
+                    headers=_list_unsubscribe_headers(sub.unsubscribe_token),
+                )
+            except Exception:
+                counts["failed"] += 1
+                logger.exception("survey.newsletter_send_failed email=%s", sub.email)
+                print("  FAILED      " + sub.email)
+                continue
+
+            if res.get("skipped"):
+                counts["skipped"] += 1
+                print("  SKIPPED     " + sub.email + " (" + str(res.get("reason")) + ")")
+                continue
+
+            counts["sent"] += 1
+            print("  SENT        " + sub.email)
+
+        if send:
+            await session.commit()
+
+    print("newsletter result: " + str(counts) + "\n")
+    return counts
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--send", action="store_true", help="actually transmit")
@@ -255,16 +394,29 @@ def main() -> None:
         "--include-sunset", action="store_true",
         help="override the re_sunset suppression. Founder decision only.",
     )
+    ap.add_argument(
+        "--audience", choices=("accounts", "newsletter", "all"), default="accounts",
+        help="who to mail. Newsletter subscribers with no account get different "
+             "copy and a different Q1 option list.",
+    )
     args = ap.parse_args()
 
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    asyncio.run(run(
-        send=args.send,
-        limit=args.limit,
-        only=args.only,
-        include_sunset=args.include_sunset,
-    ))
+    async def _go() -> None:
+        if args.audience in ("accounts", "all"):
+            await run(
+                send=args.send,
+                limit=args.limit,
+                only=args.only,
+                include_sunset=args.include_sunset,
+            )
+        if args.audience in ("newsletter", "all"):
+            await run_newsletter(
+                send=args.send, limit=args.limit, only=args.only,
+            )
+
+    asyncio.run(_go())
 
 
 if __name__ == "__main__":

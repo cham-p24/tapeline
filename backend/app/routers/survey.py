@@ -48,10 +48,19 @@ _recent_by_ip: dict[str, deque[float]] = defaultdict(deque)
 #: stored as given rather than coerced -- coercing to "other" is how the
 #: cancellation flow ended up with three nulls and no idea why.
 STATUS_OPTIONS = (
+    # People with a Tapeline account.
     "using_it",
     "signed_up_not_used",
     "used_then_stopped",
     "dont_remember",
+    # People on the newsletter list who never made an account. 14 of the 46
+    # reachable addresses are these, and every option above presupposes a
+    # signup — so without these two the instrument asks a third of the
+    # audience a question with no true answer, which is the textbook
+    # false-presupposition defect and produces a fabricated answer or an
+    # abandoned form.
+    "no_account_meaning_to",
+    "no_account_not_for_me",
 )
 
 
