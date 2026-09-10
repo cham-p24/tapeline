@@ -53,9 +53,20 @@
  *    3,051  score AND volume (worker)    -> the real active set
  *    2,500  ACTIVE_UNIVERSE_SIZE         -> ACTIVE_SCORED_TICKERS
  *
- * Copy says ~2,500 because that is the configured, defensible floor of what the
- * worker scores every tick. Every mega-cap (AAPL, MSFT, NVDA, TSLA, SPY, QQQ)
- * is in it with live volume — spot-checked the same day.
+ * Copy said ~2,500 because that was the configured floor of what the worker
+ * snapshotted every tick.
+ *
+ * ── SUPERSEDED 2026-09-07 ───────────────────────────────────────────────────
+ *
+ * That figure was never a count of anything a user could see. A row with no
+ * snapshot has no `change_pct_1d`, and every ranked surface requires one, so
+ * the knob silently became a cap on what could be SERVED — stranding 3,633
+ * scored tickers including TSM, Toyota, Sony and HubSpot. Searching "TSM"
+ * returned nothing. Fixed in #763/#765/#772: the universe was never small, we
+ * were hiding two thirds of it and advertising the smaller number.
+ *
+ * The split below is re-measured: 11,852 tracked, 7,513 scored, 6,994 returned
+ * by an unfiltered scan, 79 crypto in a separate bucket.
  *
  * RE-CHECK (read-only):
  *   SELECT count(*) FROM tickers;
@@ -80,14 +91,38 @@
  * backend ceiling, because we cannot score more than we snapshot — and that
  * is what universeSizeIsSingleSourced.test.ts now asserts.
  *
- * Still 2,500 pending measurement. That understates the product today and is
- * expected to move up materially; understating is the safe direction to be
- * wrong in while the number is unverified.
+ * MEASURED 2026-09-07 and rounded DOWN, never estimated and never rounded up.
+ * `/api/scanner?limit=200&min_dollar_volume=0` returned total_matched = 6,994,
+ * which is the same query a reader can run in ten seconds.
+ *
+ * Not 11,852 (rows we merely TRACK, most of them unscored) and not 5,130 (the
+ * DEFAULT view, which applies a $1M/day liquidity floor the user can switch
+ * off). The claimable number is what an unfiltered scan actually returns.
  */
-export const ACTIVE_SCORED_TICKERS = 2500;
+export const ACTIVE_SCORED_TICKERS = 6900;
 
-/** Rows in `tickers`, scored or merely tracked. Rounded down from 11,815. */
+/** Rows in `tickers`, scored or merely tracked. Rounded down from 11,852. */
 export const TRACKED_TICKERS = 11800;
+
+/**
+ * Crypto pairs, in their own bucket. Rounded down from 79 (measured
+ * 2026-09-07 via the same endpoint with `asset_class=crypto`).
+ *
+ * Deliberately a SEPARATE number, never added to ACTIVE_SCORED_TICKERS. A coin
+ * and a stock scoring 70 do not mean the same thing: company fundamentals and
+ * insider filings cannot exist for a token, so a coin's score is built from
+ * four readings where a stock's is built from six. Summing them into one
+ * headline would imply a comparison the arithmetic does not support — and it
+ * is the same conflation that put a token's price on four real companies'
+ * pages on 2026-09-03.
+ *
+ * Crypto also updates DAILY, not sub-60s: the vendor's real-time crypto feed
+ * is not on the current plan. Any copy stating a refresh rate must say so.
+ */
+export const CRYPTO_PAIRS = 75;
+
+/** Display form, e.g. "75". */
+export const cryptoPairsLabel = CRYPTO_PAIRS.toLocaleString("en-US");
 
 /** Display form for the number that belongs in copy, e.g. "~2,500". */
 export const activeScoredLabel = `~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}`;

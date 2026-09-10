@@ -104,7 +104,7 @@ const TOOLS: Tool[] = [
     ],
     cons: [
       "Younger brand — launched 2026 (Finviz dates to 2007)",
-      "~2,500 actively scored tickers (top by $-volume), not the full 9,000+ Finviz indexes",
+      "~6,900 actively scored tickers (top by $-volume), not the full 9,000+ Finviz indexes",
       "No raw-filter screener with 60+ technical fields — synthesis-first approach",
       "The free plan stops at ten rows a scan — every match, alerts and CSV export need a card",
     ],
