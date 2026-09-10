@@ -1404,18 +1404,37 @@ the success latch would otherwise burn, long enough that a sustained vendor
 outage isn't hammered every 60s tick."""
 
 AGGREGATES_CONCURRENCY: int = int(os.environ.get("AGGREGATES_CONCURRENCY", "8"))
-"""In-flight aggregate fetches. Measured against the live vendor 2026-09-11,
-20 symbols per level, zero errors at every level:
+"""In-flight aggregate fetches, PER MACHINE. Both workers run this pass, so the
+number the vendor sees is twice this.
 
-    concurrency= 1   0.85s/sym   ->  12,000 symbols = 170 min
-    concurrency= 4   0.22s/sym   ->                    43 min
-    concurrency= 8   0.14s/sym   ->                    28 min
-    concurrency=12   0.09s/sym   ->                    19 min
+Benchmarked 2026-09-11 on an idle machine, 20 symbols per level, no errors:
 
-8, not 12: the daily-bar endpoint took 12 without complaint, but the crypto
-and Finnhub calls share this worker and were already returning 429s, and BOTH
-worker machines run this pass (see below). 28 minutes is comfortably inside a
-daily cadence, so the extra speed buys nothing worth the headroom."""
+    concurrency= 1   0.85s/sym       concurrency= 8   0.14s/sym
+    concurrency= 4   0.22s/sym       concurrency=12   0.09s/sym
+
+Those figures are the CEILING, not the throughput. Measured again once it was
+actually running on both workers:
+
+    ~150 symbols/min  ->  a full 11,884-symbol pass in ~1.3 hours
+
+which is a third of what the idle benchmark projected (28 min), because the
+two machines share one vendor quota with each other AND with the crypto and
+Finnhub calls. The logs show steady `polygon.rate_limit retrying in 1s/2s/4s`
+backoff at this level. 1.3 hours is comfortably inside a daily cadence and
+roughly 3x the serial version it replaced, so this is left as it is — but the
+benchmark table is kept above deliberately, because reading it alone would
+tell you this pass takes half an hour, and it does not.
+
+TUNING IT DOWN MAY NOT COST THROUGHPUT
+Requests that come back 429 still consume quota and add backoff latency, so
+fewer in flight could plausibly deliver the same 150/min with less waste and
+less pressure on the crypto feed, which drops pairs when the vendor throttles
+(`crypto.history_failed ... skipping this pair`). That is a hypothesis, not a
+measurement — nobody has run 4-per-machine in production. To test it, set
+AGGREGATES_CONCURRENCY and compare with:
+
+    SELECT count(*) FILTER (WHERE last_aggregates_at > now() - interval '5 minutes')
+    FROM tickers;   -- symbols stamped per 5 min; divide by 5"""
 
 AGGREGATES_STAMP_BATCH: int = int(os.environ.get("AGGREGATES_STAMP_BATCH", "250"))
 """Symbols per `last_aggregates_at` stamp — about 35s of work at concurrency 8.
