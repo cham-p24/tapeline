@@ -41,11 +41,16 @@ table is allowed to contain*. Both, or neither is worth much.
 """
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import functools
+import logging
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 #: Namespace for every Tapeline advisory lock, so an id here can never collide
 #: with one taken by an extension or by a future caller.
@@ -55,6 +60,11 @@ LOCK_NAMESPACE = 8266
 LOCK_SCORECARD_FREEZE = 1
 LOCK_DAILY_NEWSLETTER = 2
 LOCK_DAILY_DRIPS = 3
+LOCK_EOD_DIGEST = 4
+LOCK_WEEKLY_NEWSLETTER = 5
+LOCK_CHECKOUT_RECOVERY = 6
+LOCK_ACTIVATION_NUDGE = 7
+LOCK_SEO_DIGEST = 8
 
 
 async def try_xact_lock(session: AsyncSession, objid: int) -> bool:
@@ -123,3 +133,55 @@ async def hold_xact_lock(objid: int) -> AsyncIterator[bool]:
         yield await try_xact_lock(lock_session, objid)
         # session_scope commits on the way out, which releases the lock. That
         # is the intended release point: the caller is done.
+
+
+def one_machine_at_a_time(
+    objid: int,
+    name: str,
+    *,
+    default_factory: Callable[[], Any] = lambda: None,
+) -> Callable[[Any], Any]:
+    """Let only one machine run the decorated job at a time.
+
+    A DECORATOR rather than a wrapper at the call site, for two reasons.
+
+    The first is that the guard then travels with the job. #799 put the lock
+    at the two dispatch sites in tick() and said in its own description that
+    "a guard repeated twelve times is a guard that will be missed on the
+    thirteenth" — and it was: five more email jobs in the same tick were left
+    with nothing but their process-global `_last_*` latch, which on a
+    two-machine deploy has never guaranteed anything (see the module
+    docstring). Decorating the entry point means a future caller cannot
+    reintroduce the bug by calling it from somewhere new.
+
+    The second is that it does not touch the body. Each of these jobs is a
+    gated try/except block inside tick(); wrapping them in place would mean
+    re-indenting five live email paths, which is a lot of risk for a change
+    whose entire purpose is to stop mail going out twice.
+
+    `default_factory` supplies the return value when this machine loses the
+    lock, and it matters: the callers do `if count:` and
+    `if any(counts.values())`, so a job returning counts must lose with an
+    empty dict and one returning a number with 0. Returning None to a caller
+    expecting a dict would trade a duplicate email for a crash.
+    """
+    def _decorate(fn):  # type: ignore[no-untyped-def]
+        @functools.wraps(fn)
+        async def _wrapped(*args, **kwargs):  # type: ignore[no-untyped-def]
+            async with hold_xact_lock(objid) as won:
+                if not won:
+                    logger.info("%s.skipped_other_machine_is_running", name)
+                    return default_factory()
+                return await fn(*args, **kwargs)
+
+        # Read by test_no_email_job_is_left_unlocked, which derives the list of
+        # jobs that need this from tick()'s own source rather than a list
+        # somebody has to remember to update.
+        _wrapped._one_machine_lock_id = objid  # type: ignore[attr-defined]
+        _wrapped._one_machine_name = name      # type: ignore[attr-defined]
+        # Exposed so the guard can check the loss value against how tick()
+        # actually consumes each result, not just that one was supplied.
+        _wrapped._one_machine_default_factory = default_factory  # type: ignore[attr-defined]
+        return _wrapped
+
+    return _decorate
