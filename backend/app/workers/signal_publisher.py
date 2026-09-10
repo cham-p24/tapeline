@@ -1937,14 +1937,35 @@ async def _run_daily_newsletter(started: datetime, today_str: str) -> None:
     seconds. It fans out email to the whole list, so its wall time scales with
     subscribers and was only ever going to grow.
     """
-    try:
-        from app.services.newsletter import run_daily_digest
+    from app.services.dblock import LOCK_DAILY_NEWSLETTER, hold_xact_lock
 
-        async with session_scope() as ndl_session:
-            count = await run_daily_digest(ndl_session, now=started)
-        logger.info("newsletter_daily.sent count=%d date=%s", count, today_str)
-    except Exception:
-        logger.exception("newsletter_daily.run_failed")
+    # ONE MACHINE SENDS. The `_last_daily_newsletter_date` latch at the
+    # dispatch site is a process global, and Fly runs a standby worker beside
+    # the primary that is `started` and running tick() — not idling. So the
+    # latch has been promising something it could not deliver, and the only
+    # reason it never showed is that this stage sat behind a score_upsert
+    # timeout that killed every cycle before reaching it (#798).
+    #
+    # run_daily_digest is read-then-send-then-record: SELECT every confirmed
+    # subscriber not yet sent to today, then loop, committing per subscriber.
+    # The per-subscriber commit makes a RESTART replay-safe. It does nothing
+    # about a second machine that has ALREADY read the same list — both send
+    # to all 15.
+    async with hold_xact_lock(LOCK_DAILY_NEWSLETTER) as won:
+        if not won:
+            logger.info(
+                "newsletter_daily.skipped_other_machine_is_sending date=%s",
+                today_str,
+            )
+            return
+        try:
+            from app.services.newsletter import run_daily_digest
+
+            async with session_scope() as ndl_session:
+                count = await run_daily_digest(ndl_session, now=started)
+            logger.info("newsletter_daily.sent count=%d date=%s", count, today_str)
+        except Exception:
+            logger.exception("newsletter_daily.run_failed")
 
 
 async def _refresh_news() -> None:
@@ -2205,7 +2226,9 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
         backoff keeps a persistent outage from hammering the DB/email
         provider every ~60s tick while still recovering within the hour;
       - retries are safe: every stage dedupes per-user via drip_state /
-        winback_state / founder_touch_sent_at, so nothing double-sends.
+        winback_state / founder_touch_sent_at, so a re-run re-reads the row
+        and skips. That covers a RETRY. It does not cover two machines
+        running at once — see the cross-machine lock below.
 
     The stage windows themselves are 48h wide (see email.run_daily_drip),
     so even a full missed day can't age a user out of their stage.
@@ -2221,6 +2244,35 @@ async def _maybe_run_daily_drips(started: datetime) -> None:
     )
     if not (due and backoff_elapsed):
         return
+
+    # ONE MACHINE SENDS — see the same guard on the daily newsletter.
+    #
+    # The docstring above says retries are safe because every stage dedupes
+    # per-user via drip_state / winback_state / founder_touch_sent_at. That is
+    # true of a RETRY, which re-reads the row and sees the token. It is not
+    # true of two machines running right now: each SELECTs its cohort before
+    # either has committed a token, so both see the token absent and both
+    # send. Fly runs a standby worker that is `started` and running tick().
+    # Twelve send loops share that shape, which is why the guard is here and
+    # not in each of them.
+    from app.services.dblock import LOCK_DAILY_DRIPS, hold_xact_lock
+
+    async with hold_xact_lock(LOCK_DAILY_DRIPS) as won:
+        if not won:
+            logger.info("drip.skipped_other_machine_is_sending")
+            return
+        await _run_daily_drips_locked(started)
+
+
+async def _run_daily_drips_locked(started: datetime) -> None:
+    """The drip run itself. Call only via _maybe_run_daily_drips.
+
+    Split out so the cross-machine lock can wrap the whole run — including
+    the per-user commits, which is the point. The gate and the two latch
+    globals stay with the caller's contract: this function sets them exactly
+    as the single function did.
+    """
+    global _last_drip_check, _last_drip_failed_at
 
     try:
         from app.services.email import (
