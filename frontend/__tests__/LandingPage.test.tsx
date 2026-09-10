@@ -269,6 +269,41 @@ describe("LandingPage usage-as-proof line", () => {
     expect(text).not.toMatch(/(beat|vs\.?)\s*spy[^.]{0,20}\d+(\.\d+)?%/i);
   });
 
+  it("says what is done to the record and who may read it", async () => {
+    // The founder's sentence, made true. His original opened "Every stock
+    // we've ever ranked" — measured against production that is false: we rank
+    // ~7,500 tickers a day, and the record holds the daily Top 10 (800 picks
+    // over 80 days, 423 distinct symbols). Overstating the archive by an
+    // order of magnitude on the page whose entire pitch is honesty is the one
+    // mistake this page cannot make, so the count comes from the live summary
+    // above and this line describes only the PROCESS.
+    render(await LandingPage());
+    const text = document.body.textContent ?? "";
+    expect(text).toMatch(/back-checked against the S&P the next session/i);
+    expect(text).toMatch(/never\s+edited/i);
+    expect(text).toMatch(/losses and corrections included/i);
+    expect(text).toMatch(/free to read, no account/i);
+  });
+
+  it("does not claim every ranked ticker is on the record", async () => {
+    // The record is the daily Top 10, not the ranked universe. Any phrasing
+    // that conflates them is a false claim about the size of the archive.
+    render(await LandingPage());
+    const text = document.body.textContent ?? "";
+    expect(text).not.toMatch(/every stock we(?:'|’)?ve ever (?:ranked|scored)/i);
+    expect(text).not.toMatch(/every ticker we(?:'|’)?ve ever (?:ranked|scored)/i);
+  });
+
+  it("links the AI claim to the page that substantiates it", async () => {
+    // "by your AI" is a live capability (MCP at api.tapeline.io/mcp, in the
+    // official registry as io.tapeline/tapeline), not a metaphor. It is
+    // linked so a reader is one click from checking it.
+    render(await LandingPage());
+    expect(
+      screen.getByRole("link", { name: /by your AI/i }),
+    ).toHaveAttribute("href", "/mcp");
+  });
+
   it("renders nothing extra when the summary fetch fails", async () => {
     global.fetch = vi.fn(() => Promise.reject(new Error("down"))) as any;
     render(await LandingPage());
