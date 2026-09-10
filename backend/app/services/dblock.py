@@ -41,6 +41,9 @@ table is allowed to contain*. Both, or neither is worth much.
 """
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,6 +53,8 @@ LOCK_NAMESPACE = 8266
 
 #: Registry of lock ids. Add here; never reuse a number.
 LOCK_SCORECARD_FREEZE = 1
+LOCK_DAILY_NEWSLETTER = 2
+LOCK_DAILY_DRIPS = 3
 
 
 async def try_xact_lock(session: AsyncSession, objid: int) -> bool:
@@ -74,3 +79,47 @@ async def try_xact_lock(session: AsyncSession, objid: int) -> bool:
             {"ns": LOCK_NAMESPACE, "obj": objid},
         )
     )
+
+
+@asynccontextmanager
+async def hold_xact_lock(objid: int) -> AsyncIterator[bool]:
+    """Hold advisory lock `objid` in a session of its own, and say who won.
+
+    `try_xact_lock` above is enough for a job that writes once and commits
+    once — the scorecard freeze. It is NOT enough for the email jobs, and the
+    reason is worth stating plainly, because it looks like it should be.
+
+    A transaction-scoped lock releases on COMMIT. Both email jobs commit ONCE
+    PER RECIPIENT, deliberately: a failure on one row must not roll back the
+    delivery record of everyone the provider has already sent to (see the
+    comments at newsletter.run_daily_digest and email.run_daily_drip). So a
+    lock taken on the working session would be released by the first
+    subscriber's commit, and the other machine would take it and start sending
+    from row two. The lock would be doing nothing, and — as with the
+    session-scoped variant above — nothing would raise.
+
+    Holding it on a SEPARATE session solves that. The lock session opens a
+    transaction, takes the lock, and then sits idle for the duration while the
+    caller works on its own session and commits as often as it likes. Being a
+    real open transaction, PgBouncer keeps it pinned to one backend, which is
+    the property the module docstring says is required.
+
+    WHAT THIS PROTECTS, CONCRETELY
+    Both email jobs are read-then-send-then-record: SELECT everyone who has
+    not been sent to today, then loop. Two machines that both SELECT before
+    either commits get the same list and both send it. The per-row commit
+    makes a RESTART replay-safe — the next process re-reads and sees the
+    record — and does nothing at all about a machine running right now. The
+    newsletter goes to the whole confirmed list; the drips go to people in a
+    trial. Sending either twice is the kind of thing a subscriber remembers.
+
+    Yields True when this process holds the lock and should do the work, False
+    when another machine holds it and this one should skip. Never blocks —
+    whoever holds it is already doing the job.
+    """
+    from app.db import session_scope
+
+    async with session_scope() as lock_session:
+        yield await try_xact_lock(lock_session, objid)
+        # session_scope commits on the way out, which releases the lock. That
+        # is the intended release point: the caller is done.
