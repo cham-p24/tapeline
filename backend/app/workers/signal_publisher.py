@@ -972,18 +972,29 @@ async def tick() -> None:
         global _last_score_snapshot_date
         _snap_today = started.date().isoformat()
         if _last_score_snapshot_date != _snap_today:
+            # Slot claimed BEFORE the work, rolled back only on a CAUGHT
+            # failure. The comment above is right that correctness does not
+            # depend on this latch — capture_score_snapshots is ON CONFLICT DO
+            # NOTHING — but that is about the ROWS, not about the tick. Stamped
+            # after the await, a cycle killed mid-capture never reaches the
+            # assignment, so the next tick restarts the same ~2.5k-row job and
+            # dies in the same place, and every stage below this one (the
+            # weekly universe refresh, the aggregates refresh that feeds
+            # trend/RS/momentum) stops running entirely.
+            _snap_prev = _last_score_snapshot_date
+            _last_score_snapshot_date = _snap_today
             try:
                 from app.services.score_snapshots import capture_score_snapshots
                 async with session_scope() as _snap_session:
                     _snap_rows = await capture_score_snapshots(
                         _snap_session, started.date()
                     )
-                _last_score_snapshot_date = _snap_today
                 logger.info(
                     "score_snapshots.captured date=%s rows=%d",
                     _snap_today, _snap_rows,
                 )
             except Exception:
+                _last_score_snapshot_date = _snap_prev
                 logger.exception("score_snapshots.capture_failed")
 
     # Weekly universe refresh from Massive's reference API.
@@ -1202,6 +1213,16 @@ async def tick() -> None:
         and is_trading_day(started.date())
         and _last_eod_digest_date != today_str
     ):
+        # Slot claimed BEFORE the work and rolled back only on a CAUGHT
+        # failure — the pattern already applied to the calendar seed and
+        # the trial check in #797. Latch-on-success protects against a
+        # transient error; it does NOT protect against a hang, because a
+        # cycle killed by the tick watchdog never reaches the except
+        # clause either. The stale value then survives, the next tick
+        # restarts the same job, and the worker wedges until something
+        # restarts it.
+        _eod_prev = _last_eod_digest_date
+        _last_eod_digest_date = today_str
         try:
             from app.services.email import run_eod_watchlist_digest
             from app.services.lifecycle import worker_governor
@@ -1211,10 +1232,8 @@ async def tick() -> None:
                 )
             if count:
                 logger.info("eod_digest.sent count=%d", count)
-            # Latch only on success — a transient failure must retry on the
-            # next tick, not silently skip the whole day.
-            _last_eod_digest_date = today_str
         except Exception:
+            _last_eod_digest_date = _eod_prev
             logger.exception("eod_digest.run_failed")
 
     # Weekly market digest (newsletter). Fires Monday at/after 13:00 UTC
@@ -1231,6 +1250,16 @@ async def tick() -> None:
         and started.hour >= 13                          # 13:00 UTC onward
         and _last_weekly_newsletter_token != weekly_token
     ):
+        # Slot claimed BEFORE the work and rolled back only on a CAUGHT
+        # failure — the pattern already applied to the calendar seed and
+        # the trial check in #797. Latch-on-success protects against a
+        # transient error; it does NOT protect against a hang, because a
+        # cycle killed by the tick watchdog never reaches the except
+        # clause either. The stale value then survives, the next tick
+        # restarts the same job, and the worker wedges until something
+        # restarts it.
+        _weekly_prev = _last_weekly_newsletter_token
+        _last_weekly_newsletter_token = weekly_token
         try:
             from app.services.email import run_weekly_newsletter
             from app.services.lifecycle import worker_governor
@@ -1239,11 +1268,8 @@ async def tick() -> None:
                     nl_session, now=started, governor=worker_governor(),
                 )
             logger.info("weekly_newsletter.sent count=%d token=%s", count, weekly_token)
-            # Latch only on success — otherwise one transient failure skips the
-            # whole week. Per-user dedupe in run_weekly_newsletter makes the
-            # retry safe.
-            _last_weekly_newsletter_token = weekly_token
         except Exception:
+            _last_weekly_newsletter_token = _weekly_prev
             logger.exception("weekly_newsletter.run_failed")
 
     # Daily Top 10 digest to newsletter_subscribers. Fires once per UTC day
@@ -1316,15 +1342,23 @@ async def tick() -> None:
         and started.hour >= 9                           # 09:00 UTC onward
         and _last_seo_digest_token != seo_digest_token
     ):
+        # Slot claimed BEFORE the work and rolled back only on a CAUGHT
+        # failure — the pattern already applied to the calendar seed and
+        # the trial check in #797. Latch-on-success protects against a
+        # transient error; it does NOT protect against a hang, because a
+        # cycle killed by the tick watchdog never reaches the except
+        # clause either. The stale value then survives, the next tick
+        # restarts the same job, and the worker wedges until something
+        # restarts it.
+        _seo_prev = _last_seo_digest_token
+        _last_seo_digest_token = seo_digest_token
         try:
             from app.services.seo_health import run_weekly_digest
             async with session_scope() as seo_session:
                 sent = await run_weekly_digest(seo_session)
             logger.info("seo_digest.weekly.ran sent=%s token=%s", sent, seo_digest_token)
-            # Latch only on success — a failed run retries on the next tick
-            # instead of skipping the week. Telegram-side dedupe covers repeats.
-            _last_seo_digest_token = seo_digest_token
         except Exception:
+            _last_seo_digest_token = _seo_prev
             logger.exception("seo_digest.weekly.failed")
 
     # Daily growth-bot tick. Fires once per UTC day at/after 22:00 UTC
@@ -1342,6 +1376,16 @@ async def tick() -> None:
         and started.weekday() < 5                         # Mon-Fri
         and _last_growth_tick_date != today_str
     ):
+        # Slot claimed BEFORE the work and rolled back only on a CAUGHT
+        # failure — the pattern already applied to the calendar seed and
+        # the trial check in #797. Latch-on-success protects against a
+        # transient error; it does NOT protect against a hang, because a
+        # cycle killed by the tick watchdog never reaches the except
+        # clause either. The stale value then survives, the next tick
+        # restarts the same job, and the worker wedges until something
+        # restarts it.
+        _growth_prev = _last_growth_tick_date
+        _last_growth_tick_date = today_str
         try:
             from app.services.growth_bot import run_daily_growth_tick
             async with session_scope() as gb_session:
@@ -1352,10 +1396,8 @@ async def tick() -> None:
                 result.get("fintwit_candidates_count", 0),
                 result.get("skipped", False),
             )
-            # Latch only on success so a transient failure retries on the next
-            # tick rather than skipping the day's growth package entirely.
-            _last_growth_tick_date = today_str
         except Exception:
+            _last_growth_tick_date = _growth_prev
             logger.exception("growth_bot.tick_failed")
 
     # Inbox auto-handler tick: poll Reddit (the only channel that needs
