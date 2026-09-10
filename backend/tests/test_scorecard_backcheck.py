@@ -28,22 +28,36 @@ import app.services.scorecard_backcheck as bc
 from app.db import session_scope
 from app.models import DailyScorecardEntry
 
+#: Next free rank per date, so seeded rows match the shape the freeze writes.
+#:
+#: This used to hardcode rank=1 for every row, which several tests then used to
+#: seed two symbols on the SAME date — a shape production cannot produce, since
+#: _ensure_daily_scorecard does `rank += 1` before each add. Harmless until
+#: (as_of, rank) became a unique constraint, at which point the fixture, not the
+#: code, was what broke. Ranks are irrelevant to what these tests assert (which
+#: DATES the back-check drains, and in what order), so they just need to be
+#: distinct.
+_next_rank: dict[date, int] = {}
+
 
 async def _clear_table() -> None:
     async with session_scope() as s:
         await s.execute(delete(DailyScorecardEntry))
         await s.commit()
+    _next_rank.clear()
 
 
 async def _seed(as_of: date, symbol: str, *, scored: bool) -> None:
     """Insert one scorecard row. `scored=False` leaves price_next_day NULL
     (i.e. still pending a back-check); `scored=True` fills it in."""
+    rank = _next_rank.get(as_of, 0) + 1
+    _next_rank[as_of] = rank
     async with session_scope() as s:
         s.add(
             DailyScorecardEntry(
                 as_of=as_of,
                 symbol=symbol,
-                rank=1,
+                rank=rank,
                 score_at_flag=0.9,
                 price_at_flag=100.0,
                 price_next_day=101.0 if scored else None,

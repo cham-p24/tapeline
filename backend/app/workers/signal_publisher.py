@@ -14,6 +14,7 @@ from time import monotonic
 from typing import Any
 
 from sqlalchemy import bindparam, delete, desc, func, select, update
+from sqlalchemy.exc import IntegrityError
 
 from app.config import get_settings
 from app.db import session_scope
@@ -35,6 +36,7 @@ from app.models import (
 # is owned by the SPIKE INTELLIGENCE sheet tab (sheet_feed.upsert_spikes) and the
 # congress_trades table simply stops accruing rows until a real disclosure feed
 # is wired.
+from app.services.dblock import LOCK_SCORECARD_FREEZE, try_xact_lock
 from app.services.finnhub_feed import warm_factor_caches_from_db
 from app.services.leverage import is_leveraged_fund
 from app.services.mock_feed import (
@@ -1481,6 +1483,26 @@ async def _ensure_daily_scorecard(today: date) -> None:
         return
 
     async with session_scope() as session:
+        # Exactly one machine freezes the record for a given day.
+        #
+        # The SELECT-then-INSERT below dedupes within one process only, and Fly
+        # runs a standby worker beside the primary — both were observed ticking
+        # on 2026-09-08. Two machines that both read "no row for today" both
+        # write ten, and the public record's sample size silently doubles.
+        #
+        # Transaction-scoped, because prod DATABASE_URL is Neon's `-pooler`
+        # host: PgBouncer hands one client connection to different backends
+        # between transactions, so a SESSION-scoped lock would be held on a
+        # backend somebody else is now using and would protect nothing, with no
+        # error. See services/dblock.py. No-op on SQLite, which is why the
+        # unique constraint added alongside this is the actual guarantee.
+        #
+        # Not acquiring is a normal outcome, not a failure: the other machine is
+        # already doing this. Skip and come back next tick.
+        if not await try_xact_lock(session, LOCK_SCORECARD_FREEZE):
+            logger.info("scorecard.freeze skipped=lock_held_elsewhere as_of=%s", today)
+            return
+
         existing = await session.execute(
             select(DailyScorecardEntry).where(DailyScorecardEntry.as_of == today).limit(1)
         )
@@ -1603,6 +1625,28 @@ async def _ensure_daily_scorecard(today: date) -> None:
                 # us no close (pre-0059 rows, or a snapshot missing the field).
                 price_at_flag=float(t.day_close or t.price),
             ))
+
+        # Flush inside the lock so the unique constraints are the LAST word.
+        #
+        # The advisory lock decides who writes; these constraints decide what
+        # the table is allowed to contain. The lock is a no-op on SQLite and
+        # cannot cover a machine that somehow reaches here without it, so the
+        # constraint is the real guarantee and this is where it speaks.
+        #
+        # Reaching this branch means the day is already frozen by someone else,
+        # which is a clean skip and not a failure — but it must not be logged as
+        # "snapshot_failed" via the caller's generic handler, because that
+        # sentence would send the next reader hunting for a bug in the freeze.
+        try:
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            logger.warning(
+                "scorecard.freeze already_written_by_another_worker as_of=%s "
+                "— unique constraint held; nothing double-published",
+                today,
+            )
+            return
 
         logger.info(
             "scorecard.snapshot saved for %s rows=%d "
