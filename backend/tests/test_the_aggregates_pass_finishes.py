@@ -48,8 +48,13 @@ def test_the_pass_is_not_serial():
 def test_the_measured_concurrency_is_sane():
     """Measured, not guessed — and deliberately below what the vendor took.
 
-    20 symbols per level against the live vendor, zero errors at every level:
-    1 -> 170 min, 4 -> 43 min, 8 -> 28 min, 12 -> 19 min.
+    Benchmarked on an idle machine, 20 symbols per level, zero errors at every
+    level: 1 -> 170 min, 4 -> 43 min, 8 -> 28 min, 12 -> 19 min.
+
+    Those are CEILINGS. In production both workers run this pass against one
+    shared vendor quota, and the real rate at concurrency 8 is ~150/min — a
+    ~1.3-hour pass, not 28 minutes. The cadence bound below uses the real
+    figure; this test only pins the knob inside a sane range.
     """
     assert 1 < sp.AGGREGATES_CONCURRENCY <= 12
     assert 0 < sp.AGGREGATES_STAMP_BATCH <= 1000
@@ -58,19 +63,31 @@ def test_the_measured_concurrency_is_sane():
 def test_a_full_pass_fits_inside_its_own_cadence():
     """The daily job must finish well before it is due again.
 
-    At the measured 0.14s/symbol for concurrency 8, 12,000 symbols is ~28
-    minutes. If a future edit drops the concurrency or raises the cap far
-    enough that the pass approaches 24 hours, it can never complete and we are
-    back to serving 09-06 numbers with nothing to show for it.
+    Modelled on what production ACTUALLY does, not on the idle benchmark. The
+    benchmark said 0.14s/symbol at concurrency 8, i.e. a 28-minute pass; the
+    real rate once it was running on both workers is ~150 symbols/min, a
+    ~1.3-hour pass. The gap is that the two machines share one vendor quota
+    with each other and with the crypto and Finnhub calls, so the benchmark
+    measured a ceiling nobody operates at.
+
+    Using the optimistic figure here would let a future edit halve the
+    concurrency, still "pass", and quietly go back to a pass that cannot
+    finish between restarts — which is the exact failure this file exists for.
     """
     from app.services.universe import ACTIVE_UNIVERSE_SIZE
 
-    seconds_per_symbol_at_one = 0.85          # measured
-    est = ACTIVE_UNIVERSE_SIZE * seconds_per_symbol_at_one / sp.AGGREGATES_CONCURRENCY
-    assert est < 6 * 3600, (
-        f"a full aggregates pass is ~{est / 3600:.1f}h at cap "
-        f"{ACTIVE_UNIVERSE_SIZE} and concurrency {sp.AGGREGATES_CONCURRENCY}; "
-        f"the job is on a 24h cadence and the worker restarts on every deploy"
+    # Measured in production 2026-09-11 at AGGREGATES_CONCURRENCY=8:
+    #   SELECT count(*) FILTER (WHERE last_aggregates_at > now() - '5 min')
+    #   -> 750 per 5 min = 150/min
+    MEASURED_PER_MIN_AT_8 = 150.0
+    rate = MEASURED_PER_MIN_AT_8 * (sp.AGGREGATES_CONCURRENCY / 8.0)
+    est_hours = ACTIVE_UNIVERSE_SIZE / rate / 60.0
+
+    assert est_hours < 6, (
+        f"a full aggregates pass is ~{est_hours:.1f}h at cap "
+        f"{ACTIVE_UNIVERSE_SIZE} and concurrency {sp.AGGREGATES_CONCURRENCY} "
+        f"(measured rate, not the idle benchmark); the job is on a 24h cadence "
+        f"and the worker restarts on every deploy"
     )
 
 
@@ -122,19 +139,19 @@ def test_a_killed_pass_keeps_the_batches_it_completed():
     symbols = [f"S{i}" for i in range(1000)]
     batch_size = 250
 
-    class Boom(Exception):
+    class BoomError(Exception):
         pass
 
     def _run() -> None:
         for i in range(0, len(symbols), batch_size):
             batch = symbols[i:i + batch_size]
             if i == 500:                       # killed part-way, as a deploy does
-                raise Boom
+                raise BoomError
             stamped.extend(batch)
 
     try:
         _run()
-    except Boom:
+    except BoomError:
         pass
 
     assert len(stamped) == 500, (
