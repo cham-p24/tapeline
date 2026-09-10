@@ -30,6 +30,7 @@ hours is not.
 """
 from __future__ import annotations
 
+import asyncio
 import inspect
 import re
 
@@ -148,6 +149,15 @@ SLOW_JOBS_THAT_MUST_BE_DETACHED = [
     ("_refresh_watchlisted_news", "two live HTTP calls per symbol across hundreds of symbols"),
     ("_refresh_workbook_tabs", "five CSV fetches plus a ~4,100-row upsert"),
     ("_refresh_crypto_universe", "~120 per-pair history requests plus the grouped call"),
+    # Added 2026-09-11 from a TIMED tick against production. The whole cycle
+    # measured 185 seconds against a 60-second watchdog, so it could never
+    # finish — the worker sat wedged for 24 hours and every price on the site
+    # froze. These five were the cost:
+    ("_run_backcheck", "53.3s measured"),
+    ("_run_daily_newsletter", "49.2s measured — fans email out to the whole list"),
+    ("_seed_calendar", "29.2s measured"),
+    ("_refresh_universe", "15.8s measured"),
+    ("_maybe_run_daily_drips", "11.5s measured"),
 ]
 
 
@@ -177,14 +187,179 @@ def test_the_slow_jobs_are_spawned_not_awaited(fn, why):
 def test_a_detached_job_still_latches_before_dispatch():
     """Dispatch without latching would spawn a new copy every single tick."""
     src = _tick_source()
-    for stamp, fn in (
-        ("_last_watchlisted_news_refresh", "_refresh_watchlisted_news"),
-        ("_last_sheet_refresh", "_refresh_workbook_tabs"),
-        ("_last_crypto_refresh", "_refresh_crypto_universe"),
+    for stamp, value, fn in (
+        ("_last_watchlisted_news_refresh", "started", "_refresh_watchlisted_news"),
+        ("_last_sheet_refresh", "started", "_refresh_workbook_tabs"),
+        ("_last_crypto_refresh", "started", "_refresh_crypto_universe"),
+        ("_last_backcheck", "started", "_run_backcheck"),
+        ("_last_calendar_seed", "started", "_seed_calendar"),
+        ("_last_universe_refresh", "started", "_refresh_universe"),
+        # The newsletter latches the DATE it ran, not a timestamp — it fires
+        # once per UTC day, not on an elapsed-seconds cadence.
+        ("_last_daily_newsletter_date", "today_str", "_run_daily_newsletter"),
     ):
-        assign_at = src.index(f"{stamp} = started")
+        assign_at = src.index(f"{stamp} = {value}")
         spawn_at = src.index(f"_spawn({fn}(")
         assert assign_at < spawn_at, (
             f"{stamp} is latched after {fn} is dispatched, so every tick "
             f"spawns another copy of a job that takes minutes"
         )
+
+
+# ── the whole cycle has to fit ─────────────────────────────────────────────
+
+def test_the_inline_work_is_only_what_must_run_every_minute():
+    """A 60-second watchdog over a 185-second cycle is not a watchdog.
+
+    Timed against production 2026-09-11, the tick ran 185s. It was killed at 60
+    every time, so nothing below the kill point ever ran, and because a killed
+    cycle can leave a write transaction behind, later cycles wedged on the lock
+    at `score_upsert` — a stage that itself takes 0.6s. The worker sat that way
+    for 24 hours and every price on the site froze while the process looked
+    alive and the machine reported healthy.
+
+    What is left inline is the per-minute work and nothing else: fetch the
+    snapshots, score them, write them, publish, fire alerts. Everything on a
+    cadence longer than the tick is dispatched.
+    """
+    src = _tick_source()
+    # Every awaited call that is NOT a cheap helper must be justified as
+    # per-tick work. The daily/6-hourly ones are the failure mode.
+    for fn, why in SLOW_JOBS_THAT_MUST_BE_DETACHED:
+        assert f"await {fn}(" not in src, (
+            f"{fn} is awaited inline in tick() ({why}); the cycle it sits in "
+            f"is killed at 60 seconds, so it cannot finish and everything "
+            f"below it is skipped"
+        )
+
+
+@pytest.mark.asyncio
+async def test_the_watchlist_backcheck_actually_stops_when_it_hangs(monkeypatch):
+    """A hung watchlist back-check has to give the session back.
+
+    Written behaviourally on purpose. The first version of this test read
+    the source for the budget constant and passed with the `wait_for`
+    deleted — the constant is still named in the timeout log line, so the
+    text was there while the bound was gone. Mutation testing caught it.
+    """
+    import contextlib
+
+    from app.workers import signal_publisher as sp
+
+    monkeypatch.setattr(sp, "WATCHLIST_BACKCHECK_BUDGET_SECONDS", 0.05)
+
+    @contextlib.asynccontextmanager
+    async def _fake_scope():
+        yield object()
+
+    monkeypatch.setattr(sp, "session_scope", _fake_scope)
+
+    async def _no_pending(session):
+        return 0
+
+    monkeypatch.setattr(sp, "backcheck_all_pending", _no_pending)
+
+    hung = asyncio.Event()
+
+    async def _hangs(session):
+        hung.set()
+        await asyncio.sleep(30)
+        return 0
+
+    import app.services.watchlist_trackrecord as wtr
+    monkeypatch.setattr(wtr, "backcheck_watchlist", _hangs)
+
+    # If the bound is gone this waits 30 seconds and the timeout fires.
+    await asyncio.wait_for(sp._run_backcheck(), timeout=5)
+    assert hung.is_set(), "the watchlist back-check never ran at all"
+
+
+def test_the_watchlist_backcheck_budget_is_sane():
+    """Two halves of one function, and only one of them was budgeted.
+
+    `_run_backcheck` calls `backcheck_all_pending` (which has honoured
+    BACKCHECK_BUDGET_SECONDS since #769) and then `backcheck_watchlist`, which
+    had no bound at all. That is why a stage with a 20-second budget measured
+    53.3 seconds.
+    """
+    from app.workers import signal_publisher as sp
+
+    assert 0 < sp.WATCHLIST_BACKCHECK_BUDGET_SECONDS <= 120
+
+
+# ── detaching must not let a job run twice at once ─────────────────────────
+
+def test_the_drips_cannot_be_dispatched_twice_at_once():
+    """The one detached job whose gate is NOT latched before dispatch.
+
+    `_maybe_run_daily_drips` keeps its gate inside itself and latches on
+    SUCCESS, deliberately: a transient failure has to retry on a 1h backoff
+    rather than burn a whole day of stage windows. That was safe while the job
+    was awaited inline, because the tick is a single coroutine and could not
+    re-enter it. Detached, a run that outlived the 60s cadence would be
+    dispatched again while the first copy was still in flight, both copies
+    would read the same stale `_last_drip_check`, and both would send.
+
+    Measured at 11.5s today, so this is a margin, not a live bug — which is
+    exactly when it is cheap to close.
+    """
+    src = _tick_source()
+    assert 'key="daily_drips"' in src, (
+        "_maybe_run_daily_drips is dispatched without a single-flight key; "
+        "its 24h latch is only set after a successful run, so two copies can "
+        "be in flight at once and send the same lifecycle email twice"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_keyed_job_is_dropped_while_the_first_is_still_running():
+    """The guard has to actually hold, not just be spelled correctly."""
+    from app.workers import signal_publisher as sp
+
+    started = asyncio.Event()
+    release = asyncio.Event()
+    runs = 0
+
+    async def _slow() -> None:
+        nonlocal runs
+        runs += 1
+        started.set()
+        await release.wait()
+
+    sp._spawn(_slow(), key="t")
+    await asyncio.wait_for(started.wait(), timeout=1)
+
+    # Second dispatch while the first is still in flight.
+    sp._spawn(_slow(), key="t")
+    await asyncio.sleep(0)
+    assert runs == 1, "a second copy started while the first was still running"
+
+    release.set()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    # Once it finishes, the key frees up again.
+    release2 = asyncio.Event()
+    release2.set()
+    sp._spawn(_slow(), key="t")
+    await asyncio.sleep(0)
+    assert runs == 2, "the key was never released, so the job can never run again"
+    release.set()
+
+
+@pytest.mark.asyncio
+async def test_an_unkeyed_spawn_still_runs_freely():
+    """The guard must not quietly serialise every other detached job."""
+    from app.workers import signal_publisher as sp
+
+    runs = 0
+
+    async def _quick() -> None:
+        nonlocal runs
+        runs += 1
+
+    sp._spawn(_quick())
+    sp._spawn(_quick())
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert runs == 2
