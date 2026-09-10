@@ -246,6 +246,36 @@ export default async function LandingPage() {
               {trackedSince ? `, tracked since ${trackedSince}` : ""}.
             </p>
           )}
+          {/* What is done to that record, and who is allowed to read it —
+              placed under the live count because the count is what evidences
+              it. Deliberately a PROCESS statement, not a completion claim:
+              "back-checked the next session" describes the job, and at any
+              given moment the most recent session's picks are still pending
+              (the page already distinguishes entries_logged from
+              entries_scored above for the same reason).
+
+              COMPLIANCE — Rule 3 again: no hit rate, no return, no alpha.
+              Every clause here is a description of what is published and how
+              it can be reached.
+
+              "by your AI" is not a metaphor and not a roadmap item: the MCP
+              server is live at api.tapeline.io/mcp with the honesty contract
+              tested (#511/#516), listed in the official registry as
+              io.tapeline/tapeline, and both endpoints were verified 200
+              before this line shipped. It is linked so the claim is one click
+              from being checked. */}
+          <p className="mx-auto mt-2 max-w-xl text-center text-sm leading-snug text-muted">
+            Back-checked against the S&amp;P the next session, then never
+            edited &mdash; losses and corrections included. Free to read, no
+            account, by you or{" "}
+            <Link
+              href="/mcp"
+              className="text-accent underline-offset-2 hover:underline"
+            >
+              by your AI
+            </Link>
+            .
+          </p>
         </div>
       </section>
 
