@@ -483,7 +483,7 @@ async def backcheck_all_pending(
     the single-date job didn't run is stranded forever — its rows keep
     `price_next_day IS NULL` and nothing ever revisits them. This function
     finds every distinct `as_of` that still has unscored rows and replays
-    `backcheck_yesterday(as_of_override=...)` for each, oldest first, so the
+    `backcheck_yesterday(as_of_override=...)` for each, NEWEST FIRST, so the
     backlog self-heals on the next tick.
 
     `max_dates` caps the work per run (each date is its own SPY + per-symbol
@@ -503,12 +503,39 @@ async def backcheck_all_pending(
     are skipped outright once identified, the cap counts only dates that were
     genuinely scorable, and a second (looser) cap bounds the fetches spent
     discovering newly-terminal dates in any one run.
+
+    NEWEST FIRST, and that ordering is the point.
+    Skipping terminal dates fixed the starvation for the DATE CAP but not for
+    the WALL-CLOCK budget, because the budget is spent DISCOVERING that a date
+    is terminal — several vendor fetches each — and `_TERMINAL_DATES` is
+    in-process by design (see its comment: nothing is written off permanently
+    on the strength of one bad run). The worker restarts on every deploy, so
+    every restart re-discovers the same dead dates from scratch.
+
+    Measured on prod 2026-09-11, three consecutive runs, each a fresh process:
+
+        pending_dates=19 attempted=11 scored=0 skipped_terminal=0
+        newly_terminal=11 elapsed=20.0s budget_hit=True     x3
+
+    Nineteen pending dates, eleven of them delisted names from May and June
+    (APLS, TPH, EHAB — the vendor no longer serves their history), and the
+    whole 20-second budget went to them on every run. The ten picks from
+    2026-09-08 — the most recent frozen day, perfectly scorable — were never
+    reached and would have stayed unscored on the public record forever.
+
+    Oldest-first is the intuitive order for draining a backlog and it is the
+    wrong one here: the dates least likely to succeed sort first, and the date
+    a reader is most likely to be looking at sorts last. Newest-first spends
+    the budget where it pays and leaves the archaeology for whatever is left
+    over. Every date is still attempted; only the order changes.
     """
     rows = await session.execute(
         select(DailyScorecardEntry.as_of)
         .where(DailyScorecardEntry.price_next_day.is_(None))
         .group_by(DailyScorecardEntry.as_of)
-        .order_by(DailyScorecardEntry.as_of.asc())
+        # Newest first — see the docstring. This is the line that decides
+        # whether the most recent day's picks ever get back-checked.
+        .order_by(DailyScorecardEntry.as_of.desc())
     )
     pending_dates = [d for (d,) in rows.all()]
     if not pending_dates:
