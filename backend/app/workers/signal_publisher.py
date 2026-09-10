@@ -1403,6 +1403,25 @@ enough that a transient SPY/vendor blip costs minutes rather than the full 24h
 the success latch would otherwise burn, long enough that a sustained vendor
 outage isn't hammered every 60s tick."""
 
+AGGREGATES_CONCURRENCY: int = int(os.environ.get("AGGREGATES_CONCURRENCY", "8"))
+"""In-flight aggregate fetches. Measured against the live vendor 2026-09-11,
+20 symbols per level, zero errors at every level:
+
+    concurrency= 1   0.85s/sym   ->  12,000 symbols = 170 min
+    concurrency= 4   0.22s/sym   ->                    43 min
+    concurrency= 8   0.14s/sym   ->                    28 min
+    concurrency=12   0.09s/sym   ->                    19 min
+
+8, not 12: the daily-bar endpoint took 12 without complaint, but the crypto
+and Finnhub calls share this worker and were already returning 429s, and BOTH
+worker machines run this pass (see below). 28 minutes is comfortably inside a
+daily cadence, so the extra speed buys nothing worth the headroom."""
+
+AGGREGATES_STAMP_BATCH: int = int(os.environ.get("AGGREGATES_STAMP_BATCH", "250"))
+"""Symbols per `last_aggregates_at` stamp — about 35s of work at concurrency 8.
+Small enough that a restart loses little, large enough that the pass is not
+dominated by writes."""
+
 _SPY_BENCHMARK_ATTEMPTS = 3
 """Attempts at the SPY benchmark bars before giving up on an aggregates run.
 SPY is a hard prerequisite (it's the RS denominator for every other ticker), so
@@ -2752,9 +2771,22 @@ async def _refresh_aggregates_cache() -> bool:
        statistics (52-week range, 30-day average volume) off the same bars
     4. Store in module-level caches in polygon_feed
 
-    Massive Stocks Starter is unlimited API calls so the 870 calls take
-    ~5-10 minutes wall time at moderate parallelism. Sleep between calls
-    to be polite.
+    Sized by AGGREGATES_CAP, which is ACTIVE_UNIVERSE_SIZE — 12,000 since
+    #763, not the ~870 this docstring used to quote. At AGGREGATES_CONCURRENCY
+    the pass measures ~28 minutes. `last_aggregates_at` is stamped per batch,
+    so a restart mid-pass keeps what it earned.
+
+    BOTH WORKER MACHINES RUN THIS, AND THAT IS DELIBERATE
+    The obvious next move is to put this behind the cross-machine lock in
+    services.dblock, the way the newsletter and the drips are (#799). Do not.
+    Those jobs write to the DATABASE, so one machine doing the work is enough
+    for both. This one writes to MODULE-LEVEL CACHES in polygon_feed, which
+    are per-process, and every tick reads them to build the factor set it
+    upserts. A machine that skipped the pass would hold empty caches, and
+    while _merged_factor_set keeps the previous value rather than writing
+    NULL, the two machines would be publishing factor sets of different ages
+    on alternate ticks. Two passes is the price of two machines each holding
+    their own cache; it is not waste.
     """
     from datetime import date as _d
     from datetime import timedelta as _td
@@ -2878,13 +2910,21 @@ async def _refresh_aggregates_cache() -> bool:
     # in memory, so this costs nothing.
     set_cached_bar_stats("SPY", compute_bar_stats(spy_bars))
 
-    logger.info("aggregates.refresh_started count=%d", len(symbols))
+    logger.info(
+        "aggregates.refresh_started count=%d concurrency=%d batch=%d",
+        len(symbols), AGGREGATES_CONCURRENCY, AGGREGATES_STAMP_BATCH,
+    )
     refreshed = 0
-    attempted: list[str] = []
-    for sym in symbols:
-        try:
-            bars = await fetch_aggregates(sym, from_date=start, to_date=today)
-            if bars:
+    done = 0
+    sem = asyncio.Semaphore(AGGREGATES_CONCURRENCY)
+
+    async def _one(sym: str) -> bool:
+        """Fetch one symbol. Returns whether it produced a factor score."""
+        async with sem:
+            try:
+                bars = await fetch_aggregates(sym, from_date=start, to_date=today)
+                if not bars:
+                    return False
                 t = compute_trend_score(bars)
                 r = compute_rs_score(bars, spy_bars)
                 m = compute_momentum_score(bars)
@@ -2897,28 +2937,55 @@ async def _refresh_aggregates_cache() -> bool:
                 # success latch on the factor scores, and a run that produced
                 # only bar stats must still be retried.
                 set_cached_bar_stats(sym, compute_bar_stats(bars))
-                if any(v is not None for v in (t, r, m)):
-                    refreshed += 1
-        except Exception:
-            logger.exception("aggregates.fetch_failed symbol=%s", sym)
-        attempted.append(sym)
-        await asyncio.sleep(0.3)  # gentle pacing — Starter is unlimited but still
+                return any(v is not None for v in (t, r, m))
+            except Exception:
+                logger.exception("aggregates.fetch_failed symbol=%s", sym)
+                return False
 
-    # Stamp on ATTEMPT, not on success. A symbol the vendor has no bars for
-    # would otherwise stay NULL forever and monopolise the explore slice on
-    # every run, starving the rest exactly the way the old ordering did. What
-    # this column records is "we have tried this one", which is what a fair
-    # rotation needs.
-    if attempted:
+    # STAMP AS WE GO, not once at the end.
+    #
+    # This used to fetch every symbol and then stamp all of them in one block
+    # after the loop. That is the same shape as the score_upsert bug (#798):
+    # a pass that does not reach its final write records nothing, no matter
+    # how much work it did. It went unnoticed while the pass was ~870 symbols
+    # and a few minutes long. #763 raised ACTIVE_UNIVERSE_SIZE to 12,000 and
+    # AGGREGATES_CAP is derived from it, so the pass became a serial
+    # 12,000-symbol crawl — measured at ~0.85s per fetch plus a 0.3s sleep,
+    # about four hours — and the worker restarts on every deploy. It had not
+    # completed once since 2026-09-06. `last_aggregates_at` sat at that date
+    # for five days while the job appeared to run continuously.
+    #
+    # The factors did not go NULL, which is why nothing looked wrong on the
+    # site: _merged_factor_set keeps the previous value when a factor is
+    # missing, so trend/RS/momentum kept serving numbers computed from
+    # 2026-09-06 bars. Stale, plausible, and unmarked.
+    #
+    # Stamping per batch means a killed pass keeps the ground it took, and the
+    # explore slice (oldest-first) resumes where it stopped instead of
+    # restarting from the top every time.
+    for i in range(0, len(symbols), AGGREGATES_STAMP_BATCH):
+        batch = symbols[i:i + AGGREGATES_STAMP_BATCH]
+        results = await asyncio.gather(*(_one(sym) for sym in batch))
+        refreshed += sum(1 for ok in results if ok)
+        done += len(batch)
+
+        # Stamp on ATTEMPT, not on success. A symbol the vendor has no bars
+        # for would otherwise stay NULL forever and monopolise the explore
+        # slice on every run, starving the rest exactly the way the old
+        # ordering did. What this column records is "we have tried this one",
+        # which is what a fair rotation needs.
         now = datetime.now(UTC)
         async with session_scope() as session:
-            for chunk_start in range(0, len(attempted), 500):
-                chunk = attempted[chunk_start:chunk_start + 500]
-                await session.execute(
-                    update(Ticker)
-                    .where(Ticker.symbol.in_(chunk))
-                    .values(last_aggregates_at=now)
-                )
+            await session.execute(
+                update(Ticker)
+                .where(Ticker.symbol.in_(batch))
+                .values(last_aggregates_at=now)
+            )
+
+        logger.info(
+            "aggregates.progress done=%d/%d scored=%d",
+            done, len(symbols), refreshed,
+        )
 
     sizes = aggregate_cache_sizes()
     logger.info(
