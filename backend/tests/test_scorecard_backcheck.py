@@ -81,9 +81,17 @@ def _patch_single_date(monkeypatch) -> list[date]:
 
 
 @pytest.mark.asyncio
-async def test_drains_only_pending_dates_oldest_first(monkeypatch):
-    """Discovers every distinct date with an unscored row, oldest-first, and
-    skips dates whose rows are all already scored."""
+async def test_drains_only_pending_dates_newest_first(monkeypatch):
+    """Discovers every distinct date with an unscored row, NEWEST-first, and
+    skips dates whose rows are all already scored.
+
+    The invariants here are "every pending date, and only pending dates" —
+    05-28 is fully scored and must not be revisited. The ORDER flipped
+    2026-09-11: unscorable dates sort oldest and can never complete, so
+    oldest-first spent the entire wall-clock budget on them and the most
+    recent day's picks were never back-checked at all. Measured on prod, three
+    consecutive runs, 20s budget, zero scored. See
+    test_the_backcheck_reaches_the_newest_day.py."""
     await _clear_table()
     # Two fully-pending dates...
     await _seed(date(2026, 5, 26), "AAA", scored=False)
@@ -100,8 +108,8 @@ async def test_drains_only_pending_dates_oldest_first(monkeypatch):
     async with session_scope() as s:
         total = await bc.backcheck_all_pending(s)
 
-    # 05-28 excluded (no pending rows); the rest in ascending date order.
-    assert calls == [date(2026, 5, 26), date(2026, 5, 27), date(2026, 5, 29)]
+    # 05-28 excluded (no pending rows); the rest in DESCENDING date order.
+    assert calls == [date(2026, 5, 29), date(2026, 5, 27), date(2026, 5, 26)]
     # Stub returns 1 per call → 3 dates → total 3.
     assert total == 3
 
@@ -126,7 +134,11 @@ async def test_distinct_dates_not_per_row(monkeypatch):
 async def test_max_dates_caps_work_per_run(monkeypatch):
     """`max_dates` bounds the dates touched per run (each is its own SPY +
     per-symbol fetch) so a huge backlog can't stall the worker loop. Remaining
-    dates are picked up on the next run; the cap takes the OLDEST first."""
+    dates are picked up on the next run; the cap takes the NEWEST first.
+
+    What this test protects is the CAP, not the order — but the order it takes
+    them in decides which dates get the budget, and newest-first is the one
+    that reaches the day a reader is actually looking at."""
     await _clear_table()
     for d in (date(2026, 5, 25), date(2026, 5, 26), date(2026, 5, 27)):
         await _seed(d, "AAA", scored=False)
@@ -136,7 +148,7 @@ async def test_max_dates_caps_work_per_run(monkeypatch):
     async with session_scope() as s:
         total = await bc.backcheck_all_pending(s, max_dates=2)
 
-    assert calls == [date(2026, 5, 25), date(2026, 5, 26)]
+    assert calls == [date(2026, 5, 27), date(2026, 5, 26)]
     assert total == 2
 
 
