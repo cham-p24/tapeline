@@ -21,6 +21,14 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "using_it", label: "I'm using it" },
   { value: "signed_up_not_used", label: "I signed up but haven't really used it" },
   { value: "used_then_stopped", label: "I used it for a bit and stopped" },
+  {
+    value: "no_account_meaning_to",
+    label: "I'm on the mailing list — I've been meaning to try it",
+  },
+  {
+    value: "no_account_not_for_me",
+    label: "I looked at it and it wasn't for me",
+  },
   { value: "dont_remember", label: "I don't remember signing up" },
 ];
 
@@ -137,8 +145,8 @@ export function SurveyForm({ initialStatus }: { initialStatus?: string }) {
       */}
       <div>
         <label htmlFor="trigger_story" className="block text-base font-medium">
-          What was going on the week you signed up — what made you go looking for
-          something like this then?
+          What was going on when you first came across Tapeline — what made you
+          go looking for something like this then?
         </label>
         <textarea
           id="trigger_story"

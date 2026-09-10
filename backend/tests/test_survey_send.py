@@ -25,7 +25,6 @@ from app.db import session_scope
 from app.models import User
 from app.scripts import survey_send
 
-
 _seq = 0
 
 
@@ -165,3 +164,94 @@ async def test_send_refuses_a_non_https_app_url(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(settings, "app_url", "http://localhost:3000", raising=False)
     with pytest.raises(SystemExit, match="not a public https URL"):
         await survey_send.run(send=True, limit=None)
+
+
+# ── The newsletter audience ─────────────────────────────────────────────────
+#
+# 14 of the 46 reachable addresses are confirmed newsletter subscribers with no
+# Tapeline account. They were invisible to the first version of this script,
+# which read only `users` — which is how a third of the audience nearly went
+# unasked.
+
+
+async def _mk_sub(session, email: str, **kw):
+    from app.models.newsletter import NewsletterSubscriber
+
+    sub = NewsletterSubscriber(
+        email=email,
+        status=kw.pop("status", "confirmed"),
+        unsubscribe_token=kw.pop("unsubscribe_token", "tok_" + email.split("@")[0]),
+        **kw,
+    )
+    session.add(sub)
+    await session.flush()
+    return sub
+
+
+async def test_a_confirmed_subscriber_without_an_account_is_a_recipient() -> None:
+    async with session_scope() as s:
+        await _mk_sub(s, "reader@example.com")
+        recipients, _ = await survey_send.collect_newsletter(s)
+    assert [r.email for r in recipients] == ["reader@example.com"]
+
+
+async def test_a_subscriber_who_also_has_an_account_is_skipped() -> None:
+    """Otherwise they get the survey twice, with two different sets of Q1
+    options — and the account version is the correct one for them."""
+    async with session_scope() as s:
+        await _mk(s, "both@example.com")
+        await _mk_sub(s, "both@example.com")
+        recipients, skipped = await survey_send.collect_newsletter(s)
+    assert recipients == []
+    assert [r for _x, r in skipped] == ["has_account"]
+
+
+async def test_the_account_match_is_case_insensitive() -> None:
+    """The two tables are written by different code paths and neither
+    normalises the other's casing, so a case-sensitive join would double-mail."""
+    async with session_scope() as s:
+        await _mk(s, "mixed@example.com")
+        await _mk_sub(s, "Mixed@Example.com")
+        recipients, skipped = await survey_send.collect_newsletter(s)
+    assert recipients == []
+    assert [r for _x, r in skipped] == ["has_account"]
+
+
+async def test_an_unconfirmed_subscriber_is_skipped() -> None:
+    async with session_scope() as s:
+        await _mk_sub(s, "pending@example.com", status="unsubscribed")
+        recipients, skipped = await survey_send.collect_newsletter(s)
+    assert recipients == []
+    assert [r for _x, r in skipped] == ["status_unsubscribed"]
+
+
+async def test_a_subscriber_with_no_unsubscribe_token_is_skipped() -> None:
+    """No token means no working opt-out for this list. Shipping a
+    non-transactional email without one is the thing the Spam Act is about, so
+    the correct move is to skip rather than to send."""
+    async with session_scope() as s:
+        await _mk_sub(s, "notoken@example.com", unsubscribe_token="")
+        recipients, skipped = await survey_send.collect_newsletter(s)
+    assert recipients == []
+    assert [r for _x, r in skipped] == ["no_unsubscribe_token"]
+
+
+def test_the_two_audiences_get_different_q1_options() -> None:
+    """Every account option presupposes a signup. Showing that list to someone
+    who never made an account asks a question with no true answer."""
+    from app.services.email import SURVEY_STATUS_LINKS
+
+    account = {v for v, _l in SURVEY_STATUS_LINKS["account"]}
+    news = {v for v, _l in SURVEY_STATUS_LINKS["newsletter"]}
+    assert "using_it" in account and "using_it" not in news
+    assert "no_account_meaning_to" in news and "no_account_meaning_to" not in account
+
+
+def test_the_newsletter_email_never_says_you_signed_up() -> None:
+    from app.services.email import render_customer_survey_email
+
+    html = render_customer_survey_email(
+        "there", survey_url="https://tapeline.io/survey", audience="newsletter",
+    )
+    assert "when they signed up" not in html
+    assert "never made an account" in html

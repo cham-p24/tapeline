@@ -5895,17 +5895,32 @@ def render_free_month_offer_email(
 
 # ── Customer survey, September 2026 ─────────────────────────────────────────
 
-#: Q1's four options, as (query value, label). The values match STATUS_OPTIONS
-#: in routers/survey.py and the radio list in frontend/app/survey/SurveyForm.tsx.
-SURVEY_STATUS_LINKS = (
-    ("using_it", "I'm using it"),
-    ("signed_up_not_used", "I signed up but haven't really used it"),
-    ("used_then_stopped", "I used it for a bit and stopped"),
-    ("dont_remember", "I don't remember signing up"),
-)
+#: Q1's options per audience, as (query value, label). The values match
+#: STATUS_OPTIONS in routers/survey.py and the radio list in
+#: frontend/app/survey/SurveyForm.tsx.
+#:
+#: TWO AUDIENCES, TWO OPTION SETS. 14 of the 46 reachable addresses are
+#: newsletter subscribers who never created an account. Every account-holder
+#: option presupposes a signup, so showing them that list asks a question with
+#: no true answer — the respondent either fabricates one or abandons the form.
+SURVEY_STATUS_LINKS = {
+    "account": (
+        ("using_it", "I'm using it"),
+        ("signed_up_not_used", "I signed up but haven't really used it"),
+        ("used_then_stopped", "I used it for a bit and stopped"),
+        ("dont_remember", "I don't remember signing up"),
+    ),
+    "newsletter": (
+        ("no_account_meaning_to", "I've been meaning to try it"),
+        ("no_account_not_for_me", "I looked at it and it wasn't for me"),
+        ("dont_remember", "I don't remember signing up for anything"),
+    ),
+}
 
 
-def render_customer_survey_email(user_name: str, *, survey_url: str) -> str:
+def render_customer_survey_email(
+    user_name: str, *, survey_url: str, audience: str = "account",
+) -> str:
     """The September 2026 survey invitation.
 
     WHY THE FIRST QUESTION IS IN THE EMAIL BODY
@@ -5939,19 +5954,30 @@ def render_customer_survey_email(user_name: str, *, survey_url: str) -> str:
     general information into personal advice, and the publisher exemption
     depends on never taking it.
     """
+    if audience not in SURVEY_STATUS_LINKS:
+        raise ValueError(f"unknown survey audience {audience!r}")
+
     options = "".join(
         f'<p style="margin:0 0 10px;font-size:16px;line-height:1.5;">'
         f'<a href="{survey_url}?a={value}" '
         f'style="color:#4F8DF7;text-decoration:underline;">{label}</a></p>'
-        for value, label in SURVEY_STATUS_LINKS
+        for value, label in SURVEY_STATUS_LINKS[audience]
+    )
+    # The opening line has to be true for the recipient. Telling someone on the
+    # mailing list "when you signed up" is wrong on its face and is exactly the
+    # kind of detail that makes a small list stop reading.
+    opener = (
+        "I'm Christian — I built Tapeline. I'm trying to understand what "
+        "people were actually looking for when they signed up, and I'd "
+        "rather ask than guess."
+        if audience == "account"
+        else "I'm Christian — I built Tapeline. You're on my mailing list but "
+        "you've never made an account, and I'd rather find out why than "
+        "guess at it."
     )
     return shell(
         lead(f"Hi {user_name},")
-        + paragraph(
-            "I'm Christian — I built Tapeline. I'm trying to understand what "
-            "people were actually looking for when they signed up, and I'd "
-            "rather ask than guess."
-        )
+        + paragraph(opener)
         + paragraph("Which of these is closest to true for you right now?")
         + card(options)
         + paragraph(
@@ -5964,7 +5990,11 @@ def render_customer_survey_email(user_name: str, *, survey_url: str) -> str:
             "account or what you pay. I've got about one day a week to build "
             "things, and right now I'd be choosing what to build by guessing."
         )
-        + paragraph("Thanks for signing up in the first place."),
+        + paragraph(
+            "Thanks for signing up in the first place."
+            if audience == "account"
+            else "Thanks for being on the list."
+        ),
         preheader="Four questions about what you were looking for. About ninety seconds.",
     )
 
