@@ -31,6 +31,13 @@ from typing import Any, Literal
 import httpx
 
 from app.config import get_settings
+from app.services.dblock import (
+    LOCK_ACTIVATION_NUDGE,
+    LOCK_CHECKOUT_RECOVERY,
+    LOCK_EOD_DIGEST,
+    LOCK_WEEKLY_NEWSLETTER,
+    one_machine_at_a_time,
+)
 from app.services.email_design import (
     ACCENT,
     FONT_MONO,
@@ -3486,6 +3493,9 @@ async def trial_summary_for_user(session, user) -> dict | None:
         return None
 
 
+@one_machine_at_a_time(
+    LOCK_EOD_DIGEST, "eod_digest", default_factory=int,
+)
 async def run_eod_watchlist_digest(
     session, *, governor: FrequencyGovernor | None = None,
 ) -> int:
@@ -4141,6 +4151,9 @@ async def _build_newsletter_payload(session) -> dict:
     return out
 
 
+@one_machine_at_a_time(
+    LOCK_WEEKLY_NEWSLETTER, "weekly_newsletter", default_factory=int,
+)
 async def run_weekly_newsletter(
     session, *, now=None, governor: FrequencyGovernor | None = None,
 ) -> int:
@@ -4880,6 +4893,9 @@ async def run_activation_drip(
     return counts
 
 
+@one_machine_at_a_time(
+    LOCK_ACTIVATION_NUDGE, "activation_nudge", default_factory=dict,
+)
 async def run_activation_nudge_drip(
     session, *, governor: FrequencyGovernor | None = None, now=None,
 ) -> dict[str, int]:
@@ -5733,6 +5749,9 @@ async def run_referral_milestone_drip(
     return counts
 
 
+@one_machine_at_a_time(
+    LOCK_CHECKOUT_RECOVERY, "checkout_recovery", default_factory=dict,
+)
 async def run_checkout_abandonment_recovery(
     session, *, governor: FrequencyGovernor | None = None,
 ) -> dict[str, int]:

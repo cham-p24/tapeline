@@ -40,6 +40,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.models import Ticker, User
+from app.services.dblock import (
+    LOCK_SEO_DIGEST,
+    one_machine_at_a_time,
+)
 from app.services.telegram import send_message
 
 logger = logging.getLogger(__name__)
@@ -338,6 +342,9 @@ async def render_weekly_digest(
     return "\n".join(lines)
 
 
+@one_machine_at_a_time(
+    LOCK_SEO_DIGEST, "seo_digest", default_factory=int,
+)
 async def run_weekly_digest(session: AsyncSession) -> bool:
     """Render + send the weekly SEO digest. Returns True on success."""
     chat_id = await _owner_chat_id(session)
