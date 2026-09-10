@@ -113,6 +113,24 @@ CACHE_DERIVED_COLUMNS: tuple[str, ...] = (
     "change_pct_5d", "change_pct_1m",
 )
 
+#: Rows per COMMITTED chunk in the per-tick snapshot write.
+#:
+#: The write was one executemany per column set inside ONE transaction spanning
+#: the whole active universe. Survivable at 2,500 symbols; #763 raised
+#: ACTIVE_UNIVERSE_SIZE to 12,000, the batch grew past 7,500 rows, and the stage
+#: crossed the tick watchdog — at which point it stopped being a latency problem
+#: and became a correctness one, because a watchdog kill is a ROLLBACK and not a
+#: pause. See the long comment at the write loop.
+#:
+#: 500 keeps each round trip small enough that a kill costs at most a fraction
+#: of a second of work, while staying large enough that ~15 round trips cover
+#: the universe. Env-overridable so an incident can retune it without a deploy.
+UPSERT_CHUNK_ROWS: int = int(os.environ.get("UPSERT_CHUNK_ROWS", "500"))
+
+#: Ceiling on ONE whole tick before the watchdog kills it. See the watchdog in
+#: main() for why this moved off 60 and why raising it is safe.
+TICK_TIMEOUT_SECONDS: int = int(os.environ.get("TICK_TIMEOUT_SECONDS", "240"))
+
 #: The six factors, in composite-weight order.
 FACTOR_COLUMNS: tuple[str, ...] = (
     "sub_trend", "sub_rs", "sub_fundamentals",
@@ -526,6 +544,8 @@ async def tick() -> None:
         # ran. Making the miss honest (NULL) is only safe because of this guard:
         # NULL now means "nothing new to say", and the last real score stands.
         cache_derived = CACHE_DERIVED_COLUMNS
+        _upsert_started = monotonic()
+        _rows_written = 0
         for batch in (full_updates, market_updates):
             if not batch:
                 continue
@@ -549,10 +569,45 @@ async def tick() -> None:
                 })
                 .execution_options(synchronize_session=None)
             )
-            await session.execute(
-                stmt,
-                [{**row, "b_symbol": row["symbol"]} for row in batch],
-            )
+            # Commit per chunk, not once for the whole batch.
+            #
+            # This is a CORRECTNESS fix, not a latency one. The watchdog kill is
+            # a ROLLBACK: asyncio.wait_for cancels tick(), CancelledError is a
+            # BaseException, so db.session_scope's `except Exception` arm never
+            # runs and its `await session.commit()` is never reached — the
+            # session closes and the transaction is discarded. Proven by
+            # execution, not by reading; see the test file.
+            #
+            # So while this stage sat over the 60s budget, every row it wrote
+            # was thrown away, every cycle, on both worker machines. Measured
+            # 2026-09-11: last successful score write 24.1h earlier, factor
+            # aggregates frozen 108h, zero rows scored in two hours, while the
+            # logs showed 60s of work per machine per minute.
+            #
+            # Committing per chunk makes each chunk durable the moment it lands,
+            # so a kill costs at most one chunk instead of the entire universe.
+            # It also drops the row-lock hold from the whole batch to one chunk,
+            # which stops the standby worker convoying behind the primary.
+            #
+            # Chunking splits ROWS, never a row's COLUMNS: a row's six factors,
+            # the composite computed from them, its label and its reason are all
+            # produced together and written by this ONE statement, so no commit
+            # boundary can land between a score and the factors it came from.
+            # That distinction is the 158-row desync incident, and it stays
+            # fixed.
+            rows = [{**row, "b_symbol": row["symbol"]} for row in batch]
+            for start in range(0, len(rows), UPSERT_CHUNK_ROWS):
+                await session.execute(stmt, rows[start:start + UPSERT_CHUNK_ROWS])
+                await session.commit()
+                _rows_written += len(rows[start:start + UPSERT_CHUNK_ROWS])
+
+        # The number that diagnoses this stage. There was no per-stage timing
+        # before, which is why "score_upsert is over budget" took a production
+        # log-dive to establish rather than a grep.
+        logger.info(
+            "score_upsert.done rows=%d chunk=%d elapsed=%.1fs",
+            _rows_written, UPSERT_CHUNK_ROWS, monotonic() - _upsert_started,
+        )
 
         # --- Replace squeeze setups ---
         # ONLY when the rows we're about to write are real enough to persist.
@@ -3563,13 +3618,27 @@ async def main() -> None:
         # fallback, which is bad but survivable, whereas not starting is not.
         logger.exception("active_universe.warm_failed — first tick will use the fallback")
 
-    # Watchdog: a healthy tick completes in ~6s. If one ever stalls past
-    # TICK_TIMEOUT_SECONDS we kill it and continue — better to drop one
-    # cycle than to hang the worker indefinitely. The 2026-05-17 outage
-    # froze tick() for 20+ minutes (worker process alive, tick coroutine
-    # stuck waiting on something async that never resolved) before a
-    # manual `fly machine restart` cleared it. wait_for prevents that.
-    TICK_TIMEOUT_SECONDS = 60
+    # Watchdog: if a tick ever stalls past TICK_TIMEOUT_SECONDS we kill it and
+    # continue — better to drop one cycle than to hang the worker indefinitely.
+    # The 2026-05-17 outage froze tick() for 20+ minutes (worker process alive,
+    # tick coroutine stuck waiting on something async that never resolved)
+    # before a manual `fly machine restart` cleared it. wait_for prevents that.
+    #
+    # It is a HANG detector, not a pacing knob, and the distinction is what the
+    # old value got wrong. Ticks are strictly sequential — `await wait_for(tick())`
+    # then `await sleep(interval)` — so a slow tick delays the next one and can
+    # never overlap it. Nothing is protected by keeping the ceiling tight.
+    #
+    # 60 was pure headroom when a healthy tick was ~6s at 2,500 symbols. At
+    # 12,000 (#763) the MANDATORY snapshot write alone approaches it, so the
+    # budget had stopped killing hangs and started killing the tick's required
+    # work — plus all ~20 stages queued behind it, including the aggregates
+    # refresh that feeds trend, RS and momentum. Between 2026-09-06 and
+    # 2026-09-11 that meant scores 24h stale and factor aggregates 108h stale,
+    # with `consecutive=10` in the logs the whole time.
+    #
+    # Env-overridable so an incident can retune it with `fly secrets set`
+    # instead of a deploy.
     consecutive_timeouts = 0
 
     while True:
