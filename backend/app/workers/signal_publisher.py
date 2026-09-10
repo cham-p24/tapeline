@@ -195,11 +195,45 @@ settings = get_settings()
 _bg_tasks: set[asyncio.Task] = set()
 
 
-def _spawn(coro) -> None:  # type: ignore[no-untyped-def]
-    """Fire-and-forget `coro` as a detached task, holding a strong reference."""
+_inflight: set[str] = set()
+
+
+def _spawn(coro, *, key: str | None = None) -> None:  # type: ignore[no-untyped-def]
+    """Fire-and-forget `coro` as a detached task, holding a strong reference.
+
+    `key` makes the dispatch single-flight: while a task with that key is
+    still running, a second dispatch is dropped.
+
+    Awaiting a job inline made re-entrancy impossible — the tick is one
+    coroutine, so the job could not start again until it had finished.
+    Detaching removes that guarantee, and it matters for any job whose
+    re-run gate is not latched before dispatch. The daily drips are exactly
+    that: the gate lives inside the job and latches on SUCCESS (deliberately
+    — a transient failure has to retry rather than burn the day), so a run
+    that outlived its cadence would be dispatched again while the first copy
+    was still in flight, both would read the same stale `_last_drip_check`,
+    and both would send. Duplicate lifecycle email to a paying customer is
+    not a bug we get to apologise for twice.
+
+    Jobs that latch before dispatch don't need a key — their cadence already
+    prevents a second dispatch — but passing one is harmless and cheap.
+    """
+    if key is not None:
+        if key in _inflight:
+            logger.warning("tick.spawn_skipped_still_running key=%s", key)
+            coro.close()
+            return
+        _inflight.add(key)
+
     task = asyncio.create_task(coro)
     _bg_tasks.add(task)
-    task.add_done_callback(_bg_tasks.discard)
+
+    def _done(t: asyncio.Task[object]) -> None:
+        _bg_tasks.discard(t)
+        if key is not None:
+            _inflight.discard(key)
+
+    task.add_done_callback(_done)
 
 
 _last_news_refresh: datetime | None = None
@@ -628,6 +662,10 @@ async def tick() -> None:
         # Massive/Finnhub wires. Free + zero-API-key. Idempotent (uses EDGAR accession number
         # as the NewsItem.id PK) so re-runs don't duplicate rows.
         _set_stage("edgar_8k")
+        # Measured at 11.8s. Kept inline rather than detached because it must
+        # run after _refresh_news in the same 5-minute window (it writes into
+        # the same NewsItem table and dedupes on the EDGAR accession number),
+        # and 11.8s fits comfortably now that the daily jobs below are gone.
         try:
             from app.services.edgar_feed import refresh_8k_into_news_items
             counts = await refresh_8k_into_news_items()
@@ -650,9 +688,12 @@ async def tick() -> None:
     # worker happened to miss is retried on the next run instead of stranded.
     _set_stage("backcheck")
     if _last_backcheck is None or (started - _last_backcheck).total_seconds() >= 6 * 3600:
-        # Stamped first, for the reason spelled out above the news refresh.
+        # Detached: measured at 53.3s in a timed tick against production,
+        # inside a cycle the watchdog kills at 60 seconds. Latch first,
+        # then _spawn — the pattern documented at the watchlisted-news
+        # dispatch, for the same reason.
         _last_backcheck = started
-        await _run_backcheck()
+        _spawn(_run_backcheck(), key="backcheck")
 
     # Calendar refresh (IPOs + earnings) — daily cadence. Finnhub-aware
     # via calendar_feed.upcoming_*; mock fallback when no FINNHUB_API_KEY.
@@ -669,13 +710,18 @@ async def tick() -> None:
         # timestamp survives, the next tick restarts the same job, and the
         # worker wedges. Rolling back inside `except` keeps the retry for the
         # case it was written for and removes the case it never covered.
-        _calendar_seed_before = _last_calendar_seed
+        # Detached: measured at 29.2s in a timed tick against production,
+        # inside a cycle the watchdog kills at 60 seconds. Latch first,
+        # then _spawn — the pattern documented at the watchlisted-news
+        # dispatch, for the same reason.
+        #
+        # The latch-then-roll-back dance goes with the await: a detached job
+        # cannot report failure back to this cycle, so the cadence is simply
+        # claimed and a failure waits for the next 24h window. That is the
+        # right trade for a calendar refresh and it is what every other
+        # detached job here already does.
         _last_calendar_seed = started
-        try:
-            await _seed_calendar()
-        except Exception:
-            _last_calendar_seed = _calendar_seed_before
-            logger.exception("calendar.seed_failed")
+        _spawn(_seed_calendar(), key="calendar_seed")
 
     # Hourly trial-expiry enforcement: drop unpaid expired-trial users to Free.
     # Without this the trial converts to free Premium forever (zero conversion).
@@ -734,7 +780,10 @@ async def tick() -> None:
     # retries after a short backoff instead of silently skipping a whole day
     # of stage windows.
     _set_stage("daily_drips")
-    await _maybe_run_daily_drips(started)
+    # Detached: measured at 11.5s. It sends email over the network and carries
+    # its own governor and per-drip dedup tokens, so a cycle boundary is not
+    # load-bearing for it.
+    _spawn(_maybe_run_daily_drips(started), key="daily_drips")
 
     # Checkout abandonment recovery — HOURLY (not daily like the drips above):
     # the targeting window is a tight 1-24h after a user mints a Stripe Checkout
@@ -893,11 +942,12 @@ async def tick() -> None:
     ):
         # Isolated + latch-on-success — a failed discovery must not burn the
         # 7-day window (or abort the stages below).
-        try:
-            await _refresh_universe()
-            _last_universe_refresh = started
-        except Exception:
-            logger.exception("universe.refresh_failed")
+        # Detached: measured at 15.8s in a timed tick against production,
+        # inside a cycle the watchdog kills at 60 seconds. Latch first,
+        # then _spawn — the pattern documented at the watchlisted-news
+        # dispatch, for the same reason.
+        _last_universe_refresh = started
+        _spawn(_refresh_universe(), key="universe_refresh")
 
     # Hourly active-scoring-universe refresh (top-N by daily $-volume from
     # the DB-tracked 5,757). Cheap query — keeps the cache that
@@ -1153,16 +1203,14 @@ async def tick() -> None:
         and started.weekday() < 5                         # Mon-Fri
         and _last_daily_newsletter_date != today_str
     ):
-        try:
-            from app.services.newsletter import run_daily_digest
-            async with session_scope() as ndl_session:
-                count = await run_daily_digest(ndl_session, now=started)
-            logger.info("newsletter_daily.sent count=%d date=%s", count, today_str)
-            # Latch only on success — the DB-side last_sent_at still dedupes,
-            # so retrying on the next tick can't double-send.
-            _last_daily_newsletter_date = today_str
-        except Exception:
-            logger.exception("newsletter_daily.run_failed")
+        # Detached: measured at 49.2s, the largest job in the tick after the
+        # back-check. It fans email out to the whole list.
+        #
+        # Latch-on-success is dropped with the await. It was already belt-and-
+        # braces — the comment it carried says the DB-side last_sent_at dedupes
+        # anyway — and a detached job cannot report success back to this cycle.
+        _last_daily_newsletter_date = today_str
+        _spawn(_run_daily_newsletter(started, today_str), key="daily_newsletter")
 
     # IndexNow batch submit — daily, fires once per UTC day at/after
     # 06:00 UTC (Sydney evening, so any new pages shipped today are
@@ -1827,6 +1875,23 @@ def _crypto_name(symbol: str) -> str:
     return f"{base} / USD" if base else symbol
 
 
+async def _run_daily_newsletter(started: datetime, today_str: str) -> None:
+    """Send the daily Top-10 digest. DETACHED — see the dispatch site.
+
+    Measured at 49.2s against production, in a tick the watchdog kills at 60
+    seconds. It fans out email to the whole list, so its wall time scales with
+    subscribers and was only ever going to grow.
+    """
+    try:
+        from app.services.newsletter import run_daily_digest
+
+        async with session_scope() as ndl_session:
+            count = await run_daily_digest(ndl_session, now=started)
+        logger.info("newsletter_daily.sent count=%d date=%s", count, today_str)
+    except Exception:
+        logger.exception("newsletter_daily.run_failed")
+
+
 async def _refresh_news() -> None:
     """Pull latest news into local cache. Real source = Massive (formerly Polygon).
 
@@ -2017,6 +2082,15 @@ async def _refresh_watchlisted_news() -> None:
     )
 
 
+#: Wall-clock ceiling for the per-user watchlist back-check.
+#:
+#: The scorecard drain beside it has honoured BACKCHECK_BUDGET_SECONDS since
+#: #769; this half never did, so the stage as a whole measured 53.3s against a
+#: 20s budget. Same self-healing property: an unfinished row keeps
+#: price_next_day IS NULL and is picked up on the next 6-hourly run.
+WATCHLIST_BACKCHECK_BUDGET_SECONDS = 30.0
+
+
 async def _run_backcheck() -> None:
     """Drain the scorecard back-check backlog.
 
@@ -2038,11 +2112,24 @@ async def _run_backcheck() -> None:
         # Same next-day-vs-SPY back-check for the per-user watchlist track
         # record. Shares this session + the 6h cadence; dedupes the vendor
         # fetch per (symbol, session) across users.
+        # BUDGETED SEPARATELY. `backcheck_all_pending` above honours
+        # BACKCHECK_BUDGET_SECONDS; this call did not, and it is the reason a
+        # stage with a 20-second budget measured 53.3 seconds. Two halves of
+        # one function, one of them bounded.
         try:
             from app.services.watchlist_trackrecord import backcheck_watchlist
-            wl_scored = await backcheck_watchlist(session)
+            wl_scored = await asyncio.wait_for(
+                backcheck_watchlist(session),
+                timeout=WATCHLIST_BACKCHECK_BUDGET_SECONDS,
+            )
             if wl_scored:
                 logger.info("watchlist_trackrecord.backcheck_scored total=%d", wl_scored)
+        except TimeoutError:
+            logger.info(
+                "watchlist_trackrecord.budget_hit after %.0fs — remaining rows "
+                "keep price_next_day NULL and are retried next run",
+                WATCHLIST_BACKCHECK_BUDGET_SECONDS,
+            )
         except Exception:
             logger.exception("watchlist_trackrecord.backcheck_failed")
 
