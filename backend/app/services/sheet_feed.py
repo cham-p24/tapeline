@@ -416,6 +416,27 @@ def reset_csv_hash_cache() -> None:
 #
 # When a column is genuinely gone with no successor, it belongs here with an
 # empty tuple so the audit still reports it. Silence is the failure mode.
+#: Columns whose absence MOVES A PUBLISHED SCORE.
+#:
+#: Every one of these is read into `row_for_composite` and handed to
+#: `compute_tapeline_composite` (or is the sheet's own "Score"). A missing one
+#: becomes None, the factor built from it falls back to NEUTRAL 50, and the
+#: composite comes out higher than the evidence supports — the defect that
+#: required correcting 4,112 rows on 2026-09-07 (SPY 66.0 -> 60.9).
+#:
+#: Everything else in `_ALL_SIGNALS_COLUMNS` is tracked so drift stays visible,
+#: but its loss costs a displayed field and not a number anyone trades on.
+#: `test_sheet_header_drift` derives this set from the parser's own source, so
+#: adding a column to the composite without adding it here fails the build
+#: rather than quietly downgrading its alarm.
+SCORE_BEARING_COLUMNS: frozenset[str] = frozenset({
+    "Score",
+    "3M Return %", "6M Return %", "1Y Return %",
+    "RS vs SPY 3M %", "RS vs SPY 6M %", "RS vs SPY 1Y %",
+    "Market Regime", "Momentum Quality", "Near 52W High %",
+})
+
+
 _ALL_SIGNALS_COLUMNS: dict[str, tuple[str, ...]] = {
     "Ticker":           (),
     "Score":            (),
@@ -507,13 +528,31 @@ def _log_header_drift(fieldnames: Iterable[str] | None) -> list[str]:
             ", ".join(critical),
         )
     lossy = [c for c in missing if c not in critical]
-    if lossy:
+    # Split by whether the column actually reaches the composite. The single
+    # message this replaces told every missing column it would "score as
+    # NEUTRAL 50", which is true of a factor input and false of a display
+    # field — and it has been firing on Conviction, Strategy and Raw Score
+    # every 30 seconds since the workbook dropped them. Verified against
+    # production 2026-09-11: of 7,548 scored rows, ZERO were missing a
+    # confidence_pct, i.e. losing Conviction stranded nothing. A warning that
+    # overstates its own consequence is how the next real drift gets ignored.
+    scoring = [c for c in lossy if c in SCORE_BEARING_COLUMNS]
+    cosmetic = [c for c in lossy if c not in SCORE_BEARING_COLUMNS]
+    if scoring:
         logger.warning(
-            "sheet.header_missing columns=%s — the parser reads these by name "
-            "and the workbook no longer publishes them, so they arrive as None "
-            "and score as NEUTRAL 50. Add the new spelling to "
+            "sheet.header_missing_scoring columns=%s — these feed "
+            "compute_tapeline_composite, so they arrive as None and the "
+            "factors built from them fall back to NEUTRAL 50, which inflates "
+            "every affected score. Add the new spelling to "
             "_ALL_SIGNALS_COLUMNS or restore the column.",
-            ", ".join(lossy),
+            ", ".join(scoring),
+        )
+    if cosmetic:
+        logger.info(
+            "sheet.header_missing_cosmetic columns=%s — tracked but not part "
+            "of the score; the fields they populate are simply absent. Listed "
+            "so the drift stays visible, NOT because a score moved.",
+            ", ".join(cosmetic),
         )
     return missing
 

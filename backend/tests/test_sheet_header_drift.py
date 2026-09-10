@@ -408,3 +408,98 @@ async def test_a_value_the_normaliser_cannot_read_is_left_alone():
     finally:
         async with session_scope() as s:
             await s.execute(delete(Ticker).where(Ticker.symbol == sym))
+
+
+# ── the alarm has to match the consequence ─────────────────────────────────
+
+def test_every_composite_input_is_marked_score_bearing():
+    """Derive the classification from the parser, don't hand-maintain it.
+
+    `SCORE_BEARING_COLUMNS` decides whether a missing column logs a WARNING
+    that says a score moved, or an INFO that says a display field is absent.
+    If someone adds a column to `row_for_composite` and forgets to add it
+    here, its disappearance would be reported as cosmetic while it silently
+    inflated every score built from it — which is the 4,112-row correction of
+    2026-09-07 happening again, quietly.
+
+    So the set is checked against the parser's own source rather than trusted.
+    """
+    import inspect
+    import re
+
+    from app.services import sheet_feed
+
+    src = inspect.getsource(sheet_feed.parse_all_signals_csv)
+    start = src.index("row_for_composite = {")
+    end = src.index("compute_tapeline_composite", start)
+    block = src[start:end]
+
+    referenced = set(re.findall(r'_cell\(raw,\s*"([^"]+)"\)', block))
+    assert referenced, "could not read the composite inputs out of the parser"
+
+    missing = referenced - sheet_feed.SCORE_BEARING_COLUMNS
+    assert not missing, (
+        f"{sorted(missing)} feed compute_tapeline_composite but are not in "
+        f"SCORE_BEARING_COLUMNS, so losing them would be logged as cosmetic "
+        f"while inflating every score built from them"
+    )
+
+
+def test_the_cosmetic_columns_really_are_cosmetic():
+    """The three the workbook actually dropped, and what they cost.
+
+    Conviction, Strategy and Raw Score are read by the parser but none of them
+    reaches the composite. Measured on production 2026-09-11: of 7,548 scored
+    rows, ZERO lacked a confidence_pct — losing Conviction stranded nothing.
+    (confidence_pct is computed from factor coverage in polygon_feed, not from
+    the sheet's grade.)
+    """
+    from app.services import sheet_feed
+
+    for col in ("Conviction", "Strategy", "Raw Score"):
+        assert col in sheet_feed._ALL_SIGNALS_COLUMNS, (
+            f"{col} is no longer tracked at all, so its drift is invisible"
+        )
+        assert col not in sheet_feed.SCORE_BEARING_COLUMNS, (
+            f"{col} is marked score-bearing but does not reach the composite; "
+            f"it would raise a false alarm every 30 seconds"
+        )
+
+
+def test_a_missing_display_column_does_not_claim_a_score_moved(caplog):
+    """The specific false alarm this replaces."""
+    import logging
+
+    from app.services import sheet_feed
+
+    with caplog.at_level(logging.INFO):
+        sheet_feed._log_header_drift(
+            ["Ticker", "Score", "Price", "Type", "Market Regime",
+             "Momentum Quality", "Near 52W High %",
+             "RS vs SPY 3M %", "RS vs SPY 6M %", "RS vs SPY 1Y %",
+             "3M %", "6M %", "1Y %"]
+        )
+    text = caplog.text
+    assert "header_missing_cosmetic" in text
+    assert "NEUTRAL 50" not in text, (
+        "a display-only column still claims it moved a score"
+    )
+
+
+def test_a_missing_factor_column_does_say_the_score_moved(caplog):
+    """And the alarm must still be loud when it should be."""
+    import logging
+
+    from app.services import sheet_feed
+
+    with caplog.at_level(logging.INFO):
+        sheet_feed._log_header_drift(
+            ["Ticker", "Score", "Price", "Type", "Conviction", "Strategy",
+             "Raw Score", "Asset Class", "Momentum Quality",
+             "Near 52W High %", "RS vs SPY 3M %", "RS vs SPY 6M %",
+             "RS vs SPY 1Y %", "3M %", "6M %", "1Y %"]
+        )
+    text = caplog.text
+    assert "header_missing_scoring" in text
+    assert "Market Regime" in text
+    assert "NEUTRAL 50" in text
