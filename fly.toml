@@ -82,9 +82,29 @@ primary_region = "syd"              # Sydney — lowest latency for Melbourne fo
   cpus = 2
   processes = ["api"]
 
+# Worker moved 2026-09-11 from shared-cpu-1x:512mb to performance-1x:2gb.
+# Measured on both worker machines just before the change: CPU busy 7-9%, idle
+# 0-3%, STEAL 90-91%. Once its burst balance is spent, a shared-cpu-1x gets 5ms
+# of every 80ms (6.25% of a core), and inside the VM the withheld time shows up
+# as steal. The worker is ONE single-threaded asyncio process, so what it needs
+# is one whole core. A performance core is 80ms of every 80ms with no burst
+# balance to run out. More SHARED vCPUs would not do it: the quota is per
+# machine, and at 12,000 symbols (#763) plus the concurrency-8 aggregates pass
+# (#800) the demand is about one full core, sustained.
+#
+# What running it too small cost: every tick blew TICK_TIMEOUT_SECONDS inside
+# score_upsert, so the regime heartbeat went stale, the cloud watchdog restarted
+# both worker machines (wiping every in-process cache and in-flight pass) and
+# alerted the founder, and the restarted VM, throttled again, took about an hour
+# to write its first full universe. Memory was tight too: 72-127MB available of
+# 459MB, no swap.
+#
+# Founder-approved spend, 2026-09-11 ($32.19/mo list; syd is priced above list).
+# The standby worker is billed only for its rootfs while stopped, which is the
+# state it is supposed to be in (see .github/workflows/uptime-monitor.yml).
 [[vm]]
-  memory = "512mb"
-  cpu_kind = "shared"
+  memory = "2048mb"
+  cpu_kind = "performance"
   cpus = 1
   processes = ["worker"]
 

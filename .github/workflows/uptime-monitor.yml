@@ -68,10 +68,17 @@ jobs:
             export PATH="$FLYCTL_INSTALL/bin:$PATH"
           }
 
+          # A STANDBY is a machine whose own config.standbys is non-empty (it
+          # names the machine it covers). Fly keeps a standby STOPPED until the
+          # machine it covers loses its host, and `flyctl machine restart` on a
+          # stopped machine STARTS it. Restarting every machine in the app
+          # therefore turned the backend's standby worker into a second active
+          # worker, doubling every vendor call and every write. So this never
+          # touches a standby; Fly starts one itself when it is actually needed.
           recover() {  # $1 = fly app, $2 = token
             ensure_flyctl
             FLY_API_TOKEN="$2" flyctl machines list -a "$1" --json 2>/dev/null \
-              | jq -r '.[].id' \
+              | jq -r '.[] | select(((.config.standbys // []) | length) == 0) | .id' \
               | while read -r mid; do
                   [ -n "$mid" ] && FLY_API_TOKEN="$2" flyctl machine restart "$mid" -a "$1" >/dev/null 2>&1 \
                     && echo "restarted $1/$mid"
@@ -116,8 +123,13 @@ jobs:
             fail=1
             echo "::error::worker tick STALE (status=$worker_stale) - restarting worker machines"
             ensure_flyctl
+            # Worker-group machines EXCEPT the standby (see recover() above).
+            # Until 2026-09-11 this restarted the standby on every stale run, so
+            # both machines were `started` and both ran the full tick. The
+            # standby it kept starting was covering 2867642a1e9668, a machine
+            # that no longer exists.
             wids=$(FLY_API_TOKEN="$FLY_API_TOKEN" flyctl machines list -a tapeline-backend --json 2>/dev/null \
-              | jq -r '.[] | select((.config.metadata.fly_process_group // .process_group // "") == "worker") | .id')
+              | jq -r '.[] | select((.config.metadata.fly_process_group // .process_group // "") == "worker") | select(((.config.standbys // []) | length) == 0) | .id')
             for mid in $wids; do
               [ -n "$mid" ] && FLY_API_TOKEN="$FLY_API_TOKEN" flyctl machine restart "$mid" -a tapeline-backend >/dev/null 2>&1 \
                 && echo "restarted worker $mid"
