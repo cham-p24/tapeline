@@ -98,3 +98,41 @@ And the harder fact underneath: of 35 accounts, four have ever run a scan, and
 both live trials have run zero. New creative buys more signups of the kind that
 do not activate. Worth running only alongside something that makes an account
 worth keeping.
+
+---
+
+## Update 2026-09-11 — voice-over cuts, concepts D and E, and the Reels 40% rule
+
+**Use `voiceover/` only.** Nine cuts: concepts B (money question), D (swing
+traders) and E (published record), each in 9:16, 4:5 and 1:1. The silent
+`tapeline-*.mp4` files at the top of this folder are superseded. Their 9:16 cut puts the
+disclosure inside the band Meta says to keep clear, so it must not be uploaded.
+
+- **Voice:** Microsoft neural `en-US-AndrewNeural` via edge-tts. Local SAPI
+  only has David and Zira, which would make the ads worse than no voice.
+- **Timing follows the voice.** The first script ran 45s. The shipped cuts are
+  26.6–28.5s. Each scene is held for its spoken length plus a lead-in and a
+  tail, never the reverse.
+- **Loudness:** −16 LUFS integrated, the social-video norm.
+- **Compliance gate inside the build:** `build3.mjs` writes every spoken line to
+  `vo-script.md` and runs `lint-copy-compliance.mjs --ads` on it before
+  synthesising anything. A failing line stops the build.
+- **The trial length is on screen, not spoken.** It is parsed from `frontend/lib/trial.ts`.
+- Scenes 05–06 are identical across B, D and E, sound included, so results
+  are attributable to the hook.
+
+**Reels 40% rule.** For Reels ads that carry a disclaimer, Meta says to keep the
+bottom 40% free of text, logos and key elements. The 9:16 cuts now use a
+770px bottom band (the disclosure ends at about y=1120, with the line at
+y=1152). The product frame is fitted by height as well as width, so it cannot
+overflow on 9:16 or 1:1.
+
+**Concept E hook changed.** It was "Every scanner shows you its good weeks." That is
+false: Zacks has published a record for decades. It is now "Anyone can show
+you their good weeks."
+
+**Why D and E exist, and the test design:** see `docs/META_ADS_PLAYBOOK_2026-09-11.md`
+(verified research on how large advertisers run Meta, translated to A$25/day)
+and `docs/GOOGLE_DATA_2026-09-11.md` (the Ads, Search Console and GA4 pull
+behind concept D). Copy for all three ads, with the price and billing interval
+Meta's subscription policy requires: `meta-copy-2026-09.md`.
