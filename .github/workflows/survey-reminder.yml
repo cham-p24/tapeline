@@ -1,0 +1,72 @@
+name: Survey reminder (one-shot, 2026-09-16)
+
+# Sends the September 2026 customer-survey reminder, ONCE, unattended.
+#
+# Founder-authorised 2026-09-11: "go, one address for Waad, send Wed 16".
+# The original survey went out 2026-09-11 03:44 UTC — about midnight US
+# Eastern, the wrong hour for a mostly-US list. This fires at 13:07 UTC on
+# Wednesday 16 September: 9:07am New York, 11:07pm Melbourne. Off the :00 mark
+# because Actions cron is best-effort and bunches at the hour.
+#
+# WHAT RUNS: `survey_send --reminder --send --quiet` on the deployed backend
+# over `flyctl ssh`, so it uses prod's database, Resend key and APP_URL without
+# any of them touching the runner. Who it reaches, and why it cannot
+# double-send, is documented on `run_reminder` in
+# backend/app/scripts/survey_send.py.
+#
+# --quiet IS NOT OPTIONAL. This repo is public, so this job's log is
+# world-readable, and without --quiet the script prints every recipient's
+# address. backend/tests/test_survey_reminder.py fails the build if the flag is
+# dropped from the command below.
+#
+# ONE-SHOT: GitHub cron has no year field, so "7 13 16 9 *" would fire every
+# 16 September. The date window below makes any run outside 16-18 Sep 2026 a
+# no-op, including an accidental early manual dispatch. Delete this file once
+# the reminder has gone.
+#
+# Takes no inputs, so it cannot become an arbitrary-command runner.
+
+on:
+  schedule:
+    - cron: "7 13 16 9 *"
+  workflow_dispatch:   # Fallback if the scheduled run does not fire. Same window applies.
+
+concurrency:
+  group: survey-reminder
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Only inside the authorised window
+        id: window
+        run: |
+          set -euo pipefail
+          now=$(date -u +%s)
+          start=$(date -u -d "2026-09-16T13:00:00Z" +%s)
+          end=$(date -u -d "2026-09-19T00:00:00Z" +%s)
+          if [ "$now" -lt "$start" ] || [ "$now" -ge "$end" ]; then
+            echo "::notice title=Outside window::The survey reminder is authorised for 16-18 Sep 2026 only. Nothing sent."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup flyctl
+        if: steps.window.outputs.go == 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      - name: Send the reminder
+        if: steps.window.outputs.go == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "::error title=No token::FLY_API_TOKEN secret is not set."
+            exit 1
+          fi
+          flyctl ssh console -a tapeline-backend \
+            -C "python -m app.scripts.survey_send --reminder --send --quiet"

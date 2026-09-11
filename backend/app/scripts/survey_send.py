@@ -77,6 +77,8 @@ import sys
 
 from sqlalchemy import select
 
+from app.services.dblock import LOCK_SURVEY_REMINDER, one_machine_at_a_time
+
 logger = logging.getLogger(__name__)
 
 SURVEY_TOKEN = "survey_2026_09"
@@ -382,6 +384,303 @@ async def run_newsletter(
     return counts
 
 
+# ── The reminder, 2026-09-16 ────────────────────────────────────────────────
+#
+# Founder-authorised 2026-09-11: "go, one address for Waad, send Wed 16". Sent
+# once, unattended, by .github/workflows/survey-reminder.yml at 13:07 UTC on
+# 16 September — 9am New York. The original landed at midnight US Eastern.
+#
+# WHO: everyone who RECEIVED the original and has not visibly answered — account
+# holders carrying SURVEY_TOKEN, plus the newsletter-only subscribers who existed
+# when it went out. The 8 re_sunset accounts never received the original (the
+# lifecycle governor blocked them), so they are out by construction: you cannot
+# remind someone of an email they never got.
+#
+# WHY IT COMMITS PER RECIPIENT: it runs over `flyctl ssh`. If that session drops
+# mid-run, an end-of-run commit would roll back every "already reminded" token
+# AFTER the emails had gone out, and the next run would send them all again. The
+# token is also appended in SQL rather than by rewriting `drip_state` from the
+# copy read at collection time, so a drip the worker records mid-run survives.
+#
+# WHY THE NEWSLETTER HALF HAS A RUN-LEVEL GUARD: `newsletter_subscribers` has no
+# per-row marker column, and the original newsletter send stamped nothing. So the
+# newsletter phase runs only on the FIRST reminder run — no account yet carries
+# REMINDER_TOKEN — and accounts always go first. A crash therefore under-sends
+# rather than double-sends. --force-newsletter overrides it, for a human who has
+# checked Resend first.
+#
+# WHY IT ALSO HOLDS A DATABASE LOCK: the per-recipient token makes a RETRY
+# safe, and does nothing about two runs going at once — both read "not
+# reminded" before either commits, and both send. The workflow's concurrency
+# group stops two scheduled runs overlapping, but not a manual run started at
+# the same moment. `dblock.one_machine_at_a_time` holds the lock on a session
+# of its own, so the per-recipient commits do not release it (see
+# `hold_xact_lock`). The loser returns an empty dict and sends nothing.
+#
+# WHY --quiet EXISTS: the workflow's log is world-readable on this public repo.
+# With --quiet the run prints counts, never an address.
+
+REMINDER_TOKEN = "survey_2026_09_r"
+
+#: Newsletter subscribers created before this instant received the original.
+#: Its account phase committed at 03:44:39 UTC and the newsletter phase ran
+#: straight after; the newest of those 14 subscribers joined on 2026-09-07.
+ORIGINAL_SEND_AT = "2026-09-11T03:44:00+00:00"
+
+#: Founder decision 2026-09-11: remind ONE address for Waad. waadrabeemm@
+#: ("Waad Rabeemm") and waadrabeema@ ("Waad20rabee Ma") registered 36 seconds
+#: apart; the first-registered one is kept. Otherwise this would be the third
+#: and fourth email one person received about this survey.
+REMINDER_SKIP = frozenset({"waadrabeema@gmail.com"})
+
+#: Resend reported this address "suppressed" for the original — a prior bounce
+#: or complaint on Resend's side. The database cannot know, because
+#: RESEND_WEBHOOK_SECRET is unset and bounces never reach
+#: `email_undeliverable_at`. Resend would drop it again; skipping it keeps the
+#: counts honest.
+RESEND_SUPPRESSED = frozenset({"patelsp1@yahoo.com"})
+
+_NOT_A_NAME = frozenset({"the", "mr", "mrs", "ms", "dr", "sir", "madam"})
+
+
+def first_name(full: str | None) -> str:
+    """The greeting name for the reminder.
+
+    The original greeted with the whole stored name, so it went out as
+    "Hi David Eley," / "Hi ELANGOVAN M," / "Hi The Best,". This takes the first
+    word, softens ALL-CAPS, keeps any other casing as typed (so "McKay"
+    survives), and falls back to "there" for a title word, a single letter, or
+    anything containing a digit.
+    """
+    parts = (full or "").split()
+    tok = parts[0] if parts else ""
+    if len(tok) < 2 or any(ch.isdigit() for ch in tok) or tok.lower() in _NOT_A_NAME:
+        return "there"
+    return tok.capitalize() if tok.isupper() else tok
+
+
+async def _answered(session) -> set[str]:
+    """Addresses respondents chose to leave in the form.
+
+    The form is otherwise anonymous by design, so this is the only way to know
+    that someone already answered.
+    """
+    from app.models import SurveyResponse
+
+    rows = (await session.execute(
+        select(SurveyResponse.contact_email)
+        .where(SurveyResponse.contact_email.is_not(None))
+    )).scalars().all()
+    return {e.lower() for e in rows if e}
+
+
+async def collect_reminder_accounts(session) -> tuple[list, list]:
+    """(recipients, skipped) — account holders who received the original."""
+    from app.models import User
+    from app.services.email_prefs import EmailPref, wants
+
+    answered = await _answered(session)
+    rows = (await session.execute(select(User))).scalars().all()
+
+    recipients, skipped = [], []
+    for u in rows:
+        email = (u.email or "").lower()
+        toks = _tokens(u)
+        if SURVEY_TOKEN not in toks:
+            continue  # never received the original: not part of this send at all
+        if REMINDER_TOKEN in toks:
+            skipped.append((u, "already_reminded"))
+        elif email in REMINDER_SKIP:
+            skipped.append((u, "duplicate_person"))
+        elif email in INTERNAL_ADDRESSES or getattr(u, "is_admin", False):
+            skipped.append((u, "internal"))
+        elif getattr(u, "email_undeliverable_at", None) is not None:
+            skipped.append((u, "undeliverable"))
+        elif email in answered:
+            skipped.append((u, "answered"))
+        elif not wants(u, EmailPref.RE_ENGAGEMENT):
+            skipped.append((u, "opted_out"))
+        else:
+            recipients.append(u)
+    return recipients, skipped
+
+
+async def collect_reminder_newsletter(session) -> tuple[list, list]:
+    """(recipients, skipped) — newsletter-only subscribers who got the original."""
+    from datetime import UTC, datetime
+
+    cutoff = datetime.fromisoformat(ORIGINAL_SEND_AT)
+    candidates, skipped = await collect_newsletter(session)
+    answered = await _answered(session)
+
+    recipients = []
+    for sub in candidates:
+        email = sub.email.lower()
+        created = sub.created_at
+        if created is not None and created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)  # SQLite hands back naive datetimes
+        if created is None or created >= cutoff:
+            skipped.append((sub, "joined_after_original"))
+        elif email in RESEND_SUPPRESSED:
+            skipped.append((sub, "resend_suppressed"))
+        elif email in REMINDER_SKIP:
+            skipped.append((sub, "duplicate_person"))
+        elif email in answered:
+            skipped.append((sub, "answered"))
+        else:
+            recipients.append(sub)
+    return recipients, skipped
+
+
+def _tally(skipped: list) -> str:
+    counts: dict[str, int] = {}
+    for _row, reason in skipped:
+        counts[reason] = counts.get(reason, 0) + 1
+    return ", ".join(f"{k}={v}" for k, v in sorted(counts.items())) or "none"
+
+
+@one_machine_at_a_time(LOCK_SURVEY_REMINDER, "survey_reminder", default_factory=dict)
+async def run_reminder(
+    *, send: bool, quiet: bool = False, force_newsletter: bool = False,
+) -> dict:
+    """Send (or dry-run) the one reminder. See the block comment above."""
+    from sqlalchemy import case, or_, update
+
+    from app.config import get_settings
+    from app.db import session_scope
+    from app.models import User
+    from app.services.email import render_survey_reminder_email, send_email
+    from app.services.lifecycle import worker_governor
+    from app.services.newsletter import _list_unsubscribe_headers, _unsubscribe_url
+
+    base = (get_settings().app_url or "https://tapeline.io").rstrip("/")
+    survey_url = f"{base}/survey"
+    if send and not base.startswith("https://"):
+        raise SystemExit(
+            f"refusing to send: survey link is {base!r}, which is not a public "
+            f"https URL."
+        )
+
+    def show(line: str) -> None:
+        if not quiet:
+            print(line)
+
+    counts = {
+        "accounts_sent": 0, "newsletter_sent": 0, "would_send": 0,
+        "governed": 0, "not_sent": 0, "failed": 0,
+    }
+
+    async with session_scope() as session:
+        # Decided BEFORE anything is sent. Parsed in Python, not with LIKE:
+        # `_` is a LIKE wildcard, so '%survey_2026_09_r%' also matches the
+        # original token followed by a comma and an "r".
+        states = (await session.execute(select(User.drip_state))).scalars().all()
+        first_run = not any(
+            REMINDER_TOKEN in {t for t in (d or "").split(",") if t} for d in states
+        )
+        run_news = first_run or force_newsletter
+
+        accounts, a_skipped = await collect_reminder_accounts(session)
+        news, n_skipped = await collect_reminder_newsletter(session)
+
+        print(f"\n{'SENDING' if send else 'DRY RUN — nothing will be sent'}: survey reminder")
+        print(f"link: {survey_url}")
+        print(f"accounts:   {len(accounts)} to remind; skipped: {_tally(a_skipped)}")
+        print(
+            f"newsletter: {len(news) if run_news else 0} to remind; "
+            f"skipped: {_tally(n_skipped)}"
+            + ("" if run_news else "  (PHASE SKIPPED: an earlier reminder run already started)")
+        )
+
+        governor = worker_governor()
+        for u in accounts:
+            if not send:
+                counts["would_send"] += 1
+                show(f"  WOULD SEND  {u.email:<40} Hi {first_name(u.name)},")
+                continue
+            if not governor.allows(u):
+                counts["governed"] += 1
+                show(f"  GOVERNED    {u.email}")
+                continue
+            try:
+                res = await send_email(
+                    to=u.email,
+                    subject="Tapeline — four questions",
+                    html=render_survey_reminder_email(
+                        first_name(u.name), survey_url=survey_url, audience="account",
+                    ),
+                    persona="sales",
+                    unsubscribe_user_id=u.id,
+                    unsubscribe_category="re_engagement",
+                )
+            except Exception:
+                counts["failed"] += 1
+                logger.exception("survey_reminder.send_failed user=%s", u.id)
+                show(f"  FAILED      {u.email}")
+                continue
+            if res.get("skipped"):
+                counts["not_sent"] += 1
+                show(f"  NOT SENT    {u.email} ({res.get('reason')})")
+                continue
+
+            await session.execute(
+                update(User)
+                .where(User.id == u.id)
+                .values(drip_state=case(
+                    (or_(User.drip_state.is_(None), User.drip_state == ""), REMINDER_TOKEN),
+                    else_=User.drip_state + "," + REMINDER_TOKEN,
+                ))
+                .execution_options(synchronize_session=False)
+            )
+            await session.commit()  # per recipient — see the block comment
+            governor.record(u)
+            counts["accounts_sent"] += 1
+            show(f"  SENT        {u.email}")
+
+        if run_news:
+            for sub in news:
+                if not send:
+                    counts["would_send"] += 1
+                    show(f"  WOULD SEND  {sub.email:<40} Hi there,")
+                    continue
+                # The shared footer placeholder only resolves for `users` rows,
+                # so this list's own opt-out link and header are added here.
+                unsub = _unsubscribe_url(sub.unsubscribe_token)
+                html = render_survey_reminder_email(
+                    "there", survey_url=survey_url, audience="newsletter",
+                ) + (
+                    '<p style="margin:0;padding:0 24px 24px;font-size:11px;'
+                    'line-height:1.6;color:#8a8f98;font-family:-apple-system,'
+                    'BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">'
+                    f'<a href="{unsub}" style="color:#8a8f98;'
+                    'text-decoration:underline;">Unsubscribe</a>'
+                    " — one click, no sign-in needed.</p>"
+                )
+                try:
+                    res = await send_email(
+                        to=sub.email,
+                        subject="Tapeline — four questions",
+                        html=html,
+                        persona="sales",
+                        headers=_list_unsubscribe_headers(sub.unsubscribe_token),
+                    )
+                except Exception:
+                    counts["failed"] += 1
+                    # An id, never the address: this output can be public.
+                    logger.exception("survey_reminder.newsletter_send_failed id=%s", sub.id)
+                    show(f"  FAILED      {sub.email}")
+                    continue
+                if res.get("skipped"):
+                    counts["not_sent"] += 1
+                    show(f"  NOT SENT    {sub.email} ({res.get('reason')})")
+                    continue
+                counts["newsletter_sent"] += 1
+                show(f"  SENT        {sub.email}")
+
+    print(f"\nresult: {counts}\n")
+    return counts
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--send", action="store_true", help="actually transmit")
@@ -399,10 +698,32 @@ def main() -> None:
         help="who to mail. Newsletter subscribers with no account get different "
              "copy and a different Q1 option list.",
     )
+    ap.add_argument(
+        "--reminder", action="store_true",
+        help="send the one 2026-09-16 reminder instead of the survey. It reaches "
+             "only people who received the original; --audience is ignored.",
+    )
+    ap.add_argument(
+        "--quiet", action="store_true",
+        help="print counts only, never an address. REQUIRED wherever the output "
+             "is public — the survey-reminder workflow passes it.",
+    )
+    ap.add_argument(
+        "--force-newsletter", action="store_true",
+        help="run the reminder's newsletter phase even though an earlier reminder "
+             "run already started. Check Resend's log first.",
+    )
     args = ap.parse_args()
 
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+    if args.reminder:
+        asyncio.run(run_reminder(
+            send=args.send, quiet=args.quiet, force_newsletter=args.force_newsletter,
+        ))
+        return
+
     async def _go() -> None:
         if args.audience in ("accounts", "all"):
             await run(

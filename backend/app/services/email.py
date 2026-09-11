@@ -6017,3 +6017,62 @@ def render_customer_survey_email(
         preheader="Four questions about what you were looking for. About ninety seconds.",
     )
 
+
+def render_survey_reminder_email(
+    greeting_name: str, *, survey_url: str, audience: str = "account",
+) -> str:
+    """The one reminder for the September 2026 survey, sent 2026-09-16.
+
+    SAME SUBJECT, NO "Re:". The caller sends it as "Tapeline — four questions"
+    again, so it reads as a follow-up from a person rather than a new campaign.
+    Prefixing "Re:" to a message the recipient never replied to is a fake-reply
+    pattern that spam filters, and the rules on misleading headers, both treat
+    badly.
+
+    FIRST NAME ONLY. The original greeted with the full stored name ("Hi David
+    Eley," / "Hi ELANGOVAN M,"). Callers pass scripts.survey_send.first_name().
+
+    "THE FORM DOESN'T RECORD WHO FILLED IT IN" is there because the form is
+    anonymous by design (models/survey.py), so this reminder cannot skip people
+    who answered through it. The sentence tells them why they are getting it,
+    and restates the promise the original made.
+
+    "THAT'S THE LAST TIME I'LL ASK" IS A PROMISE: no further email about this
+    survey. It is a commitment to stop, not urgency — there is no deadline.
+
+    Otherwise the same constraints as render_customer_survey_email: no offer, no
+    price, no incentive, nothing about anyone's money.
+    """
+    if audience not in SURVEY_STATUS_LINKS:
+        raise ValueError(f"unknown survey audience {audience!r}")
+
+    options = "".join(
+        f'<p style="margin:0 0 10px;font-size:16px;line-height:1.5;">'
+        f'<a href="{survey_url}?a={value}" '
+        f'style="color:#4F8DF7;text-decoration:underline;">{label}</a></p>'
+        for value, label in SURVEY_STATUS_LINKS[audience]
+    )
+    opener = (
+        "A short follow-up to my email last week. I'm trying to find out what "
+        "people were actually looking for when they signed up for Tapeline."
+        if audience == "account"
+        else "A short follow-up to my email last week. You're on the Tapeline "
+        "mailing list but have never made an account, and I'd rather find out "
+        "why than guess."
+    )
+    return shell(
+        lead(f"Hi {greeting_name},")
+        + paragraph(opener)
+        + paragraph(
+            "If you've already answered, thank you, and you can ignore this. "
+            "The form deliberately doesn't record who filled it in, so I have no "
+            "way to take you off this list myself."
+        )
+        + paragraph("If you haven't, it starts with one tap:")
+        + card(options)
+        + paragraph("Or just hit reply with a sentence. Nothing is required.")
+        + paragraph("That's the last time I'll ask about it.")
+        + paragraph("Christian"),
+        preheader="A short follow-up. One tap, or just reply.",
+    )
+
