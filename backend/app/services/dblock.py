@@ -65,6 +65,7 @@ LOCK_WEEKLY_NEWSLETTER = 5
 LOCK_CHECKOUT_RECOVERY = 6
 LOCK_ACTIVATION_NUDGE = 7
 LOCK_SEO_DIGEST = 8
+LOCK_SURVEY_REMINDER = 9
 
 
 async def try_xact_lock(session: AsyncSession, objid: int) -> bool:
