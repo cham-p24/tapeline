@@ -24,7 +24,7 @@ import contextlib
 import json
 import logging
 import time
-from datetime import UTC, date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +41,71 @@ BASE_URL = "https://finnhub.io/api/v1"
 CACHE_TTL_FUNDAMENTALS_HOURS = 24 * 7   # Fundamentals refresh weekly
 CACHE_TTL_CALENDAR_HOURS = 12           # Calendars refresh twice a day
 CACHE_TTL_INSIDER_HOURS = 24            # Insider Form 4 refresh daily
+
+#: Statuses that mean Finnhub refused the KEY rather than answering about the
+#: symbol: 429 is the per-minute throttle, 401 a rejected key. Both say nothing
+#: about the symbol that was asked about, and both apply to every symbol asked
+#: next.
+THROTTLED_STATUSES = frozenset({401, 429})
+
+
+class FinnhubThrottledError(Exception):
+    """Finnhub refused the key (429 throttle or 401), not the symbol.
+
+    Raised only when a caller passes `raise_failures=True`, which only the
+    worker's two factor passes do. Everywhere else a throttled call keeps
+    returning the same None it always has, so the API's ticker pages degrade to
+    "no data" exactly as before.
+
+    Why the passes need the difference: they stamp every symbol they ATTEMPT,
+    because "Finnhub has no fundamentals for this ETF" is a settled answer that
+    must not be asked again tomorrow. A 429 is not an answer, but it came back
+    as that same None, so it was stamped as settled too and the symbol sat out
+    a whole refresh horizon with nothing learned.
+    """
+
+    def __init__(self, endpoint: str, status: int) -> None:
+        super().__init__(f"finnhub {endpoint} throttled status={status}")
+        self.endpoint = endpoint
+        self.status = status
+
+
+class FinnhubUnavailableError(Exception):
+    """Finnhub did not answer: any non-200 other than a throttle, a transport
+    error or timeout, or a 200 whose body is not the JSON object it sends.
+
+    Raised under the same `raise_failures=True`, and deliberately a different
+    type from FinnhubThrottledError, because the passes treat it differently.
+    These can repeat for ONE symbol on every call, and a symbol that is never
+    stamped stays at the head of every future selection, so a handful of them
+    would stall the refresh for the whole universe. They are therefore still
+    stamped. What the passes need to SEE is a run of them: that is an outage,
+    and stamping through it at full pace would push every due row out a whole
+    horizon having learned nothing.
+    """
+
+    def __init__(self, endpoint: str, detail: str) -> None:
+        super().__init__(f"finnhub {endpoint} unavailable: {detail}")
+        self.endpoint = endpoint
+
+
+def _raise_if_failure(endpoint: str, status: int, raise_failures: bool) -> None:
+    """Raise for a non-200 response: none of them is an answer about the symbol.
+
+    401/429 refused the KEY and raise FinnhubThrottledError. Every other status
+    raises FinnhubUnavailableError. Finnhub reports "nothing for this symbol" as
+    a 200 with an empty body, which the callers already read as no coverage, so
+    for this universe of US listings a 403, 404, 408 or 3xx is a plan, endpoint
+    or edge refusal rather than a verdict on one symbol. Review found that
+    treating those as answers would stamp the whole due universe without a word
+    in the logs. A symbol that really is refused on its own is still stamped by
+    the passes, so it cannot block the queue.
+    """
+    if not raise_failures:
+        return
+    if status in THROTTLED_STATUSES:
+        raise FinnhubThrottledError(endpoint, status)
+    raise FinnhubUnavailableError(endpoint, f"status={status}")
 
 
 def _cache_path(name: str) -> Path:
@@ -165,6 +230,114 @@ def smart_money_cache_size() -> int:
     return len(_SMART_MONEY_SCORE_CACHE)
 
 
+#: When the worker's insider pass scores a symbol it writes the Form 4 rows it
+#: fetched to insider_transactions (one delete-then-insert, fetched_at = insert
+#: time) and then stamps last_smart_money_at in a batch flushed every 20
+#: symbols. So a symbol's stored rows ARE the fetch its stamp records exactly
+#: when they came from one insert that landed shortly before the stamp.
+#:
+#: Same rule and same numbers as app/scripts/backfill_smart_money.py (#812), so
+#: the boot-time rebuild below and that one-off repair cannot disagree about
+#: what counts as a lost reading. tests/test_factor_refresh_what_is_due.py
+#: asserts the two agree.
+INSIDER_STAMP_LAG = timedelta(minutes=15)
+INSIDER_CLOCK_SKEW = timedelta(minutes=2)
+
+
+def _aware(ts: datetime) -> datetime:
+    return ts if ts.tzinfo is not None else ts.replace(tzinfo=UTC)
+
+
+def insider_rows_are_the_stamped_fetch(
+    stamp: datetime, first_fetch: datetime, last_fetch: datetime,
+) -> bool:
+    """True when a symbol's stored Form 4 rows are the fetch its stamp recorded."""
+    stamp, first_fetch, last_fetch = _aware(stamp), _aware(first_fetch), _aware(last_fetch)
+    if first_fetch != last_fetch:
+        return False
+    lag = stamp - first_fetch
+    return -INSIDER_CLOCK_SKEW <= lag <= INSIDER_STAMP_LAG
+
+
+async def _rebuild_unsaved_smart_money_scores() -> int:
+    """Put back smart-money readings the insider pass computed but nothing saved.
+
+    THE LOSS. The insider pass puts its score only into this process's
+    `_SMART_MONEY_SCORE_CACHE`. The Ticker row receives it later: from the tick
+    for rows the sheet does not own, and from the sheet upsert - which runs only
+    when the sheet changes - for rows it does. A restart in between lost the
+    reading, and the pass's stamp then hid the symbol from the refresh. On
+    2026-09-13 production held 3,231 such rows, NVDA, AAPL, MSFT, GOOGL, AMZN
+    and META among them, each with its Form 4 rows on file. #812's script
+    repaired them once. This repeats that repair at every boot, so the next
+    restart cannot lose them again.
+
+    Rebuilt only for rows whose sub_smart_money is NULL, never for an X: crypto
+    pair, and only where the stored rows are the stamped fetch
+    (`insider_rows_are_the_stamped_fetch`). Scored over ALL of those rows, the
+    same input #812's repair uses. Stored rows are deduplicated on their natural
+    key, so for a symbol with colliding Form 4 lines the value can differ a
+    little from the one the pass computed from the raw list. No vendor call.
+
+    It fills the CACHE, not the row. The existing writers then put the value on
+    the row together with a composite recomputed from it, so a factor never
+    lands beside a score that ignored it.
+
+    Returns the number of readings rebuilt. Never raises.
+    """
+    from sqlalchemy import func, select
+
+    from app.db import session_scope
+    from app.models import InsiderTransaction, Ticker
+
+    try:
+        async with session_scope() as session:
+            groups = (await session.execute(
+                select(
+                    Ticker.symbol,
+                    Ticker.last_smart_money_at,
+                    func.min(InsiderTransaction.fetched_at),
+                    func.max(InsiderTransaction.fetched_at),
+                )
+                .join(InsiderTransaction, InsiderTransaction.symbol == Ticker.symbol)
+                .where(
+                    Ticker.sub_smart_money.is_(None),
+                    Ticker.last_smart_money_at.is_not(None),
+                    Ticker.symbol.not_like("X:%"),
+                )
+                .group_by(Ticker.symbol, Ticker.last_smart_money_at)
+            )).all()
+            eligible = [
+                sym for sym, stamp, first, last in groups
+                if insider_rows_are_the_stamped_fetch(stamp, first, last)
+            ]
+            if not eligible:
+                return 0
+            rows = (await session.execute(
+                select(
+                    InsiderTransaction.symbol,
+                    InsiderTransaction.share_change,
+                    InsiderTransaction.transaction_price,
+                ).where(InsiderTransaction.symbol.in_(eligible))
+            )).all()
+
+        by_symbol: dict[str, list[dict[str, Any]]] = {sym: [] for sym in eligible}
+        for sym, change, price in rows:
+            by_symbol[sym].append({"share_change": change, "transaction_price": price})
+        rebuilt = 0
+        for sym, txns in by_symbol.items():
+            score = compute_smart_money_score(txns)
+            if score is not None and get_cached_smart_money_score(sym) is None:
+                set_cached_smart_money_score(sym, score)
+                rebuilt += 1
+    except Exception:
+        # Guards the WHOLE rebuild, scoring included: the warm is awaited
+        # unguarded at worker boot and on the API's sheet-changed webhook.
+        logger.exception("factor_cache.smart_money_rebuild_failed")
+        return 0
+    return rebuilt
+
+
 async def warm_factor_caches_from_db() -> tuple[int, int]:
     """Refill `_FUND_SCORE_CACHE` and `_SMART_MONEY_SCORE_CACHE` from the values
     already stored on the Ticker rows.
@@ -202,9 +375,13 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
     there the caches are not merely cold after a deploy — they are empty for the
     life of the process.
 
-    Returns (fundamentals_loaded, smart_money_loaded). Never raises: a warm that
-    fails leaves the caches exactly as cold as they were, which is the
-    pre-existing behaviour.
+    Smart money gets one more source: a reading the insider pass computed but
+    no writer ever put on the row is rebuilt from its stored Form 4 rows. See
+    `_rebuild_unsaved_smart_money_scores`.
+
+    Returns (fundamentals_loaded, smart_money_loaded), the second including
+    rebuilt readings. Never raises: a warm that fails leaves the caches exactly
+    as cold as they were, which is the pre-existing behaviour.
     """
     from sqlalchemy import select
 
@@ -234,10 +411,12 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
         logger.exception("factor_cache.warm_failed")
         return funds, smart
 
+    rebuilt = await _rebuild_unsaved_smart_money_scores()
     logger.info(
-        "factor_cache.warmed fundamentals=%d smart_money=%d", funds, smart,
+        "factor_cache.warmed fundamentals=%d smart_money=%d smart_money_rebuilt=%d",
+        funds, smart, rebuilt,
     )
-    return funds, smart
+    return funds, smart + rebuilt
 
 
 # ---- Recent insider transactions — DB-backed, cross-process ---------------
@@ -722,7 +901,9 @@ async def fetch_ipo_calendar(days_ahead: int = 90) -> list[dict[str, Any]] | Non
 
 # ---- Fundamentals ----------------------------------------------------------
 
-async def _fetch_metric_all(symbol: str) -> dict[str, Any] | None:
+async def _fetch_metric_all(
+    symbol: str, *, raise_failures: bool = False,
+) -> dict[str, Any] | None:
     """
     One cached GET of /stock/metric?metric=all — the single upstream call
     behind BOTH fetch_basic_financials and fetch_key_statistics.
@@ -758,9 +939,19 @@ async def _fetch_metric_all(symbol: str) -> dict[str, Any] | None:
         async with httpx.AsyncClient(timeout=15) as c:
             r = await c.get(f"{BASE_URL}/stock/metric", params=params, headers=auth_headers())
             if r.status_code != 200:
+                # Neither a throttle nor an outage is "no coverage" - see the two
+                # error types. Never negative-cached either way: that happens
+                # only on a 200.
+                _raise_if_failure("stock/metric", r.status_code, raise_failures)
                 return None
             data = r.json()
-    except Exception:
+            if not isinstance(data, dict):
+                raise ValueError(f"expected a JSON object, got {type(data).__name__}")
+    except (FinnhubThrottledError, FinnhubUnavailableError):
+        raise
+    except Exception as exc:
+        if raise_failures:
+            raise FinnhubUnavailableError("stock/metric", type(exc).__name__) from exc
         return None
 
     metric = data.get("metric") or {}
@@ -770,14 +961,19 @@ async def _fetch_metric_all(symbol: str) -> dict[str, Any] | None:
     return metric or None
 
 
-async def fetch_basic_financials(symbol: str) -> dict[str, float] | None:
+async def fetch_basic_financials(
+    symbol: str, *, raise_failures: bool = False,
+) -> dict[str, float] | None:
     """
     Per-ticker financial metrics: P/E, margin, ROE, EPS growth, revenue growth.
     Cached 7 days per symbol — fundamentals don't change tick-to-tick.
 
     Returns None if no API key OR ticker has no data (e.g. ETFs without fundamentals).
+    With `raise_failures=True` a throttled key or a failed call raises
+    (FinnhubThrottledError / FinnhubUnavailableError) instead of returning that
+    same None.
     """
-    metric = await _fetch_metric_all(symbol)
+    metric = await _fetch_metric_all(symbol, raise_failures=raise_failures)
     if not metric:
         return None
 
@@ -1015,10 +1211,14 @@ def _seed_market_cap_from_profile(symbol: str, profile: dict[str, Any] | None) -
         set_cached_market_cap(symbol.upper(), mc_millions * 1e6)
 
 
-async def fetch_insider_transactions(symbol: str, days_back: int = 90) -> list[dict[str, Any]] | None:
+async def fetch_insider_transactions(
+    symbol: str, days_back: int = 90, *, raise_failures: bool = False,
+) -> list[dict[str, Any]] | None:
     """
     Recent insider Form 4 filings for a ticker. Used to enrich sub_smart_money.
     Returns list of {filer_name, transaction_date, share_change, transaction_value}.
+    With `raise_failures=True` a throttled key or a failed call raises
+    (FinnhubThrottledError / FinnhubUnavailableError) instead of returning None.
     """
     if not configured():
         return None
@@ -1040,9 +1240,18 @@ async def fetch_insider_transactions(symbol: str, days_back: int = 90) -> list[d
         async with httpx.AsyncClient(timeout=15) as c:
             r = await c.get(f"{BASE_URL}/stock/insider-transactions", params=params, headers=auth_headers())
             if r.status_code != 200:
+                _raise_if_failure("stock/insider-transactions", r.status_code, raise_failures)
                 return None
             data = r.json()
-    except Exception:
+            if not isinstance(data, dict):
+                raise ValueError(f"expected a JSON object, got {type(data).__name__}")
+    except (FinnhubThrottledError, FinnhubUnavailableError):
+        raise
+    except Exception as exc:
+        if raise_failures:
+            raise FinnhubUnavailableError(
+                "stock/insider-transactions", type(exc).__name__,
+            ) from exc
         return None
 
     raw = data.get("data") or []

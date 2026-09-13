@@ -9,11 +9,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import UTC, date, datetime
+from collections import deque
+from datetime import UTC, date, datetime, timedelta
 from time import monotonic
 from typing import Any
 
-from sqlalchemy import bindparam, delete, desc, func, select, update
+from sqlalchemy import bindparam, case, delete, desc, func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.config import get_settings
@@ -37,7 +38,11 @@ from app.models import (
 # congress_trades table simply stops accruing rows until a real disclosure feed
 # is wired.
 from app.services.dblock import LOCK_SCORECARD_FREEZE, try_xact_lock
-from app.services.finnhub_feed import warm_factor_caches_from_db
+from app.services.finnhub_feed import (
+    CACHE_TTL_FUNDAMENTALS_HOURS,
+    CACHE_TTL_INSIDER_HOURS,
+    warm_factor_caches_from_db,
+)
 from app.services.leverage import is_leveraged_fund
 from app.services.mock_feed import (
     fetch_congress_trades,
@@ -1132,38 +1137,15 @@ async def tick() -> None:
             # run — a full ~46 minutes of the chain, forever. It is behind the
             # factor stages now, so it no longer starves them, but it is why
             # `_backfill_sectors` sits at the end of a long chain.
-            # The two factor passes ALTERNATE in slices; they do not run one
-            # to completion and then the other. Running them in turn at a
-            # full-universe budget meant the second one never started at all —
-            # see _FACTOR_SLICE for the measurement. Ordering cannot fix that,
-            # because whichever pass is second is the one that starves.
-            factor_deadline = monotonic() + _FACTOR_PHASE_BUDGET_SECONDS
-            while True:
-                fundamentals_gap, smart_money_gap = await _factor_gap_counts()
-                gaps_remain = bool(fundamentals_gap or smart_money_gap)
-                # A pass runs if it still has gaps to close. When neither does,
-                # both run exactly one slice — that is the daily staleness
-                # rotation — and the loop exits so the display-column backfills
-                # behind it are not held off for the full phase budget.
-                if fundamentals_gap or not gaps_remain:
-                    try:
-                        await _refresh_fundamentals_cache(limit=_FACTOR_SLICE)
-                    except Exception:
-                        logger.exception("fundamentals.refresh_failed")
-                if smart_money_gap or not gaps_remain:
-                    try:
-                        await _refresh_insider_cache(limit=_FACTOR_SLICE)
-                    except Exception:
-                        logger.exception("insider.refresh_failed")
-                if not gaps_remain:
-                    break
-                if monotonic() >= factor_deadline:
-                    logger.info(
-                        "factor_phase.budget_exhausted fundamentals_gap=%d "
-                        "smart_money_gap=%d",
-                        fundamentals_gap, smart_money_gap,
-                    )
-                    break
+            # Everything that is DUE, the two passes alternating in slices.
+            # See _run_factor_phase for what "due" means, and for why the loop
+            # that used to live here settled at 400 rows a day.
+            try:
+                await _run_factor_phase()
+            except Exception:
+                # Must not take the display backfills below down with it:
+                # their latch is already claimed for the next 24 hours.
+                logger.exception("factor_phase.failed")
             try:
                 await _backfill_market_cap()
             except Exception:
@@ -2594,41 +2576,250 @@ _FACTOR_STAMP_BATCH = 20
 #:
 #: 400 rows is ~7.3 min per slice, ~15 min per round. Small enough that an
 #: ordinary deploy cadence still lands several rounds; large enough that the
-#: per-slice gap COUNT and the two selection queries stay noise.
+#: per-round due COUNT and the two selection queries stay noise.
 _FACTOR_SLICE = 400
 
-#: Wall-clock the alternating factor phase may hold before the display-column
-#: backfills get their turn. Reached only while gaps remain — once both stamp
-#: columns are fully populated the loop drops to one rotation slice each and
-#: falls through, so this is a starvation ceiling on the REST of the chain,
-#: not a target.
+#: Wall-clock the factor phase may hold before the display-column backfills get
+#: their turn. A ceiling, not a target: `_run_factor_phase` returns as soon as
+#: nothing is due.
 _FACTOR_PHASE_BUDGET_SECONDS = 3 * 3600
 
+#: How old an EQUITY's attempt stamp may get, per factor column, before the row
+#: is due again.
+#:
+#: WHY THE PHASE NEEDS A NOTION OF "DUE", measured on production 2026-09-13
+#: -------------------------------------------------------------------------
+#: It used to size itself by NEVER-ATTEMPTED rows only. While any stamp was NULL
+#: it looped for up to three hours; once every row had been tried once it ran
+#: ONE 400-row slice per factor and stopped. That was the steady state: between
+#: 09-11 13:41 and 09-13 12:45 exactly one 400/400 batch landed, and rows with a
+#: stamp older than 48h grew from 5,422 to 10,005 (fundamentals) and from 7,630
+#: to 9,805 (smart money) in two days - a ~30-day rotation for 11,918 rows.
+#: Freshness only ever came from accidents: a restart resets the in-memory latch
+#: and re-runs the chain, and a single newly discovered ticker (a NULL stamp)
+#: flipped the next run from one slice back to three hours.
+#:
+#: The horizons are set against the vendor caches in finnhub_feed:
+#:
+#: * last_smart_money_at: the 24h insider cache plus 12h. Form 4 filings arrive
+#:   within two business days of a trade, so this is the factor that moves. It
+#:   must stay above the cache TTL, or a due row is answered from the disk cache
+#:   and re-stamped having learned nothing. On the daily chain 36h re-reads
+#:   each equity every second run, about 2,950 calls a day, which holds a stamp
+#:   near 48h. A restart just before rows cross re-latches the chain for 24h, so
+#:   the worst case is about 60h.
+#: * last_fundamentals_at: the 7-day metric cache plus a day. Reported
+#:   fundamentals change quarterly. The extra day guarantees the cache has
+#:   expired when a row comes due; at exactly the TTL a run could land just
+#:   inside it, be answered from disk, and push the row out another week. On
+#:   the 24h cadence an 8-day horizon is re-read every ninth run.
+_EQUITY_FACTOR_DUE_AFTER: dict[str, timedelta] = {
+    "last_smart_money_at": timedelta(hours=CACHE_TTL_INSIDER_HOURS + 12),
+    "last_fundamentals_at": timedelta(hours=CACHE_TTL_FUNDAMENTALS_HOURS + 24),
+}
 
-async def _factor_gap_counts() -> tuple[int, int]:
-    """Rows never attempted by (fundamentals, smart-money), respectively.
+#: Non-equities - ETFs, crypto pairs, futures - rotate monthly. They almost never
+#: answer either endpoint: on 2026-09-13 crypto held a value for 0 of 100 rows
+#: and ETFs for 653 of 5,613 (mostly 2x single-stock ETFs), yet each rotation
+#: spent about half of every slice re-asking them. Not skipped outright, so a
+#: symbol that does gain coverage is still picked up within a month.
+_NON_EQUITY_FACTOR_DUE_AFTER = timedelta(days=30)
 
-    Drives the alternating loop's exit: while either is non-zero the phase is
-    still CLOSING A GAP and keeps the budget; when both hit zero it has
-    converged and the remaining work is staleness rotation, which must not
-    hold the chain open against the display-column backfills behind it.
+#: What a factor pass does when Finnhub throttles the KEY (429, or 401).
+#:
+#: Pause, then ask for the SAME symbol again. After this many consecutive
+#: throttled attempts, stop the pass and leave everything not yet answered
+#: unstamped, so it stays due; the phase backs off and tries again (see
+#: _FACTOR_PHASE_BACKOFF_SECONDS). A throttle is the one failure that must not
+#: be stamped: it says nothing about the symbol, and stamping it parked the
+#: symbol for a whole horizon. Every other failure is still stamped, because it
+#: can repeat for one symbol forever, and a row that is never stamped sits at
+#: the head of every future selection. One minute matches Finnhub's per-minute
+#: window; five pauses bound a throttled attempt to about five minutes.
+_FACTOR_THROTTLE_PAUSE_SECONDS = 60.0
+_FACTOR_THROTTLE_MAX_PAUSES = 5
+
+#: When a pass decides that the vendor - or the database behind it - is failing,
+#: rather than one symbol.
+#:
+#: A failed call is any non-200 other than a throttle, a timeout, a body that is
+#: not the JSON object Finnhub sends, or an error while scoring or saving the
+#: answer. Each one is still STAMPED, so a symbol that always fails cannot sit at
+#: the head of every selection. The cost is that an outage would be stamped too,
+#: at full pace and learning nothing, across every due row the phase reaches.
+#:
+#: So a pass stops once _FACTOR_FAILURE_STOP of its last _FACTOR_FAILURE_WINDOW
+#: attempts failed. A window, not a run: review found that a brownout failing two
+#: calls in three never builds a long run, so a run-based stop would have stamped
+#: two-thirds of the universe having learned nothing. Ten in forty is far past
+#: what a few broken symbols produce, and bounds a total outage to ten stamped
+#: rows per attempt.
+_FACTOR_FAILURE_WINDOW = 40
+_FACTOR_FAILURE_STOP = 10
+
+#: What the phase does when a pass stops, or fails before stamping anything:
+#: wait, then try again, instead of returning.
+#:
+#: The chain claims its 24h latch when it starts, so returning cost every row
+#: still due a whole day - and a pass stops after ten failures, which about
+#: eleven seconds of 5xx produces. Three ten-minute waits ride out a short
+#: incident and still bound a lasting one to forty stamped rows and thirty
+#: minutes of the phase budget. A wait that would run past the budget is not
+#: taken.
+_FACTOR_PHASE_BACKOFF_SECONDS = 600.0
+_FACTOR_PHASE_MAX_BACKOFFS = 3
+
+
+def _factor_due_clause(stamp_col: Any, now: datetime) -> Any:
+    """SQL predicate: this row's `stamp_col` factor is due at `now`.
+
+    Never attempted, or older than its asset class's horizon. `asset_class` is
+    NOT NULL, so the equity / non-equity split has no NULL hole: the count in
+    `_factor_due_counts` and the selection in `_select_factor_symbols` cover
+    exactly the same rows, so the count the phase logs and loops on is the
+    set the passes will actually be handed.
     """
+    equity_cutoff = now - _EQUITY_FACTOR_DUE_AFTER[stamp_col.key]
+    other_cutoff = now - _NON_EQUITY_FACTOR_DUE_AFTER
+    return (
+        stamp_col.is_(None)
+        | ((Ticker.asset_class == "equity") & (stamp_col < equity_cutoff))
+        | ((Ticker.asset_class != "equity") & (stamp_col < other_cutoff))
+    )
+
+
+async def _factor_due_counts(now: datetime | None = None) -> tuple[int, int]:
+    """Rows due for (fundamentals, smart-money), respectively.
+
+    Counted per column. A shared or swapped count would let a finished
+    fundamentals rotation declare smart money done.
+    """
+    now = now or datetime.now(UTC)
     async with session_scope() as session:
         fundamentals = await session.scalar(
             select(func.count()).select_from(Ticker)
-            .where(Ticker.last_fundamentals_at.is_(None))
+            .where(_factor_due_clause(Ticker.last_fundamentals_at, now))
         )
         smart_money = await session.scalar(
             select(func.count()).select_from(Ticker)
-            .where(Ticker.last_smart_money_at.is_(None))
+            .where(_factor_due_clause(Ticker.last_smart_money_at, now))
         )
     return int(fundamentals or 0), int(smart_money or 0)
 
 
-async def _select_factor_symbols(stamp_col: Any, cap: int) -> list[str]:
+async def _factor_stamps_since(since: datetime) -> int:
+    """Rows whose fundamentals or smart-money stamp landed strictly after `since`.
+
+    Strictly: a stamp written at the same instant the round started belongs to
+    the round before it. Counting it would read that round's work as this one's.
+    """
+    async with session_scope() as session:
+        landed = await session.scalar(
+            select(func.count()).select_from(Ticker).where(
+                (Ticker.last_fundamentals_at > since)
+                | (Ticker.last_smart_money_at > since)
+            )
+        )
+    return int(landed or 0)
+
+
+async def _run_factor_phase() -> None:
+    """Refresh every factor row that is due, alternating the two passes in slices.
+
+    The passes still alternate, for the reason `_FACTOR_SLICE` records: run
+    either one to completion first and the other one starves.
+
+    The phase returns when:
+
+    * nothing is due for either factor - the normal exit;
+    * the phase budget is spent. Each pass also checks it per symbol, so a slice
+      full of throttle pauses cannot run on for hours;
+    * a round landed no stamps although no pass failed - stamps are not landing;
+    * it has backed off _FACTOR_PHASE_MAX_BACKOFFS times already.
+
+    A round in which a pass STOPPED - throttled out, or failing call after call -
+    or failed before anything was stamped is not the end of the day's refresh.
+    The phase waits and tries again; see _FACTOR_PHASE_BACKOFF_SECONDS. The other
+    pass is not sent into the same wall in that round.
+
+    "No progress" means NO STAMPS LANDED, not "the due count did not fall". The
+    count cannot tell the two apart: rows cross their horizon during a round at
+    the pace an earlier run stamped them, and with horizons that are multiples of
+    the 24h latch that happens routinely. Comparing counts ended healthy phases
+    with thousands of equities still due.
+    """
+    deadline = monotonic() + _FACTOR_PHASE_BUDGET_SECONDS
+    backoffs = 0
+    fundamentals_due, smart_money_due = await _factor_due_counts()
+    logger.info(
+        "factor_phase.started fundamentals_due=%d smart_money_due=%d",
+        fundamentals_due, smart_money_due,
+    )
+    while fundamentals_due or smart_money_due:
+        round_start = datetime.now(UTC)
+        stopped = False
+        raised = False
+        if fundamentals_due:
+            try:
+                stopped = await _refresh_fundamentals_cache(
+                    limit=_FACTOR_SLICE, deadline=deadline,
+                )
+            except Exception:
+                logger.exception("fundamentals.refresh_failed")
+                raised = True
+        if smart_money_due and not stopped:
+            try:
+                stopped = await _refresh_insider_cache(
+                    limit=_FACTOR_SLICE, deadline=deadline,
+                )
+            except Exception:
+                logger.exception("insider.refresh_failed")
+                raised = True
+        fundamentals_due, smart_money_due = await _factor_due_counts()
+        if not (fundamentals_due or smart_money_due):
+            break
+        if monotonic() >= deadline:
+            logger.info(
+                "factor_phase.budget_exhausted fundamentals_due=%d smart_money_due=%d",
+                fundamentals_due, smart_money_due,
+            )
+            return
+        landed = await _factor_stamps_since(round_start)
+        if stopped or (raised and not landed):
+            if backoffs >= _FACTOR_PHASE_MAX_BACKOFFS or (
+                monotonic() + _FACTOR_PHASE_BACKOFF_SECONDS >= deadline
+            ):
+                logger.warning(
+                    "factor_phase.gave_up backoffs=%d fundamentals_due=%d smart_money_due=%d",
+                    backoffs, fundamentals_due, smart_money_due,
+                )
+                return
+            backoffs += 1
+            logger.warning(
+                "factor_phase.backoff attempt=%d/%d pause=%.0fs "
+                "fundamentals_due=%d smart_money_due=%d",
+                backoffs, _FACTOR_PHASE_MAX_BACKOFFS, _FACTOR_PHASE_BACKOFF_SECONDS,
+                fundamentals_due, smart_money_due,
+            )
+            await asyncio.sleep(_FACTOR_PHASE_BACKOFF_SECONDS)
+            continue
+        if not landed:
+            logger.warning(
+                "factor_phase.no_progress fundamentals_due=%d smart_money_due=%d",
+                fundamentals_due, smart_money_due,
+            )
+            return
+    logger.info("factor_phase.nothing_due")
+
+
+async def _select_factor_symbols(
+    stamp_col: Any, cap: int, *, now: datetime | None = None,
+) -> list[str]:
     """Pick the symbols one factor pass should attempt this run.
 
-    GAPS FIRST, then oldest-attempted. Returns at most `cap` symbols.
+    GAPS FIRST, then attempted rows that are DUE (see _EQUITY_FACTOR_DUE_AFTER),
+    equities ahead of everything else. Returns at most `cap` symbols, and never
+    a row still inside its refresh horizon: that call would teach nothing.
 
     The passes this serves used to select the top `cap` rows by
     coalesce(volume * price, -1) DESC — a ranking over the WHOLE table, with no
@@ -2665,6 +2856,7 @@ async def _select_factor_symbols(stamp_col: Any, cap: int) -> list[str]:
     inverts in production.
     """
     fill_cap = cap - int(cap * _FACTOR_ROTATION_RESERVE)
+    now = now or datetime.now(UTC)
     async with session_scope() as session:
         # Ask for the full budget's worth of gaps, not just the fill share —
         # the tail is what tops the run back up when the rotation has less to
@@ -2680,13 +2872,19 @@ async def _select_factor_symbols(stamp_col: Any, cap: int) -> list[str]:
             .limit(cap)
         )).scalars().all())
 
-        # Oldest attempt first — a plain staleness rotation. No coalesce needed:
-        # every row here carries a stamp by construction.
+        # Then the rotation: attempted rows that are DUE. Equities first - they
+        # are what the scanner ranks, and what actually answers - and the
+        # oldest stamp first within each group. A plain stamp order used to
+        # serve a 30-day-old ETF stamp ahead of a 40-hour-old equity one.
         head = gaps[:fill_cap]
         refresh = list((await session.execute(
             select(Ticker.symbol)
-            .where(stamp_col.is_not(None))
-            .order_by(stamp_col.asc(), Ticker.symbol.asc())
+            .where(stamp_col.is_not(None), _factor_due_clause(stamp_col, now))
+            .order_by(
+                case((Ticker.asset_class == "equity", 0), else_=1),
+                stamp_col.asc(),
+                Ticker.symbol.asc(),
+            )
             .limit(cap - len(head))
         )).scalars().all())
 
@@ -2723,7 +2921,9 @@ async def _stamp_factor_attempts(
         logger.exception("factor_stamp.failed column=%s size=%d", column, len(symbols))
 
 
-async def _refresh_fundamentals_cache(limit: int | None = None) -> None:
+async def _refresh_fundamentals_cache(
+    limit: int | None = None, *, deadline: float | None = None,
+) -> bool:
     """
     Pre-fetch of Finnhub fundamentals. Populates
     finnhub_feed._FUND_SCORE_CACHE so polygon_feed.fetch_snapshots can read a
@@ -2746,6 +2946,8 @@ async def _refresh_fundamentals_cache(limit: int | None = None) -> None:
     FUNDAMENTALS_CAP = ACTIVE_UNIVERSE_SIZE if limit is None else limit
 
     from app.services.finnhub_feed import (
+        FinnhubThrottledError,
+        FinnhubUnavailableError,
         compute_fundamentals_score,
         fetch_basic_financials,
         fund_cache_size,
@@ -2759,22 +2961,74 @@ async def _refresh_fundamentals_cache(limit: int | None = None) -> None:
     logger.info("fundamentals.refresh_started count=%d", len(symbols))
     refreshed = 0
     attempted = 0
+    throttled_in_a_row = 0
+    recent_failures: deque[bool] = deque(maxlen=_FACTOR_FAILURE_WINDOW)
+    stopped = False
     pending: list[str] = []
-    for sym in symbols:
+    i = 0
+    while i < len(symbols):
+        if deadline is not None and monotonic() >= deadline:
+            logger.info(
+                "fundamentals.deadline attempted=%d unanswered=%d",
+                attempted, len(symbols) - i,
+            )
+            break
+        sym = symbols[i]
         try:
-            metrics = await fetch_basic_financials(sym)
+            metrics = await fetch_basic_financials(sym, raise_failures=True)
             if metrics:
                 score = compute_fundamentals_score(metrics)
                 set_cached_score(sym, score)
                 refreshed += 1
-        except Exception:
-            logger.exception("fundamentals.fetch_failed symbol=%s", sym)
-        # Stamped whether or not the vendor had anything — see
+        except FinnhubThrottledError as exc:
+            # Not an answer: nothing was learned about this symbol, so it is
+            # NOT stamped. Wait out the vendor's window and ask again.
+            throttled_in_a_row += 1
+            if throttled_in_a_row > _FACTOR_THROTTLE_MAX_PAUSES:
+                logger.warning(
+                    "fundamentals.throttled_stop status=%d attempted=%d unanswered=%d",
+                    exc.status, attempted, len(symbols) - i,
+                )
+                stopped = True
+                break
+            logger.warning(
+                "fundamentals.throttled status=%d pause=%.0fs retry=%d",
+                exc.status, _FACTOR_THROTTLE_PAUSE_SECONDS, throttled_in_a_row,
+            )
+            # Stamp what WAS answered before waiting, so a pause never holds an
+            # answered symbol's stamp back.
+            if pending:
+                await _stamp_factor_attempts(
+                    "last_fundamentals_at", pending, datetime.now(UTC),
+                )
+                pending = []
+            await asyncio.sleep(_FACTOR_THROTTLE_PAUSE_SECONDS)
+            continue
+        except Exception as exc:
+            # Stamped like an answer (see FinnhubUnavailableError), but counted.
+            if isinstance(exc, FinnhubUnavailableError):
+                logger.warning("fundamentals.fetch_unavailable symbol=%s %s", sym, exc)
+            else:
+                logger.exception("fundamentals.fetch_failed symbol=%s", sym)
+            failed = True
+        else:
+            failed = False
+        throttled_in_a_row = 0
+        recent_failures.append(failed)
+        # Stamped whether or not the vendor had anything - see
         # _stamp_factor_attempts. Flushed as we go, not at the end, so a deploy
         # mid-pass keeps the progress this run made.
         pending.append(sym)
         attempted += 1
-        # Stay well under 60/min cap — sleep ~1.1s between calls
+        i += 1
+        if sum(recent_failures) >= _FACTOR_FAILURE_STOP:
+            logger.warning(
+                "fundamentals.failing_stop failed=%d of_last=%d attempted=%d unanswered=%d",
+                sum(recent_failures), len(recent_failures), attempted, len(symbols) - i,
+            )
+            stopped = True
+            break
+        # Stay well under 60/min cap - sleep ~1.1s between calls
         await asyncio.sleep(1.1)
         if len(pending) >= _FACTOR_STAMP_BATCH:
             await _stamp_factor_attempts(
@@ -2789,6 +3043,9 @@ async def _refresh_fundamentals_cache(limit: int | None = None) -> None:
         "fundamentals.refreshed scored=%d attempted=%d cache_size=%d",
         refreshed, attempted, fund_cache_size(),
     )
+    # True only when the vendor is unavailable - throttled out, or failing call
+    # after call. The phase backs off on it rather than send the other pass in.
+    return stopped
 
 
 async def _run_aggregates_refresh() -> None:
@@ -3074,7 +3331,9 @@ async def _refresh_aggregates_cache() -> bool:
     return refreshed > 0
 
 
-async def _refresh_insider_cache(limit: int | None = None) -> None:
+async def _refresh_insider_cache(
+    limit: int | None = None, *, deadline: float | None = None,
+) -> bool:
     """
     Pre-fetch of Finnhub insider Form 4 transactions. Populates
     _SMART_MONEY_SCORE_CACHE so polygon_feed reads a real sub_smart_money per
@@ -3090,6 +3349,8 @@ async def _refresh_insider_cache(limit: int | None = None) -> None:
     INSIDER_CAP = ACTIVE_UNIVERSE_SIZE if limit is None else limit
 
     from app.services.finnhub_feed import (
+        FinnhubThrottledError,
+        FinnhubUnavailableError,
         compute_smart_money_score,
         fetch_insider_transactions,
         insider_feed_size_db,
@@ -3105,10 +3366,21 @@ async def _refresh_insider_cache(limit: int | None = None) -> None:
     logger.info("insider.refresh_started count=%d", len(symbols))
     refreshed = 0
     attempted = 0
+    throttled_in_a_row = 0
+    recent_failures: deque[bool] = deque(maxlen=_FACTOR_FAILURE_WINDOW)
+    stopped = False
     pending: list[str] = []
-    for sym in symbols:
+    i = 0
+    while i < len(symbols):
+        if deadline is not None and monotonic() >= deadline:
+            logger.info(
+                "insider.deadline attempted=%d unanswered=%d",
+                attempted, len(symbols) - i,
+            )
+            break
+        sym = symbols[i]
         try:
-            txns = await fetch_insider_transactions(sym, days_back=90)
+            txns = await fetch_insider_transactions(sym, days_back=90, raise_failures=True)
             if txns:
                 score = compute_smart_money_score(txns)
                 set_cached_smart_money_score(sym, score)
@@ -3116,12 +3388,52 @@ async def _refresh_insider_cache(limit: int | None = None) -> None:
                 # the api machine can read what the worker writes).
                 await set_recent_insider_transactions_db(sym, txns)
                 refreshed += 1
-        except Exception:
-            logger.exception("insider.fetch_failed symbol=%s", sym)
-        # Stamped on ATTEMPT — a company with no Form 4 filings in the last 90
+        except FinnhubThrottledError as exc:
+            # Same rule as the fundamentals pass: a throttle is not an answer.
+            throttled_in_a_row += 1
+            if throttled_in_a_row > _FACTOR_THROTTLE_MAX_PAUSES:
+                logger.warning(
+                    "insider.throttled_stop status=%d attempted=%d unanswered=%d",
+                    exc.status, attempted, len(symbols) - i,
+                )
+                stopped = True
+                break
+            logger.warning(
+                "insider.throttled status=%d pause=%.0fs retry=%d",
+                exc.status, _FACTOR_THROTTLE_PAUSE_SECONDS, throttled_in_a_row,
+            )
+            # Here it matters twice over: the boot rebuild only trusts stored
+            # Form 4 rows written within INSIDER_STAMP_LAG of their stamp, and
+            # a stamp held back through repeated pauses could fall outside it.
+            if pending:
+                await _stamp_factor_attempts(
+                    "last_smart_money_at", pending, datetime.now(UTC),
+                )
+                pending = []
+            await asyncio.sleep(_FACTOR_THROTTLE_PAUSE_SECONDS)
+            continue
+        except Exception as exc:
+            if isinstance(exc, FinnhubUnavailableError):
+                logger.warning("insider.fetch_unavailable symbol=%s %s", sym, exc)
+            else:
+                logger.exception("insider.fetch_failed symbol=%s", sym)
+            failed = True
+        else:
+            failed = False
+        throttled_in_a_row = 0
+        recent_failures.append(failed)
+        # Stamped on ATTEMPT - a company with no Form 4 filings in the last 90
         # days is a real answer, not an outstanding request.
         pending.append(sym)
         attempted += 1
+        i += 1
+        if sum(recent_failures) >= _FACTOR_FAILURE_STOP:
+            logger.warning(
+                "insider.failing_stop failed=%d of_last=%d attempted=%d unanswered=%d",
+                sum(recent_failures), len(recent_failures), attempted, len(symbols) - i,
+            )
+            stopped = True
+            break
         await asyncio.sleep(1.1)  # stay well under 60/min
         if len(pending) >= _FACTOR_STAMP_BATCH:
             await _stamp_factor_attempts(
@@ -3132,11 +3444,16 @@ async def _refresh_insider_cache(limit: int | None = None) -> None:
         "last_smart_money_at", pending, datetime.now(UTC),
     )
 
+    # A failing count must not swallow the return value below.
+    try:
+        feed_size = await insider_feed_size_db()
+    except Exception:
+        feed_size = -1
     logger.info(
         "insider.refreshed scored=%d attempted=%d score_cache=%d feed_size=%d",
-        refreshed, attempted, smart_money_cache_size(),
-        await insider_feed_size_db(),
+        refreshed, attempted, smart_money_cache_size(), feed_size,
     )
+    return stopped
 
 
 _SECTOR_BACKFILL_BATCH = 20
