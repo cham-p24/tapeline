@@ -80,8 +80,8 @@ export default function HoldingsPage() {
         <h1 className="text-2xl font-bold tracking-tight">Recent insider buys</h1>
         <p className="text-sm text-muted">
           SEC Form 4 filings across the active universe — officers, directors and 10%+ owners
-          trading their own company&apos;s stock. Refreshed every 24 hours. This is the live data
-          behind the Smart Money pillar of every Tapeline Score.
+          trading their own company&apos;s stock. Each stock is re-checked about every two days.
+          This is the data behind the Smart Money pillar of every Tapeline Score.
         </p>
       </div>
 
@@ -122,7 +122,7 @@ export default function HoldingsPage() {
           </label>
           <span className="ml-auto self-center text-xs text-muted">
             Showing <strong className="text-fg">{rows.length}</strong> of{" "}
-            <strong className="text-fg">{feedSize}</strong> tracked · refresh daily
+            <strong className="text-fg">{feedSize}</strong> tracked · each stock re-checked about every two days
           </span>
         </div>
       )}
@@ -171,17 +171,18 @@ export default function HoldingsPage() {
                 </button>
               </td></tr>
             ) : rows.length === 0 && feedSize === 0 ? (
-              /* Cold feed — worker hasn't populated the cache yet. This happens
-                 right after a deploy because the cache is in-process; the daily
-                 Finnhub backfill takes ~20 minutes at 1.1 req/s × 2,500 tickers.
-                 Be explicit so the user knows it's not broken. */
+              /* Cold feed — no Form 4 rows stored at all. feed_size counts
+                 insider_transactions rows in the database, so a deploy does not
+                 empty it; this is a fresh database. The worker fills it in
+                 400-symbol slices at 1.1s/request, i.e. over hours, not the
+                 "about 20 minutes" this used to promise. Be explicit so the user
+                 knows it's not broken, without naming a time we can't keep. */
               <tr><td colSpan={7} className="px-4 py-10 text-center text-muted">
                 <p className="text-sm font-medium text-fg">Backfilling insider feed…</p>
                 <p className="mt-2 text-xs max-w-md mx-auto">
-                  The worker fetches SEC Form 4 filings across the top ~6,900 most-liquid
-                  US tickers — first run after a deploy takes about 20 minutes. Refresh in
-                  a few minutes and rows will start appearing. The same data feeds the Smart
-                  Money pillar of every Tapeline Score.
+                  No SEC Form 4 filings are stored yet. The worker fills this feed stock by
+                  stock, in batches, so rows appear gradually as it works through the
+                  universe. The same data feeds the Smart Money pillar of every Tapeline Score.
                 </p>
               </td></tr>
             ) : rows.length === 0 ? (
@@ -254,8 +255,14 @@ export default function HoldingsPage() {
       )}
 
       <p className="mt-4 text-xs text-subtle">
-        Source: SEC Form 4 filings. Updated daily for the top ~6,900 most-liquid US
-        tickers. Codes: P = open-market buy, S = open-market sale, A = grant/award,
+        {/* Cadence: backend/app/workers/signal_publisher.py
+            _EQUITY_FACTOR_DUE_AFTER (36h) on the 24h factor chain, so each
+            stock is re-read about every 48h; non-equities every 30 days.
+            Pinned by __tests__/insiderRefreshCadenceCopy.test.tsx. */}
+        Source: SEC Form 4 filings, through a data vendor that can run behind SEC
+        EDGAR. Each stock&rsquo;s filings are re-checked about every two days
+        (ETFs and other non-stocks about monthly) across the top ~6,900
+        most-liquid US tickers. Codes: P = open-market buy, S = open-market sale, A = grant/award,
         M = option exercise, G = gift, F = payment of tax via shares.
       </p>
     </div>

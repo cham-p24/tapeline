@@ -602,7 +602,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `How often does the ${sym} score update?`,
-      a: `${sym}'s score re-ticks every minute during US market hours and persists between sessions. Price and momentum data refresh sub-60s; fundamentals refresh on company filing cadence; insider Form 4 within hours of SEC filing.`,
+      a: `${sym}'s score re-ticks every minute during US market hours and persists between sessions. Price and momentum data refresh sub-60s; fundamentals refresh on company filing cadence; insider Form 4 filings are re-checked about every two days for stocks (about monthly for ETFs), through a data vendor that can run behind SEC EDGAR.`,
     },
     {
       q: `Where can I see the historical track record for Tapeline scores?`,
