@@ -1248,7 +1248,13 @@ def test_the_update_makes_no_claim_about_the_record_that_is_false() -> None:
             "Sam", scorecard_url=SCORECARD, audience=audience,
             unsubscribe_url="https://tapeline.io/api/unsubscribe?token=t",
         )
-        html = render_product_update_email("Sam", scorecard_url=SCORECARD, audience=audience)
+        html = render_product_update_email(
+            "Sam", scorecard_url=SCORECARD, audience=audience,
+            newsletter_unsubscribe_url=(
+                "https://tapeline.io/api/newsletter/unsubscribe?token=t"
+                if audience == "newsletter" else None
+            ),
+        )
         for part, body in (("text", text), ("html", html)):
             low = body.lower()
             for claim in ("never edit", "one day is missing", "filled in later",
