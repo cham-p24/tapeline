@@ -28,7 +28,7 @@ import { PRICING, usd, usdCompact } from "@/lib/pricing";
 // the OLD promise after the real one moves: this file said 14 while the page
 // it tests said 30, and the date assertion below passed against a first-charge
 // date no customer would ever be shown.
-import { TRIAL_DAYS } from "@/lib/trial";
+import { PRECHARGE_NOTICE_PHRASE, TRIAL_DAYS } from "@/lib/trial";
 
 const trackEventMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/gtag", async (importOriginal) => {
@@ -320,7 +320,12 @@ describe("card gate — the terms, as real text, before the card", () => {
     expect(text).toMatch(/every month until you cancel/i);
     expect(text).toMatch(/cancel in one click/i);
     expect(text).toMatch(/never charged/i);
-    expect(text).toMatch(/three days before/i);
+    // T-09 (2026-09-14): the notice goes about 7 days out (the daily drip),
+    // not 3. The timing is read from lib/trial.ts, never typed.
+    expect(text).toContain(`We email you ${PRECHARGE_NOTICE_PHRASE}`);
+    expect(text).not.toMatch(/three days before/i);
+    // No congress or squeeze benefit is sold on this screen (T-02).
+    expect(text).not.toMatch(/congress|squeeze/i);
   });
 
   it("carries the terms as readable content — not an image, tooltip or disclosure widget", async () => {

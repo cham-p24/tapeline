@@ -6,7 +6,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { trackEvent } from "@/lib/gtag";
 import { api, errorMessage } from "@/lib/api";
 import { authApi } from "@/lib/auth";
-import { TRIAL_DAYS, TRIAL_LENGTH_LABEL } from "@/lib/trial";
+import { PRECHARGE_NOTICE_DAYS, PRECHARGE_NOTICE_PHRASE, TRIAL_DAYS, TRIAL_LENGTH_LABEL } from "@/lib/trial";
 import { userLocale } from "@/lib/datetime";
 import { trackMetaCompleteRegistration } from "@/lib/metaConversions";
 import { PRICING, REFUND, usd, usdCompact } from "@/lib/pricing";
@@ -153,7 +153,7 @@ const FROM_COPY: Record<string, { h1: string; sub: string }> = {
   // the CARD HONESTY block above.
   trial: {
     h1: "$0 today. The charge date is on the page.",
-    sub: `The ${TRIAL_LENGTH_LABEL} Premium trial takes a card and charges $0 today — the exact date of the first charge is shown before you confirm, we email you three days ahead of it, and one click ends the trial before then. Reading the public record needs no account either way.`,
+    sub: `The ${TRIAL_LENGTH_LABEL} Premium trial takes a card and charges $0 today — the exact date of the first charge is shown before you confirm, we email you about ${PRECHARGE_NOTICE_DAYS} days ahead of it, and one click ends the trial before then. Reading the public record needs no account either way.`,
   },
 };
 
@@ -660,7 +660,7 @@ function SignUpForm() {
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-              <span><span className="text-fg">Smart-money signals</span> — Congressional trades + recent insider buys (SEC Form 4)</span>
+              <span><span className="text-fg">Insider filings</span> — recent insider buys (SEC Form 4)</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
@@ -871,7 +871,7 @@ function SignUpForm() {
                   {longDate(firstCharge)}
                 </strong>{" "}
                 &mdash; {TRIAL_DAYS} days from the day the card goes on, not from
-                today's signup. We email you three days before it.
+                today's signup. We email you {PRECHARGE_NOTICE_PHRASE} it.
               </li>
               <li>
                 <strong className="font-semibold">Cancel in one click</strong> from
@@ -893,7 +893,7 @@ function SignUpForm() {
               <span className="text-fg">$0 on the day the card goes on</span>, with the first
               charge {TRIAL_DAYS} days later at the plan you pick &mdash;{" "}
               <span className="text-fg">{longDate(firstCharge)}</span> if that were today. We
-              email you three days before, and one click ends it before then with nothing taken.
+              email you {PRECHARGE_NOTICE_PHRASE} that charge, and one click ends it before then with nothing taken.
               Your bank may briefly show a $0 or $1 authorisation while it checks the card &mdash;
               a hold, not a charge, and it clears on its own.
               Cheaper plans exist if Premium is more than you need &mdash;{" "}

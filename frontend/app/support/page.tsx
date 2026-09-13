@@ -90,12 +90,13 @@ export default function SupportPage() {
             }
           />
           <Faq
-            q="Why is the Congress feed showing trades from weeks ago?"
+            q="Is there congressional trade data?"
             a={
               <>
-                The STOCK Act gives politicians up to 45 days to disclose a trade. The data IS up to
-                date — we sync multiple times per day. The "trade date" can be weeks before
-                the "disclosed date" because of the legal disclosure delay, not a sync lag.
+                No. We don&rsquo;t currently have a real source of congressional trade
+                disclosures, so we don&rsquo;t show any. Public SEC Form 4 insider filings are on
+                the{" "}
+                <Link href="/insider-buying" className="text-accent hover:underline">insider buying page</Link>.
               </>
             }
           />

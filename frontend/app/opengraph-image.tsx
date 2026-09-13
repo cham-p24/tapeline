@@ -84,7 +84,7 @@ export default async function OG() {
               display: "flex",
             }}
           >
-            Live quantitative scanner with squeeze detection, market regime, congressional trades, and a public scorecard.
+            Live quantitative scanner with market regime, SEC Form 4 insider filings, and a public scorecard.
           </div>
         </div>
 

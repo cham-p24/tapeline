@@ -37,10 +37,10 @@ describe("ComparisonTable", () => {
         screen.queryByText(`${FREE_LIMITS.watchlistTickers} tickers`),
       ).not.toBeInTheDocument();
     }
-    // Squeeze Watch: free top-3 preview, not "—".
-    expect(
-      screen.getByText(`Top-${FREE_LIMITS.squeezePreviewRows} preview`),
-    ).toBeInTheDocument();
+    // Squeeze Watch is no longer a row at all (integrity fix, 2026-09-14):
+    // the squeeze rows were mock output, so it is not a benefit on any tier.
+    expect(screen.queryByText(/squeeze/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/congress/i)).not.toBeInTheDocument();
     // Browser push: INVERTED for #683 (2026-08-30). This used to assert the
     // Free column showed a real alert-rule count rather than "—". Free is now
     // zero on every channel, so the dash is the correct cell and a count

@@ -81,7 +81,10 @@ def test_invite_states_the_trial_terms_including_the_card():
     assert "takes a card" in html
     assert "$0 is charged today" in html
     assert "one click" in html
-    assert "three days before" in html   # the pre-charge reminder we do send
+    # The pre-charge reminder we do send: about PRECHARGE_NOTICE_DAYS (7) days
+    # out via run_trial_precharge_drip. Said "three days" until 2026-09-14 (T-09).
+    assert "about 7 days before" in html
+    assert "three days before" not in html
 
 
 def test_neither_email_uses_pressure_or_performance_language():

@@ -113,12 +113,14 @@ def test_new_trials_are_clamped_to_the_floor():
     )
 
 
-def test_refund_policy_still_promises_the_three_day_notice():
-    """The floor exists to keep this sentence true — pin them together.
+def test_refund_policy_supersedes_the_three_day_sentence_with_a_dated_note():
+    """/legal/refund is dated legal text: the old sentence stays, a note supersedes it.
 
-    If the copy is ever reworded away from a three-day promise, this test
-    should be updated in the SAME change that reconsiders MIN_TRIAL_DAYS,
-    rather than the two drifting apart silently.
+    Until 2026-09-14 this test pinned "we email you three days before" as a
+    promise to keep true. The notice moved to about 7 days (Visa + Mastercard)
+    and the sentence became false. The founder-approved fix (T-09) keeps the
+    published sentence and adds a dated revision note that reads the shared
+    PRECHARGE_NOTICE_PHRASE, so this now pins both halves.
     """
     import pathlib
 
@@ -127,6 +129,8 @@ def test_refund_policy_still_promises_the_three_day_notice():
         return
     text = " ".join(page.read_text(encoding="utf-8").split())
     assert "we email you three days before" in text, (
-        "/legal/refund no longer promises the three-day pre-charge notice. If "
-        "that was deliberate, revisit MIN_TRIAL_DAYS in routers/billing.py too."
+        "the originally published sentence was rewritten; dated legal text is "
+        "superseded with a revision note, not silently edited"
     )
+    assert "Updated 14 September 2026:" in text
+    assert "{PRECHARGE_NOTICE_PHRASE} that charge, not three days before" in text

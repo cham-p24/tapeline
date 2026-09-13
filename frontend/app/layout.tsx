@@ -109,8 +109,6 @@ export const metadata: Metadata = {
     "stock scanner",
     "quantitative scoring",
     "live market scanner",
-    "squeeze detection",
-    "congressional trades",
     "insider Form 4",
     "market regime",
     "retail trading",

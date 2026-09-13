@@ -58,7 +58,9 @@ _CANCEL_REASONS = frozenset(
 # STARTING the trial is a separate, deliberate act, and the card is what it
 # costs. It is also what the card buys: every matching row instead of the
 # first ten, a second saved screen, alerts on every channel, CSV export, the
-# 200-symbol watchlist, congressional and insider filings. We open the same
+# 200-symbol watchlist, SEC Form 4 insider filings. (Until 2026-09-14 this list
+# also said "congressional filings"; no real congressional data has ever been
+# ingested, so the claim was removed everywhere it was made.) We open the same
 # Stripe Checkout the paid flow uses, in mode=subscription with
 # subscription_data.trial_end TRIAL_DAYS out. Stripe charges $0 today, bills the first real amount at
 # trial_end, and the subscription is cancellable in one click from the
@@ -76,25 +78,25 @@ TRIAL_DAYS = 30
 #
 # We collect a card up front, so the trial ends in a real charge. The only
 # thing standing between that charge and a surprised customer is the pre-charge
-# warning email (services/email.render_trial_precharge_reminder_email), and that
-# email does not run on a timer of ours — it rides on Stripe's
-# `customer.subscription.trial_will_end`, which fires about THREE DAYS before
-# the trial ends. Its own subject line says "Your trial ends in 3 days."
+# warning email (services/email.render_trial_precharge_reminder_email). The
+# primary send is our own daily drip, `run_trial_precharge_drip`, about
+# PRECHARGE_NOTICE_DAYS (7) days before the charge (services/precharge_notice).
+# Stripe's `customer.subscription.trial_will_end`, about three days out, is the
+# backstop if the drip has not sent.
 #
-# Two places promise that warning to the customer IN WRITING:
-#   * /legal/refund §4 — "we email you three days before that happens"
-#   * the trial disclosure on the trial-start screen (/app/start)
+# Several places promise that warning to the customer IN WRITING, all reading
+# the same constant: /legal/refund, /app/start, /signup and the trial emails.
 #
 # So a new trial shorter than the warning window would charge someone without
 # the notice we told them they would get. That is the chargeback-and-complaint
 # pattern the reminder exists to prevent, and on a financial product it is a
 # consumer-law problem rather than a UX one.
 #
-# Hence: this is an invariant, not a tunable. Shortening the trial below
-# MIN_TRIAL_DAYS is only safe if the pre-charge notice is first moved onto a
-# mechanism we control (a scheduled send keyed on trial_ends_at) instead of
-# Stripe's fixed T-3 event. Raise this floor freely; lower it only with that
-# work done, and update the two copy surfaces above in the same change.
+# Hence: this is an invariant, not a tunable. It is the floor under which not
+# even Stripe's T-3 backstop could fire; a trial shorter than
+# PRECHARGE_NOTICE_DAYS would already miss the 7-day notice the copy promises.
+# Raise this floor freely; lower it only with the notice timing and its copy
+# changed in the same change.
 MIN_TRIAL_DAYS = 3
 
 if TRIAL_DAYS < MIN_TRIAL_DAYS:  # pragma: no cover - import-time invariant
@@ -621,7 +623,7 @@ def _pause_blocked_until(user: User) -> datetime | None:
     time. Re-calling on day 89 simply pushed `resumes_at` 90 days further out.
 
     Repeat every ~89 days and you have unlimited Premium — full universe,
-    congress + insider feeds, unlimited alerts, the 1,000/day API quota — with
+    insider feed, unlimited alerts, the 1,000/day API quota — with
     zero further charges. `limit_strict` is irrelevant at a 3-month cadence, and
     the account still counts as an active subscription in the admin dashboard,
     so the missing revenue never shows up anywhere.

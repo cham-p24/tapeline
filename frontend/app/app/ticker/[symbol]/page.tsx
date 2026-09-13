@@ -24,7 +24,6 @@ import { SECTORS } from "@/app/sector/sectors";
 import { relatedMatchups, canonicalMatchup } from "@/lib/comparePairs";
 import { useTheme } from "@/components/ThemeProvider";
 import { useUser } from "@/components/UserContext";
-import { ANON_LIMITS } from "@/lib/pricing";
 
 /**
  * In-app scanner, pre-filtered to this sector, if it maps to a known GICS
@@ -109,8 +108,7 @@ export function LookupMeterPill({
       <span aria-hidden="true">·</span>
       <span>
         The free plan includes {limit} detailed look-ups a day, and the count
-        resets tomorrow. Without an account it is {ANON_LIMITS.dailyLookups} a
-        day. Paid plans are not metered.
+        resets tomorrow. Paid plans are not metered.
       </span>
       <Link href="/pricing" className="text-accent hover:underline">
         Compare plans
@@ -537,30 +535,11 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         </div>
       </div>
 
-      {/* Squeeze panel, only if detected */}
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        {data.squeeze ? (
-          <div className="card">
-            <div className="border-b border-border p-4">
-              <h2 className="font-semibold">🔥 Squeeze detected</h2>
-            </div>
-            <dl className="space-y-2 p-4 text-sm">
-              <Kv k="Spike score" v={data.squeeze.spike_score != null ? data.squeeze.spike_score.toFixed(1) : "—"} />
-              <Kv k="Squeeze days" v={`${data.squeeze.squeeze_days}d`} />
-              <Kv k="Volume x avg" v={data.squeeze.volume_multiple != null ? `${data.squeeze.volume_multiple.toFixed(2)}x` : "—"} />
-              <Kv k="OBV" v={data.squeeze.obv_trend} />
-              <Kv k="Pattern" v={data.squeeze.breakout_type} />
-              <Kv k="Window" v={data.squeeze.suggested_window} />
-            </dl>
-            <p className="p-4 text-xs text-muted italic">{data.squeeze.reason}</p>
-          </div>
-        ) : (
-          <div className="card p-5">
-            <h2 className="font-semibold text-muted">No squeeze setup</h2>
-            <p className="mt-2 text-sm text-muted">Volatility is within normal range for this ticker right now.</p>
-          </div>
-        )}
-      </div>
+      {/* The squeeze panel ("Squeeze detected" / "No squeeze setup") was
+          removed on 2026-09-14 (integrity fix, founder-approved). The rows it
+          read were mock output frozen on 2026-07-18, and "No squeeze setup —
+          volatility is within normal range" claimed a check that never ran.
+          /api/ticker now always returns squeeze: null. */}
 
       {/* Score history sparkline — trace from the daily scorecard, sparse
           by design (only top-10 days populate). Empty-state-friendly. */}
@@ -572,7 +551,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
           (US + UK / international ADRs). Trial users
           see this for free since trial = Premium for 30 days; post-trial
           Free + Pro users see the Paywall instead. Mirrors how other
-          Premium intelligence (Congress, insider Form 4) is gated. */}
+          Premium intelligence (insider Form 4) is gated. */}
       <div className="mt-6">
         <Paywall feature="ratings.analyst" title="Analyst consensus is Premium">
           <AnalystRatings symbol={data.symbol} currentPrice={data.price} />
@@ -698,14 +677,6 @@ function Row({ label, value }: { label: string; value: number | null | undefined
       <span className={`nums ${value > 0 ? "text-up" : value < 0 ? "text-down" : ""}`}>
         {(value >= 0 ? "+" : "") + value.toFixed(2)}%
       </span>
-    </div>
-  );
-}
-function Kv({ k, v }: { k: string; v: string | number }) {
-  return (
-    <div className="flex justify-between text-sm">
-      <dt className="text-muted">{k}</dt>
-      <dd className="nums font-medium">{v}</dd>
     </div>
   );
 }

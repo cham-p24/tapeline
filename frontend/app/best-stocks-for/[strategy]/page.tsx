@@ -403,7 +403,8 @@ export default async function BestStocksForStrategyPage({
         </nav>
 
         {/* Related Tapeline tools — cross-link into the feature landing pages
-            (squeeze, congress, insider, heatmap, regime). Tightens the
+            (insider, heatmap, regime). Squeeze and congress are not linked:
+            neither has real data behind it (integrity fix, 2026-09-14). Tightens the
             internal link graph between the strategy cluster and the feature
             cluster, both of which the GSC audit flagged as under-indexed
             because they sat as siloed templated content. */}
@@ -415,12 +416,6 @@ export default async function BestStocksForStrategyPage({
             Related Tapeline tools
           </h2>
           <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-            <Link href="/short-squeeze-scanner" className="text-muted hover:text-accent underline-offset-4 hover:underline">
-              Short squeeze scanner
-            </Link>
-            <Link href="/congressional-trades" className="text-muted hover:text-accent underline-offset-4 hover:underline">
-              Congressional trades
-            </Link>
             <Link href="/insider-buying" className="text-muted hover:text-accent underline-offset-4 hover:underline">
               Insider buying (Form 4)
             </Link>

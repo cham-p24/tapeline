@@ -622,6 +622,75 @@ const HEADLINE_RULE = {
 };
 
 /* ------------------------------------------------------------------ *
+ * UNBACKED FEATURE CLAIM — congress / squeeze on a SELL surface.
+ *
+ * WHY THIS EXISTS (integrity fix, founder-approved 2026-09-14)
+ * ------------------------------------------------------------
+ * No real congressional disclosure has ever been ingested: every
+ * `congress_trades` row in production is mock output, filtered out by
+ * backend/app/services/congress_integrity.py. Every `squeeze_setups` row is
+ * mock output last written 2026-07-18. Both were nonetheless SOLD — on
+ * /pricing and its OG card, /signup, /app/start, the billing plan cards, the
+ * pricing and comparison tables, the trial panels, the trial and invite
+ * emails and llms.txt. The data guard existed; nothing guarded the copy.
+ *
+ * WHY IT IS PATH-SCOPED
+ * ---------------------
+ * "squeeze" and "congressional" are legitimate words elsewhere: the glossary
+ * defines a short squeeze, a blog post explains the Bollinger Band squeeze,
+ * and the honest /congressional-trades and squeeze pages have to be able to
+ * say the data is not available. The failure this rule exists for is a
+ * BENEFIT claim, and benefit claims live on the surfaces listed below — the
+ * places a plan, a trial or what a card buys is described. Adding a surface
+ * here is the right response to a new place that sells.
+ *
+ * The honest not-available page (frontend/app/congressional-trades/**) and
+ * the squeeze pages (frontend/app/short-squeeze-scanner/**,
+ * frontend/app/app/squeeze/**) are deliberately NOT listed, so their
+ * empty-state wording can name what is missing. A denial on a listed surface
+ * ("no congressional data") is already let through by the negation guard.
+ *
+ * Lift the rule for a surface only when a real source is writing rows, and
+ * say so in the same change.
+ * ------------------------------------------------------------------ */
+export const SELL_SURFACE_GLOBS = [
+  "frontend/app/pricing/**",
+  "frontend/app/signup/**",
+  "frontend/app/app/start/**",
+  "frontend/app/app/billing/**",
+  "frontend/components/PricingTable.tsx",
+  "frontend/components/ComparisonTable.tsx",
+  "frontend/components/TrialEndedModal.tsx",
+  "frontend/components/TrialOfferPanel.tsx",
+  "frontend/components/UpgradeNudge.tsx",
+  "frontend/components/SeoFeaturePage.tsx",
+  "frontend/lib/pricing.ts",
+  "frontend/lib/seo.ts",
+  "frontend/lib/appNav.ts",
+  "frontend/public/llms.txt",
+  "backend/app/services/email.py",
+  "backend/app/services/inbox_templates.py",
+];
+
+const UNBACKED_FEATURE_RULE = {
+  id: "unbacked-feature-claim",
+  brief: "Never sell a feature with no real data behind it (congress, squeeze)",
+  message:
+    "Congressional trades or squeeze detection named on a surface that sells " +
+    "a plan, a trial or what a card buys. Neither has real data behind it: no " +
+    "congressional disclosure has ever been ingested, and the squeeze rows were " +
+    "mock output frozen on 2026-07-18 (founder-approved removal, 2026-09-14). " +
+    "Remove the claim. If a real source now writes rows, lift this rule for the " +
+    "surface in the same change and say so.",
+  patterns: [/\bcongress(?:ional)?\b/gi, /\bsqueezes?\b/gi],
+};
+
+function isSellSurface(filePath) {
+  const p = String(filePath).replace(/\\/g, "/");
+  return SELL_SURFACE_GLOBS.some((g) => globMatch(g, p));
+}
+
+/* ------------------------------------------------------------------ *
  * Rule 10 — trading vocabulary that is banned in AD CREATIVE ONLY.
  *
  * WHY THIS IS PATH-SCOPED AND NOT A GLOBAL RULE
@@ -1253,6 +1322,19 @@ export function scanSource(text, filePath = "<input>", options = {}) {
       let m;
       while ((m = re.exec(code)) !== null) {
         push(rule, m.index, m[0]);
+        if (m[0].length === 0) re.lastIndex += 1;
+      }
+    }
+  }
+
+  // Congress / squeeze on a sell surface. Path-scoped: see the
+  // UNBACKED FEATURE CLAIM block for why.
+  if (isSellSurface(filePath)) {
+    for (const pattern of UNBACKED_FEATURE_RULE.patterns) {
+      const re = new RegExp(pattern.source, pattern.flags);
+      let m;
+      while ((m = re.exec(code)) !== null) {
+        push(UNBACKED_FEATURE_RULE, m.index, m[0]);
         if (m[0].length === 0) re.lastIndex += 1;
       }
     }

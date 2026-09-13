@@ -99,9 +99,10 @@ export class TierGateError extends Error {
  *
  * - "free_lookup_limit" → logged-in free user over their 12/day cap
  *   (tier.FREE_DAILY_LOOKUPS); the ticker page renders an UPGRADE wall.
- * - "signup_required"   → anonymous visitor over their 2/day cap
- *   (tier.ANON_DAILY_LOOKUPS); the ticker page renders a CREATE-AN-ACCOUNT
- *   wall.
+ * - "signup_required"   → reserved for an anonymous per-IP cap. NOT sent
+ *   today: /api/ticker/{symbol} does not meter anonymous callers (see
+ *   routers/ticker.py). If it ever is, the ticker page renders a
+ *   CREATE-AN-ACCOUNT wall.
  *
  * Pro / Premium / active-trial users are unlimited and never see a 402,
  * so this never fires for them.

@@ -100,8 +100,11 @@ def test_trial_started_email_states_the_terms_not_a_purchase():
     for claim in ("you're in", "thanks for your payment", "payment received",
                   "receipt", "you have been charged"):
         assert claim not in low, f"trial-start email reads as a purchase: {claim!r}"
-    # And it must promise the reminder we actually send (trial_will_end, T-3).
-    assert "three days before" in low
+    # And it must promise the reminder we actually send: the daily pre-charge
+    # drip, about PRECHARGE_NOTICE_DAYS (7) days out. It said "three days"
+    # until 2026-09-14, which stopped being true when the notice moved (T-09).
+    assert "about 7 days before" in low
+    assert "three days before" not in low
 
 
 def test_cancel_email_leads_with_no_money_taken_and_does_not_argue():

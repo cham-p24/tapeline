@@ -7,18 +7,25 @@ Two modes:
    - "Your watchlist" section: current score per ticker + delta since added
      (baseline_score captured on add via /api/watchlist), sorted by current
      score descending. Highlights meaningful drift (|delta| >= alert threshold).
-   - Squeeze setups intersected with the watchlist when any qualify; otherwise
-     site-wide top 3 (squeezes are sparse — better to show context than nothing).
    - CTA: open the user's watchlist directly.
 
 2. **Site-wide** (no user / empty watchlist):
-   - Original layout: regime + site-wide top 3 by score + top 3 squeezes
+   - Original layout: regime + site-wide top 3 by score
    - CTA changes to "Add tickers to your watchlist" so the next briefing is
      personalised instead of generic.
 
 The function used to take only `user_name: str`. The new signature is
 backwards-compatible — pass a User and you get personalisation; pass anything
 truthy in the string slot (or None) and you get the site-wide layout.
+
+SQUEEZE SECTION REMOVED 2026-09-14 (integrity fix, founder-approved). Both
+modes used to add "Squeeze setups" rows read straight from `squeeze_setups`.
+Every one of those rows was mock-generator output last written 2026-07-18: the
+production writer (the SPIKE sheet tab) has never been configured. The
+briefing was emailing invented setups to paying users as a morning read. It
+now queries nothing from that table and renders no squeeze block. Do not
+restore it without a publishability filter on real, fresh rows
+(services/squeeze_integrity.py, owned by the squeeze integrity change).
 """
 from __future__ import annotations
 
@@ -117,35 +124,14 @@ async def _generate_personalised(session: AsyncSession, user: User) -> str:
         await session.execute(select(RegimeState).where(RegimeState.id == 1))
     ).scalar_one_or_none()
 
-    # Squeeze setups intersected with the watchlist
-    sq_in_watchlist = (
-        await session.execute(
-            select(SqueezeSetup)
-            .where(SqueezeSetup.symbol.in_(symbols))
-            .order_by(desc(SqueezeSetup.spike_score))
-            .limit(3)
-        )
-    ).scalars().all()
-    if sq_in_watchlist:
-        squeeze_label = "Squeeze setups in your watchlist"
-        squeeze_rows = sq_in_watchlist
-    else:
-        # Fall back to site-wide top 3 squeezes — better than an empty section
-        squeeze_rows = (
-            await session.execute(
-                select(SqueezeSetup).order_by(desc(SqueezeSetup.spike_score)).limit(3)
-            )
-        ).scalars().all()
-        squeeze_label = "Squeeze setups (market-wide)"
-
     return _render_html(
         user_name=user.name or "trader",
         regime=regime,
         watchlist_rows=top_rows,
         baselines=baseline_by_symbol,
         thresholds=threshold_by_symbol,
-        squeezes=squeeze_rows,
-        squeeze_label=squeeze_label,
+        squeezes=(),  # no squeeze rows: see the module docstring
+        squeeze_label="",
         cta_href="https://tapeline.io/app/watchlist",
         cta_label="Open your watchlist →",
         watchlist_total=len(items),
@@ -160,7 +146,7 @@ async def _generate_sitewide(
     user_name: str,
     personalise_cta: bool = False,
 ) -> str:
-    """Original briefing layout — site-wide top scores + squeezes."""
+    """Original briefing layout — site-wide top scores."""
     from app.services.ticker_freshness import live_clauses
 
     # Freshness + data-quality floor — keep stale ghost rows AND corrupt
@@ -172,12 +158,6 @@ async def _generate_sitewide(
     top = (
         await session.execute(
             _top_stmt.order_by(desc(Ticker.score)).limit(3)
-        )
-    ).scalars().all()
-
-    sq = (
-        await session.execute(
-            select(SqueezeSetup).order_by(desc(SqueezeSetup.spike_score)).limit(3)
         )
     ).scalars().all()
 
@@ -198,8 +178,8 @@ async def _generate_sitewide(
         watchlist_rows=top,
         baselines={},          # no baselines in site-wide mode
         thresholds={},
-        squeezes=sq,
-        squeeze_label="Squeeze setups",
+        squeezes=(),  # no squeeze rows: see the module docstring
+        squeeze_label="",
         cta_href=cta_href,
         cta_label=cta_label,
         watchlist_total=None,  # signals "site-wide mode" to the template

@@ -73,6 +73,11 @@ from app.services.email_design import (
 # imports nothing from here (its only app import is a TYPE_CHECKING-guarded
 # models reference), so there's no cycle.
 from app.services.lifecycle import RE_SUNSET_TOKEN, FrequencyGovernor, SendClass
+from app.services.precharge_notice import (
+    PRECHARGE_WINDOW_LOWER_DAYS,
+    PRECHARGE_WINDOW_UPPER_DAYS,
+    precharge_notice_phrase,
+)
 from app.services.tier import (
     FREE_DAILY_LOOKUPS,
     FREE_SCANNER_ROWS,
@@ -279,14 +284,14 @@ async def send_email(
 def render_alert_email(
     user_name: str, rule_name: str, symbol: str, score: float | None, message: str,
 ) -> str:
-    """User-rule alert (score / squeeze / regime / congress / news).
+    """User-rule alert, one per rule type (the types are in routers/alerts.py).
 
     Single CTA → /app/scanner since these are usually market-wide signals;
     if the alert is symbol-specific the receiver can click into the ticker
     from the scanner.
 
-    `score` is None for rule types that never read a composite (news, congress,
-    regime) and for a symbol with no scored row. Those paths used to pass a
+    `score` is None for rule types that never read a composite (news, the
+    retired disclosure type, regime) and for a symbol with no scored row. Those paths used to pass a
     hardcoded 0, which printed "Score · 0.0" — a bottom-of-the-range reading the
     scanner never produced. When it is None the score line and the preheader's
     score clause are omitted entirely rather than rendered as a zero.
@@ -590,20 +595,16 @@ def render_trial_day3_email(user_name: str, _summary: dict | None = None) -> str
         + lead(
             "If you've only been on the scanner, here's what else is in your trial."
         )
-        + card(
-            f'<div style="font-weight:600;color:{ACCENT};font-size:14px;font-family:{FONT_SANS};">Squeeze Watch</div>'
-            f'<div class="tl-muted" style="margin-top:4px;color:{LIGHT_MUTED};font-size:14px;line-height:1.5;font-family:{FONT_SANS};">Bollinger Band compressions flagged before they break.</div>'
-        )
-        + card(
-            f'<div style="font-weight:600;color:{ACCENT};font-size:14px;font-family:{FONT_SANS};">Congress Trades</div>'
-            f'<div class="tl-muted" style="margin-top:4px;color:{LIGHT_MUTED};font-size:14px;line-height:1.5;font-family:{FONT_SANS};">Politicians\' disclosed buys and sells. House and Senate, by ticker.</div>'
-        )
+        # Squeeze Watch and Congress Trades cards removed 2026-09-14 (integrity
+        # fix, founder-approved): neither has real data behind it. The squeeze
+        # rows were mock output frozen on 2026-07-18 and no congressional
+        # disclosure has ever been ingested.
         + card(
             f'<div style="font-weight:600;color:{ACCENT};font-size:14px;font-family:{FONT_SANS};">Recent insider buys</div>'
             f'<div class="tl-muted" style="margin-top:4px;color:{LIGHT_MUTED};font-size:14px;line-height:1.5;font-family:{FONT_SANS};">SEC Form 4 transactions across the universe — date, insider, shares, value.</div>'
         )
         + button("Try a Premium feature", "https://tapeline.io/app/holdings"),
-        preheader="Squeeze Watch, Congress Trades, Insider Buys — inside your trial.",
+        preheader="Recent insider buys, and the rest of what is inside your trial.",
     )
 
 
@@ -711,21 +712,20 @@ def render_trial_day7_email(user_name: str, summary: dict | None = None) -> str:
             f"{FREE_DAILY_LOOKUPS} a day, "
             + (
                 f"the watchlist caps at {FREE_WATCHLIST_TICKERS} tickers, and "
-                "alerts and the Congress feed switch off."
+                "alerts switch off."
                 if free_has_watchlist()
-                else "and the watchlist, alerts, and the Congress "
-                "feed switch off."
+                else "and the watchlist and alerts switch off."
             )
             + " To keep what you have, add a card."
         )
         + _pricing_card(
             "Pro", "$9.99", "$8.25", "$99", "$20",
-            "Full live scanner, squeeze, regime, watchlist, email alerts, daily briefing.",
+            "Full live scanner, regime, watchlist, email alerts, daily briefing.",
             accent=False,
         )
         + _pricing_card(
             "Premium", "$19.99", "$16.58", "$199", "$40",
-            "Everything in Pro + Congress + insider Form 4 + analyst ratings.",
+            "Everything in Pro + insider Form 4 + analyst ratings.",
             accent=True,
         )
         + button("Add a card", "https://tapeline.io/app/billing")
@@ -844,7 +844,7 @@ def render_trial_day13_email(
             )
             + f"the scanner caps at the top {FREE_SCANNER_ROWS} rows, ticker "
             f"look-ups at {FREE_DAILY_LOOKUPS} a day, and alerts "
-            f"and the Congress feed switch off."
+            f"switch off."
         )
         + muted_paragraph(
             "Two ways to keep it: <strong>keep everything — Premium "
@@ -1023,7 +1023,7 @@ def render_trial_lapse30_email(
             "for Pro</a></strong> (the full scanner) and "
             f'<strong><a href="{premium_url}" style="color:{ACCENT};">'
             "$19.99/mo for Premium</a></strong> (scanner + smart alerts "
-            "and the Congress feed) — locked in for early "
+            "and SEC Form 4 insider filings) — locked in for early "
             "subscribers for as long as they stay subscribed."
         )
         + muted_paragraph(
@@ -1634,7 +1634,7 @@ def render_checkout_abandoned_email(
             f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Your plan</div>'
             f'<div class="tl-fg" style="margin-top:6px;font-size:18px;font-weight:700;color:{LIGHT_FG};font-family:{FONT_SANS};">{price_line}</div>'
             f'<p class="tl-fg" style="margin:10px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">'
-            f"Full universe scanner, live scores, squeeze + regime + heatmap, and "
+            f"Full universe scanner, live scores, regime + heatmap, and "
             f"every alert channel — unlocked the moment you finish."
             f"</p>"
             + button(f"Finish upgrading to {tier_label}", resume_url),
@@ -1978,32 +1978,17 @@ _RECONTACT_UTM = (
 )
 
 
-def _free_squeeze_preview_limit() -> int:
-    """How many squeeze setups a free account can see.
-
-    Lazy import: the constant's home is the squeeze router, and a service
-    module importing a router at module scope risks an import cycle. Falls
-    back to the shipped value if the import ever moves.
-    """
-    try:
-        from app.routers.squeeze import FREE_SQUEEZE_PREVIEW_LIMIT
-
-        return int(FREE_SQUEEZE_PREVIEW_LIMIT)
-    except Exception:  # pragma: no cover - defensive
-        return 3
-
-
 def _free_tier_changelog_lines() -> list[str]:
     """The changelog rows, as plain sentences.
 
-    Sourced from the tier.py constants (+ the squeeze router's preview cap)
-    so the copy can never quote a cap the product no longer enforces. Shared
+    Sourced from the tier.py constants so the copy can never quote a cap the
+    product no longer enforces. (The squeeze-preview line was removed on
+    2026-09-14: the squeeze rows were mock output, so it is not a benefit.) Shared
     by the HTML and plain-text renderers so the two can't drift.
     """
     lines = [
         f"{FREE_DAILY_LOOKUPS} full ticker look-ups a day.",
         f"{FREE_SCANNER_ROWS} live scanner rows (live data, not delayed).",
-        f"The squeeze radar's top {_free_squeeze_preview_limit()} setups.",
         "A saved screen, which re-runs each time you open it.",
     ]
     # The browser-alert line that used to close this list is gone rather than
@@ -2556,7 +2541,6 @@ def render_activation_arm_alerts_email(
             f"""
             <ul style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
               <li><strong>Score move</strong> — a ticker on your watchlist changes score by more than the number of points you choose.</li>
-              <li><strong>Squeeze condition</strong> — the short-interest and float measures cross the levels you set.</li>
               <li><strong>Regime change</strong> — the market-wide readings Tapeline tracks shift from one state to another.</li>
             </ul>
             """
@@ -2794,7 +2778,6 @@ def render_free_trial_invite_email(
         + card(
             f"""
             <ul style="margin:0;padding-left:18px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.75;">
-              <li><strong>Congressional trades</strong> — disclosed House and Senate buys and sells, by ticker</li>
               <li><strong>Insider filings</strong> — SEC Form 4 transactions: date, insider, shares, value</li>
               <li><strong>Analyst consensus</strong> per ticker</li>
               <li><strong>Alerts on every channel, and the daily briefing</strong> — the screen re-runs after each close and tells you what changed; Free runs a screen when you open it</li>
@@ -2807,8 +2790,8 @@ def render_free_trial_invite_email(
             f"The trial runs {TRIAL_DAYS} days and <strong>takes a card</strong>: "
             f"<strong>$0 is charged today</strong>, the first charge lands "
             f"{TRIAL_DAYS} days later, and one click ends it before then with "
-            "nothing taken. We email "
-            "you three days before that date, so it cannot arrive unannounced. "
+            f"nothing taken. We email you {precharge_notice_phrase()} that "
+            "date, so it cannot arrive unannounced. "
             f"{decline_line}"
         )
         + button("See what's included", "https://tapeline.io/app/billing")
@@ -2908,8 +2891,9 @@ def render_trial_started_email(
             accent=True,
         )
         + muted_paragraph(
-            "We will email you three days before that date, so the charge will "
-            "not arrive unannounced. Cancelling takes one click in Billing — no "
+            f"We will email you {precharge_notice_phrase()} that date, so the "
+            "charge will not arrive unannounced. Cancelling takes one click in "
+            "Billing — no "
             "email, no phone call, no retention questions."
         )
         + button("Open the scanner", "https://tapeline.io/app/scanner")
@@ -2962,7 +2946,13 @@ def render_trial_precharge_reminder_email(
     amount_label: str,
     charge_date_label: str,
 ) -> str:
-    """T-3 pre-charge notice for a CARD-REQUIRED trial.
+    """Pre-charge notice for a CARD-REQUIRED trial.
+
+    Sent by `run_trial_precharge_drip` about PRECHARGE_NOTICE_DAYS (7) days
+    before the charge, with Stripe's `trial_will_end` (about 3 days out) as a
+    backstop. Until 2026-09-14 the headline said "Your trial ends in 3 days."
+    even when it went out 7 days early; it now states the date, which is true
+    whichever path sends it.
 
     This email is not optional and it is not marketing. A trial that collects a
     card up front and then charges it without warning is the exact pattern that
@@ -2984,7 +2974,7 @@ def render_trial_precharge_reminder_email(
     """
     tier_label = tier.capitalize()
     return shell(
-        h1("Your trial ends in 3 days.")
+        h1(f"Your trial ends on {charge_date_label}.")
         + lead(
             f"{user_name}, a heads-up before anything is charged: your "
             f"<strong>{tier_label}</strong> trial ends on "
@@ -3074,7 +3064,7 @@ def render_carded_trial_setup_email(
             f"""
             <ul style="margin:0;padding-left:18px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.75;">
               <li><strong>The whole scored universe</strong> &mdash; not the top ten. Sort and filter it on the scanner.</li>
-              <li><strong>Congressional trades and SEC Form 4 insider filings</strong> &mdash; by ticker, under Holdings.</li>
+              <li><strong>SEC Form 4 insider filings</strong> &mdash; by ticker, under Holdings.</li>
               <li><strong>Alerts and CSV export</strong> &mdash; a rule re-runs after each close and tells you what changed.</li>
             </ul>
             """
@@ -3124,7 +3114,7 @@ def render_carded_trial_value_email(
             "https://tapeline.io/app/watchlist?utm_source=email&utm_campaign=carded_trial_value&utm_medium=transactional",
         )
         + muted_paragraph(
-            "Premium also carries the full scored universe, congressional and "
+            "Premium also carries the full scored universe, SEC Form 4 "
             "insider filings, alerts on every rule you set, and CSV export."
         )
         + _calm_trial_note(trial_ends_at)
@@ -5506,7 +5496,11 @@ async def run_trial_precharge_drip(
 
     now = datetime.now(UTC)
     counts = {"trial_precharge": 0}
-    lower, upper = now + timedelta(days=6), now + timedelta(days=8)
+    # (now+6d, now+8d) with PRECHARGE_NOTICE_DAYS = 7. The same constant is the
+    # number the customer-facing copy quotes, so the promise and the send
+    # cannot drift apart again (T-09, 2026-09-14).
+    lower = now + timedelta(days=PRECHARGE_WINDOW_LOWER_DAYS)
+    upper = now + timedelta(days=PRECHARGE_WINDOW_UPPER_DAYS)
 
     rows = (
         await session.execute(
@@ -5892,7 +5886,7 @@ def render_free_month_offer_email(
             '<li style="margin:0 0 8px;font-size:15px;line-height:1.55;">'
                         "Recent insider buys — SEC Form 4 filings: date, insider, shares, value</li>"
             '<li style="margin:0 0 8px;font-size:15px;line-height:1.55;">'
-            "The full scored universe, plus squeeze, regime and the sector heatmap</li>"
+            "The full scored universe, plus regime and the sector heatmap</li>"
             '<li style="margin:0 0 8px;font-size:15px;line-height:1.55;">'
             "Email alerts, CSV export, a 200-ticker watchlist, and the public API</li>"
             "</ul>"

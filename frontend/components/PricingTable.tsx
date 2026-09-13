@@ -83,7 +83,7 @@ const PLANS = [
       "Unlimited ticker look-ups",
       `Real-time, full ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker scanner`,
       "Score + plain-English Why on every row",
-      "Squeeze Watch · Regime · Heatmap",
+      "Regime · Heatmap",
       "IPOs · Earnings · News calendars",
       "Watchlist (50) with smart alerts",
       "Email alerts (10/day) · daily briefing",

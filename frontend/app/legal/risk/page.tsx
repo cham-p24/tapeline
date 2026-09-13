@@ -32,7 +32,7 @@ export default function RiskPage() {
         <section>
           <h2 className="text-lg font-semibold text-fg">1. Not investment advice</h2>
           <p>
-            Scores, signals, regime labels, squeeze flags, Congressional trade records, and
+            Scores, signals, regime labels, and
             alerts are <strong>informational only</strong>. They are not recommendations to
             buy, sell, or hold any security. Tapeline has no knowledge of your portfolio, risk
             tolerance, tax situation, investment objectives, or financial position, and cannot

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
+import { PRECHARGE_NOTICE_PHRASE } from "@/lib/trial";
 
 // pageMeta (not a bare object) so this page self-canonicalises, matching its
 // three siblings (privacy / terms / risk / extension-privacy).
@@ -80,6 +81,20 @@ export default function RefundPolicyPage() {
             the day you add it. The first charge lands on day 30 at the plan price you picked, and
             we email you three days before that happens. Cancel any time before day 30 and you are
             never billed &mdash; there is nothing to refund, because no money moved.
+          </p>
+          {/* DATED REVISION (integrity fix T-09, founder-approved 2026-09-14).
+              The sentence above is left exactly as it was published. The
+              reminder stopped going out at three days when the pre-charge
+              notice moved to our own daily send at about seven days (Visa
+              requires at least 7, Mastercard 3 to 7), and this page kept the
+              old number. Legal text is superseded with a dated note, never
+              silently rewritten. The timing reads lib/trial.ts, the same
+              constant the backend drip window is pinned to. */}
+          <p data-testid="refund-precharge-revision">
+            <strong className="text-fg">Updated 14 September 2026:</strong> the reminder email
+            before your first charge now goes out {PRECHARGE_NOTICE_PHRASE} that charge, not three
+            days before. This replaces the timing in the paragraph above. If that email cannot be
+            sent, a second reminder goes out about three days before the charge.
           </p>
           <p>
             A note on history, because it changes what people were told at sign-up: between

@@ -4,10 +4,16 @@ Tier gating — three-tier model (Free / Pro / Premium).
 - Free: LIVE but limited — top-10 scanner rows (live, no delay), a small
   daily ticker-lookup budget, and a small saved watchlist. Conversion
   pressure comes from breadth + the lookup meter, NOT stale data.
-- Pro $9.99/mo ($99/yr): live scanner, full universe, squeeze + regime +
-  heatmap, watchlist with smart alerts, email alerts, CSV export
-- Premium $19.99/mo ($199/yr): everything in Pro + Congressional trades,
-  unlimited email alerts, public API (1,000/day), priority support
+- Pro $9.99/mo ($99/yr): live scanner, full universe, regime + heatmap,
+  watchlist with smart alerts, email alerts, CSV export
+- Premium $19.99/mo ($199/yr): everything in Pro + SEC Form 4 insider
+  filings, unlimited email alerts, public API (1,000/day), priority support
+
+The `squeeze.full` and `congress.feed` keys below are entitlement keys and are
+left exactly as they are. As of 2026-09-14 neither is described to customers
+as a benefit: no real congressional data has ever been ingested, and the
+squeeze rows were mock output. What a tier is ENTITLED to did not change; what
+we CLAIM it includes did.
 
 Team / Enterprise / Lifetime sales map to 'premium' in the DB; per-account
 overrides handle larger seat counts or API caps if needed.
@@ -502,7 +508,7 @@ def effective_limit(user: User, key: str) -> int | None:
 # a watchlist, a daily ticker-page budget. A card starts the 30-day Premium
 # trial (Stripe Checkout, $0 that day, first charge at trial end, one click to
 # cancel before then) and is what turns on every matching row, a second saved
-# screen, alerts, export and the filings feeds.
+# screen, alerts, export and SEC Form 4 insider filings.
 #
 # `must_add_card` below therefore no longer gates ACCESS. It is still the ONE
 # predicate every surface reads, but what it now answers is "has this account

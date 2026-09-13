@@ -7,7 +7,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline Data Categories — What Powers Every Score",
   description:
-    "The data categories Tapeline reads from: live market data, fundamentals, macro indicators, SEC filings, Congressional disclosures, news, analyst ratings. Composite score and labels are Tapeline's own derived output.",
+    "The data categories Tapeline reads from: live market data, fundamentals, macro indicators, SEC filings, news, analyst ratings. Composite score and labels are Tapeline's own derived output.",
   path: "/data-sources",
 });
 
@@ -78,24 +78,20 @@ const CATEGORIES: Category[] = [
     publicRecord: true,
   },
   {
-    // Truth check (2026-08-23): no live congressional disclosure feed is wired
-    // in production — the dev-only generator is gated out of prod
-    // (backend/app/workers/signal_publisher.py, _mock_writes_enabled), so the
-    // /app/congress table does not accrue new rows. What IS live: curated
-    // STOCK Act names from the scoring workbook feed the Smart Money
-    // sub-factor (backend/app/services/sheet_feed.py, parse_smart_money_csv).
-    // Do not re-describe /app/congress as a daily-refreshed feed until a real
-    // disclosure source ships.
-    name: "Congressional disclosures",
-    usedFor: [
-      "Curated House + Senate STOCK Act disclosure filings",
-      "Inputs to the Smart Money sub-factor",
-    ],
+    // Integrity fix (founder-approved 2026-09-14). This entry used to say
+    // congressional disclosures fed the Smart Money sub-factor and that
+    // /app/congress showed "previously collected disclosures". Neither was
+    // true: no real congressional disclosure has ever been ingested (every
+    // congress_trades row is mock output, filtered out by
+    // backend/app/services/congress_integrity.py), and the Smart Money factor
+    // reads SEC Form 4 only (see /how-it-works). Stated as unavailable rather
+    // than silently dropped, so nobody reads the absence as an omission.
+    name: "Congressional disclosures (not available)",
+    usedFor: ["Nothing today"],
     surfaceArea:
-      "The Smart Money sub-factor in every score breakdown. The Congressional trades page at /app/congress (Premium tier) shows previously collected disclosures; it is not currently receiving new filings.",
-    refreshCadence:
-      "Curated batches on the scoring-workbook cadence. There is no live per-filing feed today.",
-    publicRecord: true,
+      "None. We don't currently have a real source of congressional trade disclosures, so we don't show any, and none feed the score.",
+    refreshCadence: "Not applicable.",
+    publicRecord: false,
   },
   {
     name: "News wire",

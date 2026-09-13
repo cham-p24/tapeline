@@ -47,7 +47,6 @@ function freeTierKeeps(): string[] {
     // "top 10" to someone who can see 1,000 rows would read as a lie about
     // the product they are looking at.
     `The top ${freeScannerRows({ authenticated: true })} scanner rows, live — no delay`,
-    `Squeeze Watch top-${FREE_LIMITS.squeezePreviewRows} preview`,
     // #683: Free carries no alerts on any channel, so this "what you keep"
     // list must not name one. Guarded on the constant in case it returns.
     ...(FREE_LIMITS.webPushAlerts > 0
@@ -152,8 +151,8 @@ export function TrialEndedModal() {
           </ul>
           <p className="mt-3 text-xs text-muted">
             Premium adds unlimited look-ups, the full ~6,900-ticker scanner,
-            email alerts, the congressional-trades and insider
-            feeds, CSV export and API access.
+            email alerts, recent insider buys (SEC Form 4), CSV export and
+            API access.
           </p>
         </div>
 

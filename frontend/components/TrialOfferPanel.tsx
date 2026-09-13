@@ -132,7 +132,7 @@ export function TrialOfferPanel({
       </h2>
       <p className="mt-1.5 text-sm text-muted">
         Every Premium feature for {TRIAL_DAYS} days: the full ~{ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker live
-        universe, score breakdowns, Congressional trades and insider buys,
+        universe, score breakdowns, recent insider buys (SEC Form 4),
         watchlist of 200 and unlimited email alerts. Starting the trial takes a
         card, because it becomes a paid subscription if you keep it. Here is
         exactly what that means.

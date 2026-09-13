@@ -10,9 +10,9 @@
  * meter once three or fewer look-ups remained, so look-ups 1-8 still carried no
  * evidence an allowance existed and the meter itself appeared out of nowhere at
  * nine. A cap you can see from the start is a described product; a cap that
- * materialises near the end is a trap. It now counts up from look-up 1, and
- * names the no-account allowance so the value of having signed up is legible
- * next to the value of paying.
+ * materialises near the end is a trap. It now counts up from look-up 1. (It
+ * also used to name a "2 a day" no-account allowance; that was never enforced
+ * and was removed on 2026-09-14, T-08.)
  *
  * The risk in fixing it is over-correcting into a growth-dark-pattern. So the
  * assertions here are two-sided:
@@ -26,7 +26,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import { LookupMeterPill } from "@/app/app/ticker/[symbol]/page";
-import { ANON_LIMITS, FREE_LIMITS } from "@/lib/pricing";
+import { FREE_LIMITS } from "@/lib/pricing";
 
 const CAP = 12;
 
@@ -120,26 +120,13 @@ describe("LookupMeterPill", () => {
     ).toHaveAttribute("href", "/pricing");
   });
 
-  describe("it names the no-account allowance too", () => {
-    // Someone reading this meter is signed in and metered. Naming what a
-    // visitor with no account gets is what makes the account itself legible as
-    // a step that already bought them something — and it comes from
-    // lib/pricing.ts, the only place on the client a cap may be written down
-    // (see freeCapsComeFromOneSource.test.tsx).
-    it("states the anonymous daily allowance", () => {
-      const text =
-        render(<LookupMeterPill used={2} limit={CAP} remaining={10} />)
-          .container.textContent ?? "";
-      expect(text).toMatch(
-        new RegExp(`without an account it is ${ANON_LIMITS.dailyLookups} a day`, "i"),
-      );
-    });
-
-    it("reads both allowances out of lib/pricing rather than restating them", () => {
-      // Discriminating: the anonymous cap (2) and the free cap (12) are
-      // different numbers, so a page that printed one where the other belongs
-      // fails here rather than passing by coincidence.
-      expect(ANON_LIMITS.dailyLookups).not.toBe(FREE_LIMITS.dailyLookups);
+  describe("it states no anonymous allowance (T-08, 2026-09-14)", () => {
+    // This block used to require "Without an account it is 2 a day". That was
+    // false: /api/ticker/{symbol} does not meter anonymous callers, and three
+    // anonymous GETs of tapeline.io/t/AAPL on 2026-09-14 all rendered the full
+    // page. The founder chose to correct the copy, not the enforcement, so the
+    // meter must not name a no-account number at all.
+    it("does not claim a no-account daily cap", () => {
       const text =
         render(
           <LookupMeterPill
@@ -149,7 +136,13 @@ describe("LookupMeterPill", () => {
           />,
         ).container.textContent ?? "";
       expect(text).toContain(`of ${FREE_LIMITS.dailyLookups} today`);
-      expect(text).toContain(`${ANON_LIMITS.dailyLookups} a day`);
+      expect(text).not.toMatch(/without an account/i);
+      expect(text).not.toMatch(/(^|[^0-9])2 a day/);
+    });
+
+    it("lib/pricing no longer exports an anonymous limit", async () => {
+      const pricing = (await import("@/lib/pricing")) as Record<string, unknown>;
+      expect(pricing.ANON_LIMITS).toBeUndefined();
     });
   });
 });

@@ -917,3 +917,51 @@ test("llms.txt stays inside the default lint scope", () => {
     "frontend/public/llms.txt matches no include glob, so CI does not scan it.",
   );
 });
+
+/* ------------------------------------------------------------------ *
+ * unbacked-feature-claim — congress / squeeze on a sell surface.
+ *
+ * Founder-approved 2026-09-14: no real congressional disclosure has ever been
+ * ingested, and the squeeze rows were mock output. The rule is path-scoped to
+ * the surfaces that sell a plan, a trial or what a card buys.
+ * ------------------------------------------------------------------ */
+
+test("unbacked-feature-claim fires on congress or squeeze in sell copy", () => {
+  const bad = [
+    ["<li>Congressional trades feed (House + Senate)</li>", "frontend/app/app/billing/page.tsx"],
+    ['note="+ Congress · Insider · API"', "frontend/app/pricing/opengraph-image.tsx"],
+    ['"Squeeze Watch · Regime · Heatmap",', "frontend/components/PricingTable.tsx"],
+    ["<li><strong>Congressional trades</strong> by ticker</li>", "backend/app/services/email.py"],
+    ["full universe live, squeeze + regime + heatmap", "frontend/public/llms.txt"],
+    ["alerts, CSV export and the congressional filings", "frontend/app/signup/SignUpForm.tsx"],
+  ];
+  for (const [src, file] of bad) {
+    assert.ok(fires(src, "unbacked-feature-claim", file), `missed in ${file}: ${src}`);
+  }
+});
+
+test("unbacked-feature-claim stays out of honest and educational pages", () => {
+  const fine = [
+    // The honest not-available pages must be able to name what is missing.
+    ["<h1>Congressional trade data isn't available</h1>", "frontend/app/congressional-trades/page.tsx"],
+    ["<h1>Congressional trade data isn't available</h1>", "frontend/app/app/congress/page.tsx"],
+    ["<p>Squeeze data is not currently published.</p>", "frontend/app/short-squeeze-scanner/page.tsx"],
+    // Education is not a benefit claim.
+    ["term: \"Short squeeze\",", "frontend/app/glossary/terms.ts"],
+  ];
+  for (const [src, file] of fine) {
+    assert.ok(!fires(src, "unbacked-feature-claim", file), `false positive in ${file}: ${src}`);
+  }
+  // A denial on a sell surface passes the negation guard.
+  assert.ok(
+    !fires(
+      "No Tapeline plan includes congressional trades, and any summary saying otherwise is incorrect.",
+      "unbacked-feature-claim",
+      "frontend/public/llms.txt",
+    ),
+  );
+  // The backend-mirrored entitlement key is not a word match.
+  assert.ok(
+    !fires("squeezePreviewRows: 3,", "unbacked-feature-claim", "frontend/lib/pricing.ts"),
+  );
+});

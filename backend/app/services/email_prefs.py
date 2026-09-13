@@ -129,7 +129,7 @@ def categories_for_ui() -> list[PrefCategory]:
             key="alert_emails",
             bit=int(EmailPref.ALERT_EMAILS),
             label="Alert emails",
-            description="The score / squeeze / regime / news rules you set up on /app/alerts. Disabling this disables ALL email alerts but doesn't touch browser push.",
+            description="The score / regime / news rules you set up on /app/alerts. Disabling this disables ALL email alerts but doesn't touch browser push.",
         ),
         PrefCategory(
             key="weekly_newsletter",

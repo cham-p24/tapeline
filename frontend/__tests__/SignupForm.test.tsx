@@ -20,6 +20,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import SignUpPage from "@/app/signup/page";
 import { PRICING, REFUND, usd, usdCompact } from "@/lib/pricing";
+import { PRECHARGE_NOTICE_DAYS, PRECHARGE_NOTICE_PHRASE } from "@/lib/trial";
 
 vi.mock("@/lib/auth", () => ({
   authApi: {
@@ -226,9 +227,15 @@ describe("SignUpPage", () => {
     expect(text).not.toMatch(/your first charge is on/i);
     expect(text).toMatch(/if (you started the trial today|that were today)/i);
     expect(text).toMatch(/one click ends it before then/i);
-    // The advance warning is a promise the backend actually keeps (the
-    // trial_will_end handler), so the page is allowed to make it.
-    expect(text).toMatch(/three days before/i);
+    // The advance warning is a promise the backend actually keeps (the daily
+    // pre-charge drip, about PRECHARGE_NOTICE_DAYS out), so the page is
+    // allowed to make it. T-09: it said "three days before" until 2026-09-14,
+    // which stopped being true when the notice moved to 7 days.
+    expect(text).toContain(`email you ${PRECHARGE_NOTICE_PHRASE}`);
+    expect(text).not.toMatch(/three days/i);
+    // T-02: no congressional-trades benefit is sold here.
+    expect(text).not.toMatch(/congress/i);
+    expect(text).not.toMatch(/squeeze/i);
   });
 
   it("keeps the strongest card-free claim: the record needs no account at all", () => {
@@ -401,12 +408,13 @@ describe("SignUpPage", () => {
     const sub = (container.querySelector("h1")?.nextElementSibling?.textContent ?? "")
       .replace(/\s+/g, " ");
     // Every clause is something the codebase can actually produce: Stripe
-    // Checkout ($0 today + the exact date), the cancel flow, and the T-3
-    // render_trial_precharge_reminder_email fired from trial_will_end.
+    // Checkout ($0 today + the exact date), the cancel flow, and the
+    // pre-charge notice from run_trial_precharge_drip (about 7 days out).
     expect(sub).toMatch(/takes a card/i);
     expect(sub).toMatch(/\$0 today/i);
     expect(sub).toMatch(/exact date of the first charge/i);
-    expect(sub).toMatch(/three days ahead/i);
+    expect(sub).toContain(`about ${PRECHARGE_NOTICE_DAYS} days ahead`);
+    expect(sub).not.toMatch(/three days/i);
     expect(sub).toMatch(/one click ends the trial/i);
     // The escape hatch that keeps "read the record first" true.
     expect(sub).toMatch(/public record needs no account/i);

@@ -146,7 +146,7 @@ export function UpgradeNudge() {
             sell the saved watchlist as one of the Pro perks below. */}
         {nudge.watchlist_cap > 0 ? `, a ${nudge.watchlist_cap}-ticker watchlist.` : "."}{" "}
         Go Pro for the full real-time universe with unlimited look-ups
-        {nudge.watchlist_cap > 0 ? "" : ", a saved watchlist"}, plus squeeze, regime &amp; heatmap.
+        {nudge.watchlist_cap > 0 ? "" : ", a saved watchlist"}, plus regime &amp; heatmap.
       </span>
       <span className="flex shrink-0 items-center gap-2">
         <Link
