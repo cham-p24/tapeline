@@ -64,6 +64,7 @@ from app.db import session_scope
 from app.models import Ticker
 from app.workers import signal_publisher as sp
 from tests import updated_at_runtime_guard as guard
+from tests.tick_driver import run_tick_through_score_upsert
 from tests.updated_at_runtime_guard import (
     LIVE_DATA_WRITERS,
     ORM_LIVE_DATA_WRITERS,
@@ -372,12 +373,6 @@ async def test_sector_remap_script_holds_updated_at() -> None:
 # 3. The live-data writers still advance it.
 # ---------------------------------------------------------------------------
 
-class _StoppedAtPublishError(Exception):
-    """Raised from the tick's first `broker.publish`, which it reaches only
-    after the score-upsert scope has committed. Ends the tick there, so none
-    of the ~25 cadence-gated jobs below the upsert run against the test DB."""
-
-
 def _snapshot(symbol: str, price: float) -> dict[str, Any]:
     return {
         "symbol": symbol, "price": price, "change_pct_1d": 0.5,
@@ -407,29 +402,13 @@ async def test_the_real_tick_advances_updated_at(
     await _seed(market_cap=7.0)
     await _seed(symbol=sheet_sym, market_cap=8.0, score=44.0)
 
-    async def _fetch_snapshots() -> list[dict[str, Any]]:
-        return [_snapshot(SYM, 11.0), _snapshot(sheet_sym, 12.0)]
-
-    async def _fetch_regime(_snapshots: list[dict[str, Any]]) -> dict[str, Any]:
-        return {}  # no regime row: nothing for this test to clean up or assert
-
-    published: list[tuple[str, Any]] = []
-
-    async def _publish(event: str, payload: Any) -> None:
-        published.append((event, payload))
-        raise _StoppedAtPublishError
-
-    monkeypatch.setattr(sp, "fetch_snapshots", _fetch_snapshots)
-    monkeypatch.setattr(sp, "fetch_regime", _fetch_regime)
-    monkeypatch.setattr(sp, "_mock_writes_enabled", lambda: False)
     # One row through each of the tick's two batches: the full update, and the
     # market-only update for symbols whose composite the sheet owns.
-    monkeypatch.setattr(sp, "_sheet_is_scoring_source", lambda: True)
-    monkeypatch.setattr(sp, "_sheet_governed_symbols", frozenset({sheet_sym}))
-    monkeypatch.setattr(sp.broker, "publish", _publish)
-
-    with pytest.raises(_StoppedAtPublishError):
-        await sp.tick()
+    published = await run_tick_through_score_upsert(
+        monkeypatch,
+        [_snapshot(SYM, 11.0), _snapshot(sheet_sym, 12.0)],
+        sheet_governed={sheet_sym},
+    )
 
     assert [(e, p["count"]) for e, p in published] == [("scores_updated", 2)], (
         "the tick did not reach the publish that follows its score upsert"

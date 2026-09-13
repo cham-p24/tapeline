@@ -30,7 +30,7 @@ from sqlalchemy import bindparam, delete, func, select, update
 from app.db import session_scope
 from app.models import Ticker
 from app.services import finnhub_feed, polygon_feed
-from app.workers.signal_publisher import CACHE_DERIVED_COLUMNS
+from app.workers.signal_publisher import CACHE_DERIVED_COLUMNS, _score_upsert_params
 
 _FACTORS = (
     "sub_trend", "sub_rs", "sub_fundamentals",
@@ -165,21 +165,24 @@ async def test_null_factors_preserve_the_last_good_score_through_the_tick():
         data = {"symbol": sym, "price": 11.0, "volume": 1234.0,
                 **_merged_factor_set(snap, previous)}
         columns = [k for k in data if k != "symbol"]
+        # The statement shape tick() builds (Core table, v_/b_ bind names),
+        # fed by the tick's own parameter converter. The real tick is driven
+        # in tests/test_score_upsert_is_a_real_executemany.py.
+        table = Ticker.__table__
         stmt = (
-            update(Ticker)
-            .where(Ticker.symbol == bindparam("b_symbol"))
+            update(table)
+            .where(table.c.symbol == bindparam("b_symbol"))
             .values({
                 col: (
-                    func.coalesce(bindparam(col), getattr(Ticker, col))
+                    func.coalesce(bindparam(f"v_{col}"), table.c[col])
                     if col in CACHE_DERIVED_COLUMNS
-                    else bindparam(col)
+                    else bindparam(f"v_{col}")
                 )
                 for col in columns
             })
-            .execution_options(synchronize_session=None)
         )
         async with session_scope() as s:
-            await s.execute(stmt, [{**data, "b_symbol": sym}])
+            await s.execute(stmt, _score_upsert_params([data], columns))
 
         async with session_scope() as s:
             row = (await s.execute(
