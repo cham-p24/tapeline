@@ -6,9 +6,10 @@ WHY THIS FILE EXISTS
 `signal_publisher.tick()`'s score_upsert stage was commented, in two places, as
 "executemany'd per column set". It was not. The statement was built on the ORM
 entity — `update(Ticker).where(Ticker.symbol == bindparam("b_symbol"))
-.values(...)` — and SQLAlchemy 2.0.49 routes an ORM UPDATE handed a list of
-parameter sets through its bulk-by-primary-key path (orm/persistence.py), which
-issues one UPDATE per row. A before_cursor_execute probe: 5 parameter sets ->
+.values(...)` — and SQLAlchemy 2.0.49 sends an ORM UPDATE that carries .values() and is handed
+a list of parameter sets down the per-record branch of orm/persistence.py's
+_emit_update_statements, which issues one UPDATE per row — the .values() is
+what selects that branch. A before_cursor_execute probe: 5 parameter sets ->
 5 cursor executions, executemany=False each. The same statement on
 `update(Ticker.__table__)`, with bind names that do not collide with column
 names: 1 execution, executemany=True.
@@ -32,7 +33,9 @@ WHAT IS PINNED
    commit after each, and the unchanged `score_upsert.done` log line.
 4. The identity map: no Ticker the tick's session holds is ever in an UPDATE.
 5. The statements tick() actually executed, compiled for postgresql+psycopg,
-   render the pre-change SQL exactly, bind names aside.
+   render the same SQL as the pre-change construct compiled on its own, bind
+   names aside. (The ORM bulk path the old statement really took also ANDed
+   `tickers.symbol = %(tickers_symbol)s` onto the WHERE; it selects the same row.)
 """
 from __future__ import annotations
 
@@ -411,7 +414,9 @@ async def test_the_executed_statements_compile_for_postgres_psycopg_unchanged(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The Update constructs tick() actually executed — not copies — compiled
-    for postgresql+psycopg, match the pre-change statement bind names aside.
+    for postgresql+psycopg, match the pre-change construct compiled on its own,
+    bind names aside. The ORM bulk path the old statement really ran also ANDed
+    `tickers.symbol = %(tickers_symbol)s` onto the WHERE, selecting the same row.
 
     Nothing in them is SQLite-specific: UPDATE ... SET ... WHERE, coalesce(),
     now() for the onupdate, and psycopg's rendered bind casts. The executemany

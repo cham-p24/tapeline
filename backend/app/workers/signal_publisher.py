@@ -124,9 +124,10 @@ CACHE_DERIVED_COLUMNS: tuple[str, ...] = (
 #: the long comment at the write loop.
 #:
 #: This comment used to say each chunk was "one executemany". It was not. The
-#: statement was built on the ORM entity, update(Ticker), and SQLAlchemy 2.0.49
-#: routes an ORM UPDATE handed a list of parameter sets through its
-#: bulk-by-primary-key path, which issues ONE UPDATE PER ROW: a
+#: statement was built on the ORM entity with .values(), and SQLAlchemy 2.0.49
+#: sends an ORM UPDATE that carries .values() and is handed a list of parameter
+#: sets down the per-record branch of its bulk path, which issues ONE UPDATE PER
+#: ROW — the .values() is what selects that branch: a
 #: before_cursor_execute probe saw 5 parameter sets -> 5 cursor executions,
 #: executemany=False each. Production logged `score_upsert.done rows=11585
 #: chunk=500 elapsed=39.5s` every minute on a performance-1x worker at ~52%
@@ -553,9 +554,9 @@ async def tick() -> None:
         # One Core UPDATE ... WHERE symbol = :b_symbol per column set (the full
         # batch and the sheet-governed batch), executemany'd per chunk.
         #
-        # COALESCE on the four CACHE-DERIVED columns is load-bearing, not a
-        # nicety. market_cap comes from _MARKET_CAP_CACHE and the three bar
-        # stats from _BAR_STATS_CACHE; both are in-memory dicts that are EMPTY
+        # COALESCE on the CACHE-DERIVED columns (six; see CACHE_DERIVED_COLUMNS)
+        # is load-bearing, not a nicety. market_cap comes from _MARKET_CAP_CACHE
+        # and the bar stats from _BAR_STATS_CACHE; both are in-memory dicts that are EMPTY
         # for every symbol after a process start, and this upsert runs every 60
         # seconds. Writing the plain value therefore stamped NULL over perfectly
         # good data on the first tick after each deploy, and kept doing so until
@@ -571,16 +572,16 @@ async def tick() -> None:
         # NOT protected this way — they come fresh from the vendor on every
         # tick, so a NULL there is a real "no read", and preserving a stale one
         # would be the dishonest choice.
-        # The six factors, the composite they produce, and the two fields derived
-        # from that composite belong in this tuple for exactly the same reason as
-        # the four above: all of them are fed by in-memory caches that a daily
-        # pass fills, so all of them are NULL on the first tick after a restart.
-        # Before the polygon_feed fix that pairs with this, a cache miss left the
-        # mock's random.gauss draw in place instead of a NULL — so the first tick
-        # after every deploy overwrote the entire non-sheet universe's SCORE with
-        # a number derived from random factors and kept it until the daily pass
-        # ran. Making the miss honest (NULL) is only safe because of this guard:
-        # NULL now means "nothing new to say", and the last real score stands.
+        # The six factors, the composite and the two fields derived from it are
+        # NOT in that tuple, although their caches are just as empty after a
+        # restart. Per-column COALESCE was tried for them and published scores
+        # that disagreed with their own factors (158 rows, each off by ~3.75),
+        # because each column decided independently whether to keep or replace.
+        # They are merged in Python instead — see _merged_factor_set: incoming or
+        # previous per factor, then the composite, label and sentence recomputed
+        # from that merged set — and arrive here as plain values. A cache miss is
+        # an honest NULL (it used to be a random.gauss draw) and the merge keeps
+        # the last real value, so the last real score stands.
         cache_derived = CACHE_DERIVED_COLUMNS
         tickers_table = Ticker.__table__
         _upsert_started = monotonic()
@@ -594,8 +595,8 @@ async def tick() -> None:
             #
             # As update(Ticker) this was not an executemany at all, whatever the
             # comments here said. Handed a list of parameter sets, an ORM UPDATE
-            # goes through SQLAlchemy's bulk-by-primary-key path, which issues
-            # one UPDATE per row (2.0.49, before_cursor_execute: 5 parameter
+            # that carries .values() goes down the per-record branch of
+            # SQLAlchemy's bulk path, which issues one UPDATE per row (2.0.49, before_cursor_execute: 5 parameter
             # sets -> 5 executions, executemany=False each). Not a SQLite
             # quirk: a statement carrying .values() takes the per-record
             # branch of orm/persistence.py _emit_update_statements, which
@@ -3501,8 +3502,8 @@ async def _backfill_key_statistics(cap: int = 2500) -> None:
                 #
                 # NOT an executemany, although it is handed a list of
                 # parameter sets. Because the statement is built on the ORM
-                # entity, SQLAlchemy routes it through its bulk-by-primary-key
-                # path, which issues one UPDATE per record — measured on 2.0.49
+                # entity AND carries .values(), SQLAlchemy sends it down the
+                # per-record branch of its bulk path, which issues one UPDATE per record — measured on 2.0.49
                 # with a before_cursor_execute probe: 5 records, 5 cursor
                 # executions, executemany=False each. Fine at this batch size;
                 # a statement built on Ticker.__table__ would be a true
