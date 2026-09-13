@@ -864,22 +864,38 @@ async def status() -> dict[str, object]:
                 if regime_updated.tzinfo is None:
                     regime_updated = regime_updated.replace(tzinfo=UTC)
                 age = (datetime.now(UTC) - regime_updated).total_seconds()
-                # `age` is the age of the REGIME row, which the tick writes
-                # roughly a third of the way through its work. That is a
-                # heartbeat for "a tick started recently", not for "a tick
-                # finished" — and on 2026-08-24 the difference mattered: the
-                # daily stale-link audit saturated the worker's event loop, 180
-                # consecutive ticks hit the 60s timeout and were killed mid-way,
-                # and scoring froze for ~3 hours while this check reported "ok"
-                # the entire time. The cloud watchdog reads this field, so it
-                # never fired either.
+                # `age` is the age of the REGIME row. The tick writes it AFTER
+                # the score-upsert loop, inside `if regime:` in the same
+                # session scope, and it lands when that scope commits (the
+                # sheet's MARKET tab also rewrites it, but only when that CSV
+                # changes). So a fresh row says a tick got past the upsert
+                # loop — but NOT that the loop wrote anything: with an empty
+                # snapshot batch the loop is a no-op and the regime row is
+                # still written. Nor does it say the rest of the tick (alerts,
+                # the daily jobs below the upsert) finished. On 2026-08-24,
+                # when this check read the regime age alone, the daily
+                # stale-link audit saturated the worker's event loop, 180
+                # consecutive ticks hit the 60s timeout and were killed
+                # mid-way, and scoring froze for ~3 hours while this check
+                # reported "ok" the entire time. The cloud watchdog reads this
+                # field, so it never fired either.
                 #
-                # `Ticker.updated_at` is only advanced by the bulk upsert, and
-                # the tick reaches that upsert only after the vendor fetch and
-                # the merge have both completed. A fresh max(updated_at) is
-                # therefore evidence the tick got through its actual work.
-                # Reported alongside the regime age rather than replacing it, so
-                # a mismatch between the two is visible instead of averaged away.
+                # `Ticker.updated_at` is advanced by LIVE-DATA writers: the
+                # tick's score upsert, the sheet refresh (sheet_feed's ORM
+                # upserts, and only when a CSV has changed) and the daily
+                # crypto refresh. The metadata `update(Ticker)` writes — the
+                # factor-attempt and aggregates stamps, the sector /
+                # market-cap / key-statistics backfills, the universe
+                # reconciliation — deliberately hold it still, which
+                # tests/test_ticker_updated_at_means_live_data.py enforces.
+                # Before that, those passes (the factor phase alone budgets
+                # 3 hours) stamped rows in small batches all through their run
+                # and could keep max(updated_at) fresh through ticks that
+                # wrote no scores. A fresh max(updated_at) is therefore
+                # evidence rows were written with live data, which the regime
+                # age alone cannot give. Reported alongside the regime age
+                # rather than replacing it, so a mismatch between the two is
+                # visible instead of averaged away.
                 tick_written = (await session.execute(
                     select(func.max(Ticker.updated_at))
                 )).scalar_one_or_none()

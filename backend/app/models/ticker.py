@@ -180,6 +180,25 @@ class Ticker(Base):
     last_smart_money_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
+    # When this row's LIVE DATA — price, score, factors — was last refreshed.
+    #
+    # Readers depend on exactly that meaning: services/ticker_freshness.py
+    # drops a row from every ranked surface (scanner, daily Top 10, scorecard
+    # freeze, newsletter, MCP) once updated_at is 7 days behind the newest
+    # scored row, routers/heatmap.py applies a wall-clock floor on it, and
+    # /api/status reads max(updated_at) as proof that ticks are writing.
+    #
+    # onupdate=func.now() makes ANY `update(Ticker)` that does not name this
+    # column advance it. Metadata writers — the attempt stamps, the sector /
+    # market-cap / key-statistics backfills, the universe reconciliation —
+    # therefore pass `updated_at=Ticker.updated_at`, which SQLAlchemy emits as
+    # `SET updated_at = tickers.updated_at` and which suppresses the onupdate.
+    # Before that, the daily aggregates pass stamped every symbol it ATTEMPTED,
+    # so a row that had stopped receiving data (a delisting, a crypto pair
+    # whose own refresh failed) was kept "fresh" indefinitely.
+    #
+    # The onupdate stays: it is what the live-data writers rely on. Enforced
+    # in both directions by tests/test_ticker_updated_at_means_live_data.py.
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

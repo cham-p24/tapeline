@@ -56,8 +56,13 @@ async def main() -> None:
             # tells the founder which legacy strings were the worst offenders.
             label = raw_sector or "<null>"
             by_old_label[label] = by_old_label.get(label, 0) + 1
+            # Relabelling a sector is not a refresh of the row's live data:
+            # hold updated_at still, or this remap would restart the 7-day
+            # staleness clock on every row it touches — including rows no feed
+            # writes any more. See the comment on Ticker.updated_at.
             await s.execute(
-                update(Ticker).where(Ticker.symbol == symbol).values(sector=target)
+                update(Ticker).where(Ticker.symbol == symbol)
+                .values(sector=target, updated_at=Ticker.updated_at)
             )
             fixed += 1
 
