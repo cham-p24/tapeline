@@ -259,7 +259,7 @@ export const FACTORS: Factor[] = [
       },
     ],
     caveat:
-      "Disclosure is lagged by statute, not by Tapeline. A Form 4 is filed days after the transaction it reports, so this factor is always reading the past — and the filing records that a transaction happened, never why.",
+      "Disclosure is lagged by statute: a Form 4 is generally filed up to two business days after the trade. Tapeline's copy can lag further, because our data vendor can run behind SEC EDGAR and not every stock is re-checked every day. So this factor is always reading the past, and the filing records that a transaction happened, never why.",
     limitations: [
       "Many disclosed transactions carry no view at all. Sales scheduled months in advance under a 10b5-1 plan, option exercises, vesting events and share sales made purely to cover tax withholding all arrive as Form 4 filings and are netted like any other.",
       "Smaller and less-covered companies file rarely, so the window is frequently empty and the factor is unavailable for long stretches.",

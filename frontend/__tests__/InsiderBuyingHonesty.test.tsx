@@ -123,7 +123,7 @@ describe("/insider-buying — no invented Form 4 filings", () => {
     );
   });
 
-  it("renders the real rows, and calls them live, when the feed answers", async () => {
+  it("renders the real rows, dated, when the feed answers", async () => {
     mockFeed([realRow]);
     const { container } = await renderPage();
 

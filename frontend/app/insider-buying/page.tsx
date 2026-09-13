@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SeoFeaturePage } from "@/components/SeoFeaturePage";
-import { PRICING, annualRateLabel, usd } from "@/lib/pricing";
+import { PRICING, billedAnnuallyNote, usd } from "@/lib/pricing";
 import { pageMeta } from "@/lib/seo";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
@@ -174,12 +174,13 @@ export default async function InsiderBuyingPage() {
             <p>
               The date in each row is the trade date reported on the filing. We
               do not store the filing date, so this page cannot show the gap
-              between the two. Each row links to the ticker&rsquo;s page. The
-              longer list lives at{" "}
+              between the two. Each row links to the ticker&rsquo;s page. The full
+              Form 4 list (all transaction codes, with a buys-only filter) is
+              at{" "}
               <Link href="/app/holdings" className="link">
                 /app/holdings
               </Link>{" "}
-              (Premium), also ordered newest trade first.
+              on Premium, also newest trade first.
             </p>
           </>
         ),
@@ -195,7 +196,7 @@ export default async function InsiderBuyingPage() {
         },
         {
           q: "What's the difference between this and OpenInsider / Insider Monkey?",
-          a: "Those sites are built around the filings themselves. This page is a short preview: the ten most recent code-P purchases in Tapeline's data, newest trade first, each linked to that ticker's Tapeline page. The longer list is at /app/holdings on Premium.",
+          a: "Those sites are built around the filings themselves. This page is a short preview: the ten most recent code-P purchases in Tapeline's data, newest trade first, each linked to that ticker's Tapeline page. The full Form 4 list (all transaction codes, with a buys-only filter) is at /app/holdings on Premium, also newest trade first.",
         },
         {
           q: "Is there an alert for new insider buys?",
@@ -207,7 +208,7 @@ export default async function InsiderBuyingPage() {
         },
         {
           q: "What tier do I need?",
-          a: `This preview page is free and needs no account. The longer insider list at /app/holdings is a Premium feature (${usd(PRICING.premium.monthly)}/mo, or ${annualRateLabel(PRICING.premium)}), and the 30-day Premium trial includes it.`,
+          a: `This preview page is free and needs no account. The full Form 4 list at /app/holdings is a Premium feature: ${usd(PRICING.premium.monthly)} a month, or ${usd(PRICING.premium.annualPerMonth)} a month ${billedAnnuallyNote(PRICING.premium)}. The 30-day Premium trial includes it.`,
         },
       ]}
       tier="premium"
@@ -313,9 +314,10 @@ export default async function InsiderBuyingPage() {
             : "This snapshot is empty because the feed was unreachable at render time. It is not a sample."}{" "}
         The{" "}
         <Link href="/app/holdings" className="text-accent hover:underline">
-          longer list
+          full Form 4 list
         </Link>{" "}
-        is on Premium and is also ordered newest trade first.
+        (all transaction codes, with a buys-only filter) is on Premium, also
+        newest trade first.
       </p>
     </SeoFeaturePage>
   );

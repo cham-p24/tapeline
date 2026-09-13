@@ -35,6 +35,7 @@ vi.mock("@/components/TransparencyStrip", () => ({ TransparencyStrip: () => null
 import InsiderBuyingPage, { metadata as insiderMeta } from "@/app/insider-buying/page";
 import HowItWorksPage, { metadata as howMeta } from "@/app/how-it-works/page";
 import { FACTORS } from "@/app/how-it-works/factors";
+import { PRICING, billedAnnuallyNote, usd } from "@/lib/pricing";
 
 type Row = Record<string, unknown>;
 
@@ -93,6 +94,11 @@ const BANNED_INSIDER: (string | RegExp)[] = [
   /alert rule for insider/i,
   /this week/i,
   />\s*Filed\s*</,
+  // "The longer list" read as a longer list of code-P buys; /app/holdings
+  // shows every transaction code by default.
+  /longer (insider )?list/i,
+  // The tier FAQ once nested "/mo · billed annually (...)" inside brackets.
+  /\/mo · billed/,
 ];
 
 describe("/insider-buying — labels and claims", () => {
@@ -135,6 +141,17 @@ describe("/insider-buying — labels and claims", () => {
       expect(source.textContent).not.toContain("Newest trade shown");
       unmount();
     }
+  });
+
+  it("describes the Premium list as the full Form 4 list, not a longer list of buys", async () => {
+    mockFeed([row("AAAA", "2026-08-31")]);
+    const { text, html } = await renderInsider();
+    expect(text).toContain("(all transaction codes, with a buys-only filter)");
+    // Tier FAQ price reads as a sentence, in the visible FAQ and the JSON-LD.
+    expect(text).toContain(
+      `${usd(PRICING.premium.monthly)} a month, or ${usd(PRICING.premium.annualPerMonth)} a month ${billedAnnuallyNote(PRICING.premium)}.`,
+    );
+    expect(html).not.toMatch(/\/mo · billed/);
   });
 
   it.each([
@@ -180,6 +197,7 @@ describe("/how-it-works — insider freshness and the daily record", () => {
     const copy = JSON.stringify(smart);
     expect(copy).not.toMatch(/published as its own feed/i);
     expect(copy).not.toMatch(/within hours/i);
+    expect(copy).not.toMatch(/not by Tapeline/i);
     expect(copy).toMatch(/not every stock is re-checked every day/i);
   });
 });
