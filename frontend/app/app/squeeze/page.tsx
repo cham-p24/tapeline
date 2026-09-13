@@ -23,6 +23,13 @@ const OBV_OPTIONS = [
 // the free /api/squeeze/preview taste returns.
 const FREE_PREVIEW_LIMIT = 3;
 
+// Shown whenever the feed holds no publishable rows. Both endpoints now filter
+// through backend services/squeeze_integrity (written after 2026-07-19 and in
+// the last 48 hours); production has no live squeeze writer, so today this is
+// what every tier sees. Never replace it with example or cached rows.
+const SQUEEZE_EMPTY_STATE =
+  "No squeeze data right now. We don't have a live source for this list, so we aren't showing one.";
+
 // The table renders both feed shapes: the full Pro feed (SqueezeRow) and the
 // free preview (SqueezePreviewRow), which lacks the Pro-only analytics
 // columns — those cells fall back to an em-dash.
@@ -44,6 +51,9 @@ export default function SqueezePage() {
   // "Top 3 of N" locked-section copy. Null on the full feed (not needed).
   const [totalSetups, setTotalSetups] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // True after the first successful load, so the empty state never flashes
+  // before the feed has answered.
+  const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounced(search);
   const [minScore, setMinScore] = useState<number | "">("");
@@ -64,6 +74,7 @@ export default function SqueezePage() {
         setTotalSetups(r.total_setups);
       }
       setLoadError(null);
+      setLoaded(true);
     } catch (e) {
       // A failed load must never masquerade as the "No squeeze setups right
       // now" empty state — keep whatever rows we have and surface the error.
@@ -84,15 +95,20 @@ export default function SqueezePage() {
   const resetFilters = () => { setSearch(""); setMinScore(""); setObv(""); };
 
   const isPreview = !userLoading && !hasFullFeed;
+  // No publishable rows at all (not a filter result, not a load error). In that
+  // state nothing on this page may imply a live feed: no Live badge, no filter
+  // bar over an empty list, no upgrade pitch for rows that don't exist.
+  const feedEmpty = rows.length === 0 && !loadError;
+  const showEmptyState = feedEmpty && loaded;
 
   return (
     <div>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Squeeze Watch</h1>
-          <p className="text-sm text-muted">Stocks where price has gone quiet — historically a setup for a bigger-than-usual move.</p>
+          <p className="text-sm text-muted">Stocks whose price range has gone quiet. Direction is not predicted.</p>
         </div>
-        <LiveBadge status={status} lastUpdate={lastUpdate} />
+        {!feedEmpty && <LiveBadge status={status} lastUpdate={lastUpdate} />}
       </div>
 
       <details className="card mt-4 cursor-pointer p-4 text-sm">
@@ -101,13 +117,11 @@ export default function SqueezePage() {
           <p>
             Each row is a stock whose <strong>Bollinger Bands</strong> (a measure of how
             wide the price range has been) have compressed to historically tight levels.
-            Volatility has contracted — buyers and sellers are temporarily balanced.
-            Tight squeezes tend to release into larger-than-average moves once the coil breaks.
-            <strong> Direction is not predicted</strong> — these can break up or down.
+            Volatility has contracted.
+            <strong> Direction is not predicted</strong> — these can break up or down, or not at all.
           </p>
           <p>
             <strong>Score (0-100):</strong> combines BB tightness + how long the squeeze has lasted + volume trend + OBV direction.
-            <strong> 75+ = meaningful compression worth watching.</strong>
           </p>
           <p>
             <strong>OBV</strong> = On-Balance Volume, a running total of up-day vs down-day volume.
@@ -116,8 +130,8 @@ export default function SqueezePage() {
             <span className="ml-2">FLAT</span> = no edge.
           </p>
           <p>
-            <strong>Window</strong> is a rough timing guide based on how compressed the squeeze is now —
-            tighter squeezes tend to resolve faster.
+            <strong>Window</strong> is a rough timing guide based on how compressed the squeeze is now.
+            It is not a forecast.
           </p>
         </div>
       </details>
@@ -126,6 +140,7 @@ export default function SqueezePage() {
           filter params). The OBV dropdown is hidden on the free preview:
           preview rows don't carry obv_trend, so the filter could only ever
           empty the table. */}
+      {!feedEmpty && (
       <FilterBar
         trailing={<>Showing <strong className="text-fg">{visibleRows.length}</strong> of {rows.length}</>}
       >
@@ -144,6 +159,7 @@ export default function SqueezePage() {
           <button onClick={resetFilters} className="btn-ghost text-sm">Reset filters</button>
         )}
       </FilterBar>
+      )}
 
       <div className="card mt-4 overflow-x-auto">
         <table className="w-full text-sm nums">
@@ -180,7 +196,11 @@ export default function SqueezePage() {
                     <button onClick={resetFilters} className="mt-3 text-xs text-accent hover:underline">Clear filters</button>
                   </>
                 ) : (
-                  <p>No squeeze setups right now. The worker rescans every ~60 seconds.</p>
+                  showEmptyState ? (
+                    <p data-testid="squeeze-empty-state">{SQUEEZE_EMPTY_STATE}</p>
+                  ) : (
+                    <p>Loading squeeze data&hellip;</p>
+                  )
                 )}
               </td></tr>
             ) : visibleRows.map((r) => (
@@ -205,7 +225,7 @@ export default function SqueezePage() {
           states the real remaining count (from the backend, not invented)
           and where the rest lives. Descriptive only: no urgency, no
           performance claims. */}
-      {isPreview && !loadError && (
+      {isPreview && !loadError && !feedEmpty && (
         <div className="card mt-4 p-6 text-center">
           <div className="inline-block rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
             Pro feature

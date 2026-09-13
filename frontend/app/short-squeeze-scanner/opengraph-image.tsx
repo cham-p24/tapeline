@@ -10,6 +10,6 @@ export default async function OG() {
     eyebrow: "FEATURE",
     title: "Short Squeeze Scanner.",
     subtitle:
-      "Live setups across ~6,900 US stocks — Bollinger Band compression + volume + OBV scored. Pro feature, 30-day Premium trial.",
+      "No squeeze data right now. We don't have a live source for this list, so we aren't showing one.",
   });
 }

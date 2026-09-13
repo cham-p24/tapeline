@@ -307,6 +307,26 @@ def _mock_writes_enabled() -> bool:
     return get_settings().app_env != "production"
 
 
+def _mock_squeeze_writes_enabled() -> bool:
+    """May `mock_feed.fetch_squeezes` rows be written to SqueezeSetup?
+
+    Stricter than `_mock_writes_enabled()`, and it fails CLOSED. That check
+    only refuses when APP_ENV is literally "production"; `app_env` defaults to
+    "development", so a worker booted without APP_ENV would write invented
+    squeeze setups (and wipe the table first). The 15 mock rows production
+    still holds (all dated 2026-07-18) were written before any gate existed,
+    and were served as live setups until services/squeeze_integrity.
+
+    Mock squeeze writes now require BOTH an explicit development env AND not
+    running on Fly (Fly sets FLY_APP_NAME on every machine; verified on
+    tapeline-backend 2026-09-14). The real SPIKE INTELLIGENCE sheet writer
+    (sheet_feed.upsert_spikes) is not gated by this.
+    """
+    if os.environ.get("FLY_APP_NAME"):
+        return False
+    return _mock_writes_enabled() and get_settings().app_env == "development"
+
+
 def _sheet_is_scoring_source() -> bool:
     """True when the signal-system sheet owns Ticker.score + the sub-scores.
 
@@ -384,11 +404,16 @@ async def tick() -> None:
     # wired for either). Don't even generate them in production — see
     # `_mock_writes_enabled()`.
     mock_writes = _mock_writes_enabled()
+    # Squeeze mock writes have their own fail-closed guard (see
+    # `_mock_squeeze_writes_enabled`): a missing APP_ENV must not publish
+    # invented squeeze setups.
+    mock_squeeze_writes = _mock_squeeze_writes_enabled()
     squeezes: list[dict] = []
     new_trades: list[dict] = []
     _set_stage("mock_writes")
-    if mock_writes:
+    if mock_squeeze_writes:
         squeezes = await fetch_squeezes() if inspect.iscoroutinefunction(fetch_squeezes) else fetch_squeezes()
+    if mock_writes:
         new_trades = (
             await fetch_congress_trades()
             if inspect.iscoroutinefunction(fetch_congress_trades)
@@ -620,7 +645,7 @@ async def tick() -> None:
         # (5-min throttle, skipped entirely when the CSV is unchanged), so
         # wiping it every 60s here deleted real data and served ~15 fabricated
         # setups in its place.
-        if mock_writes:
+        if mock_squeeze_writes:
             await session.execute(delete(SqueezeSetup))
             for s in squeezes:
                 session.add(SqueezeSetup(**s))
@@ -661,7 +686,7 @@ async def tick() -> None:
     _set_stage("publish")
     await broker.publish("scores_updated", {"ts": started.isoformat(), "count": len(snapshots)})
     await broker.publish("regime_updated", regime)
-    if mock_writes:
+    if mock_squeeze_writes:
         # Only announce a squeeze change when this tick actually wrote one —
         # otherwise the event carried count=0 while the table held real rows.
         await broker.publish("squeeze_updated", {"count": len(squeezes)})

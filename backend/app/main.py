@@ -677,19 +677,22 @@ async def public_squeeze(limit: int = 5) -> dict[str, object]:
     """Public, no-auth preview of the squeeze-watch surface.
 
     Powers /short-squeeze-scanner. Capped tightly (5 rows by default,
-    20 hard max) so the live /app/squeeze view (Pro+, no row cap) is
-    still the upgrade reason. Pre-computed spike_score / squeeze_days /
-    OBV trend are exposed — the structural setup is the SEO hook.
+    20 hard max). Only publishable rows are returned — see
+    services/squeeze_integrity: the 15 rows production holds were written by
+    a mock tick on 2026-07-18 and are never served. With no live writer
+    configured this returns an empty list, and the page says so.
     """
     from sqlalchemy import desc, select
 
     from app.db import session_scope
     from app.models import SqueezeSetup
+    from app.services.squeeze_integrity import publishable_clause
 
     capped = max(1, min(limit, 20))
     async with session_scope() as session:
         result = await session.execute(
             select(SqueezeSetup)
+            .where(publishable_clause())
             .order_by(desc(SqueezeSetup.spike_score))
             .limit(capped)
         )
@@ -705,6 +708,7 @@ async def public_squeeze(limit: int = 5) -> dict[str, object]:
                 "obv_trend": r.obv_trend,
                 "breakout_type": r.breakout_type,
                 "reason": r.reason,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
             }
             for r in rows
         ],

@@ -2,6 +2,10 @@
 
 Pre-2026-05-16 this was anonymous-readable. Locked down to match
 services/tier.FEATURES["squeeze.full"].
+
+Every query here (rows AND counts) goes through
+services/squeeze_integrity.publishable_clause(): production holds only mock
+rows from 2026-07-18, and those must never be served as current setups.
 """
 from __future__ import annotations
 
@@ -13,6 +17,7 @@ from app.db import get_session
 from app.models import SqueezeSetup, User
 from app.services.auth import current_user_required
 from app.services.cap_events import record_cap_hit
+from app.services.squeeze_integrity import publishable_clause
 from app.services.tier import Tier, has_feature
 
 router = APIRouter()
@@ -40,8 +45,10 @@ async def squeeze_preview(
     surface the main feed was locked down to close — the free taste is a
     logged-in activation nudge, not a public endpoint.
     """
+    publishable = publishable_clause()
     stmt = (
         select(SqueezeSetup)
+        .where(publishable)
         .order_by(desc(SqueezeSetup.spike_score))
         .limit(FREE_SQUEEZE_PREVIEW_LIMIT)
     )
@@ -50,7 +57,9 @@ async def squeeze_preview(
     # state the real count it's holding back ("Top 3 of N") — a real number,
     # not marketing copy. Costs one COUNT(*) on a small worker-refreshed table.
     total_setups = (
-        await session.execute(select(func.count()).select_from(SqueezeSetup))
+        await session.execute(
+            select(func.count()).select_from(SqueezeSetup).where(publishable)
+        )
     ).scalar_one()
     # Cap-hit instrumentation: a free user (no squeeze.full feature) who is shown
     # only the top-3 preview while MORE setups exist is being refused the rest of
@@ -92,6 +101,7 @@ async def list_squeezes(
         raise HTTPException(403, "Squeeze scanner is a Pro feature")
     stmt = (
         select(SqueezeSetup)
+        .where(publishable_clause())
         .where(SqueezeSetup.spike_score >= min_score)
         .order_by(desc(SqueezeSetup.spike_score))
         .limit(limit)
