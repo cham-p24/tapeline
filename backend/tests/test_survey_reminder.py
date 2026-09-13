@@ -378,3 +378,19 @@ async def test_a_run_that_loses_the_lock_sends_nothing(
     assert result == {}
     assert outbox == [], "a run that lost the lock still sent email"
 
+
+async def test_a_subscriber_who_joined_after_the_real_send_is_not_reminded() -> None:
+    """Pins the cutoff to when the original actually went out.
+
+    Resend's log puts every survey email at 2026-09-10 15:59-16:00 UTC. The
+    cutoff used to be 2026-09-11 03:44, read off `users.updated_at`, so someone
+    who joined the list overnight would have been sent a "follow-up" to an email
+    they never received.
+    """
+    async with session_scope() as s:
+        await _sub(s, "overnight@example.com", created=datetime(2026, 9, 11, 0, 0, tzinfo=UTC))
+        await _sub(s, "before@example.com", created=datetime(2026, 9, 10, 15, 0, tzinfo=UTC))
+        recipients, skipped = await ss.collect_reminder_newsletter(s)
+    assert [r.email for r in recipients] == ["before@example.com"]
+    assert {x.email: r for x, r in skipped}["overnight@example.com"] == "joined_after_original"
+

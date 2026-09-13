@@ -3,10 +3,10 @@ name: Survey reminder (one-shot, 2026-09-16)
 # Sends the September 2026 customer-survey reminder, ONCE, unattended.
 #
 # Founder-authorised 2026-09-11: "go, one address for Waad, send Wed 16".
-# The original survey went out 2026-09-11 03:44 UTC — about midnight US
-# Eastern, the wrong hour for a mostly-US list. This fires at 13:07 UTC on
-# Wednesday 16 September: 9:07am New York, 11:07pm Melbourne. Off the :00 mark
-# because Actions cron is best-effort and bunches at the hour.
+# The original survey went out 2026-09-10 16:00 UTC — noon in New York. This
+# fires at 13:07 UTC on Wednesday 16 September: 9:07am New York, 11:07pm
+# Melbourne. Off the :00 mark because Actions cron is best-effort and bunches
+# at the hour.
 #
 # WHAT RUNS: `survey_send --reminder --send --quiet` on the deployed backend
 # over `flyctl ssh`, so it uses prod's database, Resend key and APP_URL without

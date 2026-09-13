@@ -388,7 +388,8 @@ async def run_newsletter(
 #
 # Founder-authorised 2026-09-11: "go, one address for Waad, send Wed 16". Sent
 # once, unattended, by .github/workflows/survey-reminder.yml at 13:07 UTC on
-# 16 September — 9am New York. The original landed at midnight US Eastern.
+# 16 September — 9am New York. The original went out at noon New York on
+# Thursday 10 September.
 #
 # WHO: everyone who RECEIVED the original and has not visibly answered — account
 # holders carrying SURVEY_TOKEN, plus the newsletter-only subscribers who existed
@@ -423,9 +424,18 @@ async def run_newsletter(
 REMINDER_TOKEN = "survey_2026_09_r"
 
 #: Newsletter subscribers created before this instant received the original.
-#: Its account phase committed at 03:44:39 UTC and the newsletter phase ran
-#: straight after; the newest of those 14 subscribers joined on 2026-09-07.
-ORIGINAL_SEND_AT = "2026-09-11T03:44:00+00:00"
+#:
+#: Resend's log timestamps all 39 survey emails between 15:59:38 and 16:00:21
+#: UTC on 2026-09-10 — noon in New York. This constant previously said
+#: 2026-09-11 03:44, read off `users.updated_at`: a column later activity
+#: bumps, not a send record. That put the cutoff ~12 hours late, so a
+#: newsletter-only subscriber who joined in between would have been sent a
+#: "follow-up" to an email they never received. Checked on production
+#: 2026-09-13: nobody fell in that window (the one subscriber who did already
+#: had an account), and it is in the past, so nobody can. Set a few seconds
+#: BEFORE the first send, so anyone who joined mid-send is left out — an
+#: under-send, never a false follow-up.
+ORIGINAL_SEND_AT = "2026-09-10T15:59:00+00:00"
 
 #: Founder decision 2026-09-11: remind ONE address for Waad. waadrabeemm@
 #: ("Waad Rabeemm") and waadrabeema@ ("Waad20rabee Ma") registered 36 seconds
