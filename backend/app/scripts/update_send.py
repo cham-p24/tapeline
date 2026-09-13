@@ -1,0 +1,403 @@
+"""Send the September 2026 product update — once, unattended. HELD.
+
+NOT YET AUTHORISED. The copy and the send date both wait on the founder. The
+workflow that runs this, .github/workflows/product-update-send.yml, schedules
+the send the moment it is merged, so the PR carrying it stays open until the
+founder has approved both.
+
+WHAT IT SAYS
+------------
+What changed in the week to 11 September, including what broke: the ~24-hour
+scoring freeze, the permanent 9 September gap in the public record, the universe
+growing from ~2,000 to ~11,500, crypto, and the 7 September score correction.
+Account holders also get one sentence the newsletter list does not: the
+open-access month ended on 8 September. The copy lives in
+`services/email.render_product_update_email`, where the copy linter reads it.
+
+It promotes nothing — no price, no offer, no upgrade ask, no deadline — for the
+same reason the survey did not: the consent basis for a non-transactional email
+to this list is an existing relationship plus a message that sells nothing.
+
+WHO RECEIVES IT
+---------------
+Account holders (`users`), minus these, each for a stated reason:
+  * no address; the founder's accounts and the ads contractor
+    (`survey_send.INTERNAL_ADDRESSES`) and admins — not customers;
+  * `email_undeliverable_at` — a bounce or complaint already on record;
+  * `survey_send.RESEND_SUPPRESSED` — Resend drops it anyway, and counting it as
+    sent would make the result line lie;
+  * `re_sunset` — suppressed from every non-transactional send by the lifecycle
+    governor (checked here too, so it shows up as a counted reason);
+  * opted out of `EmailPref.RE_ENGAGEMENT` — a product update to someone who is
+    not being actively mailed is re-engagement, the honest category to gate on;
+  * already carrying UPDATE_TOKEN — so a second run is a no-op;
+  * a `drip_state` too full to take the token (`_room_for_token`) — an email
+    that cannot be recorded is an email a retry would send again.
+
+Newsletter-only subscribers: confirmed, with a working unsubscribe token, whose
+address belongs to NO account in any casing (`survey_send.collect_newsletter`),
+and not Resend-suppressed. Deduplicating against EVERY account — not only the
+eligible ones — is deliberate: someone who opted their account out of
+re-engagement must not be reached through the mailing list instead.
+
+WHY IT CANNOT DOUBLE-SEND
+-------------------------
+Four layers, because each one covers a failure the others do not.
+
+  1. PER-RECIPIENT COMMIT. It runs over `flyctl ssh`. If that session drops
+     mid-run, an end-of-run commit would roll back every token AFTER the emails
+     had gone, and the next run would send them all again. The token is
+     appended in SQL, not written back from the copy of `drip_state` read at
+     collection time, so a drip the worker records mid-run survives.
+  2. "ALREADY SENT" IS PARSED IN PYTHON, never with SQL LIKE. `_` is a LIKE
+     wildcard, so '%product_update_2026_09%' would also match tokens this job
+     never wrote.
+  3. THE NEWSLETTER HALF RUNS ON THE FIRST RUN ONLY. `newsletter_subscribers`
+     has no per-row marker (`last_sent_at` belongs to the daily digest, which
+     would stop sending if this job wrote it). So accounts always go first, and
+     the newsletter phase runs only when no account carried the token before
+     this run AND this run stamped at least one. The second condition closes a
+     hole the survey reminder's guard has: a run that stamps no account leaves
+     no trace, so without it a re-run would mail the list a second time. A crash
+     therefore under-sends rather than double-sends. `--force-newsletter` is
+     for a human who has checked Resend's log first.
+  4. A DATABASE LOCK. The token makes a RETRY safe and does nothing about two
+     runs at once — both read "not sent" before either commits. The workflow's
+     concurrency group stops two scheduled runs overlapping, not a manual
+     `flyctl ssh` started at the same moment. `dblock.one_machine_at_a_time`
+     holds LOCK_PRODUCT_UPDATE on a session of its own, so the per-recipient
+     commits do not release it. The loser returns {} and sends nothing.
+
+SAFETY
+------
+  * DRY RUN BY DEFAULT. `--send` is required to transmit anything.
+  * `--quiet` prints counts, never an address. The workflow's log is
+    world-readable on this public repo. It also routes every log line through
+    a formatter that redacts address-shaped text: `send_email` logs `to=` at
+    WARNING when there is no Resend key and at ERROR when its undeliverable
+    check fails, and with no logging configured Python prints WARNING and
+    above straight to stderr, which is the same public log.
+  * Refuses to send unless APP_URL is a public https URL (the scorecard link is
+    built from it), and unless SESSION_SECRET can sign an unsubscribe link —
+    without it every account holder's footer and plain-text part would carry
+    no working opt-out.
+  * Honours the shared lifecycle frequency governor, like the reminder.
+
+Usage:
+    python -m app.scripts.update_send                   # dry run
+    python -m app.scripts.update_send --send --quiet    # what the workflow runs
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import logging
+import re
+import sys
+
+from sqlalchemy import select
+
+from app.scripts.survey_send import (
+    INTERNAL_ADDRESSES,
+    RESEND_SUPPRESSED,
+    SUNSET_TOKEN,
+    collect_newsletter,
+    first_name,
+)
+from app.services.dblock import LOCK_PRODUCT_UPDATE, one_machine_at_a_time
+
+logger = logging.getLogger(__name__)
+
+UPDATE_TOKEN = "product_update_2026_09"
+
+#: Invisible on the page — the link text is derived without the query string —
+#: and lets the scorecard's traffic from this one email be told apart.
+SCORECARD_UTM = "utm_source=email&utm_medium=email&utm_campaign=product_update_2026_09"
+
+
+def _state_tokens(drip_state: str | None) -> set[str]:
+    """`User.drip_state` is a COMMA-SEPARATED TOKEN STRING, not JSON.
+
+    Takes the raw column, not a User, so the first-run check can read
+    `select(User.drip_state)` without loading every row as an object.
+    """
+    return {t for t in (drip_state or "").split(",") if t}
+
+
+async def collect_accounts(session) -> tuple[list, list]:
+    """(recipients, skipped) — read-only. See the module docstring for why."""
+    from app.models import User
+    from app.services.email_prefs import EmailPref, wants
+
+    rows = (await session.execute(select(User))).scalars().all()
+    recipients, skipped = [], []
+    for u in rows:
+        email = (u.email or "").lower()
+        toks = _state_tokens(u.drip_state)
+        if not email:
+            skipped.append((u, "no_email"))
+        elif UPDATE_TOKEN in toks:
+            skipped.append((u, "already_sent"))
+        elif email in INTERNAL_ADDRESSES or getattr(u, "is_admin", False):
+            skipped.append((u, "internal"))
+        elif getattr(u, "email_undeliverable_at", None) is not None:
+            skipped.append((u, "undeliverable"))
+        elif email in RESEND_SUPPRESSED:
+            skipped.append((u, "resend_suppressed"))
+        elif SUNSET_TOKEN in toks:
+            skipped.append((u, "sunset"))
+        elif not wants(u, EmailPref.RE_ENGAGEMENT):
+            skipped.append((u, "opted_out"))
+        elif not _room_for_token(u.drip_state):
+            skipped.append((u, "no_room_for_token"))
+        else:
+            recipients.append(u)
+    return recipients, skipped
+
+
+def _room_for_token(drip_state: str | None) -> bool:
+    """Whether appending UPDATE_TOKEN still fits `users.drip_state`.
+
+    The column is VARCHAR(255) and this has already bitten once: weekly tokens
+    overran it and Postgres raised StringDataRightTruncation on commit (see
+    email.run_weekly_newsletter). Here the stamp is written AFTER the email is
+    delivered and outside the send's try, so an overflow would abort the run
+    with that person mailed but unstamped — and every retry would mail them
+    again. Skipping them, counted, is the only order that cannot double-send.
+    SQLite does not enforce the length, so the test suite could never see the
+    failure; the capacity is read from the model rather than restated here.
+    """
+    from app.models import User
+
+    capacity = User.__table__.c.drip_state.type.length
+    current = drip_state or ""
+    needed = len(current) + (1 if current else 0) + len(UPDATE_TOKEN)
+    return needed <= capacity
+
+
+async def collect_newsletter_only(session) -> tuple[list, list]:
+    """(recipients, skipped) — confirmed subscribers who have no account."""
+    candidates, skipped = await collect_newsletter(session)
+    recipients = []
+    for sub in candidates:
+        if sub.email.lower() in RESEND_SUPPRESSED:
+            skipped.append((sub, "resend_suppressed"))
+        else:
+            recipients.append(sub)
+    return recipients, skipped
+
+
+def _tally(skipped: list) -> str:
+    counts: dict[str, int] = {}
+    for _row, reason in skipped:
+        counts[reason] = counts.get(reason, 0) + 1
+    return ", ".join(f"{k}={v}" for k, v in sorted(counts.items())) or "none"
+
+
+@one_machine_at_a_time(LOCK_PRODUCT_UPDATE, "product_update", default_factory=dict)
+async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False) -> dict:
+    """Send (or dry-run) the product update. See the module docstring."""
+    from sqlalchemy import case, or_, update
+
+    from app.config import get_settings
+    from app.db import session_scope
+    from app.models import User
+    from app.services.email import (
+        PRODUCT_UPDATE_SUBJECT,
+        render_product_update_email,
+        render_product_update_text,
+        send_email,
+    )
+    from app.services.lifecycle import worker_governor
+    from app.services.newsletter import _list_unsubscribe_headers, _unsubscribe_url
+    from app.services.unsubscribe import unsubscribe_url
+
+    base = (get_settings().app_url or "https://tapeline.io").rstrip("/")
+    scorecard_url = f"{base}/scorecard?{SCORECARD_UTM}"
+    if send and not base.startswith("https://"):
+        raise SystemExit(
+            f"refusing to send: the scorecard link is {base!r}, which is not a "
+            f"public https URL."
+        )
+    if send and unsubscribe_url("u_probe", "re_engagement") is None:
+        raise SystemExit(
+            "refusing to send: SESSION_SECRET is not set, so no account holder's "
+            "unsubscribe link can be signed."
+        )
+
+    def show(line: str) -> None:
+        if not quiet:
+            print(line)
+
+    counts = {
+        "accounts_sent": 0, "newsletter_sent": 0, "would_send": 0,
+        "governed": 0, "not_sent": 0, "failed": 0,
+    }
+
+    async with session_scope() as session:
+        # Decided BEFORE anything is sent, and parsed in Python — see layer 2.
+        states = (await session.execute(select(User.drip_state))).scalars().all()
+        first_run = not any(UPDATE_TOKEN in _state_tokens(d) for d in states)
+
+        accounts, a_skipped = await collect_accounts(session)
+        news, n_skipped = await collect_newsletter_only(session)
+
+        print(f"\n{'SENDING' if send else 'DRY RUN — nothing will be sent'}: product update")
+        print(f"link: {scorecard_url}")
+        print(f"accounts:   {len(accounts)} to send; skipped: {_tally(a_skipped)}")
+        print(f"newsletter: {len(news)} eligible; skipped: {_tally(n_skipped)}")
+
+        governor = worker_governor()
+        for u in accounts:
+            greeting = first_name(u.name)
+            if not send:
+                counts["would_send"] += 1
+                show(f"  WOULD SEND  {u.email:<40} Hi {greeting},")
+                continue
+            if not governor.allows(u):
+                counts["governed"] += 1
+                show(f"  GOVERNED    {u.email}")
+                continue
+            try:
+                res = await send_email(
+                    to=u.email,
+                    subject=PRODUCT_UPDATE_SUBJECT,
+                    html=render_product_update_email(
+                        greeting, scorecard_url=scorecard_url, audience="account",
+                    ),
+                    text=render_product_update_text(
+                        greeting, scorecard_url=scorecard_url, audience="account",
+                        unsubscribe_url=unsubscribe_url(u.id, "re_engagement") or "",
+                    ),
+                    persona="sales",
+                    unsubscribe_user_id=u.id,
+                    unsubscribe_category="re_engagement",
+                )
+            except Exception:
+                counts["failed"] += 1
+                # An id, never the address: this output can be public.
+                logger.exception("product_update.send_failed user=%s", u.id)
+                show(f"  FAILED      {u.email}")
+                continue
+            if res.get("skipped"):
+                counts["not_sent"] += 1
+                show(f"  NOT SENT    {u.email} ({res.get('reason')})")
+                continue
+
+            await session.execute(
+                update(User)
+                .where(User.id == u.id)
+                .values(drip_state=case(
+                    (or_(User.drip_state.is_(None), User.drip_state == ""), UPDATE_TOKEN),
+                    else_=User.drip_state + "," + UPDATE_TOKEN,
+                ))
+                .execution_options(synchronize_session=False)
+            )
+            await session.commit()  # per recipient — layer 1
+            governor.record(u)
+            counts["accounts_sent"] += 1
+            show(f"  SENT        {u.email}")
+
+        # Layer 3. Dry runs report what the first real run would do.
+        if force_newsletter:
+            run_news, why = True, "FORCED by --force-newsletter"
+        elif not first_run:
+            run_news, why = False, "SKIPPED: an earlier run already stamped accounts"
+        elif send and counts["accounts_sent"] == 0:
+            run_news, why = False, (
+                "SKIPPED: this run stamped no account, so a re-run could not tell "
+                "the list had been mailed"
+            )
+        else:
+            run_news, why = True, "running"
+        print(f"newsletter phase: {why}")
+
+        if run_news:
+            for sub in news:
+                if not send:
+                    counts["would_send"] += 1
+                    show(f"  WOULD SEND  {sub.email:<40} Hi there,")
+                    continue
+                unsub = _unsubscribe_url(sub.unsubscribe_token)
+                try:
+                    res = await send_email(
+                        to=sub.email,
+                        subject=PRODUCT_UPDATE_SUBJECT,
+                        html=render_product_update_email(
+                            "there", scorecard_url=scorecard_url,
+                            audience="newsletter", newsletter_unsubscribe_url=unsub,
+                        ),
+                        text=render_product_update_text(
+                            "there", scorecard_url=scorecard_url,
+                            audience="newsletter", unsubscribe_url=unsub,
+                        ),
+                        persona="sales",
+                        headers=_list_unsubscribe_headers(sub.unsubscribe_token),
+                    )
+                except Exception:
+                    counts["failed"] += 1
+                    logger.exception("product_update.newsletter_send_failed id=%s", sub.id)
+                    show(f"  FAILED      {sub.email}")
+                    continue
+                if res.get("skipped"):
+                    counts["not_sent"] += 1
+                    show(f"  NOT SENT    {sub.email} ({res.get('reason')})")
+                    continue
+                counts["newsletter_sent"] += 1
+                show(f"  SENT        {sub.email}")
+
+    print(f"\nresult: {counts}\n")
+    return counts
+
+
+#: Anything shaped like local@domain. Deliberately loose: redacting a
+#: non-address that happens to contain "@" costs nothing in a count-only log,
+#: and missing a real address costs a customer's privacy.
+_ADDRESS_SHAPED = re.compile(r"[^\s<>\"'(),;:\[\]]+@[^\s<>\"'(),;:\[\]]+")
+
+
+class RedactAddresses(logging.Formatter):
+    """Formats a record — traceback included — then removes address-shaped text."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        return _ADDRESS_SHAPED.sub("<address>", super().format(record))
+
+
+def configure_quiet_logging() -> logging.Handler:
+    """Route every log line through RedactAddresses. See SAFETY in the docstring."""
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(RedactAddresses("%(levelname)s %(name)s %(message)s"))
+    root = logging.getLogger()
+    root.handlers[:] = [handler]
+    root.setLevel(logging.WARNING)
+    return handler
+
+
+def main(argv: list[str] | None = None) -> None:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--send", action="store_true", help="actually transmit")
+    ap.add_argument(
+        "--quiet", action="store_true",
+        help="print counts only, never an address. REQUIRED wherever the output "
+             "is public — the product-update workflow passes it.",
+    )
+    ap.add_argument(
+        "--force-newsletter", action="store_true",
+        help="run the newsletter phase even though it would otherwise be skipped. "
+             "Check Resend's log first.",
+    )
+    args = ap.parse_args(argv)
+
+    if args.quiet:
+        configure_quiet_logging()
+
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+    asyncio.run(run(
+        send=args.send, quiet=args.quiet, force_newsletter=args.force_newsletter,
+    ))
+
+
+if __name__ == "__main__":
+    main()
