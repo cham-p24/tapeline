@@ -55,7 +55,7 @@ const METHODOLOGY_LOG: LogEntry[] = [
     title: "Entries on this page said no recorded value had ever been changed. That was wrong",
     body:
       "Several entries below say that no historical entry was altered, that every past day stands exactly as it was recorded, or that we don't rewrite the record: the 2026-09-06 entries for #761 and #762, the 2026-07-09 entry, and the 2026-07-10 release note. Those statements were false when they were written. On 15 June 2026 the recorded scores for the 190 entries from 18 May to 12 June 2026 were capped at 100 and the original values were not kept (see the 2026-06-15 entry). The 2026-08-24 entry also says 688 rows were rebased: 684 of the 688 were, and 4 were left as first recorded because the data vendor no longer returns prices for them. We are leaving those entries as written, because this log corrects rather than rewrites. What is true: entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026.",
-    ref: "this PR",
+    ref: "#821",
   },
   {
     date: "2026-09-14",
@@ -63,7 +63,7 @@ const METHODOLOGY_LOG: LogEntry[] = [
     title: "Four US trading days have no top 10 on the record",
     body:
       "No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026. On 9 September our system stopped writing data at 15:36 UTC and did not recover before the daily list was due. The cause for the other three days has not been established, so we are not stating one. None of the four days was filled in afterwards, and none will be. The scorecard page now lists every trading day with no entry, computed from the record itself, and the CSV and JSON downloads carry the same list as missing_sessions.",
-    ref: "this PR",
+    ref: "#821",
   },
   {
     date: "2026-09-10",
