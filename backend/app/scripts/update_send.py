@@ -186,9 +186,17 @@ def _room_for_token(drip_state: str | None) -> bool:
     SQLite does not enforce the length, so the test suite could never see the
     failure; the capacity is read from the model rather than restated here.
     """
+    from sqlalchemy import String
+
     from app.models import User
 
-    capacity = User.__table__.c.drip_state.type.length
+    # Narrowed with isinstance so mypy knows `.length` exists (a bare
+    # TypeEngine does not declare it). Text subclasses String with
+    # length=None, i.e. no limit, so a future Text column never blocks a send.
+    col_type = User.__table__.c.drip_state.type
+    capacity = col_type.length if isinstance(col_type, String) else None
+    if capacity is None:
+        return True
     current = drip_state or ""
     needed = len(current) + (1 if current else 0) + len(UPDATE_TOKEN)
     return needed <= capacity
