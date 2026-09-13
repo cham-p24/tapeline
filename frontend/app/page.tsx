@@ -215,7 +215,7 @@ export default async function LandingPage() {
             &mdash; the live scanner, top ten scored rows a scan. Adding a card is
             what starts the trial: 30 days of Premium, and nothing is charged that day
             &mdash; the first charge is on day 30 at the plan you pick, we email you
-            seven days before, and one click cancels before then. The scorecard and
+            about 7 days before, and one click cancels before then. The scorecard and
             daily Top 10 stay free to read with no account either way.
           </p>
         </div>

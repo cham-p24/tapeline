@@ -155,7 +155,7 @@ function TrialMock() {
   const rows: [string, string][] = [
     ["Due today", "$0.00"],
     ["First charge", "day 30 · the plan you pick"],
-    ["Reminder email", "seven days before"],
+    ["Reminder email", "about 7 days before"],
   ];
   return (
     <div className="mx-auto max-w-[300px] space-y-1.5">
@@ -446,7 +446,7 @@ export default function WhatsNewPage() {
               separate step that starts the 30-day Premium trial, and it is what turns on every
               matching row, a second saved screen, alerts, CSV export and insider filings:{" "}
               <strong className="text-fg">$0 charged today</strong>, first charge on day 30 at the
-              plan you pick. We email you <strong className="text-fg">seven days before</strong> that
+              plan you pick. We email you <strong className="text-fg">about 7 days before</strong> that
               charge, and cancelling is one click on the first screen — cancel before day 30 and you
               are never charged. The published record stays free to read with no account.
             </>
