@@ -255,7 +255,7 @@ export const FACTORS: Factor[] = [
     feeds: [
       {
         name: "SEC filings",
-        detail: "Form 4 insider transactions, ingested daily for the liquid universe.",
+        detail: "Form 4 insider transactions from a data vendor, pulled in a once-a-day refresh that works through the stock universe in batches. Not every stock is re-checked every day, and the vendor can run behind SEC EDGAR.",
       },
     ],
     caveat:
@@ -263,7 +263,7 @@ export const FACTORS: Factor[] = [
     limitations: [
       "Many disclosed transactions carry no view at all. Sales scheduled months in advance under a 10b5-1 plan, option exercises, vesting events and share sales made purely to cover tax withholding all arrive as Form 4 filings and are netted like any other.",
       "Smaller and less-covered companies file rarely, so the window is frequently empty and the factor is unavailable for long stretches.",
-      "The factor reads corporate-insider Form 4 filings. Congressional disclosure data is ingested by Tapeline and published as its own feed in the product, but it is not an input to this sub-score today.",
+      "The factor reads corporate-insider Form 4 filings only. It has no congressional-trade input.",
       "Netting by dollar value means one large filer can dominate a company with many reporting insiders.",
       "Insiders are not a uniformly informed group, and this factor makes no claim that they are. The name of the factor is conventional industry shorthand, not an assessment of anyone's judgement.",
     ],

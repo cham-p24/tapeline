@@ -151,9 +151,9 @@ export default async function FactorPage({
             onto the 0&ndash;100 scale. What is published is the factor set, the
             weight ordering, each factor&rsquo;s contribution on every ticker, and{" "}
             <Link href="/scorecard" className="link">
-              the record of every daily top-10
+              the daily top-10 record
             </Link>
-            .
+            {" "}(four trading days since the record began on 11 May 2026 have no list).
           </p>
         </div>
       </section>
