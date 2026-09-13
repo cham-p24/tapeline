@@ -113,19 +113,56 @@ CACHE_DERIVED_COLUMNS: tuple[str, ...] = (
     "change_pct_5d", "change_pct_1m",
 )
 
-#: Rows per COMMITTED chunk in the per-tick snapshot write.
+#: Rows per COMMITTED chunk in the per-tick snapshot write — and, since the
+#: statement moved onto the Core table, rows per cursor executemany.
 #:
-#: The write was one executemany per column set inside ONE transaction spanning
-#: the whole active universe. Survivable at 2,500 symbols; #763 raised
-#: ACTIVE_UNIVERSE_SIZE to 12,000, the batch grew past 7,500 rows, and the stage
-#: crossed the tick watchdog — at which point it stopped being a latency problem
-#: and became a correctness one, because a watchdog kill is a ROLLBACK and not a
-#: pause. See the long comment at the write loop.
+#: The write used to sit inside ONE transaction spanning the whole active
+#: universe. Survivable at 2,500 symbols; #763 raised ACTIVE_UNIVERSE_SIZE to
+#: 12,000, the batch grew past 7,500 rows, and the stage crossed the tick
+#: watchdog — at which point it stopped being a latency problem and became a
+#: correctness one, because a watchdog kill is a ROLLBACK and not a pause. See
+#: the long comment at the write loop.
 #:
-#: 500 keeps each round trip small enough that a kill costs at most a fraction
-#: of a second of work, while staying large enough that ~15 round trips cover
-#: the universe. Env-overridable so an incident can retune it without a deploy.
+#: This comment used to say each chunk was "one executemany". It was not. The
+#: statement was built on the ORM entity, update(Ticker), and SQLAlchemy 2.0.49
+#: routes an ORM UPDATE handed a list of parameter sets through its
+#: bulk-by-primary-key path, which issues ONE UPDATE PER ROW: a
+#: before_cursor_execute probe saw 5 parameter sets -> 5 cursor executions,
+#: executemany=False each. Production logged `score_upsert.done rows=11585
+#: chunk=500 elapsed=39.5s` every minute on a performance-1x worker at ~52%
+#: CPU — 11,585 statements a minute where the chunking implied ~24.
+#:
+#: 500 keeps each commit small enough that a kill costs at most a fraction of a
+#: second of work, while staying large enough that ~24 round trips cover the
+#: 11,585-row universe. Env-overridable so an incident can retune it without a
+#: deploy.
 UPSERT_CHUNK_ROWS: int = int(os.environ.get("UPSERT_CHUNK_ROWS", "500"))
+
+
+def _score_upsert_params(
+    batch: list[dict[str, Any]], columns: list[str]
+) -> list[dict[str, Any]]:
+    """The parameter sets for tick()'s score upsert, one per row of `batch`.
+
+    Every key is a bind name that CANNOT be a tickers column: `b_symbol` for
+    the WHERE, `v_<col>` for each SET value. On a Core UPDATE that is not
+    style, it is what keeps the SET clause the one the statement declares —
+    Core adds `SET <key>=?` for any parameter key that names a column, so the
+    old row dicts (which carried `symbol` beside `b_symbol`) would have
+    rendered `SET symbol=?, ...`. Measured on SQLAlchemy 2.0.49 / SQLite.
+
+    Rows in one batch share one key set (they are built from one dict literal
+    in tick()), so every row supplies every bind.
+
+    A module-level function only so the equivalence test can see the
+    pre-conversion `batch` it is handed; the statement itself stays in tick(),
+    where the updated_at guards key it.
+    """
+    return [
+        {"b_symbol": row["symbol"], **{f"v_{col}": row[col] for col in columns}}
+        for row in batch
+    ]
+
 
 #: Ceiling on ONE whole tick before the watchdog kills it. See the watchdog in
 #: main() for why this moved off 60 and why raising it is safe.
@@ -513,7 +550,8 @@ async def tick() -> None:
             else:
                 full_updates.append({"symbol": snap["symbol"], **data})
 
-        # Bulk UPDATE ... WHERE symbol = :symbol, executemany'd per column set.
+        # One Core UPDATE ... WHERE symbol = :b_symbol per column set (the full
+        # batch and the sheet-governed batch), executemany'd per chunk.
         #
         # COALESCE on the four CACHE-DERIVED columns is load-bearing, not a
         # nicety. market_cap comes from _MARKET_CAP_CACHE and the three bar
@@ -544,35 +582,64 @@ async def tick() -> None:
         # ran. Making the miss honest (NULL) is only safe because of this guard:
         # NULL now means "nothing new to say", and the last real score stands.
         cache_derived = CACHE_DERIVED_COLUMNS
+        tickers_table = Ticker.__table__
         _upsert_started = monotonic()
         _rows_written = 0
         for batch in (full_updates, market_updates):
             if not batch:
                 continue
             columns = [k for k in batch[0] if k != "symbol"]
-            # synchronize_session=None is required: an executemany UPDATE with
-            # WHERE criteria cannot synchronize persistent objects, and without
-            # it SQLAlchemy raises InvalidRequestError on every tick the moment
-            # any Ticker is resident in the session — which is exactly what
-            # took the worker down for 4h on 2026-08-23 (tick.failure loop).
-            # Nothing in the tick relies on in-session Ticker state afterwards.
+            # Built on the Core TABLE, not the ORM entity, so that each chunk is
+            # ONE cursor executemany.
+            #
+            # As update(Ticker) this was not an executemany at all, whatever the
+            # comments here said. Handed a list of parameter sets, an ORM UPDATE
+            # goes through SQLAlchemy's bulk-by-primary-key path, which issues
+            # one UPDATE per row (2.0.49, before_cursor_execute: 5 parameter
+            # sets -> 5 executions, executemany=False each). Not a SQLite
+            # quirk: a statement carrying .values() takes the per-record
+            # branch of orm/persistence.py _emit_update_statements, which
+            # checks no dialect, so Postgres paid it too. Production logged
+            # `score_upsert.done rows=11585 chunk=500 elapsed=39.5s` every
+            # minute on a performance-1x worker at ~52% CPU. The same statement
+            # on the table is 1 execution, executemany=True; what it writes is
+            # pinned column-for-column against the old form by
+            # tests/test_score_upsert_is_a_real_executemany.py.
+            #
+            # The SQL is unchanged apart from bind names and one clause (the
+            # compiled Postgres form is compared with the old statement's in
+            # that test file): the ORM path ANDed a second
+            # `tickers.symbol = ?` (the primary key from each row dict) onto
+            # the same WHERE, which with b_symbol == symbol selects the same
+            # row.
+            #
+            # Bind names are v_<col> and b_symbol, never a column name: see
+            # _score_upsert_params for what Core does with a column-named key.
+            #
+            # No identity-map hazard. A Core UPDATE refreshes no in-session
+            # object — and neither did the old form, which ran with
+            # synchronize_session=None (#576, the 2026-08-23 outage). The only
+            # Tickers this session ever holds are the new symbols session.add()
+            # stages above; they are never in a batch, never bound to a name,
+            # and nothing below reads them before the scope closes.
             #
             # updated_at is deliberately NOT in this SET: this is the live-data
-            # write, so the column's onupdate must fire and advance it. It is
-            # the one update(Ticker) allowed to — see the comment on
-            # Ticker.updated_at and tests/test_ticker_updated_at_means_live_data.py.
+            # write, so the column's onupdate must fire and advance it — a
+            # Column-level onupdate, so it fires for the Core table exactly as
+            # it did for the entity. It is the one update(Ticker) allowed to —
+            # see the comment on Ticker.updated_at and
+            # tests/test_ticker_updated_at_means_live_data.py.
             stmt = (
-                update(Ticker)
-                .where(Ticker.symbol == bindparam("b_symbol"))
+                update(tickers_table)
+                .where(tickers_table.c.symbol == bindparam("b_symbol"))
                 .values({
                     col: (
-                        func.coalesce(bindparam(col), getattr(Ticker, col))
+                        func.coalesce(bindparam(f"v_{col}"), tickers_table.c[col])
                         if col in cache_derived
-                        else bindparam(col)
+                        else bindparam(f"v_{col}")
                     )
                     for col in columns
                 })
-                .execution_options(synchronize_session=None)
             )
             # Commit per chunk, not once for the whole batch.
             #
@@ -600,7 +667,7 @@ async def tick() -> None:
             # boundary can land between a score and the factors it came from.
             # That distinction is the 158-row desync incident, and it stays
             # fixed.
-            rows = [{**row, "b_symbol": row["symbol"]} for row in batch]
+            rows = _score_upsert_params(batch, columns)
             for start in range(0, len(rows), UPSERT_CHUNK_ROWS):
                 await session.execute(stmt, rows[start:start + UPSERT_CHUNK_ROWS])
                 await session.commit()

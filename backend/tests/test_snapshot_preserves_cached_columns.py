@@ -47,7 +47,11 @@ def test_cache_derived_columns_are_coalesced():
             f"{col} is fed by an in-memory cache that is empty after every "
             f"restart; without COALESCE the first tick post-deploy erases it"
         )
-    assert "func.coalesce(bindparam(col), getattr(Ticker, col))" in SRC
+    # The spelling in tick() since the upsert moved onto the Core table. That
+    # the COALESCE is applied to exactly these columns, and keeps a held value
+    # through a cold cache, is executed against the real tick in
+    # tests/test_score_upsert_is_a_real_executemany.py.
+    assert 'func.coalesce(bindparam(f"v_{col}"), tickers_table.c[col])' in SRC
 
 
 def test_snapshot_fields_are_NOT_coalesced():

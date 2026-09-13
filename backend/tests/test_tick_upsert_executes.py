@@ -16,9 +16,19 @@ So this one drives real rows through a real session — with a Ticker
 deliberately loaded into the identity map first, because ORM residency is
 exactly the condition that armed the production failure — and reads them back.
 
+The tick's statement has since moved off the ORM entity onto the Core table,
+update(Ticker.__table__), so that each chunk is one cursor executemany rather
+than one UPDATE per row (tests/test_score_upsert_is_a_real_executemany.py).
+A Core UPDATE never attempts to synchronize in-session objects, so it cannot
+raise the error above at all; the resident Ticker stays, as the condition this
+file exists to keep covered.
+
 _stmt() below mirrors the statement the tick builds in
-app/workers/signal_publisher.py::tick(). If the tick's statement shape
-changes, change this in lockstep — the point is to execute the same shape.
+app/workers/signal_publisher.py::tick(), and the parameter sets come from the
+tick's own converter, signal_publisher._score_upsert_params. If the tick's
+statement shape changes, change this in lockstep — the point is to execute the
+same shape. The real tick is driven, not mirrored, in
+tests/test_score_upsert_is_a_real_executemany.py.
 """
 from __future__ import annotations
 
@@ -29,6 +39,7 @@ from sqlalchemy import bindparam, func, select, update
 
 from app.db import session_scope
 from app.models import Ticker
+from app.workers.signal_publisher import _score_upsert_params
 
 _SYMS = ["UPS0", "UPS1"]
 
@@ -51,25 +62,32 @@ async def _cleanup() -> None:
 
 
 def _stmt(columns: list[str], cache_derived: tuple[str, ...]):
-    """The exact statement shape the tick builds — ORM entity + the
-    synchronize_session=None execution option from #576.
+    """The exact statement shape the tick builds — the Core tickers table,
+    bind names that cannot collide with a column (b_symbol, v_<col>).
 
-    Without that option, an executemany UPDATE against the ORM entity with an
-    explicit WHERE raises InvalidRequestError as soon as any Ticker is in the
-    session's identity map. That is the production outage, reproduced.
+    It used to be the ORM entity plus synchronize_session=None (#576): without
+    that option, an UPDATE against the entity with an explicit WHERE and a list
+    of parameter sets raised InvalidRequestError as soon as any Ticker was in
+    the session's identity map. That was the production outage.
     """
+    table = Ticker.__table__
     return (
-        update(Ticker)
-        .where(Ticker.symbol == bindparam("b_symbol"))
+        update(table)
+        .where(table.c.symbol == bindparam("b_symbol"))
         .values({
             col: (
-                func.coalesce(bindparam(col), getattr(Ticker, col))
+                func.coalesce(bindparam(f"v_{col}"), table.c[col])
                 if col in cache_derived
-                else bindparam(col)
+                else bindparam(f"v_{col}")
             )
             for col in columns
         })
-        .execution_options(synchronize_session=None)
+    )
+
+
+def _params(columns: list[str], **values: float | None) -> list[dict]:
+    return _score_upsert_params(
+        [{"symbol": sym, **{c: values[c] for c in columns}} for sym in _SYMS], columns,
     )
 
 
@@ -88,7 +106,7 @@ async def test_the_bulk_upsert_executes_without_raising():
             await _make_resident(s)
             await s.execute(
                 _stmt(["price", "market_cap"], ("market_cap",)),
-                [{"symbol": sym, "b_symbol": sym, "price": 20.0, "market_cap": None} for sym in _SYMS],
+                _params(["price", "market_cap"], price=20.0, market_cap=None),
             )
     finally:
         await _cleanup()
@@ -105,8 +123,8 @@ async def test_a_cold_cache_preserves_the_existing_value():
                 _stmt(["price", "market_cap", "week52_high"],
                       ("market_cap", "week52_high")),
                 # price fresh from the vendor; both cache-derived fields cold.
-                [{"symbol": sym, "b_symbol": sym, "price": 33.0,
-                  "market_cap": None, "week52_high": None} for sym in _SYMS],
+                _params(["price", "market_cap", "week52_high"],
+                        price=33.0, market_cap=None, week52_high=None),
             )
         async with session_scope() as s:
             rows = (await s.execute(
@@ -131,7 +149,7 @@ async def test_a_real_value_still_overwrites():
             await _make_resident(s)
             await s.execute(
                 _stmt(["market_cap"], ("market_cap",)),
-                [{"symbol": sym, "b_symbol": sym, "market_cap": 5_000.0} for sym in _SYMS],
+                _params(["market_cap"], market_cap=5_000.0),
             )
         async with session_scope() as s:
             caps = (await s.execute(
