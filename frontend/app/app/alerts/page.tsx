@@ -35,13 +35,25 @@ function humanizeGateError(e: TierGateError, channel: Channel): string {
   return `${CHANNEL_HUMAN[channel]} are a ${tier} feature.`;
 }
 
+// The rule types a user can CREATE. "squeeze" and "congress" were removed
+// from this list on 2026-09-14 (integrity fix, founder-approved): no real
+// congressional disclosure is being ingested today, and the squeeze rows were
+// mock output frozen on 2026-07-18, so offering an alert on either sold
+// something that could not truthfully fire. The backend still accepts both
+// types (entitlements unchanged), and a rule a user already has keeps its
+// label via RETIRED_RULE_LABELS below.
 const RULE_TYPES: { value: RuleType; label: string; needsSymbol: boolean; needsThreshold: boolean; help: string }[] = [
   { value: "score",    label: "Score crosses threshold", needsSymbol: true,  needsThreshold: true,  help: "Fires when this ticker's composite score crosses your threshold." },
   { value: "news",     label: "News on a ticker",         needsSymbol: true,  needsThreshold: false, help: "Fires on every fresh article tagged to this ticker." },
-  { value: "squeeze",  label: "Squeeze detected",         needsSymbol: false, needsThreshold: false, help: "Fires when any ticker enters a squeeze setup." },
   { value: "regime",   label: "Regime change",            needsSymbol: false, needsThreshold: false, help: "Fires on RISK_ON → RISK_OFF or the reverse." },
-  { value: "congress", label: "Congress trade disclosed", needsSymbol: true,  needsThreshold: false, help: "Fires when a politician discloses a trade on this ticker. Premium." },
 ];
+
+// Labels for rule types that can no longer be created, so an existing rule
+// still reads as what it is in the user's list.
+const RETIRED_RULE_LABELS: Partial<Record<RuleType, string>> = {
+  squeeze: "Squeeze (retired)",
+  congress: "Congress trade (retired)",
+};
 
 // How many tickers the picker offers. Enough to cover the names a user
 // actually watches without turning the create form into a second table.
@@ -268,7 +280,8 @@ function AlertsPageInner() {
     }
   }
 
-  const ruleTypeLabel = (t: RuleType) => RULE_TYPES.find((r) => r.value === t)?.label ?? t;
+  const ruleTypeLabel = (t: RuleType) =>
+    RULE_TYPES.find((r) => r.value === t)?.label ?? RETIRED_RULE_LABELS[t] ?? t;
   const channelLabel = (c: Channel) =>
     c === "web_push" ? "Web push" : "Email";
 

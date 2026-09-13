@@ -23,12 +23,14 @@
  *
  *  1. THE FULL TERMS, AS REAL BODY TEXT, ABOVE THE BUTTON. $0 today, the exact
  *     calendar date of the first charge, the exact amount, that one click
- *     cancels before then, and that we email three days ahead of the charge.
+ *     cancels before then, and when we email ahead of the charge.
  *     Not a tooltip, not an image, not behind a <details>, not on the next
- *     screen. (The three-days-ahead email is a real thing we send — it is the
- *     `customer.subscription.trial_will_end` branch in
- *     backend/app/routers/webhooks.py — so stating it here is a promise the
- *     system keeps, not a reassurance.)
+ *     screen. (The pre-charge email is a real thing we send — the daily
+ *     `run_trial_precharge_drip` in backend/app/services/email.py, about
+ *     PRECHARGE_NOTICE_DAYS (7) days out, with Stripe's `trial_will_end`
+ *     webhook as a 3-day backstop — so stating it here is a promise the
+ *     system keeps, not a reassurance. The timing is read from lib/trial.ts;
+ *     until 2026-09-14 this screen said "three days before", which was wrong.)
  *  2. A REAL WAY OUT, NOT PUNISHED. The public record and today's picks stay
  *     free and need no account at all; both are linked, plainly, right here,
  *     as is signing out. Someone who does not want to give us a card must be
@@ -52,7 +54,7 @@ import { useUser } from "@/components/UserContext";
 // what happened here: the card-gate tests mocked TrialBanner with
 // TRIAL_DAYS: 14 and kept passing against 14 after the real trial moved
 // to 30, while the page under test quoted the wrong first-charge date.
-import { TRIAL_DAYS } from "@/lib/trial";
+import { PRECHARGE_NOTICE_PHRASE, TRIAL_DAYS } from "@/lib/trial";
 import { PRICING, DEFAULT_BILLING_PERIOD, usd, usdCompact, type BillingPeriod } from "@/lib/pricing";
 import { userLocale } from "@/lib/datetime";
 import { trackEvent } from "@/lib/gtag";
@@ -314,7 +316,7 @@ export default function CardGateStartPage() {
         {" "}Your account already works without one &mdash; the free plan runs the
         live scanner on the top ten scored rows. What the card adds is every
         matching row instead of the first ten, a second saved screen, alerts,
-        CSV export and the filings feeds; the trial becomes a paid subscription
+        CSV export and SEC Form 4 insider filings; the trial becomes a paid subscription
         if you keep it. Here is exactly what that means, before you enter
         anything.
       </p>
@@ -348,7 +350,7 @@ export default function CardGateStartPage() {
         <li className="flex gap-2">
           <span aria-hidden="true" className="text-muted">·</span>
           <span>
-            <strong className="font-semibold">We email you three days before</strong>{" "}
+            <strong className="font-semibold">We email you {PRECHARGE_NOTICE_PHRASE}</strong>{" "}
             that charge, so it cannot arrive unannounced.
           </span>
         </li>

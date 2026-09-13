@@ -82,7 +82,7 @@ export default function AccountPage() {
     {
       title: "Alert rules",
       href: "/app/alerts",
-      description: "Score thresholds, squeeze setups, regime flips — all your active rules.",
+      description: "Score thresholds, news, regime flips — all your active rules.",
     },
   ];
 

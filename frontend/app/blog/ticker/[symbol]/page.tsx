@@ -231,7 +231,7 @@ function confidenceContext(symbol: string, conf: number | null): string {
       `${symbol}'s ${Math.round(conf)}% confidence reflects near-full data ` +
       `coverage across the six factor inputs — Trend + RS pull from real ` +
       `historical bars, Fundamentals from a third-party data feed quarterly statements, Smart ` +
-      `Money from SEC Form 4 + Congressional disclosures, Macro from a public macro feed, ` +
+      `Money from SEC Form 4 insider filings, Macro from a public macro feed, ` +
       `Momentum from primary OHLCV. The composite is as well-informed as the ` +
       `data plumbing allows for a US-listed equity at this scale.`
     );
@@ -240,7 +240,7 @@ function confidenceContext(symbol: string, conf: number | null): string {
     return (
       `${symbol}'s ${Math.round(conf)}% confidence reflects strong-but-not-` +
       `complete coverage. Typical gap: Smart Money data may be lighter (fewer ` +
-      `recent Form 4 filings or no Congressional disclosures), or Fundamentals ` +
+      `recent Form 4 filings), or Fundamentals ` +
       `may lag the latest quarter. The composite is reliable but tilted slightly ` +
       `toward the always-present Trend/RS/Momentum factors.`
     );
@@ -504,7 +504,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
             <FactorRow
               label="Smart Money"
               factor={data?.breakdown?.smart_money}
-              why="Insider net buying (SEC Form 4) and, where applicable, Congressional disclosures and institutional flow. Confirmation factor — most useful in confluence with leading factors."
+              why="Insider net buying from SEC Form 4 filings. Confirmation factor — most useful in confluence with leading factors."
             />
             <FactorRow
               label="Macro"

@@ -7,7 +7,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline Data Categories — What Powers Every Score",
   description:
-    "The data categories Tapeline reads from: live market data, fundamentals, macro indicators, SEC filings, Congressional disclosures, news, analyst ratings. Composite score and labels are Tapeline's own derived output.",
+    "The data categories Tapeline reads from: live market data, fundamentals, macro indicators, SEC filings, news, analyst ratings. Composite score and labels are Tapeline's own derived output.",
   path: "/data-sources",
 });
 
@@ -17,6 +17,8 @@ type Category = {
   surfaceArea: string;
   refreshCadence: string;
   publicRecord: boolean;
+  /** A category we state as NOT available: rendered with no source badge. */
+  unavailable?: boolean;
 };
 
 // Vendor-agnostic data category list. We deliberately do not name specific
@@ -82,24 +84,22 @@ const CATEGORIES: Category[] = [
     publicRecord: true,
   },
   {
-    // Truth check (2026-08-23): no live congressional disclosure feed is wired
-    // in production — the dev-only generator is gated out of prod
-    // (backend/app/workers/signal_publisher.py, _mock_writes_enabled), so the
-    // /app/congress table does not accrue new rows. What IS live: curated
-    // STOCK Act names from the scoring workbook feed the Smart Money
-    // sub-factor (backend/app/services/sheet_feed.py, parse_smart_money_csv).
-    // Do not re-describe /app/congress as a daily-refreshed feed until a real
-    // disclosure source ships.
-    name: "Congressional disclosures",
-    usedFor: [
-      "Curated House + Senate STOCK Act disclosure filings",
-      "Inputs to the Smart Money sub-factor",
-    ],
+    // Integrity fix (founder-approved 2026-09-14). This entry used to say
+    // congressional disclosures fed the Smart Money sub-factor and that
+    // /app/congress showed "previously collected disclosures". Neither is
+    // true today: every congress_trades row is mock output (filtered out by
+    // backend/app/services/congress_integrity.py), there is no current source
+    // of congressional disclosures, and the Smart Money factor reads SEC
+    // Form 4 (see /how-it-works). Stated as unavailable rather
+    // than silently dropped, so nobody reads the absence as an omission.
+    // copy-compliance-allow unbacked-feature-claim -- the entry states the data is NOT available
+    name: "Congressional disclosures (not available)",
+    usedFor: ["Nothing today"],
     surfaceArea:
-      "The Smart Money sub-factor in every score breakdown. The Congressional trades page at /app/congress (Premium tier) shows previously collected disclosures; it is not currently receiving new filings.",
-    refreshCadence:
-      "Curated batches on the scoring-workbook cadence. There is no live per-filing feed today.",
-    publicRecord: true,
+      "None. We don't currently have a real source of congressional trade disclosures, so we don't show any, and none feed the score.",
+    refreshCadence: "Not applicable.",
+    publicRecord: false,
+    unavailable: true,
   },
   {
     name: "News wire",
@@ -181,7 +181,7 @@ export default function DataSourcesPage() {
             <li key={c.name} className="py-8">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <h2 className="text-xl font-semibold">{c.name}</h2>
-                {c.publicRecord ? (
+                {c.unavailable ? null : c.publicRecord ? (
                   <span className="rounded-full border border-up/30 bg-up/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-up">
                     Public record
                   </span>

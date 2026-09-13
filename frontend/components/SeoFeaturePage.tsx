@@ -1,7 +1,7 @@
 /**
- * Shared shell for the public feature landing pages — squeeze, congressional
- * trades, insider buys, heatmap, regime. Each of these is a high-intent
- * keyword cluster Tapeline targets with its own /feature-name URL.
+ * Shared shell for the public feature landing pages — insider buys, heatmap,
+ * regime (and the squeeze page, which is not cross-linked). Each of these is a
+ * high-intent keyword cluster Tapeline targets with its own /feature-name URL.
  *
  * Why a shared component rather than 5 copies:
  *   - The chrome (hero, FAQ accordion, methodology block, CTA, sister-feature
@@ -26,15 +26,18 @@ import { activeScoredLabel } from "@/lib/universe";
 export type FeatureFAQ = { q: string; a: string };
 
 export type SisterFeature = {
-  slug: string;     // URL path without leading slash, e.g. "short-squeeze-scanner"
-  label: string;    // Short label for the link, e.g. "Short squeeze scanner"
+  slug: string;     // URL path without leading slash, e.g. "insider-buying"
+  label: string;    // Short label for the link, e.g. "Insider buying (Form 4)"
 };
 
 // Canonical list of sister features. Add new feature pages here so they
 // cross-link from every other feature page automatically.
+//
+// Short squeeze scanner and Congressional trades were removed from this list
+// on 2026-09-14 (integrity fix, founder-approved): neither has real data behind
+// it, so no page may link to them as a feature. Do not re-add either until a
+// real source is writing rows.
 export const FEATURE_PAGES: SisterFeature[] = [
-  { slug: "short-squeeze-scanner", label: "Short squeeze scanner" },
-  { slug: "congressional-trades",  label: "Congressional trades" },
   { slug: "insider-buying",        label: "Insider buying (Form 4)" },
   { slug: "stock-market-heatmap",  label: "Stock market heatmap" },
   { slug: "market-regime",         label: "Market regime indicator" },
@@ -55,7 +58,7 @@ export const STRATEGY_LINKS: RelatedStrategy[] = [
 ];
 
 type Props = {
-  /** URL slug for this page, e.g. "short-squeeze-scanner". Used for canonical
+  /** URL slug for this page, e.g. "insider-buying". Used for canonical
       + breadcrumb URL, and to filter the sister-feature link list. */
   slug: string;
   /** Eyebrow label above the H1. Short category descriptor. */

@@ -90,21 +90,21 @@ export const FREE_LIMITS = {
   savedScans: 1,
 } as const;
 
-/**
- * What a visitor with NO account gets. Mirrors backend/app/services/tier.py
- * `ANON_DAILY_LOOKUPS`.
+/*
+ * NO ANONYMOUS LOOK-UP ALLOWANCE IS STATED ANYWHERE (T-08, 2026-09-14).
  *
- * Separate from FREE_LIMITS on purpose — anonymous is not the Free tier, it is
- * the state before one — but it lives here for the same reason FREE_LIMITS
- * does: `lib/pricing.ts` is the only place on the client a cap may be written
- * down (see __tests__/freeCapsComeFromOneSource.test.tsx). A surface that
- * names the free allowance and the no-account allowance in the same breath —
- * the look-up meter does — must read both from here, not restate either.
+ * This file used to export ANON_LIMITS = { dailyLookups: 2 }, and the look-up
+ * meter told signed-in users "Without an account it is 2 a day". That was not
+ * true: GET /api/ticker/{symbol} does not meter anonymous callers at all
+ * (backend/app/routers/ticker.py — the per-IP cap 402'd our own SSR renders of
+ * /t/{symbol}, so it was switched off), and three anonymous GETs of
+ * https://tapeline.io/t/AAPL at 2026-09-13 ~21:04 UTC (14 Sep AEST) all
+ * returned the full page. The
+ * founder chose to correct the copy, not the enforcement, so the constant and
+ * the sentence are gone. `tier.ANON_DAILY_LOOKUPS` survives in the backend as
+ * a dormant utility only. Do not reintroduce a no-account number in copy unless
+ * an anonymous meter is actually enforced.
  */
-export const ANON_LIMITS = {
-  /** Ticker-detail look-ups per UTC day, per IP, with no account. */
-  dailyLookups: 2,
-} as const;
 
 /**
  * Open-access month — mirrors backend tier.py `PROMO_OPEN_ACCESS_UNTIL` +

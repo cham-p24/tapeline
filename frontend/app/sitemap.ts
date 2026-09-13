@@ -218,11 +218,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/best-free-stock-screener`,  lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     { url: `${base}/free-stock-scanner-no-credit-card`, lastModified: STATIC_LAST_MODIFIED, priority: 0.8 },
     // Feature landing pages — public surfaces for the gated /app/* tools.
-    // High-intent keyword clusters: short squeeze, congress trades, insider
-    // buying, market heatmap, market regime. Each ranks for the cluster +
-    // converts to the matching tier via a tier-aware CTA.
-    { url: `${base}/short-squeeze-scanner`,     lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
-    { url: `${base}/congressional-trades`,      lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
+    // High-intent keyword clusters: insider buying, market heatmap, market
+    // regime. Each ranks for the cluster + converts to the matching tier via a
+    // tier-aware CTA.
+    //
+    // /short-squeeze-scanner and /congressional-trades are deliberately NOT
+    // listed (integrity fix, founder-approved 2026-09-14). Neither has real
+    // data behind it: no congressional disclosure is being ingested today, and
+    // the squeeze rows were mock output frozen on 2026-07-18. The congress
+    // route is now a noindex "not available" page. Do not re-add either until
+    // a real source is writing rows. Pinned by __tests__/sellCopyIntegrity.test.tsx.
     { url: `${base}/insider-buying`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
     { url: `${base}/stock-market-heatmap`,      lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
     { url: `${base}/market-regime`,             lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },

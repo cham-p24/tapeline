@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { pageMeta } from "@/lib/seo";
+import { PRECHARGE_NOTICE_PHRASE } from "@/lib/trial";
 
 // pageMeta (not a bare object) so this page self-canonicalises, matching its
 // three siblings (privacy / terms / risk / extension-privacy).
@@ -32,7 +33,8 @@ export default function RefundPolicyPage() {
       <div className="mx-auto max-w-3xl px-6 py-10">
         <h1 className="text-4xl font-bold tracking-tight">Refund &amp; cancellation policy</h1>
         <p className="mt-3 text-sm text-muted">
-          Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+          {/* Pinned, not the render date: this page carries dated revisions. */}
+          Last updated: September 14, 2026
         </p>
 
         <p className="mt-6 text-base leading-relaxed text-fg">
@@ -80,6 +82,21 @@ export default function RefundPolicyPage() {
             the day you add it. The first charge lands on day 30 at the plan price you picked, and
             we email you three days before that happens. Cancel any time before day 30 and you are
             never billed &mdash; there is nothing to refund, because no money moved.
+          </p>
+          {/* DATED REVISION (integrity fix T-09, founder-approved 2026-09-14).
+              The sentence above is left exactly as it was published. The
+              reminder stopped going out at three days when the pre-charge
+              notice moved to our own daily send at about seven days (Visa
+              requires at least 7, Mastercard 3 to 7), and this page kept the
+              old number. Legal text is superseded with a dated note, never
+              silently rewritten. The timing reads lib/trial.ts, the same
+              constant the backend drip window is pinned to. */}
+          <p data-testid="refund-precharge-revision">
+            <strong className="text-fg">Updated 14 September 2026:</strong> since 6 September 2026
+            the reminder email before your first charge goes out {PRECHARGE_NOTICE_PHRASE} that
+            charge, not three days before. This replaces the timing in the paragraph above. If that
+            email cannot be sent, a backup reminder goes out about three days before the charge
+            instead.
           </p>
           <p>
             A note on history, because it changes what people were told at sign-up: between

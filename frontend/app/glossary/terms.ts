@@ -570,7 +570,7 @@ export const TERMS: GlossaryTerm[] = [
       "Float is the supply side of price formation. The same dollar amount of buying pressure moves a security with a small tradable supply much further than one with a large one, which is why small-float securities show larger percentage swings on ordinary-looking order flow. It is also the denominator underneath short interest, so a short position that looks modest against shares outstanding can be large against float.",
     tapeline:
       "Tapeline's Momentum methodology notes that low-float tickers produce large readings from small dollar flows, and that a liquidity floor is applied to the ranked scanner and the public scorecard for that reason.",
-    related: { href: "/short-squeeze-scanner", label: "The squeeze scanner" },
+    related: { href: "/how-it-works", label: "How the score is built" },
     see: ["short-interest", "short-squeeze", "average-dollar-volume", "market-capitalisation"],
   },
   {
@@ -588,8 +588,8 @@ export const TERMS: GlossaryTerm[] = [
     matters:
       "Short interest describes the size of the position that has to be closed by buying, which is why it is tracked alongside volume: a large position relative to typical daily trading takes many sessions to unwind. Two cautions matter. The reporting lag means the figure can be badly stale during exactly the fast-moving periods when traders look at it. And a large position is not evidence of a coming move in either direction — some of it is hedging against convertible bonds or options books rather than a directional view.",
     tapeline:
-      "Short-interest data feeds Tapeline's squeeze detection, which is a separate product surface from the composite score — it is not one of the six scoring factors.",
-    related: { href: "/short-squeeze-scanner", label: "The squeeze scanner" },
+      "Short interest is not one of the six factors in Tapeline's composite score.",
+    related: { href: "/how-it-works", label: "How the score is built" },
     see: ["days-to-cover", "short-squeeze", "float", "volume"],
   },
   {
@@ -608,8 +608,8 @@ export const TERMS: GlossaryTerm[] = [
     matters:
       "The ratio normalises a raw short position against how much a security actually trades, which is what makes it comparable between a mega-cap and a small-cap. Its built-in assumption is also its main weakness: it implicitly treats future volume as equal to past volume, and volume expands sharply in exactly the conditions where the ratio is being consulted. A high reading describes a position that is large relative to recent liquidity — nothing more.",
     tapeline:
-      "Days to cover is one of the inputs to Tapeline's squeeze detection, a separate surface from the six-factor composite score.",
-    related: { href: "/short-squeeze-scanner", label: "The squeeze scanner" },
+      "Days to cover is not one of the six factors in Tapeline's composite score.",
+    related: { href: "/how-it-works", label: "How the score is built" },
     see: ["short-interest", "short-squeeze", "volume", "float"],
   },
   {
@@ -628,8 +628,8 @@ export const TERMS: GlossaryTerm[] = [
     matters:
       "Understanding the mechanism explains why some price moves accelerate far past what the underlying news appears to justify: closing a short is a purchase, so the mechanism is self-reinforcing while it runs. The corresponding caution is symmetry — the same conditions that allow a squeeze to run allow it to unwind just as fast once the forced buying is exhausted, and the conditions themselves are present far more often than squeezes actually occur.",
     tapeline:
-      "Tapeline runs squeeze detection as its own surface, available on Pro and above. It reads short interest, days to cover and float; it is not one of the six factors in the composite score.",
-    related: { href: "/short-squeeze-scanner", label: "The squeeze scanner" },
+      "Short-squeeze conditions are not one of the six factors in Tapeline's composite score.",
+    related: { href: "/how-it-works", label: "How the score is built" },
     see: ["short-interest", "days-to-cover", "float", "volatility"],
   },
   {
@@ -782,8 +782,8 @@ export const TERMS: GlossaryTerm[] = [
     matters:
       "These filings are followed closely because of who is filing rather than because of demonstrated informational content, and the honest framing is that the data is interesting rather than proven. The mechanical limits are real: the reporting deadline is generous enough that a disclosure can arrive well after the market has already absorbed whatever prompted it, the value bands are too wide for position sizing to be inferred, and many transactions are executed by advisers under arrangements the filer does not direct.",
     tapeline:
-      "Tapeline ingests congressional disclosures and publishes them as their own Premium feed. The methodology page for Smart Money states explicitly that this data is not an input to that sub-score today.",
-    related: { href: "/congressional-trades", label: "Congressional trades feed" },
+      "Tapeline does not currently have a real source of congressional trade disclosures, so it shows none, and they are not an input to the Smart Money sub-score.",
+    related: { href: "/insider-buying", label: "SEC Form 4 insider filings" },
     see: ["sec-form-4", "form-13f", "accumulation-distribution", "composite-score"],
   },
   {

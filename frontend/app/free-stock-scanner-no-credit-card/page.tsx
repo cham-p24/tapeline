@@ -3,6 +3,7 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { PRICING, usd } from "@/lib/pricing";
+import { PRECHARGE_NOTICE_PHRASE } from "@/lib/trial";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
@@ -55,7 +56,7 @@ const SCANNERS: Scanner[] = [
     publicFormula: "Yes",
     trackRecord: "Public scorecard",
     summary:
-      "The only US scanner here that names all six of its scoring factors and their weight ordering AND leaves every losing day on a public scorecard you can download. You can read all of it without an account: the daily Top 10 at /daily-picks, the whole record at /scorecard, a page per ticker, and the raw CSV and JSON behind them. Be clear-eyed about that record — it currently trails SPY, and we leave it up unedited, because an auditable record is the whole point. Since 30 August 2026 you can also run the scanner yourself for nothing: signing up takes an email and a password, no card, and the free plan is live rather than delayed — the top ten scored rows of any scan you build, one saved screen, a five-symbol watchlist and twelve ticker deep-pages a day. What a card buys is every matching row instead of the first ten, a second saved screen, alerts by email and web push, CSV export, the 200-symbol watchlist and the congressional and insider filings. Adding one starts the 30-day Premium trial through Stripe Checkout — $0 charged that day, the exact first-charge date shown before you confirm, an email three days before it, and one click to cancel.",
+      `The only US scanner here that names all six of its scoring factors and their weight ordering AND leaves every losing day on a public scorecard you can download. You can read all of it without an account: the daily Top 10 at /daily-picks, the whole record at /scorecard, a page per ticker, and the raw CSV and JSON behind them. Be clear-eyed about that record — it currently trails SPY, and we leave it up unedited, because an auditable record is the whole point. Since 30 August 2026 you can also run the scanner yourself for nothing: signing up takes an email and a password, no card, and the free plan is live rather than delayed — the top ten scored rows of any scan you build, one saved screen, a five-symbol watchlist and twelve ticker deep-pages a day. What a card buys is every matching row instead of the first ten, a second saved screen, alerts by email and web push, CSV export, the 200-symbol watchlist and SEC Form 4 insider filings. Adding one starts the 30-day Premium trial through Stripe Checkout — $0 charged that day, the exact first-charge date shown before you confirm, an email ${PRECHARGE_NOTICE_PHRASE} the charge, and one click to cancel.`,
   },
   {
     name: "StockAnalysis.io",
@@ -360,7 +361,7 @@ export default function FreeStockScannerNoCreditCardPage() {
             live rather than delayed and shows the top ten scored rows of any scan.{" "}
             <strong>A card</strong> is the third step, and it buys the rest: every matching
             row instead of the first ten, a second saved screen, alerts, CSV export, the
-            200-symbol watchlist and the filings feeds. Adding one starts the 30-day Premium
+            200-symbol watchlist and SEC Form 4 insider filings. Adding one starts the 30-day Premium
             trial — $0 that day, first charge on day 30, one click to cancel before then.
             The raw filter screeners don&apos;t produce a composite score, so the
             factors and scorecard columns simply don&apos;t apply to them — a difference in

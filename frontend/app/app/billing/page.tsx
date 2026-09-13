@@ -871,7 +871,7 @@ export default function BillingPage() {
               <ul className="mt-3 space-y-1 text-xs text-muted">
                 <li>· Full 6,900-ticker live universe</li>
                 <li>· Watchlist of 200 with smart alerts</li>
-                <li>· Congressional trades + insider buys (SEC Form 4)</li>
+                <li>· Recent insider buys (SEC Form 4)</li>
               </ul>
             </>
           ) : (
@@ -985,7 +985,7 @@ export default function BillingPage() {
               items={[
                 `Full ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} ticker universe, live`,
                 "Score breakdown + Why on every row",
-                "Squeeze Watch + Regime + Heatmap",
+                "Regime + Heatmap",
                 "Watchlist (50) with smart alerts",
                 "TradingView charts + news",
                 "IPO + Earnings calendars",
@@ -1004,7 +1004,6 @@ export default function BillingPage() {
               note={billingPeriod === "annual" ? `${usd(TIER_META.premium.annual)}/yr · billed annually · save $${annualSaving(TIER_META.premium)}${isCardlessTrial ? ` · or ${usd(TIER_META.premium.monthly)}/mo monthly` : ""}` : "billed monthly"}
               proPlus
               items={[
-                "Congressional trades feed (House + Senate)",
                 `Recent insider buys — live SEC Form 4 across ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} tickers`,
                 "Email alerts · unlimited (Pro: 10/day)",
                 "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",

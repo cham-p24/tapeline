@@ -152,7 +152,7 @@ export function InlineUpgradePrompt({ feature }: { feature: keyof typeof FEATURE
 
 /**
  * Modal variant — pops when a free user tries to cross a feature boundary.
- * Usage: <PaywallModal open onClose={...} feature="squeeze" />
+ * Usage: <PaywallModal open onClose={...} feature="csv_export" />
  *
  * `heading` / `description` override the default "<Feature> is on <Tier>"
  * copy for COUNT-cap moments (watchlist full, web-push allowance used up)
@@ -182,16 +182,17 @@ export function PaywallModal({
   if (!open) return null;
   const requiredTier = FEATURE_TIERS[feature];
   const priceLine = requiredTier === "premium" ? "$19.99/mo · Premium" : "$9.99/mo · Pro";
+  // No "squeeze" or "congress" names (integrity fix, 2026-09-14): neither has
+  // real data behind it, so neither may render as "<X> is on Pro/Premium".
+  // A caller passing either key gets the neutral "This feature" fallback.
   const featureName = ({
     "scanner.full": "Full live scanner",
     "scanner.live": "Live scanner updates",
     "watchlist": "Watchlist with smart alerts",
-    "squeeze": "Squeeze Watch",
     "regime.full": "Full regime dashboard",
     "heatmap": "Market heatmap",
     "alerts.email": "Email alerts",
     "ticker.full": "Full ticker deep-dive",
-    "congress": "Congressional trades",
     "alerts.web_push": "Browser push alerts",
     "briefing": "Daily briefing email",
     "api": "API access",

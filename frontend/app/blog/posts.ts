@@ -208,7 +208,7 @@ export const POSTS: BlogPost[] = [
 <p>None of this makes the squeeze useless. It makes it a <em>timing</em> observation, not a <em>direction</em> one. Treating "the bands are tight" as a reason to expect a specific outcome is the mistake.</p>
 
 <h2>Squeeze is not the same as short squeeze</h2>
-<p>Worth clearing up, because the words collide: a Bollinger Band squeeze is a volatility-contraction pattern on the chart. A <em>short</em> squeeze is a completely different thing — a crowded short position forced to cover, mechanically driving price up. They can occur together, but they are measured from entirely different data. Tapeline's <a href="/short-squeeze-scanner">short-squeeze scanner</a> reads short interest, float, and crowding, not band width. Don't conflate the two.</p>
+<p>Worth clearing up, because the words collide: a Bollinger Band squeeze is a volatility-contraction pattern on the chart. A <em>short</em> squeeze is a completely different thing — a crowded short position forced to cover, mechanically driving price up. They can occur together, but they are measured from entirely different data. A short squeeze is measured from short interest, float and borrow cost, not band width. Don't conflate the two.</p>
 
 <h2>How Tapeline reads the context around a squeeze</h2>
 <p>Tapeline does <strong>not</strong> have a dedicated "squeeze" score, and this post isn't going to invent one. What the scanner provides is the directional context a squeeze itself can't: a 0–100 composite built from <a href="/how-it-works">six named factors</a> — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum.</p>
@@ -372,17 +372,16 @@ export const POSTS: BlogPost[] = [
       deserves a paragraph more than "trust us, we're tracking the
       smart money."</p>
 
-      <h2>The data sources behind the factor</h2>
-      <p>Smart Money sums to a 0–100 sub-score from two independent
-      data streams, each with its own lag and signal-to-noise
-      characteristics:</p>
+      <h2>The data source behind the factor</h2>
+      <p><em>Corrected 14 September 2026: an earlier version of this post
+      said the factor reads congressional (STOCK Act) disclosures and that
+      Premium includes a congressional trades feed. Neither is true today:
+      Tapeline has no current source of congressional disclosures, no plan
+      includes a congressional trades feed, and the factor reads SEC Form 4
+      filings.</em></p>
+      <p>Smart Money is a 0–100 sub-score built from one data stream,
+      with its own lag and signal-to-noise characteristics:</p>
       <ol>
-        <li><strong>Congressional disclosures</strong> — required by the
-        STOCK Act (Stop Trading on Congressional Knowledge Act, 2012).
-        US House and Senate members must disclose trades over $1,000
-        within 30–45 days. The signal: when multiple members on relevant
-        committees buy or sell the same name, that's information they
-        plausibly had access to that the market didn't.</li>
         <li><strong>Insider Form 4 filings</strong> — required by the
         SEC within 2 business days of any insider transaction
         (executives, directors, 10%+ owners). The signal: insiders are
@@ -395,14 +394,6 @@ export const POSTS: BlogPost[] = [
       <h2>What "smart money buying" actually predicts</h2>
       <p>Each data source has a different predictive horizon. Let me
       walk through the cases that matter:</p>
-
-      <p><strong>Congressional buying</strong> works best on names
-      where committee members have informational access — defense
-      contractors near a relevant Armed Services committee member, healthcare names near
-      a Finance committee member, regulatory beneficiaries before a
-      relevant ruling. The base rate of edge is small but non-zero;
-      academic studies (Ziobrowski et al., Belmont & Sayers) have
-      shown weak positive alpha on a portfolio basis.</p>
 
       <p><strong>Insider Form 4 filings</strong> have the shortest lag
       (1–3 business days) and the highest signal-to-noise for cluster
@@ -420,10 +411,8 @@ export const POSTS: BlogPost[] = [
       reasons:</p>
 
       <p><strong>The lags compound.</strong> Insider Form 4 filings
-      arrive 1–3 days after the trade. Congressional STOCK Act filings
-      can be 30–45 days late and include trades that have already been
-      unwound. By the time the data is clean and public, much of the
-      move has happened.</p>
+      arrive 1–3 days after the trade. By the time the data is clean and
+      public, much of the move may have happened.</p>
 
       <p><strong>It's a confirmation factor, not a leading one.</strong>
       Smart money flow is most useful in confluence with the other
@@ -442,21 +431,16 @@ export const POSTS: BlogPost[] = [
       filing is public, the edge is largely priced.</p>
 
       <h2>How the Tapeline score uses it differently from competitors</h2>
-      <p>Most "smart money" scoring in retail tools is broken in one of
-      two ways: either it's a single-source (just hedge fund holdings,
-      or just Congressional) which misses the confluence signal, or
-      it's opaque (Tipranks' Hedge Fund Sentiment is a Smart Score
-      input but the weighting and the underlying fund list are not
-      published). Tapeline:</p>
+      <p>Much "smart money" scoring in retail tools is opaque (Tipranks'
+      Hedge Fund Sentiment is a Smart Score input but the weighting and
+      the underlying fund list are not published). Tapeline:</p>
       <ul>
-        <li>Combines Congressional STOCK Act disclosures and SEC Form 4
-        insider transactions into a single 0-100 sub-score with
-        published methodology.</li>
+        <li>Turns SEC Form 4 insider transactions into a single 0-100
+        sub-score with published methodology.</li>
         <li>Weights the sub-score as a mid-tier factor — high enough
         to matter, low enough not to drown out the leading factors when
         smart money is late or noisy.</li>
-        <li>Surfaces the actual data feeds: the Premium tier exposes
-        the underlying Congressional trades feed at /app/congress and
+        <li>Surfaces the underlying filings: the Premium tier exposes
         the recent insider buys at /app/holdings — not just the
         aggregated score.</li>
       </ul>
@@ -486,9 +470,8 @@ export const POSTS: BlogPost[] = [
 
       <p>You can see live Smart Money sub-scores on any ticker page —
       e.g. <a href="/t/NVDA">/t/NVDA</a>, <a href="/t/AAPL">/t/AAPL</a>
-      — or filter by it on the live scanner. The full Congressional
-      trades feed and recent insider buys are Premium features at
-      /app/congress and /app/holdings; the Smart Money sub-score itself
+      — or filter by it on the live scanner. Recent insider buys are a
+      Premium feature at /app/holdings; the Smart Money sub-score itself
       is shown on the ticker pages linked above.</p>
     `,
   },
@@ -698,9 +681,8 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       out. NVDA doesn't do that. Look at the spread:</p>
 
       <ul>
-        <li><strong>Smart Money 97</strong> (top 3%) — insiders are
-        net-accumulating. Congressional disclosures and SEC Form 4 buying
-        — both flowing in.</li>
+        <li><strong>Smart Money 97</strong> (top 3%) — the factor was
+        reading strong accumulation.</li>
         <li><strong>Momentum 87</strong> (top 13%) — short-term price action
         is accelerating, volume is confirming, breakouts are recent.</li>
         <li><strong>Trend 41</strong> (below median) — but the multi-timeframe

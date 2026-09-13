@@ -4,8 +4,15 @@
  * Both the left sidebar / mobile drawer (app/app/layout.tsx) and the ⌘K command
  * palette (components/GlobalSearch.tsx) import from here so the two can never
  * drift — previously the palette kept its own hardcoded DESTINATIONS list, which
- * had fallen behind the sidebar and could not reach Regime / Congress / Insider
- * buys / News / Earnings / IPOs.
+ * had fallen behind the sidebar and could not reach Regime / Insider buys /
+ * News / Earnings / IPOs.
+ *
+ * Squeeze and Congress are deliberately absent (integrity fix, founder-approved
+ * 2026-09-14): neither has real data behind it. The squeeze rows were mock
+ * output frozen on 2026-07-18 and no congressional disclosure is being
+ * ingested today. The routes still resolve (the congress page states that the data
+ * is not available); they are simply not advertised. Do not re-add either
+ * until a real source is writing rows. Pinned by __tests__/sellCopyIntegrity.test.tsx.
  *
  * Copy note: hints are plain descriptions of the destination — no performance,
  * return, or urgency claims.
@@ -33,14 +40,12 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Signals",
     items: [
       { href: "/app/heatmap", label: "Heatmap", hint: "Sector heatmap" },
-      { href: "/app/squeeze", label: "Squeeze", hint: "Short-squeeze setups" },
       { href: "/app/regime", label: "Regime", hint: "Market regime" },
     ],
   },
   {
     label: "Ownership & markets",
     items: [
-      { href: "/app/congress", label: "Congress", hint: "Congress trades" },
       { href: "/app/holdings", label: "Insider buys", hint: "Insider buying" },
       { href: "/app/news", label: "News", hint: "Latest headlines" },
       { href: "/app/earnings", label: "Earnings", hint: "Earnings calendar" },

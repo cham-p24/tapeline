@@ -156,12 +156,6 @@
       "reason": "Names Zacks' own published rating label ('Strong Buy') in a comparison. Naming a competitor's product feature is not Tapeline rating a security."
     },
     {
-      "file": "frontend/app/congressional-trades/page.tsx",
-      "rule": "performance-claim",
-      "phrase": "beaten the market",
-      "reason": "Reports the academic literature on congressional trading ('studies are mixed; some senate trades have historically beaten the market') and immediately disclaims that Tapeline makes no such claim. Statement about third-party research, not about Tapeline. Flagged for an editorial pass to soften the phrasing."
-    },
-    {
       "file": "frontend/app/blog/posts.ts",
       "rule": "evaluative-adjective",
       "phrase": "strong name",

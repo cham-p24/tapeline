@@ -470,10 +470,11 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
 
     Freemium metering (added 2026-06-20): a "lookup" is one of these detailed
     views. Pro / Premium / active-trial callers are never metered. A logged-in
-    FREE user gets tier.FREE_DAILY_LOOKUPS per UTC day; an anonymous (no-account)
-    caller gets tier.ANON_DAILY_LOOKUPS per IP per day. Over-cap callers get a
-    402 per the shared API contract (error "free_lookup_limit" for free users,
-    "signup_required" for anon). The lookup is only counted AFTER the symbol is
+    FREE user gets tier.FREE_DAILY_LOOKUPS per UTC day. Anonymous (no-account)
+    callers are NOT metered (see the comment at the metering block below; the
+    dormant tier.ANON_DAILY_LOOKUPS is not enforced, and no copy may state an
+    anonymous allowance). Over-cap free users get a 402 per the shared API
+    contract (error "free_lookup_limit"). The lookup is only counted AFTER the symbol is
     confirmed to resolve to a real ticker, so a 404/invalid symbol never burns
     the caller's daily budget.
 
@@ -638,11 +639,15 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
                 user.activated_at = datetime.now(UTC)
                 await session.commit()
 
-        sq = (
-            await session.execute(
-                select(SqueezeSetup).where(SqueezeSetup.symbol == symbol)
-            )
-        ).scalar_one_or_none()
+        # No squeeze read (integrity fix, founder-approved 2026-09-14). Every
+        # `squeeze_setups` row in production is mock-generator output last
+        # written 2026-07-18 — the real writer (the SPIKE sheet tab) is not
+        # configured (unset since 2026-07-26) — and this endpoint was handing
+        # those rows to the in-app ticker page as "Squeeze detected". The
+        # payload keeps its `squeeze` key (always null) so no client breaks.
+        # Restore the read
+        # only behind services/squeeze_integrity.is_publishable().
+        sq: SqueezeSetup | None = None
 
         # Next scheduled earnings date — the one key stat that does NOT live on
         # the ticker row. calendar_events.earnings_events has been populated in

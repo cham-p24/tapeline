@@ -62,7 +62,6 @@ const SECTIONS: Section[] = [
   {
     name: "Discovery tools",
     rows: [
-      { label: "Squeeze Watch", free: `Top-${FREE_LIMITS.squeezePreviewRows} preview`, pro: "✓", premium: "✓" },
       { label: "Market Heatmap", free: "—", pro: "✓", premium: "✓" },
       { label: "IPO + Earnings calendars", free: "—", pro: "✓", premium: "✓" },
       // One saved screen on Free, not zero (#683, tier.py saved_scans). Free
