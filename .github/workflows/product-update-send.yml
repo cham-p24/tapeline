@@ -1,8 +1,10 @@
-name: Product update (one-shot, 2026-09-15) — HELD
+name: Product update (one-shot, 2026-09-15)
 
-# HELD PENDING FOUNDER APPROVAL. Merging this file SCHEDULES A SEND to real
-# customers. Do not merge until the founder has approved both the copy
-# (services/email.render_product_update_email) and the time below.
+# FOUNDER-APPROVED 2026-09-13 ("do it all now", in reply to "Reply yes and
+# I'll merge it for Tuesday"). Before merge, two sentences about the public
+# record were cut because an integrity review verified them false (PR #814).
+# Merging this file SCHEDULES THE SEND. To stop it, disable this workflow in
+# GitHub Actions or delete this file before the window below opens.
 #
 # Sends the September 2026 product update, ONCE, unattended, at 17:07 UTC on
 # Tuesday 15 September 2026: 1:07pm New York, 3:07am Wednesday Melbourne. Off

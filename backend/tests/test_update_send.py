@@ -1188,7 +1188,7 @@ def test_the_schedule_fires_inside_its_own_window() -> None:
 
 def test_the_workflow_is_marked_held_and_pinned() -> None:
     raw = WORKFLOW.read_text(encoding="utf-8")
-    assert "HELD PENDING FOUNDER APPROVAL" in raw
+    assert "FOUNDER-APPROVED 2026-09-13" in raw
     assert "DELETE THIS FILE" in raw
     (uses,) = [s["uses"] for s in _steps(_workflow_doc(raw)) if "uses" in s]
     pin = re.fullmatch(r"superfly/flyctl-actions/setup-flyctl@([0-9a-f]{40})", uses)
