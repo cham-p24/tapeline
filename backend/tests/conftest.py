@@ -171,8 +171,29 @@ def _isolated_test_db(tmp_path_factory: pytest.TempPathFactory, _template_db, mo
             db_dir.rmdir()
 
 
+@pytest.fixture(autouse=True)
+def ticker_update_log():
+    """Judge every `UPDATE tickers` a test runs against the updated_at contract.
+
+    `Ticker.updated_at` must mean "this row's live data was refreshed"; see
+    tests/test_ticker_updated_at_means_live_data.py. That file's AST walk only
+    understands the spellings it was taught, so this listener checks the SQL
+    that actually reaches the database instead: an UPDATE issued from app code
+    that moves updated_at, outside the live-data writers, errors the test at
+    teardown. Mechanics and limits: tests/updated_at_runtime_guard.py.
+
+    Yields the recorder so a test can read what was issued.
+    """
+    from tests import updated_at_runtime_guard as guard
+
+    with guard.recording() as log:
+        yield log
+    problems = log.problems()
+    assert not problems, "\n".join(problems)
+
+
 @pytest_asyncio.fixture(autouse=True)
-async def _drain_background_tasks(_isolated_test_db):
+async def _drain_background_tasks(_isolated_test_db, ticker_update_log):
     """Reap detached fire-and-forget tasks before the event loop tears down.
 
     Endpoints may spawn detached `asyncio.create_task(...)` work that outlives
@@ -183,7 +204,8 @@ async def _drain_background_tasks(_isolated_test_db):
 
     Depends on `_isolated_test_db` so that teardown ordering keeps the
     test's engine bound while stragglers are cancelled and their sessions
-    close. With the per-test database, a straggler can no longer affect any
+    close. Depends on `ticker_update_log` for the same ordering reason: a
+    straggler that writes tickers while it is being reaped is still judged. With the per-test database, a straggler can no longer affect any
     OTHER test either way — this fixture is now about clean loop shutdown,
     not lock hygiene.
     """
