@@ -3021,6 +3021,136 @@ async def _stamp_factor_attempts(
         logger.exception("factor_stamp.failed column=%s size=%d", column, len(symbols))
 
 
+#: Attempts at one reading's compare-and-set before it is stamped without
+#: being written. See `_save_factor_readings`.
+_FACTOR_SAVE_ATTEMPTS = 3
+
+
+async def _held_factors(
+    symbols: list[str], columns: list[str],
+) -> dict[str, dict[str, float | None]]:
+    """The stored values of `columns` for each of `symbols` that has a row."""
+    async with session_scope() as session:
+        rows = (await session.execute(
+            select(Ticker.symbol, *(getattr(Ticker, c) for c in columns))
+            .where(Ticker.symbol.in_(symbols))
+        )).all()
+    return {row.symbol: {c: getattr(row, c) for c in columns} for row in rows}
+
+
+async def _save_factor_readings(
+    stamp_column: str, factor: str, readings: dict[str, float], now: datetime,
+) -> None:
+    """Put each reading on its row, beside a composite recomputed from it, in the
+    same statement that stamps the row.
+
+    WHY THE PASS WRITES THE ROW ITSELF, measured on production 2026-09-13
+    ---------------------------------------------------------------------
+    The pass used to put a reading only into this process's cache and stamp the
+    row, and leave the row to a later writer. For the rows the tick owns that
+    writer comes within one tick (~130s). For the rows the ALL SIGNALS sheet
+    owns - about 3,700 - it is `sheet_feed.upsert_tickers`, which runs only
+    when the sheet CHANGES, and the sheet can sit unchanged for a whole weekend.
+    A deploy in between took the reading with it, and the stamp hid the row for
+    8 days. Among equities carrying key statistics from the same Finnhub blob,
+    the sheet-owned rows of the last five interrupted runs were NULL 15/15,
+    37/37, 31/31, 64/64 and 56/56 - the 64 were still in memory six hours after
+    their run, waiting for the sheet - while the tick's own rows lost ~0. That
+    left 1,548 such equities at NEUTRAL 50, ADBE, JPM, COST, V, CAT, PEP, MRK
+    and BA among them. The metric blob that could rebuild a lost reading is on
+    Fly's ephemeral disk, which the same deploy wipes, so unlike smart money
+    there is nothing to rebuild from.
+
+    WHAT IS WRITTEN. The factor, and the `score` and `signal` recomputed from it
+    and the five factors already on the row, exactly as `_merged_factor_set`
+    and the sheet upsert compute them: a factor never lands beside a composite
+    that ignored it (see `warm_factor_caches_from_db`). Both owners' composites
+    are the same function of the six stored factors, so this is the value either
+    owner would write with the reading in hand. `reason` and `confidence_pct`
+    are left to the row's owner; the tick re-renders its rows within a tick.
+
+    ONE ROW, ONE STATEMENT, ONE TRANSACTION. The stamp rides in the same UPDATE,
+    so a stamp can never land without its reading. Each row commits on its own,
+    so the pass never holds more than one row lock while the tick's 500-row
+    chunks are writing - two multi-row transactions could deadlock.
+
+    COMPARE-AND-SET. The UPDATE only matches while the other five factors still
+    hold the values the composite was computed from. A writer that changed one
+    in between makes it miss; the row is re-read and tried again, up to
+    _FACTOR_SAVE_ATTEMPTS times, and then stamped without the write so it cannot
+    head every selection forever. The reading is still in the cache for the
+    owner to write.
+
+    What remains: a tick that read a row before this commit can put the old
+    factor back, and restores the reading on its next write, from the cache.
+    Only a restart inside that one tick loses it. A sheet upsert already in
+    flight when this commits can do the same, until the sheet next changes.
+
+    `updated_at` is held still: a factor reading is not proof the row's price is
+    live, and a delisted symbol that still answers /stock/metric must not stay
+    on ranked surfaces (see the comment on Ticker.updated_at).
+
+    Crypto pairs are never written: they are scored on a different factor set.
+    """
+    from app.services.mock_feed import _signal_from_score
+    from app.services.polygon_feed import _composite_from_subs
+
+    pending = {s: v for s, v in readings.items() if not s.startswith("X:")}
+    unwritten = [s for s in readings if s not in pending]
+    others = [c for c in FACTOR_COLUMNS if c != factor]
+    for _attempt in range(_FACTOR_SAVE_ATTEMPTS):
+        if not pending:
+            break
+        missed: dict[str, float] = {}
+        for sym, held in (await _held_factors(list(pending), others)).items():
+            score = _composite_from_subs({**held, factor: pending[sym]})
+            async with session_scope() as session:
+                result = await session.execute(
+                    update(Ticker)
+                    .where(
+                        Ticker.symbol == sym,
+                        *(getattr(Ticker, c).is_not_distinct_from(v) for c, v in held.items()),
+                    )
+                    .values({
+                        factor: pending[sym],
+                        "score": score,
+                        "signal": _signal_from_score(score),
+                        stamp_column: now,
+                        "updated_at": Ticker.updated_at,
+                    })
+                    .execution_options(synchronize_session=False)
+                )
+            if result.rowcount != 1:  # type: ignore[attr-defined]
+                missed[sym] = pending[sym]
+        pending = missed
+    if pending:
+        logger.warning(
+            "factor_save.contended factor=%s symbols=%d stamped_unwritten",
+            factor, len(pending),
+        )
+    await _stamp_factor_attempts(stamp_column, [*unwritten, *pending], now)
+
+
+async def _flush_fundamentals_attempts(
+    pending: list[str], readings: dict[str, float],
+) -> None:
+    """Record a batch of fundamentals attempts: symbols with a reading are
+    written with it (`_save_factor_readings`), the rest are only stamped."""
+    now = datetime.now(UTC)
+    answered = {s: readings[s] for s in pending if s in readings}
+    try:
+        await _save_factor_readings(
+            "last_fundamentals_at", "sub_fundamentals", answered, now,
+        )
+    except Exception:
+        # A row whose write did not land is not stamped either, so it stays due
+        # and is asked again.
+        logger.exception("fundamentals.save_failed size=%d", len(answered))
+    await _stamp_factor_attempts(
+        "last_fundamentals_at", [s for s in pending if s not in answered], now,
+    )
+
+
 async def _refresh_fundamentals_cache(
     limit: int | None = None, *, deadline: float | None = None,
 ) -> bool:
@@ -3065,6 +3195,8 @@ async def _refresh_fundamentals_cache(
     recent_failures: deque[bool] = deque(maxlen=_FACTOR_FAILURE_WINDOW)
     stopped = False
     pending: list[str] = []
+    # This batch's readings, written onto their rows as the batch is stamped.
+    readings: dict[str, float] = {}
     i = 0
     while i < len(symbols):
         if deadline is not None and monotonic() >= deadline:
@@ -3079,6 +3211,8 @@ async def _refresh_fundamentals_cache(
             if metrics:
                 score = compute_fundamentals_score(metrics)
                 set_cached_score(sym, score)
+                if score is not None:
+                    readings[sym] = score
                 refreshed += 1
         except FinnhubThrottledError as exc:
             # Not an answer: nothing was learned about this symbol, so it is
@@ -3098,10 +3232,8 @@ async def _refresh_fundamentals_cache(
             # Stamp what WAS answered before waiting, so a pause never holds an
             # answered symbol's stamp back.
             if pending:
-                await _stamp_factor_attempts(
-                    "last_fundamentals_at", pending, datetime.now(UTC),
-                )
-                pending = []
+                await _flush_fundamentals_attempts(pending, readings)
+                pending, readings = [], {}
             await asyncio.sleep(_FACTOR_THROTTLE_PAUSE_SECONDS)
             continue
         except Exception as exc:
@@ -3116,7 +3248,8 @@ async def _refresh_fundamentals_cache(
         throttled_in_a_row = 0
         recent_failures.append(failed)
         # Stamped whether or not the vendor had anything - see
-        # _stamp_factor_attempts. Flushed as we go, not at the end, so a deploy
+        # _stamp_factor_attempts - and written onto the row when it did (see
+        # _save_factor_readings). Flushed as we go, not at the end, so a deploy
         # mid-pass keeps the progress this run made.
         pending.append(sym)
         attempted += 1
@@ -3131,13 +3264,9 @@ async def _refresh_fundamentals_cache(
         # Stay well under 60/min cap - sleep ~1.1s between calls
         await asyncio.sleep(1.1)
         if len(pending) >= _FACTOR_STAMP_BATCH:
-            await _stamp_factor_attempts(
-                "last_fundamentals_at", pending, datetime.now(UTC),
-            )
-            pending = []
-    await _stamp_factor_attempts(
-        "last_fundamentals_at", pending, datetime.now(UTC),
-    )
+            await _flush_fundamentals_attempts(pending, readings)
+            pending, readings = [], {}
+    await _flush_fundamentals_attempts(pending, readings)
 
     logger.info(
         "fundamentals.refreshed scored=%d attempted=%d cache_size=%d",
