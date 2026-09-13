@@ -10,7 +10,7 @@
  * own losing days — which is exactly what the incumbents refuse to do — so it
  * is one of the few high-intent clusters a two-month-old domain can realistically
  * win. The page is built entirely on the four assets nobody can copy: the
- * append-only public scorecard, the downloadable CSV/JSON dataset, the named
+ * public scorecard (not re-ranked or deleted, corrections dated), the downloadable CSV/JSON dataset, the named
  * six-factor methodology, and the per-ticker frozen records at /scorecard/{TICKER}.
  *
  * COMPLIANCE POSTURE (docs/COMPLIANCE_COPY_RULES.md — scripts/lint-copy-compliance.mjs)
@@ -38,7 +38,7 @@ import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 export const metadata = pageMeta({
   title: "A Stock Screener You Can Verify — Download the Full Record",
   description:
-    "A transparent stock screener whose record you can download and check yourself — every daily top-10 pick, its six factors, and how it did the next session. Append-only, losing days kept.",
+    "A transparent stock screener whose record you can download and check yourself — every daily top-10 pick, its score, and how it did the next session. Losing days kept, corrections dated.",
   path: "/verify",
 });
 
@@ -53,9 +53,9 @@ const SCORECARD_JSON_URL = "/api/scorecard.json";
 // The three rules that make the archive checkable rather than decorative.
 const RULES = [
   {
-    title: "Append-only",
+    title: "Not re-ranked or deleted, and every correction dated",
     body:
-      "Every entry is written once and never edited or deleted. If the method changes, the change is dated in the changelog and the old rows stay exactly as they were recorded. There is no hindsight editing and no quiet re-scoring.",
+      "Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. Both corrections are listed on the scorecard, in the changelog and inside the download itself, and trading days with no list are named the same way. If the method changes, the change is dated in the changelog and earlier lists are not re-ranked.",
   },
   {
     title: "Losing days kept",
@@ -74,9 +74,9 @@ const RULES = [
 const FIELDS = [
   { name: "Date", desc: "The session the pick was recorded." },
   { name: "Symbol", desc: "The ticker, as it was ranked that day." },
-  { name: "Tapeline Score", desc: "The original 0-100 composite, frozen at record time." },
-  { name: "Signal label", desc: "The band the score fell into that day." },
-  { name: "Six factor readings", desc: "Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — as scored." },
+  { name: "Rank", desc: "Position 1-10 in that session's list." },
+  { name: "Tapeline Score", desc: "The 0-100 composite recorded at the close. For 18 May to 12 June 2026 every score reads 100: on 15 June 2026 every score above 100 was set to 100, the originals were not kept, and which entries that changed is not known." },
+  { name: "Prices", desc: "The official close on the session and on the next session (restated on 25 August 2026 for entries up to 21 August). Four older entries the data vendor can no longer price, and the flag prices on the 24 August 2026 list, are still the last trade including after-hours trading." },
   { name: "Next-session move", desc: "How the ticker moved the following session, beside SPY's move over the same window." },
 ];
 
@@ -86,11 +86,11 @@ const FIELDS = [
 const VERIFY_FAQ = [
   {
     q: "Can I verify Tapeline's record myself?",
-    a: "Yes. The full scorecard is downloadable as CSV or JSON with no login and no card. Each row is one top-10 daily pick with its original Tapeline Score, its signal label, its six factor readings, and how the ticker moved the next session beside SPY's move. You can re-run the comparison yourself from the file.",
+    a: "Yes. The scorecard is downloadable as CSV or JSON with no login and no card; entries appear 7 days after the session. Each row is one top-10 daily pick with its rank, its recorded Tapeline Score, its prices, and how the ticker moved the next session beside SPY's move. The file also lists every correction and every trading day with no list. You can re-run the comparison yourself from the file.",
   },
   {
-    q: "What does 'append-only' mean here?",
-    a: "Entries are written once and never edited or removed. When the methodology changes it is dated in the changelog and past rows are left as they were first recorded — so the archive can't be quietly cleaned up to look better than it was.",
+    q: "Has the record ever been changed?",
+    a: "Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. The score cap was not disclosed until 14 September 2026. Both corrections are dated on the scorecard, in the changelog and in the download.",
   },
   {
     q: "Does the scorecard keep the days the picks lost?",
@@ -136,9 +136,10 @@ export default function VerifyPage() {
           <p className="mt-6 text-lg text-muted leading-relaxed">
             Most screeners hand you a number and ask you to trust it. You cannot
             see the method, and you cannot see how the output has actually done.
-            Tapeline publishes both: the six factors behind every score, and an
-            append-only record of every daily top-10 pick, back-checked against
-            SPY the next session — including the days it went nowhere.
+            Tapeline publishes both: the six factors behind every score, and a
+            record of every daily top-10 pick, back-checked against SPY the next
+            session — including the days it went nowhere. Entries are not
+            re-ranked or deleted, and every correction to a recorded value is dated.
           </p>
           <LandingCta
             from="scorecard"
@@ -158,8 +159,8 @@ export default function VerifyPage() {
           </h2>
           <p className="mt-2 text-sm text-muted">
             A track record is only worth something if the person publishing it
-            can&rsquo;t edit it after the fact. These three rules are what let you
-            treat the archive as evidence instead of marketing.
+            can&rsquo;t quietly change it after the fact. These three rules are what
+            let you treat the archive as evidence instead of marketing.
           </p>
           <div className="mt-6 space-y-3">
             {RULES.map((r) => (
@@ -186,8 +187,8 @@ export default function VerifyPage() {
               </span>
               <div className="text-sm text-muted leading-relaxed">
                 <span className="font-medium text-fg">Download the raw record.</span>{" "}
-                Take the whole archive as a spreadsheet or as JSON — no login, no
-                card, nothing gated.
+                Take the archive as a spreadsheet or as JSON — no login, no card.
+                It runs to sessions 7 days old, the same delay as the public page.
                 <div className="mt-3 flex flex-wrap gap-3">
                   <a
                     href={SCORECARD_CSV_URL}
@@ -212,8 +213,9 @@ export default function VerifyPage() {
                 <span className="font-medium text-fg">Re-run the arithmetic.</span>{" "}
                 Every row carries the pick&rsquo;s move and SPY&rsquo;s move over
                 the same next session. The comparison is the identical calculation
-                on each row, so you can reproduce the summary — and count the
-                losing days for yourself — straight from the file.
+                on each row, so you can recompute it — and count the losing days
+                for yourself — straight from the file. The scorecard page says how
+                many of its back-checked entries are newer than the download.
               </div>
             </li>
             <li className="flex gap-4">

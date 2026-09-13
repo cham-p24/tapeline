@@ -51,7 +51,13 @@ def test_the_append_only_promise_no_longer_overclaims():
     )
     # The narrower promise that IS still true must survive — otherwise the
     # fix has thrown away the guarantee instead of qualifying it.
-    assert "never re-ranked, back-filled or deleted" in text
+    assert "not re-ranked, back-filled or deleted" in text
+    # "If restatements is empty, no published row has ever been altered" and
+    # "written once" were both false from 2026-06-15 (the score cap), which
+    # this file did not list until 2026-09-14.
+    for false_claim in ("no published row has ever been altered", "written once",
+                        "exactly what was published", "what is in this file"):
+        assert false_claim not in text, false_claim
     assert "restatements" in text, (
         "the promise does not point the reader at the enumerated exceptions"
     )
@@ -117,7 +123,8 @@ async def test_restatements_survive_into_the_json_export():
     meta = _meta()
     body = "".join([chunk async for chunk in ex.iter_json(meta, _no_rows())])
     parsed = json.loads(body)
-    assert parsed["meta"]["restatements"][0]["date"] == "2026-08-25", (
+    dates = [r["date"] for r in parsed["meta"]["restatements"]]
+    assert "2026-08-25" in dates and "2026-06-15" in dates, (
         "the restatement list is dropped between dataset_meta and the "
         "rendered JSON file"
     )

@@ -280,8 +280,12 @@ describe("LandingPage usage-as-proof line", () => {
     render(await LandingPage());
     const text = document.body.textContent ?? "";
     expect(text).toMatch(/back-checked against the S&P the next session/i);
-    expect(text).toMatch(/never\s+edited/i);
-    expect(text).toMatch(/losses and corrections included/i);
+    // "then never edited" was false: recorded values were corrected on
+    // 2026-06-15 (scores capped) and 2026-08-25 (prices). Integrity wave 2026-09-14.
+    expect(text).not.toMatch(/never\s+edited/i);
+    expect(text).toMatch(/not re-ranked or deleted/i);
+    expect(text).toMatch(/15 June 2026/);
+    expect(text).toMatch(/25 August 2026/);
     expect(text).toMatch(/free to read, no account/i);
   });
 

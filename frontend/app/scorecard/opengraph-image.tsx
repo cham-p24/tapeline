@@ -9,7 +9,7 @@
  * no arrow and no win/loss framing.
  *
  * What it does carry is the mechanism: the six named factors, the date, the
- * methodology URL, and the fact that the archive is append-only and keeps
+ * methodology URL, and the fact that entries are not re-ranked or deleted and keeps
  * its losing days. Those are all checkable statements about how the thing
  * works rather than claims about how it did.
  *
@@ -27,7 +27,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 export const alt =
-  "Tapeline public scorecard — every daily top-10 frozen at the close, append-only, losing days kept";
+  "Tapeline public scorecard — every daily top-10 frozen at the close, not re-ranked or deleted, losing days kept";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -109,7 +109,7 @@ export default async function OG() {
               maxWidth: "980px",
             }}
           >
-            Append-only archive. Entries are never re-ranked, back-filled or removed — losing days
+            Entries are not re-ranked, back-filled or removed; corrections are dated. Losing days
             stay on the page.
           </div>
         </div>

@@ -37,6 +37,7 @@ from __future__ import annotations
 import logging
 import os as _os
 import time
+from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
@@ -237,6 +238,32 @@ def _session_is_complete(next_day: date, today: date, now: datetime | None = Non
         BACKCHECK_CLOSE_UTC_HOUR,
         BACKCHECK_CLOSE_UTC_MINUTE,
     )
+
+
+def missing_trading_sessions(
+    first: date | None, last: date | None, present: Iterable[date],
+) -> list[date]:
+    """US trading days between `first` and `last` (inclusive) with no entry.
+
+    The public record promises a top 10 per trading session. When a session
+    has none, that is a gap a reader is owed, and it must be COMPUTED rather
+    than typed into a disclosure by hand: four sessions (2026-08-31,
+    2026-09-02, 2026-09-04, 2026-09-09) went missing without any page saying
+    so, and a hand-kept list would miss the fifth the same way.
+
+    "Trading day" is `is_trading_day`, i.e. weekdays minus the NYSE holiday
+    table above, so a holiday is never reported as a gap. Oldest first.
+    """
+    if first is None or last is None or last < first:
+        return []
+    have = set(present)
+    out: list[date] = []
+    d = first
+    while d <= last:
+        if d not in have and is_trading_day(d):
+            out.append(d)
+        d += timedelta(days=1)
+    return out
 
 
 def _next_trading_day(d: date) -> date:

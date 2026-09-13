@@ -361,7 +361,7 @@ export function softwareApplicationJsonLd() {
     applicationSubCategory: "Stock Scanner",
     operatingSystem: "Web",
     description:
-      "Live quantitative market scanner for retail stock pickers. One 0-100 score and one plain-English sentence per US ticker, plus squeeze detection, market regime, congressional trades, and a public scorecard.",
+      "Live quantitative market scanner for retail stock pickers. One 0-100 score and one plain-English sentence per US ticker, plus market regime and a public scorecard.",
     offers: [
       {
         "@type": "Offer",
@@ -479,9 +479,11 @@ export function howToJsonLd(a: HowToArgs) {
 /**
  * Schema.org Dataset for /scorecard.
  *
- * The public scorecard is Tapeline's flagship proprietary asset — a permanent,
- * append-only record of every top-10 daily pick with original score, signal,
- * and reasoning, back-checked vs SPY the next session. Modeling it as Dataset
+ * The public scorecard is Tapeline's flagship proprietary asset — a record of
+ * every top-10 daily pick with its rank, score and prices, back-checked vs SPY
+ * the next session. It is NOT described as append-only or unedited: recorded
+ * values were corrected on 2026-06-15 (scores capped) and 2026-08-25 (prices),
+ * and it stores no signal label or reasoning (integrity wave, 2026-09-14). Modeling it as Dataset
  * makes it citable as a structured data source by AI systems and lets it
  * surface in Google Dataset Search. Live stats (days tracked, hit rate) are
  * deliberately omitted from the schema because the page fetches them client-
@@ -495,7 +497,7 @@ export function scorecardDatasetJsonLd() {
     name: "Tapeline Public Scorecard",
     alternateName: "Tapeline Top-10 Daily Picks Track Record",
     description:
-      "Append-only public record of every top-10 daily pick produced by the Tapeline 6-factor scanner. Each entry preserves the original Tapeline Score, signal label, plain-English reasoning, and the realised next-session return benchmarked against SPY. No hindsight editing, no cherry-picking, no survivor bias.",
+      "Public record of every top-10 daily pick produced by the Tapeline 6-factor scanner. Each entry holds the rank, the recorded Tapeline Score, the recorded price, and the realised next-session return benchmarked against SPY; losing picks are included. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. Trading days with no entry and other known limitations are listed with the data.",
     url: "https://tapeline.io/scorecard",
     isAccessibleForFree: true,
     license: "https://tapeline.io/legal/terms",
@@ -546,9 +548,9 @@ export function scorecardDatasetJsonLd() {
     // is true and stays; it just does not belong in this dataset's schema.
     variableMeasured: [
       { "@type": "PropertyValue", name: "Rank", description: "Position 1-10 in that session's published top ten", minValue: 1, maxValue: 10 },
-      { "@type": "PropertyValue", name: "Tapeline Score", description: "Composite 0-100 score, frozen at publication", minValue: 0, maxValue: 100 },
-      { "@type": "PropertyValue", name: "Price at flag", description: "Official close on the session the pick was published", unitText: "USD" },
-      { "@type": "PropertyValue", name: "Price next day", description: "Official close one trading session later", unitText: "USD" },
+      { "@type": "PropertyValue", name: "Tapeline Score", description: "Composite 0-100 score recorded at the close; every score from 18 May to 12 June 2026 was capped at 100 on 15 June 2026 and the originals were not kept", minValue: 0, maxValue: 100 },
+      { "@type": "PropertyValue", name: "Price at flag", description: "Price on the session the pick was recorded: the official close, except the 24 August 2026 list and 4 earlier entries the vendor can no longer price, which carry the last trade including after-hours trading", unitText: "USD" },
+      { "@type": "PropertyValue", name: "Price next day", description: "Official close one trading session later, except 4 earlier entries the vendor can no longer price, which keep the price as first recorded", unitText: "USD" },
       { "@type": "PropertyValue", name: "Realised 1-day return", description: "Close-to-close price change one session forward", unitText: "percent" },
       { "@type": "PropertyValue", name: "SPY 1-day return", description: "The same session's SPY close-to-close change, the benchmark leg", unitText: "percent" },
       { "@type": "PropertyValue", name: "Alpha vs SPY", description: "Realised 1-day return minus the SPY return for the same session", unitText: "percent" },
@@ -559,7 +561,7 @@ export function scorecardDatasetJsonLd() {
     // ones linked from the /scorecard "Verify this yourself" block, served by
     // backend/app/routers/scorecard.py (text/csv and application/json) and
     // resolved same-origin via the next.config.js /api/* rewrite. They carry
-    // the full append-only archive since inception. robots.txt Allows these
+    // the full archive since inception, up to the publication delay. robots.txt Allows these
     // two paths explicitly (the rest of /api/ is Disallow'd) so Googlebot can
     // actually fetch them.
     distribution: [
@@ -949,10 +951,9 @@ export function compareJsonLd(a: CompareArgs) {
         "Six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum), weighted most toward Trend and Relative Strength and least toward Momentum",
         "Public scorecard — every top-10 daily pick back-checked vs SPY next session",
         "Sub-60-second refresh during market hours",
-        "Plain-English reasoning per ticker (free tier included)",
-        "~6,900 actively scored from the full liquid US universe",
-        "Squeeze + market-regime detection",
-        "Congressional trades + recent insider buys via SEC Form 4 (Premium)",
+        "A one-sentence plain-English read per scored ticker (free tier included)",
+        "Market-regime detection",
+        "Insider buys via SEC Form 4 (Premium)",
       ],
     },
     {

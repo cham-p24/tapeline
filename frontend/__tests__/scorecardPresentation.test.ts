@@ -109,7 +109,10 @@ describe("scorecard <title> and meta description (Rule 3)", () => {
   });
 
   it("still describes the mechanism", () => {
-    expect(`${title} ${description}`).toMatch(/append-only|frozen/i);
+    expect(`${title} ${description}`).toMatch(/frozen/i);
+    // "append-only" was dropped on 2026-09-14: recorded values were changed
+    // on 2026-06-15 and 2026-08-25, so the archive is not strictly append-only.
+    expect(`${title} ${description}`).not.toMatch(/append-only/i);
   });
 });
 
@@ -129,9 +132,10 @@ describe("scorecard OG card (Rule 3)", () => {
     }
   });
 
-  it("shows the methodology link and the append-only fact", () => {
+  it("shows the methodology link and the not-re-ranked fact", () => {
     expect(shipped).toMatch(/how-it-works/);
-    expect(shipped).toMatch(/append-only/i);
+    expect(shipped).toMatch(/not re-ranked/i);
+    expect(shipped).not.toMatch(/append-only/i);
   });
 
   it("headlines no win, no loss and no vs-SPY figure", () => {

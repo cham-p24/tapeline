@@ -21,7 +21,7 @@ export const metadata = pageMeta({
   // Front-loaded and tightened to ~155 chars so the differentiator (raw
   // downloadable record) survives SERP truncation. Descriptive only.
   description:
-    "The append-only public record of every daily top-10 Tapeline ranks — frozen at the close, checked against SPY the next session, losing days kept. Raw CSV and JSON to verify it yourself.",
+    "The public record of every daily top-10 Tapeline ranks — frozen at the close, checked against SPY the next session, losing days kept, gaps and corrections dated. Raw CSV and JSON.",
   path: "/scorecard",
 });
 

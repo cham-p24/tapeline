@@ -120,7 +120,8 @@ export default async function LandingPage() {
               <span className="font-medium text-fg">Tapeline Score</span>{" "}
               blends six named factors into one read on every ticker &mdash; and every
               call, win or miss, goes on a permanent public record you can check
-              before you ever pay. Same day, no edits.
+              before you ever pay. Entries are not re-ranked or deleted, and every
+              correction is dated.
             </p>
             {/* ENTRY POINTS — the proof door and the product door at equal
                 weight, with the no-account browse path under them.
@@ -214,7 +215,7 @@ export default async function LandingPage() {
             &mdash; the live scanner, top ten scored rows a scan. Adding a card is
             what starts the trial: 30 days of Premium, and nothing is charged that day
             &mdash; the first charge is on day 30 at the plan you pick, we email you
-            three days before, and one click cancels before then. The scorecard and
+            about 7 days before, and one click cancels before then. The scorecard and
             daily Top 10 stay free to read with no account either way.
           </p>
         </div>
@@ -265,9 +266,11 @@ export default async function LandingPage() {
               before this line shipped. It is linked so the claim is one click
               from being checked. */}
           <p className="mx-auto mt-2 max-w-xl text-center text-sm leading-snug text-muted">
-            Back-checked against the S&amp;P the next session, then never
-            edited &mdash; losses and corrections included. Free to read, no
-            account, by you or{" "}
+            Back-checked against the S&amp;P the next session, losses
+            included. Entries are not re-ranked or deleted. We have corrected
+            recorded values twice, and said so: prices on 25 August 2026, and
+            scores from 18 May to 12 June capped on 15 June 2026. Free to read,
+            no account, by you or{" "}
             <Link
               href="/mcp"
               className="text-accent underline-offset-2 hover:underline"
@@ -377,9 +380,10 @@ export default async function LandingPage() {
             </FadeIn>
             <FadeIn delayMs={160}>
               <Step n="3" title="Every call on the record">
-                Top-10 picks logged daily with the original reasoning
-                preserved. Performance vs SPY recorded next session. No
-                cherry-picking, no hindsight edits.
+                The daily top 10 logged at the close with its score and
+                price. The move vs SPY recorded next session. No
+                cherry-picking; losing picks stay in, and every correction
+                is dated.
               </Step>
             </FadeIn>
           </div>
@@ -476,9 +480,11 @@ export default async function LandingPage() {
             before you decide anything.
           </Faq>
           <Faq q="Is the scorecard really real?">
-            Yes. Top-10 picks log automatically at market close every day; the
-            next session records the actual price move + alpha vs SPY. We
-            don&rsquo;t edit losers. The whole record is on{" "}
+            Yes. Each trading day&rsquo;s top 10 is logged automatically at the
+            close; the next session records the actual price move + alpha vs
+            SPY. Losing picks stay in. Trading days with no list are named on the
+            scorecard, alongside every correction. The whole record
+            is on{" "}
             <Link href="/scorecard" className="link">
               /scorecard
             </Link>{" "}

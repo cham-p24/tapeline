@@ -1,4 +1,9 @@
-import { citableSentence, loggedCount, type CitableSummary } from "@/lib/scorecardCitation";
+import {
+  citableSentence,
+  formatTrackedSince,
+  loggedCount,
+  type CitableSummary,
+} from "@/lib/scorecardCitation";
 
 /**
  * The headline stats of the archive as STATIC server-rendered HTML.
@@ -18,13 +23,47 @@ import { citableSentence, loggedCount, type CitableSummary } from "@/lib/scoreca
  *   - Rule 4: every value is a raw count or a plain central-tendency measure
  *     of raw rows. Nothing derived, compounded or annualised.
  */
-export function CitableRecord({ summary }: { summary: CitableSummary }) {
+/**
+ * The /api/scorecard summary as this page reads it: the citable fields plus
+ * the disclosure fields added 2026-09-14. All optional, because a cached
+ * response from before they existed will not carry them.
+ */
+export type ScorecardSummary = CitableSummary & {
+  /** US trading days in the record's range with no top 10 (ISO dates). */
+  missing_sessions?: string[] | null;
+  /** Newest session the public CSV/JSON download includes (ISO date). */
+  export_cutoff?: string | null;
+  /** How many of the n rows behind the figures are newer than the download. */
+  entries_scored_after_export_cutoff?: number | null;
+};
+
+/**
+ * T-06: the figures here are computed over every back-checked entry, but the
+ * download stops at the publication-delay cutoff. Without this line a reader
+ * who recomputes the share from the CSV gets a different n and a different
+ * percentage and reasonably concludes the page is wrong. Null when there is
+ * no difference to explain or the API did not say.
+ */
+export function downloadDifferenceNote(summary: ScorecardSummary, n: number): string | null {
+  const k = summary.entries_scored_after_export_cutoff;
+  const cutoff = summary.export_cutoff;
+  if (typeof k !== "number" || k <= 0 || !cutoff) return null;
+  const since = formatTrackedSince(cutoff) ?? cutoff;
+  return (
+    `These figures include ${k} back-checked ${k === 1 ? "entry" : "entries"} newer than the download ` +
+    `(which runs to sessions on or before ${since}), so recomputing them from the download uses n = ${Math.max(n - k, 0)}, ` +
+    `not ${n}.`
+  );
+}
+
+export function CitableRecord({ summary }: { summary: ScorecardSummary }) {
   const sentence = citableSentence(summary);
   if (!sentence) return null;
 
   // The denominator the aggregates were computed over — scored rows minus
   // data-quality exclusions. Disclosed inline, same as the summary table.
   const n = Math.max(summary.entries_scored - summary.entries_excluded_outliers, 0);
+  const downloadNote = downloadDifferenceNote(summary, n);
   const logged = loggedCount(summary);
   const median =
     summary.median_alpha_vs_spy == null
@@ -76,6 +115,9 @@ export function CitableRecord({ summary }: { summary: CitableSummary }) {
           <dd className="nums font-medium text-fg">{median}</dd>
         </div>
       </dl>
+      {downloadNote && (
+        <p className="mt-3 max-w-3xl text-xs leading-relaxed text-muted">{downloadNote}</p>
+      )}
     </section>
   );
 }
