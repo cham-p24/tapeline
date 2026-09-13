@@ -6112,14 +6112,6 @@ PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
         "dedicated machine, and it has not stalled since 11 September.",
     ),
     (
-        "One day is missing from the public record, permanently.",
-        "We freeze the daily Top 10 after the US close and never edit it. On 9 "
-        "September that step did not run, so there is no Top 10 for that day. We "
-        "could have rebuilt one after the fact, but a record is only worth "
-        "trusting if nothing in it was filled in later. So there is a gap, and it "
-        "will stay a gap.",
-    ),
-    (
         "The scanner now covers about 11,500 stocks and ETFs.",
         "At the start of the month it was about 2,000. That is not new data we "
         "bought. It is data we already had and were not refreshing. Search for "
@@ -6139,7 +6131,7 @@ PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
         "missing, and a missing input was being scored as neutral, which "
         "flattered most stocks. We recalculated 4,112 scores and 3,233 of them "
         "went down. If a score you watch dropped that week, the lower number is "
-        "the accurate one. Nothing in the public record was changed.",
+        "the accurate one.",
     ),
 )
 

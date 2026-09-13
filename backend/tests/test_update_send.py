@@ -68,9 +68,6 @@ A lot changed at Tapeline over the past week, and part of it went wrong in a way
 Scores and prices stopped updating for about a day.
 From 15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner kept showing numbers that were not being refreshed. Over the following day it stalled several more times before recovering on its own. The cause was our own code plus a server that could not keep up with the larger universe described below. Both are fixed: scoring now runs on a dedicated machine, and it has not stalled since 11 September.
 
-One day is missing from the public record, permanently.
-We freeze the daily Top 10 after the US close and never edit it. On 9 September that step did not run, so there is no Top 10 for that day. We could have rebuilt one after the fact, but a record is only worth trusting if nothing in it was filled in later. So there is a gap, and it will stay a gap.
-
 The scanner now covers about 11,500 stocks and ETFs.
 At the start of the month it was about 2,000. That is not new data we bought. It is data we already had and were not refreshing. Search for TSM, Sony or Toyota and they are there.
 
@@ -78,7 +75,7 @@ Crypto is in: 100 pairs, updated once a day.
 Coins sit in their own list and are never ranked against stocks, because two of our six factors — company fundamentals and insider buying — cannot exist for a coin. Prices update daily, not live. Our data plan does not include live crypto prices, and we would rather tell you that than label a day-old number "live".
 
 Scores moved on 7 September, mostly down.
-A renamed column in one of our data sources meant some inputs went missing, and a missing input was being scored as neutral, which flattered most stocks. We recalculated 4,112 scores and 3,233 of them went down. If a score you watch dropped that week, the lower number is the accurate one. Nothing in the public record was changed.
+A renamed column in one of our data sources meant some inputs went missing, and a missing input was being scored as neutral, which flattered most stocks. We recalculated 4,112 scores and 3,233 of them went down. If a score you watch dropped that week, the lower number is the accurate one.
 
 And one thing that is not an improvement: the open-access month ended on 8 September, as scheduled. Free accounts are back to the top 10 rows per scan.
 
@@ -713,7 +710,7 @@ def test_the_section_headings_are_bold_in_html() -> None:
     from app.services.email import render_product_update_email
 
     headings = [b.split("\n")[0] for b in APPROVED_COPY.split("\n\n") if "\n" in b]
-    assert len(headings) == 5, headings  # self-test: the detector found the headings
+    assert len(headings) == 4, headings  # self-test: the detector found the headings
     html = render_product_update_email("Sam", scorecard_url=SCORECARD, audience="account")
     for h in headings:
         assert f"<strong>{h}</strong>" in html, f"not bold: {h!r}"
@@ -1229,3 +1226,31 @@ async def test_a_run_that_loses_the_lock_sends_nothing(
         await _sub(s, "racersub@example.com")
     assert await us.run(send=True, quiet=True) == {}
     assert outbox == [], "a run that lost the lock still sent email"
+
+
+def test_the_update_makes_no_claim_about_the_record_that_is_false() -> None:
+    """Two sentences were cut from the approved copy on 2026-09-13, after an
+    integrity review verified against production that both were false:
+
+    - "We freeze the daily Top 10 ... and never edit it": all 190 published
+      rows from 18 May to 12 Jun carry score_at_flag = 100.0 (no other row
+      does) — a 15 June migration overwrote them, and no restatement exists.
+    - "One day is missing from the public record": four trading days are
+      missing (31 Aug, 2 Sep, 4 Sep, 9 Sep), not one.
+
+    How to tell customers about the record is the founder's decision. Until
+    it is made, this email says nothing about the record's completeness or
+    immutability, and this test keeps it that way."""
+    from app.services.email import render_product_update_email, render_product_update_text
+
+    for audience in ("account", "newsletter"):
+        text = render_product_update_text(
+            "Sam", scorecard_url=SCORECARD, audience=audience,
+            unsubscribe_url="https://tapeline.io/api/unsubscribe?token=t",
+        )
+        html = render_product_update_email("Sam", scorecard_url=SCORECARD, audience=audience)
+        for part, body in (("text", text), ("html", html)):
+            low = body.lower()
+            for claim in ("never edit", "one day is missing", "filled in later",
+                          "nothing in the public record", "append-only", "stay a gap"):
+                assert claim not in low, f"{audience} {part} still claims: {claim!r}"
