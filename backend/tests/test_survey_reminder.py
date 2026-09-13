@@ -338,8 +338,8 @@ def test_the_workflow_runs_the_reminder_quietly() -> None:
 
 def test_the_workflow_is_one_shot_and_takes_no_inputs() -> None:
     code = _workflow_code()
-    assert 'cron: "7 13 16 9 *"' in code
-    assert "2026-09-16T13:00:00Z" in code and "2026-09-19T00:00:00Z" in code
+    assert 'cron: "7 17 16 9 *"' in code
+    assert "2026-09-16T17:00:00Z" in code and "2026-09-19T00:00:00Z" in code
     assert "inputs:" not in code, "workflow_dispatch must take no inputs"
 
 
@@ -394,3 +394,36 @@ async def test_a_subscriber_who_joined_after_the_real_send_is_not_reminded() -> 
     assert [r.email for r in recipients] == ["before@example.com"]
     assert {x.email: r for x, r in skipped}["overnight@example.com"] == "joined_after_original"
 
+
+
+def _worker_send_hour(stage: str) -> int:
+    """The UTC hour a worker email stage opens, read from tick()'s own source.
+
+    Derived rather than restated so a worker that moves its send cannot leave
+    this reminder silently colliding with it again.
+    """
+    import inspect
+
+    from app.workers import signal_publisher as sp
+
+    src = inspect.getsource(sp.tick)
+    start = src.index(f'_set_stage("{stage}")')
+    end = src.find("_set_stage(", start + 1)
+    m = re.search(r"started\.hour\s*>=\s*(\d+)", src[start:end if end != -1 else None])
+    assert m, f"no `started.hour >= N` gate found in the {stage} stage"
+    return int(m.group(1))
+
+
+def test_the_reminder_is_clear_of_the_workers_own_sends() -> None:
+    """13:07 was seven minutes after the Daily Top 10 reached every newsletter
+    subscriber, and the frequency governor cannot see the worker's sends from a
+    fresh ssh process. Keep at least two hours from each worker email gate."""
+    m = re.search(r'cron:\s*"(\d+)\s+(\d+)\s+16\s+9\s+\*"', _workflow_code())
+    assert m, "reminder cron not found"
+    fire_minutes = int(m.group(2)) * 60 + int(m.group(1))
+    for stage in ("daily_newsletter_date", "eod_digest_date"):
+        gate = _worker_send_hour(stage) * 60
+        assert abs(fire_minutes - gate) >= 120, (
+            f"reminder fires at {fire_minutes // 60:02d}:{fire_minutes % 60:02d} UTC, "
+            f"within two hours of the worker's {stage} send at {gate // 60:02d}:00"
+        )
