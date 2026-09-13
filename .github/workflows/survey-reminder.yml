@@ -4,9 +4,19 @@ name: Survey reminder (one-shot, 2026-09-16)
 #
 # Founder-authorised 2026-09-11: "go, one address for Waad, send Wed 16".
 # The original survey went out 2026-09-10 16:00 UTC — noon in New York. This
-# fires at 13:07 UTC on Wednesday 16 September: 9:07am New York, 11:07pm
+# fires at 17:07 UTC on Wednesday 16 September: 1:07pm New York, 3:07am Thursday in
 # Melbourne. Off the :00 mark because Actions cron is best-effort and bunches
 # at the hour.
+#
+# MOVED 2026-09-13 from 13:07 to 17:07 UTC, same day. 13:07 landed seven
+# minutes after the worker's weekday Daily Top 10 goes to every confirmed
+# newsletter subscriber (13:00 UTC), and the lifecycle frequency governor
+# cannot space the two: its ledger lives inside each process, and this job
+# runs in a fresh `flyctl ssh` process that has never seen the worker's sends.
+# 17:07 is four hours clear of that send and of the 21:00 UTC watchlist
+# digest; test_the_reminder_is_clear_of_the_workers_own_sends derives both
+# hours from the worker's source. Found in review of #814, which moved for
+# the same reason.
 #
 # WHAT RUNS: `survey_send --reminder --send --quiet` on the deployed backend
 # over `flyctl ssh`, so it uses prod's database, Resend key and APP_URL without
@@ -19,7 +29,7 @@ name: Survey reminder (one-shot, 2026-09-16)
 # address. backend/tests/test_survey_reminder.py fails the build if the flag is
 # dropped from the command below.
 #
-# ONE-SHOT: GitHub cron has no year field, so "7 13 16 9 *" would fire every
+# ONE-SHOT: GitHub cron has no year field, so "7 17 16 9 *" would fire every
 # 16 September. The date window below makes any run outside 16-18 Sep 2026 a
 # no-op, including an accidental early manual dispatch. Delete this file once
 # the reminder has gone.
@@ -28,7 +38,7 @@ name: Survey reminder (one-shot, 2026-09-16)
 
 on:
   schedule:
-    - cron: "7 13 16 9 *"
+    - cron: "7 17 16 9 *"
   workflow_dispatch:   # Fallback if the scheduled run does not fire. Same window applies.
 
 concurrency:
@@ -45,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           now=$(date -u +%s)
-          start=$(date -u -d "2026-09-16T13:00:00Z" +%s)
+          start=$(date -u -d "2026-09-16T17:00:00Z" +%s)
           end=$(date -u -d "2026-09-19T00:00:00Z" +%s)
           if [ "$now" -lt "$start" ] || [ "$now" -ge "$end" ]; then
             echo "::notice title=Outside window::The survey reminder is authorised for 16-18 Sep 2026 only. Nothing sent."

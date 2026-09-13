@@ -387,8 +387,9 @@ async def run_newsletter(
 # ── The reminder, 2026-09-16 ────────────────────────────────────────────────
 #
 # Founder-authorised 2026-09-11: "go, one address for Waad, send Wed 16". Sent
-# once, unattended, by .github/workflows/survey-reminder.yml at 13:07 UTC on
-# 16 September — 9am New York. The original went out at noon New York on
+# once, unattended, by .github/workflows/survey-reminder.yml at 17:07 UTC on
+# 16 September — 1pm New York; moved from 13:07 on 2026-09-13 to clear the
+# worker's 13:00 UTC Daily Top 10 (see the workflow header). The original went out at noon New York on
 # Thursday 10 September.
 #
 # WHO: everyone who RECEIVED the original and has not visibly answered — account
