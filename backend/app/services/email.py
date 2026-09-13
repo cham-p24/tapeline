@@ -2783,7 +2783,6 @@ def render_free_trial_invite_email(
               <li><strong>Insider filings</strong> — SEC Form 4 transactions: date, insider, shares, value</li>
               <li><strong>Analyst consensus</strong> per ticker</li>
               <li><strong>Alerts on every channel, and the daily briefing</strong> — the screen re-runs after each close and tells you what changed; Free runs a screen when you open it</li>
-              <li><strong>Your watchlist's own record</strong> — how each name you saved has scored since you added it</li>
               <li><strong>CSV export and API access</strong></li>
             </ul>
             """

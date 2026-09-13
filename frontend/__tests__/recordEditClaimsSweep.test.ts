@@ -236,6 +236,12 @@ describe("published blog passages keep their words and carry a dated note", () =
     expect(posts.slice(newer, older)).toMatch(/about 11,500/);
   });
 
+  it("why-we-score-2500 post: the excerpt (blog index, meta description, JSON-LD) opens with the dated count", () => {
+    const m = posts.match(/slug: "why-we-score-2500-not-5000",[\s\S]*?excerpt:\s*"([^"]*)"/);
+    expect(m).not.toBeNull();
+    expect(m![1].startsWith("Updated 14 September 2026: we now score about 11,500 US stocks and ETFs.")).toBe(true);
+  });
+
   it("every other record claim in posts is gone, and 6,900 appears only in dated history", () => {
     for (const pat of BANNED_RECORD_CLAIMS) {
       const all = [...posts.matchAll(new RegExp(pat.source, pat.flags + "g"))];
@@ -253,4 +259,17 @@ describe("published blog passages keep their words and carry a dated note", () =
       expect(around).toMatch(/September 2026/);
     }
   });
+});
+
+describe("plan tables do not call insider filings live", () => {
+  // /app/holdings (pinned by insiderRefreshCadenceCopy.test.tsx) says each
+  // stock's Form 4 filings are re-checked about every two days, ETFs about
+  // monthly. "live SEC Form 4" on the plan tables contradicted that.
+  for (const file of ["components/PricingTable.tsx", "app/app/billing/page.tsx"]) {
+    it(`${file}: no "live" insider claim`, () => {
+      const copy = shippedCopy(read(file));
+      expect(copy).not.toMatch(/live SEC Form 4/i);
+      expect(copy).toMatch(/Recent insider buys — SEC Form 4 filings across/);
+    });
+  }
 });

@@ -901,7 +901,7 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
     slug: "why-we-score-2500-not-5000",
     title: "Why we score 2,500 tickers, not 5,000.",
     excerpt:
-      "A third-party market-data feed covers thousands of US tickers. We actively score ~2,500 by daily dollar-volume — here's why that cutoff exists, what we do with the rest, and why bigger isn't better.",
+      "Updated 14 September 2026: we now score about 11,500 US stocks and ETFs. As published in May 2026: A third-party market-data feed covers thousands of US tickers. We actively score ~2,500 by daily dollar-volume — here's why that cutoff exists, what we do with the rest, and why bigger isn't better.",
     publishedAt: "2026-05-03",
     author: "Tapeline",
     body: `

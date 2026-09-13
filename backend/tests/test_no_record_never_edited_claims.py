@@ -127,3 +127,31 @@ def test_carded_trial_value_email_does_not_promise_the_dark_watchlist_record():
     assert "its own version" not in html
     assert "own scored record" not in html
     assert "Open your watchlist" in html
+
+
+WATCHLIST_RECORD_PROMISES = ("watchlist's own record", "watchlist's record", "own scored record")
+
+
+@pytest.mark.parametrize("name,fn,kwargs", _cases())
+async def test_no_email_renderer_promises_the_dark_watchlist_record(name, fn, kwargs):
+    """watchlist.track_record is dark for every tier (tier.DISABLED_FEATURES), so
+    no email may promise it. render_free_trial_invite_email listed "Your
+    watchlist's own record" under what a trial adds; the plain score-since-added
+    comparison is on the free watchlist anyway, so a trial adds neither."""
+    from app.services import tier
+
+    assert "watchlist.track_record" in tier.DISABLED_FEATURES
+    try:
+        out = fn(**kwargs)
+        if inspect.isawaitable(out):
+            out = await out
+    except Exception as exc:  # never a silent skip
+        pytest.fail(f"{name} could not be rendered with synthesised args ({exc!r})")
+    text = (out if isinstance(out, str) else str(out)).replace("&#x27;", "'").replace("&#39;", "'").replace("’", "'").lower()
+    for phrase in WATCHLIST_RECORD_PROMISES:
+        assert phrase not in text, f"{name} promises {phrase!r}"
+
+
+def test_the_free_trial_invite_email_is_in_the_sweep():
+    names = {p.values[0] for p in _cases()}
+    assert "render_free_trial_invite_email" in names

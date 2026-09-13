@@ -114,7 +114,7 @@ const PLANS = [
     // Styled as the power tier (darker, quieter) — no popularity badge.
     proPlus: true,
     highlights: [
-      `Recent insider buys — live SEC Form 4 across ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} tickers`,
+      `Recent insider buys — SEC Form 4 filings across ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} tickers`,
       "Email alerts · unlimited (Pro: 10/day)",
       "Public API access · 1,000 requests/day",
       "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
