@@ -56,7 +56,7 @@ export default async function OG() {
             The methodology. Public.
           </div>
           <div style={{ fontSize: "26px", color: "#a1a1aa", lineHeight: 1.4, display: "flex", maxWidth: "900px" }}>
-            Six named factors. One score. Every top-10 pick back-checked on the public scorecard.
+            Six named factors. One score. Daily top-10 lists, back-checked on the public scorecard.
           </div>
         </div>
 

@@ -11,6 +11,7 @@
  *    page whose H1 reads "Live SEC Form 4 Tracker", that asserts recent
  *    transactions by named public companies that never happened. There is now
  *    no fallback data at all: the page says the feed is unavailable.
+ *    (The H1 no longer says "Live" either — see InsiderBuyingClaims.test.tsx.)
  *
  * 2. FABRICATED ZEROS. transaction_price / transaction_value are NOT NULL with
  *    a 0 default in backend/app/models/insider_transaction.py, so a filing the
@@ -108,14 +109,21 @@ describe("/insider-buying — no invented Form 4 filings", () => {
     }
   });
 
-  it("renders an empty feed as unavailable rather than as a live snapshot", async () => {
+  it("renders an empty feed as empty, not as unreachable and not as a snapshot", async () => {
     mockFeed([]);
     const { container } = await renderPage();
-    expect(screen.getByTestId("insider-feed-unavailable")).toBeInTheDocument();
+    // The feed answered with no rows — a different fact from "we could not
+    // reach it", so it gets its own state and never a table.
+    expect(screen.getByTestId("insider-feed-empty")).toBeInTheDocument();
+    expect(screen.queryByTestId("insider-feed-unavailable")).toBeNull();
+    expect(container.querySelector("table")).toBeNull();
     expect(container.textContent).not.toMatch(/live preview/i);
+    expect(screen.getByTestId("insider-source-line").textContent).toMatch(
+      /No filings are available/,
+    );
   });
 
-  it("renders the real rows, and calls them live, when the feed answers", async () => {
+  it("renders the real rows, dated, when the feed answers", async () => {
     mockFeed([realRow]);
     const { container } = await renderPage();
 
@@ -125,7 +133,10 @@ describe("/insider-buying — no invented Form 4 filings", () => {
     expect(container.textContent).toContain("SMITH JANE");
     expect(container.textContent).toContain("$25.50");
     expect(container.textContent).toContain("$102K");
-    expect(container.textContent).toMatch(/live preview/i);
+    // The newest row here is 13+ days old in production; "Live preview" was
+    // the wrong label for it. The source line carries the date instead.
+    expect(container.textContent).not.toMatch(/live preview/i);
+    expect(screen.getByTestId("insider-source-line").textContent).toContain("Aug 14, 2026");
   });
 });
 
@@ -158,7 +169,7 @@ describe("/insider-buying — an omitted figure is an em-dash, not $0.00", () =>
     expect(priced.textContent).toContain("$102K");
 
     const unpriced = rows.find((r) => r.textContent?.includes("NOPRICE"))!;
-    // Cell order: ticker, insider, shares, price, value, filed.
+    // Cell order: ticker, insider, shares, price, value, trade date.
     const tds = [...unpriced.querySelectorAll("td")];
     expect(tds[3].textContent).toBe("—");
     expect(tds[4].textContent).toBe("—");

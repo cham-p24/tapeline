@@ -8,7 +8,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 export const metadata = pageMeta({
   title: "How Tapeline Works: Our 6-Factor Stock Scoring Methodology",
   description:
-    "How the Tapeline Score is calculated: a weighted blend of six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum. No black box; every pick logged to a public scorecard.",
+    "How the Tapeline Score is calculated: a weighted blend of six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum. No black box. Each day's top 10 is logged to a public scorecard; four trading days since the record began on 11 May 2026 have no list.",
   path: "/how-it-works",
 });
 
@@ -25,7 +25,7 @@ const HOW_FAQ = [
   },
   {
     q: "How often does the score update?",
-    a: "Scores re-tick every minute during market hours and persist between sessions. Most data feeds (price, volume, RSI, MACD, regime) update sub-60s; fundamentals refresh on company filing cadence; insider Form 4 within hours of SEC filing.",
+    a: "Scores re-tick every minute during market hours and persist between sessions. Most data feeds (price, volume, RSI, MACD, regime) update sub-60s; fundamentals refresh on company filing cadence. Insider Form 4 filings are pulled from a data vendor in a once-a-day refresh that works through the stock universe in batches, so not every stock is re-checked every day, and the vendor can run behind SEC EDGAR.",
   },
   {
     q: "What is the per-ticker confidence percentage?",
@@ -33,7 +33,7 @@ const HOW_FAQ = [
   },
   {
     q: "Is the methodology really public?",
-    a: "Yes. We name all six factors, show each factor's contribution on every ticker, and log every top-10 daily pick to a public scorecard that's back-checked against SPY the next session. Any change to the factor set ships through the public changelog. The moat is the data spine plus that public track record — not a secret list of factors.",
+    a: "Yes. We name all six factors, show each factor's contribution on every ticker, and log each day's top 10 to a public scorecard that's back-checked against SPY the next session. Since the record began on 11 May 2026, four trading days have no list: 31 August, 2 September, 4 September and 9 September 2026. Any change to the factor set ships through the public changelog. The moat is the data spine plus that public track record — not a secret list of factors.",
   },
 ];
 
@@ -50,10 +50,19 @@ const HOW_FAQ = [
 // 2026-07-18 accuracy fix: the Smart money line previously read "Insider net
 // buying (SEC Form 4) and, where applicable, Congressional disclosures and
 // institutional flow." Only the Form 4 half is true — the sub-score reads
-// disclosed insider transactions and nothing else. Congressional disclosure
-// data is ingested and published as its own feed in the product, but it is not
-// an input to this factor, and there is no institutional-flow input at all.
+// disclosed insider transactions and nothing else. Congress data is not an
+// input to this factor, and there is no institutional-flow input at all.
+// (2026-09-14: this comment used to say congressional data "is ingested and
+// published as its own feed". No real congress data exists.)
 // Corrected here rather than left to contradict the factor page it links to.
+//
+// 2026-09-14 integrity pass: the FAQ said insider Form 4 data arrives "within
+// hours of SEC filing" and the description claimed every pick was logged.
+// Neither was true. _refresh_insider_cache in
+// backend/app/workers/signal_publisher.py runs on a 24h latch in 400-symbol
+// slices, and the newest code-P trade the public feed returned on 2026-09-14
+// was dated 2026-08-31. daily_scorecard has no rows for 2026-08-31, 09-02,
+// 09-04 or 09-09 (prod, read-only, 2026-09-14).
 //
 // Same fix on Relative strength: the line claimed a sector comparison. sub_rs
 // in backend/app/services/score.py measures the ticker's change minus the
@@ -251,8 +260,9 @@ export default function HowItWorksPage() {
             >
               <h3 className="text-sm font-semibold transition-colors group-hover:text-accent">Public scorecard</h3>
               <p className="mt-1.5 text-xs text-muted leading-relaxed">
-                Every daily top-10, back-checked against the next session, with
-                the sample size shown and losing days left in.
+                Each day&rsquo;s top 10, back-checked against the next session, with
+                the sample size shown and losing days left in. Four trading days since
+                the record began have no list.
               </p>
             </Link>
             <Link
