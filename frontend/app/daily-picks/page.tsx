@@ -139,12 +139,13 @@ export default async function DailyPicksPage() {
             <NewsletterCapture source="homepage" heading="" sub="" />
           </div>
           <p className="mt-3 text-xs text-muted">
-            Past daily lists, and how each name moved against SPY the next
-            session, are on{" "}
+            Our back-checked record of past daily top 10s, chosen at each close
+            and able to differ from this list, is on{" "}
             <Link href="/scorecard" className="hover:text-fg underline-offset-2 hover:underline">
               the public scorecard
-            </Link>{" "}
-            7 days after each session, with every correction dated.
+            </Link>
+            , with entries appearing 7 days after each session and every
+            correction dated.
           </p>
         </div>
       </section>
@@ -158,8 +159,9 @@ export default async function DailyPicksPage() {
                 The Top 10 right now
               </h2>
               <p className="mt-2 text-sm text-muted">
-                Free-tier view (live scores). Email subscribers get the same
-                picks delivered each US market morning.
+                Free-tier view (live scores, so this list can change during the
+                day). Email subscribers get a Top 10 from the same composite
+                each US market morning.
               </p>
             </div>
             <Link

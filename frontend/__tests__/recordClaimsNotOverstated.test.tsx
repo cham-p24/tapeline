@@ -90,10 +90,21 @@ const BANNED_RECORD_CLAIMS: RegExp[] = [
   /append-only/i,
   /don(?:'|’|&rsquo;)t edit losers/i,
   /no published row has ever been altered/i,
+  // The Dataset JSON-LD called the score "frozen at publication"; the 18 May -
+  // 12 June 2026 scores were overwritten on 15 June 2026.
+  /frozen at publication/i,
+  // /daily-picks and the email are not the record's list (T-10 not approved):
+  // never describe the record as this page's past lists.
+  /Past daily lists/i,
+  /\bsame (daily )?(list|lists|picks|top 10)\b/i,
+  // Completeness claim the limitations block cannot back.
+  /everything else we know/i,
+  // Overstated certainty about the 15 June 2026 cap.
+  /faulty values/i,
 ];
 
 /** Stale or expired statements on these routes. */
-const BANNED_STALE: RegExp[] = [/until 8 September/i, /~2,500/, /three days before/i];
+const BANNED_STALE: RegExp[] = [/until 8 September/i, /~2,500/, /6,900/, /three days before/i];
 
 /** Features with no real data behind them (checked outside the changelog). */
 const BANNED_FEATURE_CLAIMS: RegExp[] = [/congress/i, /squeeze/i];
@@ -147,6 +158,12 @@ describe("JSON-LD makes no false claim about the record", () => {
     });
   }
 
+  it("the Dataset price columns do not claim every price is the official close", () => {
+    const blob = JSON.stringify(scorecardDatasetJsonLd());
+    expect(blob).not.toMatch(/"Official close on the session the pick was published"/);
+    expect(blob).toMatch(/24 August 2026/);
+  });
+
   it("the Dataset description carries the dated corrections", () => {
     const d = scorecardDatasetJsonLd().description;
     expect(d).toMatch(/not re-ranked or deleted/);
@@ -182,8 +199,19 @@ describe("rendered static pages", () => {
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/Past entries are never edited/i);
     expect(text).not.toMatch(/both append-only/i);
+    // The June cap: verified facts plus the stated uncertainty, nothing more.
+    expect(text).not.toMatch(/were ranked on faulty values/);
+    expect(text).not.toMatch(/held scores above 100/);
+    // Past entries are corrected by NEW dated entries, never by notes inside them.
+    expect(text).not.toMatch(/Correction added 14 September 2026/);
     for (const needle of [
-      "Recorded scores from 18 May to 12 June were capped at 100, and the originals were not kept",
+      "Recorded scores above 100 were set to 100, and the originals were not kept",
+      "we cannot tell which of the 190 entries were changed or by how much",
+      "until a fix on 9 June 2026 the daily top 10 could be ranked on such scores",
+      "The squeeze data behind squeeze alerts was not real market data",
+      "all 338,015 rows in our congressional-trades table were test output",
+      "the list for 24 August 2026 was recorded shortly before",
+      "6,092 of 11,649 scored tickers had neither reading",
       "Four US trading days have no top 10 on the record",
       "31 August, 2 September, 4 September or 9 September 2026",
       "some tickers could be scored from random placeholder numbers",

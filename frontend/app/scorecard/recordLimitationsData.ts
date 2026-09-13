@@ -4,7 +4,8 @@
  *
  * Integrity wave approved by the founder on 2026-09-14 (tickets T-05, T-29).
  * Before that date none of the following was stated on /scorecard:
- *   - the 15 June 2026 overwrite of 190 recorded scores (18 May – 12 June),
+ *   - the 15 June 2026 cap of recorded scores above 100 (all 190 entries from
+ *     18 May – 12 June now read 100; which of them changed is unknown),
  *   - the four US trading days with no top 10,
  *   - the placeholder-factor defect, the inflated spreadsheet scores and the
  *     6–10 September factor refresh stall.
@@ -65,13 +66,13 @@ export const CORRECTIONS: Correction[] = [
     date: "2026-06-15",
     label: "15 June 2026",
     body:
-      "Scores recorded for the 190 entries from 18 May to 12 June 2026 were capped at 100. A bug had stored values above 100, and each of those days' top 10 was ranked on those faulty values. The original values were not kept, so every score in that window now reads 100. The lists were not re-ranked. This was not disclosed until 14 September 2026.",
+      "A database change set every recorded score above 100 to 100 and kept no copy of the originals. All 190 entries from 18 May to 12 June 2026 now read 100. Scores of 120 to 137 had been verified in entries from 22 May to 5 June, and until a fix on 9 June 2026 the daily top 10 could be ranked on such scores. Because the originals were not kept, we cannot tell which of the 190 entries were changed or by how much. The lists were not re-ranked. This was not disclosed until 14 September 2026.",
   },
   {
     date: "2026-08-25",
     label: "25 August 2026",
     body:
-      "Recorded prices were restated on 684 of 688 entries, because they had been taken from after-hours trades instead of the official close. See the restatement note above.",
+      "Recorded prices were restated on 684 of the 688 entries for sessions up to 21 August 2026, because they had been taken from after-hours trades instead of the official close. The other 4 were left as first recorded. The list for 24 August 2026 was not part of this restatement and still uses the after-hours prices (see below). See the restatement note above.",
   },
 ];
 
@@ -91,10 +92,16 @@ export const LIMITATIONS: Limitation[] = [
       "After each restart of our system, tickers not covered by our scoring spreadsheet were scored from random placeholder factor values until the daily data pass ran. A list from this period could include names scored that way, and our stored data cannot show whether any was. Fixed on 23 August 2026.",
   },
   {
-    date: "2026-09-06",
-    period: "Lists recorded before 6 September 2026",
+    date: "2026-08-25",
+    period: "The list for 24 August 2026",
     body:
-      "When measured on 6 September 2026, 77% of scored tickers had no reading for two of the six factors (fundamentals and insider activity), which then counted as neutral. The listed names were therefore drawn mostly from the tickers that did have readings.",
+      "This list was recorded shortly before we switched to official closing prices, and it was not included in the 25 August 2026 restatement. Its prices at flag still come from the last trade including after-hours trading. For 7 of its 10 entries that price differs from the official close, by 0.08% to 1.36%, so their results are not on the official-close basis either. Not corrected.",
+  },
+  {
+    date: "2026-09-06",
+    period: "All lists to date",
+    body:
+      "When measured on 6 September 2026, 5,697 of 7,417 scored tickers (77%) had no reading for two of the six factors (fundamentals and insider activity), which then counted as neutral, so the listed names were drawn mostly from the tickers that did have readings. Changes merged on 6 September 2026 (#762) and 7 September 2026 (#775). Coverage is still incomplete: on 14 September 2026, 6,092 of 11,649 scored tickers had neither reading.",
   },
   {
     date: "2026-09-07",

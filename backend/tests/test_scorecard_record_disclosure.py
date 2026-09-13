@@ -6,9 +6,10 @@ Three things were true of production and invisible in every artefact a reader
 could hold:
 
 1. On 2026-06-15 migration 0034_clamp_scorecard_scores set `score_at_flag` to
-   100 on all 190 rows from the sessions 2026-05-18 to 2026-06-12. A bug had
-   stored values above 100, each of those lists was ranked on them, and the
-   originals were not kept. The export's `restatements` did not list it, and
+   100 on every row above 100; all 190 rows from the sessions 2026-05-18 to
+   2026-06-12 now read 100. A bug had stored values above 100 (120-137 were
+   verified for 2026-05-22..06-05), and the originals were not kept, so which
+   rows changed is unknown. The export's `restatements` did not list it, and
    its header said "If `restatements` is empty, no published row has ever
    been altered".
 2. Four US trading days (2026-08-31, 2026-09-02, 2026-09-04, 2026-09-09) have
@@ -90,7 +91,18 @@ def test_the_june_score_cap_is_a_listed_restatement():
     assert "2026-05-18" in r["scope"] and "2026-06-12" in r["scope"]
     # The three facts that make it material, each stated rather than implied.
     assert "above 100" in r["reason"]
-    assert "ranked" in r["reason"], "does not say the lists were ranked on the bad values"
+    assert "could be ranked" in r["reason"], "does not say lists could be ranked on the bad values"
+    # What is verified is stated; what is not is said to be unknown. Migration
+    # 0034 kept nothing, and lists recorded after #260 (2026-06-09) could not
+    # hold a score above 100, so "every list was ranked on faulty values" and
+    # "all 190 rows held scores above 100" are not claims the evidence supports.
+    assert "120 to 137" in r["reason"] and "2026-05-22" in r["reason"]
+    assert "#260" in r["reason"]
+    assert "not known" in r["scope"]
+    assert "cannot tell which" in r["magnitude"]
+    for overclaim in ("each of these sessions was ranked", "faulty values"):
+        blob = " ".join(r.values())
+        assert overclaim not in blob, f"the 2026-06-15 restatement still says {overclaim!r}"
     assert "not kept" in r["remedy"] and "cannot be recovered" in r["remedy"]
     # A late disclosure must not pass for a timely one.
     assert "2026-09-14" in r["disclosed"]
@@ -154,8 +166,13 @@ def test_known_limitations_are_dated_and_cover_the_verified_defects():
         "2026-09-07", "#766",   # sheet-score correction
         "2026-09-06", "#800",   # factor refresh stall
         "2026-08-31", "2026-09-02", "2026-09-04", "2026-09-09",
+        "session 2026-08-24",   # list outside the 25 Aug restatement (P5)
+        "#775", "6,092 of 11,649",  # factor coverage still incomplete
     ):
         assert must in blob, f"known_limitations does not mention {must!r}"
+    coverage = next(k for k in lims if "5,697 of 7,417" in k["limitation"])
+    assert coverage["period"] == "all lists to date"
+    assert "Fixed" not in coverage["status"], "factor coverage is still incomplete"
     assert ex.dataset_meta(
         row_count=1, session_count=1, delay_days=7, first_date=None,
         last_date=None, cutoff=date(2026, 9, 7),

@@ -4,9 +4,10 @@
  *
  * Integrity wave approved by the founder on 2026-09-14 (T-05, T-29). Verified
  * against production that day:
- *   - 190 entries from 18 May to 12 June 2026 read score 100.0, because
- *     migration 0034 capped every stored score above 100 on 15 June 2026 and
- *     kept no originals; the lists had been ranked on the faulty values;
+ *   - 190 entries from 18 May to 12 June 2026 read score 100.0; migration 0034
+ *     set every stored score above 100 to 100 on 15 June 2026 and kept no
+ *     originals, so which entries it changed is unknown. 120-137 was verified
+ *     for 22 May - 5 June, and #260 (9 June) stopped ranking on such scores;
  *   - no top 10 exists for 2026-08-31, 2026-09-02, 2026-09-04, 2026-09-09.
  * Before this change the page said the scores "are exactly what was published
  * on the day" and listed no gap at all.
@@ -129,6 +130,18 @@ describe("KnownLimitations", () => {
     expect(text).toMatch(/Corrected on 7 September 2026/);
     expect(text).toMatch(/6 to 10 September 2026/);
     expect(text).toMatch(/not disclosed until 14 September 2026/);
+    // The 24 August 2026 list fell outside the price restatement (not corrected).
+    expect(text).toMatch(/The list for 24 August 2026/);
+    expect(text).toMatch(/0\.08% to 1\.36%/);
+    // Factor coverage is still open, not "fixed".
+    expect(text).toMatch(/6,092 of 11,649 scored tickers had neither reading/);
+    expect(text).toMatch(/All lists to date/);
+    // No completeness claim.
+    expect(text).not.toMatch(/everything else we know/i);
+    expect(text).toMatch(/gaps and problems we have verified/);
+    // The June cap is stated no more certainly than the evidence allows.
+    expect(text).toMatch(/cannot tell which of the 190 entries were changed/);
+    expect(text).not.toMatch(/faulty values/);
     // Descriptive only.
     for (const banned of ["beat the market", "outperform", "guarantee"]) {
       expect(text.toLowerCase()).not.toContain(banned);
@@ -154,8 +167,11 @@ describe("restatement note includes the 15 June 2026 cap", () => {
   it("states the three material facts of the cap", () => {
     render(<RestatementNotice />);
     const text = document.body.textContent ?? "";
-    expect(text).toMatch(/190 entries recorded from 18 May to 12 June/);
-    expect(text).toMatch(/ranked on those faulty values/);
+    expect(text).toMatch(/190 entries recorded from 18 May to 12 June 2026 now read 100/);
+    expect(text).toMatch(/could be ranked on such scores/);
+    expect(text).toMatch(/cannot tell which\s+of the 190 entries were changed/);
+    expect(text).not.toMatch(/faulty values/);
+    expect(text).not.toMatch(/held scores above 100/);
     expect(text).toMatch(/original values were not kept/);
     expect(text).not.toMatch(/exactly what was\s+published/i);
   });

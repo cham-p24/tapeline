@@ -39,8 +39,8 @@ export function KnownLimitations({ liveMissing }: { liveMissing?: readonly strin
       <p className="mt-3 text-sm text-muted">
         Entries are not re-ranked or deleted. We have corrected recorded values
         twice, and said so: prices on 25 August 2026, and scores from 18 May to
-        12 June capped on 15 June 2026. Below is everything else we know is
-        missing or was wrong in this record, with dates.
+        12 June capped on 15 June 2026. Below are the gaps and problems we have
+        verified, with dates.
       </p>
 
       <h3 className="mt-5 text-sm font-semibold text-fg">
@@ -78,6 +78,7 @@ export function KnownLimitations({ liveMissing }: { liveMissing?: readonly strin
       <p className="mt-1 text-sm text-muted">
         None of these changed a stored entry. The lists from those days stand as
         they were recorded, including any effect these problems had on them.
+        Some are still open.
       </p>
       <ul className="mt-2 space-y-2 text-sm text-muted">
         {LIMITATIONS.map((l) => (
@@ -88,7 +89,7 @@ export function KnownLimitations({ liveMissing }: { liveMissing?: readonly strin
       </ul>
 
       <p className="mt-4 text-sm text-muted">
-        Each of these is also a dated entry on the{" "}
+        Most of these are also dated entries on the{" "}
         <Link href="/changelog" className="link">
           changelog
         </Link>

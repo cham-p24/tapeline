@@ -75,8 +75,8 @@ const FIELDS = [
   { name: "Date", desc: "The session the pick was recorded." },
   { name: "Symbol", desc: "The ticker, as it was ranked that day." },
   { name: "Rank", desc: "Position 1-10 in that session's list." },
-  { name: "Tapeline Score", desc: "The 0-100 composite recorded at the close. For 18 May to 12 June 2026 every score reads 100: it was capped on 15 June 2026 and the originals were not kept." },
-  { name: "Prices", desc: "The official close on the session and on the next session (restated on 25 August 2026 for entries up to 21 August)." },
+  { name: "Tapeline Score", desc: "The 0-100 composite recorded at the close. For 18 May to 12 June 2026 every score reads 100: on 15 June 2026 every score above 100 was set to 100, the originals were not kept, and which entries that changed is not known." },
+  { name: "Prices", desc: "The official close on the session and on the next session (restated on 25 August 2026 for entries up to 21 August). Four older entries the data vendor can no longer price, and the flag prices on the 24 August 2026 list, are still the last trade including after-hours trading." },
   { name: "Next-session move", desc: "How the ticker moved the following session, beside SPY's move over the same window." },
 ];
 

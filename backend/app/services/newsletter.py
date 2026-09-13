@@ -213,8 +213,9 @@ async def _send_welcome(*, email: str, token: str) -> None:
     # the record are described separately, and the corrections are named.
     # Pinned by tests/test_record_claims_newsletter_welcome.py.
     record_note = (
-        "Our public record at tapeline.io/scorecard shows each past daily top 10 "
-        "and how each name moved against SPY the next session. Entries appear "
+        "Our public record at tapeline.io/scorecard shows each past daily top 10, "
+        "chosen at each close, and how each name moved against SPY the next "
+        "session. It can differ from this email's list. Entries appear "
         "there 7 days after the session. Entries are not re-ranked or deleted. "
         "We have corrected recorded values twice, and said so: prices on "
         "25 August 2026, and scores from 18 May to 12 June capped on "

@@ -54,7 +54,23 @@ const METHODOLOGY_LOG: LogEntry[] = [
     kind: "correction",
     title: "Entries on this page said no recorded value had ever been changed. That was wrong",
     body:
-      "Several entries below say that no historical entry was altered, that every past day stands exactly as it was recorded, or that we don't rewrite the record: the 2026-09-06 entries for #761 and #762, the 2026-07-09 entry, and the 2026-07-10 release note. Those statements were false when they were written. On 15 June 2026 the recorded scores for the 190 entries from 18 May to 12 June 2026 were capped at 100 and the original values were not kept (see the 2026-06-15 entry). The 2026-08-24 entry also says 688 rows were rebased: 684 of the 688 were, and 4 were left as first recorded because the data vendor no longer returns prices for them. We are leaving those entries as written, because this log corrects rather than rewrites. What is true: entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026.",
+      "Several entries below say that no historical entry was altered, that every past day stands exactly as it was recorded, or that we don't rewrite the record: the 2026-09-06 entries for #761 and #762, the 2026-07-09 entry, and the 2026-07-10 release note. Those statements were false when they were written. On 15 June 2026 every recorded score above 100 was set to 100 and the original values were not kept; all 190 entries from 18 May to 12 June 2026 now read 100 (see the 2026-06-15 entry). The 2026-08-24 entry also says 688 rows were rebased: 684 of the 688 were, and 4 were left as first recorded because the data vendor no longer returns prices for them. The list for 24 August 2026 was not rebased either (see the 2026-09-14 entry on two known problems). We have left the wording of those entries in place, because this log corrects rather than rewrites. What is true: entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026.",
+    ref: "#821",
+  },
+  {
+    date: "2026-09-14",
+    kind: "correction",
+    title: "Release notes described congressional-trade and squeeze data that was never real",
+    body:
+      "Three release notes below describe features whose data was not real. The 2026-05-17 note says the Smart Money factor explanation was updated to cover congressional disclosures, and the 2026-08-30 note says a card turns on congressional-trade filings. No real congressional-trade data has ever been loaded into Tapeline: all 338,015 rows in our congressional-trades table were test output, and no real source ever wrote one. The 2026-08-12 note says squeeze alerts go out over email and browser push. The squeeze data behind squeeze alerts was not real market data. It was test output last written on 18 July 2026, and no real squeeze feed was running. We have left the wording of those release notes in place and are correcting them here.",
+    ref: "#821",
+  },
+  {
+    date: "2026-09-14",
+    kind: "disclosure",
+    title: "Two known problems with the record that were not stated before",
+    body:
+      "First, the list for 24 August 2026 was recorded shortly before we switched the record to official closing prices, and it was not included in the 25 August 2026 restatement. Its prices at flag are still the last trade including after-hours trading. For 7 of its 10 entries that price differs from the official close, by 0.08% to 1.36%, so those entries' results are not on the official-close basis either. It has not been corrected. Second, the 2026-09-06 entry for #762 describes most tickers missing the fundamentals and insider-activity readings. The changes merged on 6 September 2026 (#762) and 7 September 2026 (#775) did not make coverage complete: on 14 September 2026, 6,092 of 11,649 scored tickers had neither reading, and a missing reading still counts as neutral. Both are listed under Gaps and known limitations on the scorecard page and in the CSV and JSON downloads.",
     ref: "#821",
   },
   {
@@ -164,9 +180,9 @@ const METHODOLOGY_LOG: LogEntry[] = [
   {
     date: "2026-06-15",
     kind: "correction",
-    title: "Recorded scores from 18 May to 12 June were capped at 100, and the originals were not kept",
+    title: "Recorded scores above 100 were set to 100, and the originals were not kept",
     body:
-      "Added on 14 September 2026; this change was not disclosed anywhere until then. A bug let raw factor values, which are not on the 0-100 scale, into the stored score. The daily top 10 is chosen by ranking on that score, so the lists for the 19 sessions from 18 May to 12 June 2026 were ranked on faulty values, and the 190 entries recorded on those days held scores above 100 (values of 120 to 137 were observed). On 15 June 2026 a one-off database change set every recorded score above 100 to exactly 100, and the write path was fixed so no later entry can exceed 100. The original values were not kept and cannot be recovered, so every score in that window now reads 100. The lists were not re-ranked and no entry was removed: those days still show the ten names chosen on the faulty values. Prices and next-session results were not touched, and the summary figures on the scorecard do not use the score. This change is listed as a restatement on the scorecard page and in the CSV and JSON downloads.",
+      "Added on 14 September 2026; this change was not disclosed anywhere until then. A bug let raw factor values, which are not on the 0-100 scale, into the stored score. On 15 June 2026 a database change set every recorded score above 100 to 100 and kept no copy of the originals. All 190 entries from 18 May to 12 June 2026 now read 100. Scores of 120 to 137 had been verified in entries from 22 May to 5 June, and until a fix on 9 June 2026 the daily top 10 could be ranked on such scores. Because the originals were not kept, we cannot tell which of the 190 entries were changed or by how much. The lists were not re-ranked and no entry was removed, so any list that was ranked on scores above 100 still shows the names chosen that way. Prices and next-session results were not touched, and the summary figures on the scorecard do not use the score. This change is listed as a restatement on the scorecard page and in the CSV and JSON downloads.",
     ref: "#286",
   },
   {
@@ -205,7 +221,7 @@ const ENTRIES: Entry[] = [
     title: "The card moved off the front door — sign up with an email and a password",
     body: [
       "Signing up takes an email and a password. The account it makes lands on the Free plan and opens the live scanner straight away: the top ten scored rows of any scan, on live data, no delay. Free also carries one saved screen, a 5-symbol watchlist, and 12 ticker deep-pages a day.",
-      "A card is what starts the 30-day Premium trial, and it is what turns on every matching row instead of the first ten, a second saved screen, alerts on email and browser push, CSV export, the 200-symbol watchlist, and congressional-trade and insider filings. Free now carries no alerts on any channel, browser push included. (Correction added 14 September 2026: no congressional-trade feed with real data is available, so a card does not turn one on.)",
+      "A card is what starts the 30-day Premium trial, and it is what turns on every matching row instead of the first ten, a second saved screen, alerts on email and browser push, CSV export, the 200-symbol watchlist, and congressional-trade and insider filings. Free now carries no alerts on any channel, browser push included.",
       "The trial terms are unchanged: $0 charged that day, the exact first-charge date shown before you confirm, an email three days before the charge, and one click to cancel.",
       // copy-compliance-allow card-required-signup -- dated changelog entry; it states the superseded arrangement, and says so
       "This supersedes the arrangement in the 22 August 2026 entry below, where a new account added a card at first sign-in before the logged-in product opened. That entry stands as a record of what shipped then. The published record — daily top 10, scorecard, per-ticker pages, CSV/JSON — is unchanged and still needs no account.",
@@ -267,7 +283,7 @@ const ENTRIES: Entry[] = [
     tag: "improvement",
     title: "Telegram alerts retired; alerts consolidated on email + browser push",
     body: [
-      "The Telegram alert channel has been retired. Score-change, squeeze and regime alerts now go out over email and browser push, which cover the same triggers. Existing rules keep firing on those channels — nothing about your watchlist, billing or the feeds changes. (Correction added 14 September 2026: the squeeze data behind squeeze alerts had not been updated since 18 July 2026.)",
+      "The Telegram alert channel has been retired. Score-change, squeeze and regime alerts now go out over email and browser push, which cover the same triggers. Existing rules keep firing on those channels — nothing about your watchlist, billing or the feeds changes.",
     ],
   },
   {
@@ -277,7 +293,7 @@ const ENTRIES: Entry[] = [
     title: "Rankings + scorecard now filter out untradeable names",
     body: [
       "The scanner and the public scorecard now apply a liquidity floor. High-scoring names that barely trade — a bond or single-strategy ETF changing hands a few hundred dollars a day — no longer top the ranked list or get frozen onto the scorecard. A score you can't realistically act on isn't useful, so the tradeable names come first now.",
-      "Methodology note, in keeping with our published practice: this only changes which names qualify going forward. No past scorecard day is touched — every historical pick, winner or loser, stays exactly as it was recorded. We don't rewrite the record. (Correction added 14 September 2026: the last two sentences were not true. Recorded scores from 18 May to 12 June 2026 had been capped at 100 on 15 June 2026 — see the 2026-06-15 and 2026-09-14 entries in the methodology log above.)",
+      "Methodology note, in keeping with our published practice: this only changes which names qualify going forward. No past scorecard day is touched — every historical pick, winner or loser, stays exactly as it was recorded. We don't rewrite the record.",
       "Names with no volume reading are left in, so the filter only ever removes rows that are genuinely untradeable. On the scanner you can still turn the liquidity floor off to browse the entire scored universe.",
     ],
   },

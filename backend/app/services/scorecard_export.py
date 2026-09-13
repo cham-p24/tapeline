@@ -76,8 +76,9 @@ RESTATEMENTS: list[dict[str, str]] = [
             "2026-09-14."
         ),
         "scope": (
-            "all 190 rows recorded for the 19 sessions from 2026-05-18 to "
-            "2026-06-12"
+            "any of the 190 rows recorded for the 19 sessions from 2026-05-18 "
+            "to 2026-06-12 that held a value above 100. Which of the 190 did is "
+            "not known; all 190 now read 100"
         ),
         "fields_changed": "score_at_flag",
         "fields_unchanged": (
@@ -86,25 +87,26 @@ RESTATEMENTS: list[dict[str, str]] = [
         ),
         "reason": (
             "A bug let raw factor values, which are not on the 0-100 scale, "
-            "into the stored score. The daily top 10 is chosen by ranking on "
-            "that score, so each of these sessions was ranked on the faulty "
-            "values, and score_at_flag recorded values above 100 (values of "
-            "120 to 137 were observed)."
+            "into the stored score, so score_at_flag could hold values above "
+            "100. Scores of 120 to 137 had been verified in rows from the "
+            "sessions 2026-05-22 to 2026-06-05. The daily top 10 is chosen by "
+            "ranking on the score, and until a fix merged on 2026-06-09 "
+            "(PR #260) the daily top 10 could be ranked on such scores."
         ),
         "remedy": (
             "A one-off database migration (0034_clamp_scorecard_scores) set "
-            "every score_at_flag above 100 to exactly 100. The original values "
-            "were not kept and cannot be recovered. The write path was fixed "
-            "at the same time, so no later row can exceed 100."
+            "every score_at_flag above 100 to exactly 100. No copy was made, so "
+            "the original values were not kept and cannot be recovered."
         ),
         "not_restated": (
-            "The sessions were not re-ranked and no row was removed, so each of "
-            "these sessions still lists the ten names chosen on the faulty "
-            "values."
+            "The sessions were not re-ranked and no row was removed, so any "
+            "list that was ranked on scores above 100 still shows the names "
+            "chosen that way."
         ),
         "magnitude": (
-            "All 190 rows in the window now read 100.0. How far above 100 each "
-            "one was is unknown, because the originals were overwritten."
+            "All 190 rows in the window now read 100.0. Because the originals "
+            "were not kept, we cannot tell which of the 190 rows were changed "
+            "or by how much."
         ),
         "effect_on_summary": (
             "None on the summary figures, which are computed from prices and "
@@ -192,12 +194,21 @@ COLUMN_DEFINITIONS: dict[str, str] = {
                      "Fundamentals, Momentum, Macro, Smart Money) at flag time. "
                      "The methodology URL describes what each factor measures and "
                      "the order in which they are weighted. For the sessions "
-                     "2026-05-18 to 2026-06-12 every value reads 100: it was "
-                     "capped on 2026-06-15 and the original is not known "
-                     "(see restatements).",
-    "price_at_flag": "Closing price on `date`, in USD.",
+                     "2026-05-18 to 2026-06-12 every value reads 100: every "
+                     "value above 100 was set to 100 on 2026-06-15, the "
+                     "originals were not kept, and which rows that changed "
+                     "is not known (see restatements).",
+    "price_at_flag": "Price on `date`, in USD. For sessions up to 2026-08-21 "
+                     "this is the official close, except 4 rows the vendor "
+                     "could no longer price, which keep the last trade "
+                     "including after-hours trading. For the 2026-08-24 "
+                     "session it is also the last trade including after-hours "
+                     "trading, not the official close (see known_limitations). "
+                     "From 2026-08-25 it is the official close.",
     "price_next_day": "Closing price on the next US trading session, in USD. "
-                      "Empty when the next-day back-check has not run yet.",
+                      "Empty when the next-day back-check has not run yet. "
+                      "The 4 rows left out of the 2026-08-25 restatement keep "
+                      "this price as first recorded.",
     "change_pct_1d_after": "(price_next_day / price_at_flag - 1) * 100.",
     "spy_change_pct_1d": "SPY's close-to-close percentage change over the same two sessions.",
     "alpha_vs_spy": "change_pct_1d_after - spy_change_pct_1d. Negative values are "
@@ -243,11 +254,14 @@ KNOWN_LIMITATIONS: list[dict[str, str]] = [
         "date": "2026-06-15",
         "period": "sessions 2026-05-18 to 2026-06-12 (190 rows)",
         "limitation": (
-            "These lists were ranked on scores that wrongly held values above "
-            "100. On 2026-06-15 the stored scores were capped at 100 and the "
-            "originals were not kept. See restatements."
+            "On 2026-06-15 every recorded score above 100 was set to 100 and no "
+            "copy of the originals was kept, so all 190 rows now read 100. "
+            "Scores of 120 to 137 had been verified in rows from 2026-05-22 to "
+            "2026-06-05, and until a fix on 2026-06-09 (PR #260) the daily top "
+            "10 could be ranked on such scores. Which of the 190 rows were "
+            "changed, and by how much, cannot be told. See restatements."
         ),
-        "status": "Stored score capped; lists not re-ranked; originals unrecoverable.",
+        "status": "Stored scores capped; lists not re-ranked; originals not kept.",
     },
     {
         "date": "2026-08-23",
@@ -268,11 +282,28 @@ KNOWN_LIMITATIONS: list[dict[str, str]] = [
             "Recorded prices had been taken from after-hours trades instead of "
             "the official close. See restatements."
         ),
-        "status": "Prices restated 2026-08-25 (684 of 688 rows).",
+        "status": (
+            "Prices restated 2026-08-25 (684 of 688 rows). The other 4 rows, "
+            "and the 2026-08-24 list, still use the old price basis (see the "
+            "next entry)."
+        ),
+    },
+    {
+        "date": "2026-08-25",
+        "period": "session 2026-08-24 (10 rows)",
+        "limitation": (
+            "The list for 2026-08-24 was recorded shortly before the change to "
+            "official closes and fell outside the 2026-08-25 restatement, so "
+            "its price_at_flag is still the last trade including after-hours "
+            "trading. For 7 of its 10 rows that price differs from the official "
+            "close, by 0.08% to 1.36%, so change_pct_1d_after and alpha_vs_spy "
+            "for those rows are not on the official-close basis either."
+        ),
+        "status": "Not corrected.",
     },
     {
         "date": "2026-09-06",
-        "period": "sessions before 2026-09-06",
+        "period": "all lists to date",
         "limitation": (
             "When measured on 2026-09-06, 5,697 of 7,417 scored tickers (77%) "
             "had no reading for two of the six factors (fundamentals and "
@@ -280,7 +311,11 @@ KNOWN_LIMITATIONS: list[dict[str, str]] = [
             "were therefore drawn mostly from the tickers that did have "
             "readings."
         ),
-        "status": "Fixed forward 2026-09-06 (PR #762). Earlier lists not changed.",
+        "status": (
+            "Changes merged 2026-09-06 (PR #762) and 2026-09-07 (PR #775). "
+            "Coverage is still incomplete: on 2026-09-14, 6,092 of 11,649 "
+            "scored tickers had neither reading. Earlier lists not changed."
+        ),
     },
     {
         "date": "2026-09-07",

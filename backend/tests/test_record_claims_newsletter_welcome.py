@@ -68,3 +68,6 @@ async def test_welcome_email_names_both_corrections_and_the_delay(captured):
         assert "15 June 2026" in body
         assert "18 May to 12 June" in body
         assert "7 days after the session" in body
+        # The morning email's list and the record are separate lists (T-10 is
+        # not approved), so the email must not imply they are the same.
+        assert "It can differ from this email's list" in body
