@@ -216,6 +216,16 @@ def market_cap_cache_size() -> int:
 # read per-tick by polygon_feed.fetch_snapshots.
 _SMART_MONEY_SCORE_CACHE: dict[str, float] = {}
 
+#: Symbols whose last insider answer was EMPTY, until a tick has written that.
+#:
+#: A cache miss means "not measured yet", so the tick's `_merged_factor_set`
+#: keeps the row's previous value. An empty answer means "measured, no Form 4
+#: filings in 90 days", and the previous value is exactly what must go. The
+#: insider pass clears the row itself, but a tick that read the old value before
+#: that commit writes it straight back. This set tells the tick to write NULL
+#: instead. The tick removes the symbols it wrote; a new reading removes its own.
+_SMART_MONEY_CLEARED: set[str] = set()
+
 
 def get_cached_smart_money_score(symbol: str) -> float | None:
     return _SMART_MONEY_SCORE_CACHE.get(symbol.upper())
@@ -223,7 +233,27 @@ def get_cached_smart_money_score(symbol: str) -> float | None:
 
 def set_cached_smart_money_score(symbol: str, score: float | None) -> None:
     if score is not None:
-        _SMART_MONEY_SCORE_CACHE[symbol.upper()] = score
+        sym = symbol.upper()
+        _SMART_MONEY_SCORE_CACHE[sym] = score
+        _SMART_MONEY_CLEARED.discard(sym)
+
+
+def clear_cached_smart_money_score(symbol: str) -> None:
+    """Forget this process's reading because the vendor answered with nothing.
+
+    Not the same as never having a reading; see `_SMART_MONEY_CLEARED`."""
+    sym = symbol.upper()
+    _SMART_MONEY_SCORE_CACHE.pop(sym, None)
+    _SMART_MONEY_CLEARED.add(sym)
+
+
+def smart_money_cleared_symbols() -> frozenset[str]:
+    """A copy: the tick reads it once, then releases exactly what it wrote."""
+    return frozenset(_SMART_MONEY_CLEARED)
+
+
+def release_smart_money_cleared(symbols: frozenset[str] | set[str]) -> None:
+    _SMART_MONEY_CLEARED.difference_update(symbols)
 
 
 def smart_money_cache_size() -> int:
@@ -379,6 +409,15 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
     no writer ever put on the row is rebuilt from its stored Form 4 rows. See
     `_rebuild_unsaved_smart_money_scores`.
 
+    And one removal. The API process warms on every sheet-changed webhook, so
+    its cache holds whatever the rows said the LAST time. When the insider pass
+    has since cleared a reading - an empty answer: row NULL, Form 4 rows
+    deleted - the stale entry would be written back onto the sheet-owned row by
+    the refresh that follows. So an entry whose row is NULL and which has no
+    Form 4 rows on file is dropped. Nothing is lost by that: there is no reading
+    on the row and nothing to rebuild one from. The worker warms only at boot,
+    when its cache is empty and this removes nothing.
+
     Returns (fundamentals_loaded, smart_money_loaded), the second including
     rebuilt readings. Never raises: a warm that fails leaves the caches exactly
     as cold as they were, which is the pre-existing behaviour.
@@ -386,10 +425,11 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
     from sqlalchemy import select
 
     from app.db import session_scope
-    from app.models import Ticker
+    from app.models import InsiderTransaction, Ticker
 
     funds = 0
     smart = 0
+    dropped = 0
     try:
         async with session_scope() as session:
             rows = (await session.execute(
@@ -400,6 +440,15 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
                     | Ticker.sub_smart_money.is_not(None)
                 )
             )).all()
+            on_row = {sym for sym, _, sm in rows if sm is not None}
+            unbacked = [s for s in _SMART_MONEY_SCORE_CACHE if s not in on_row]
+            with_form4: set[str] = set()
+            if unbacked:
+                with_form4 = set((await session.execute(
+                    select(InsiderTransaction.symbol)
+                    .where(InsiderTransaction.symbol.in_(unbacked))
+                    .distinct()
+                )).scalars().all())
         for sym, fund, sm in rows:
             if fund is not None:
                 set_cached_score(sym, float(fund))
@@ -407,14 +456,19 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
             if sm is not None:
                 set_cached_smart_money_score(sym, float(sm))
                 smart += 1
+        for sym in unbacked:
+            if sym not in with_form4:
+                _SMART_MONEY_SCORE_CACHE.pop(sym, None)
+                dropped += 1
     except Exception:
         logger.exception("factor_cache.warm_failed")
         return funds, smart
 
     rebuilt = await _rebuild_unsaved_smart_money_scores()
     logger.info(
-        "factor_cache.warmed fundamentals=%d smart_money=%d smart_money_rebuilt=%d",
-        funds, smart, rebuilt,
+        "factor_cache.warmed fundamentals=%d smart_money=%d smart_money_rebuilt=%d "
+        "smart_money_dropped=%d",
+        funds, smart, rebuilt, dropped,
     )
     return funds, smart + rebuilt
 

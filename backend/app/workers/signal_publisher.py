@@ -41,6 +41,8 @@ from app.services.dblock import LOCK_SCORECARD_FREEZE, try_xact_lock
 from app.services.finnhub_feed import (
     CACHE_TTL_FUNDAMENTALS_HOURS,
     CACHE_TTL_INSIDER_HOURS,
+    release_smart_money_cleared,
+    smart_money_cleared_symbols,
     warm_factor_caches_from_db,
 )
 from app.services.leverage import is_leveraged_fund
@@ -180,9 +182,13 @@ FACTOR_COLUMNS: tuple[str, ...] = (
     "sub_smart_money", "sub_macro", "sub_momentum",
 )
 
+_SMART_MONEY_ONLY: frozenset[str] = frozenset({"sub_smart_money"})
+
 
 def _merged_factor_set(
-    snap: dict[str, Any], previous: dict[str, Any] | None
+    snap: dict[str, Any],
+    previous: dict[str, Any] | None,
+    cleared: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     """The factor columns, the composite, and everything derived from it —
     as ONE internally consistent set.
@@ -209,13 +215,22 @@ def _merged_factor_set(
 
     `previous` is None for a symbol we have never seen, in which case the
     merge is just the incoming values.
+
+    `cleared` names factors whose source ANSWERED with nothing, as opposed to
+    not having answered yet. Those are written as None, whatever the snapshot
+    or the row holds - "incoming-or-previous" would keep the very value the
+    answer retired. See finnhub_feed._SMART_MONEY_CLEARED.
     """
     from app.services.mock_feed import _render_reason, _signal_from_score
     from app.services.polygon_feed import _composite_from_subs
 
     prev = previous or {}
     merged: dict[str, Any] = {
-        col: (snap.get(col) if snap.get(col) is not None else prev.get(col))
+        col: (
+            None if col in cleared
+            else snap.get(col) if snap.get(col) is not None
+            else prev.get(col)
+        )
         for col in FACTOR_COLUMNS
     }
 
@@ -533,6 +548,11 @@ async def tick() -> None:
         }
         full_updates: list[dict] = []
         market_updates: list[dict] = []
+        # Symbols whose smart-money reading an empty insider answer retired.
+        # Read once, before the merge, and released below only once this
+        # tick's writes have committed: the snapshots were taken earlier and
+        # may still carry the retired value, and so may existing_factors.
+        sm_cleared = smart_money_cleared_symbols()
         for snap in snapshots:
             market_only = {
                 "price": snap["price"],
@@ -578,7 +598,11 @@ async def tick() -> None:
                 data = {
                     **market_only,
                     **_merged_factor_set(
-                        snap, existing_factors.get(snap["symbol"])
+                        snap, existing_factors.get(snap["symbol"]),
+                        cleared=(
+                            _SMART_MONEY_ONLY if snap["symbol"] in sm_cleared
+                            else frozenset()
+                        ),
                     ),
                 }
             if snap["symbol"] not in existing_symbols:
@@ -718,6 +742,11 @@ async def tick() -> None:
             "score_upsert.done rows=%d chunk=%d elapsed=%.1fs",
             _rows_written, UPSERT_CHUNK_ROWS, monotonic() - _upsert_started,
         )
+        # Every row this tick merged is committed. A clear that landed after
+        # the read above is not in sm_cleared and stays for the next tick.
+        # Sheet-owned symbols are released too: the tick writes none of their
+        # factors, and the sheet refresh reads the (already emptied) cache.
+        release_smart_money_cleared(sm_cleared & {s["symbol"] for s in snapshots})
 
         # --- Replace squeeze setups ---
         # ONLY when the rows we're about to write are real enough to persist.
@@ -3431,6 +3460,100 @@ async def _refresh_aggregates_cache() -> bool:
     return refreshed > 0
 
 
+#: The insider window the pass asks Finnhub about, in days.
+_INSIDER_WINDOW_DAYS = 90
+
+#: An empty answer is not believed while we hold a filing dated this recently.
+#:
+#: Clearing deletes data, so it has to survive a vendor that answers `[]` when
+#: it should not. A filing dated inside the window cannot have left it, so an
+#: empty answer for a symbol with one on file is a bad answer, not news. Ten
+#: days short of the window, so a date-boundary or timezone difference between
+#: us and Finnhub is never read as a contradiction. A bad answer counts as a
+#: failed call, so an outage of empty bodies trips the pass's failure stop
+#: after 10 of 40 instead of wiping ~3,400 readings (production, 2026-09-13).
+_INSIDER_EMPTY_CONTRADICTED_WITHIN = timedelta(days=_INSIDER_WINDOW_DAYS - 10)
+
+
+async def _clear_smart_money_reading(symbol: str) -> bool:
+    """Retire a symbol's smart-money reading: Finnhub found no Form 4 filings.
+
+    An empty answer from the 90-day insider window is a MEASUREMENT - nothing to
+    score, so the factor is None and the composite uses NEUTRAL for it, exactly
+    as for a symbol never measured (`compute_smart_money_score([])` is None).
+    Before this, only a non-empty answer was written, and every path kept the
+    old value: the tick's merge falls back to the row, the boot warm reloads the
+    row, and the Form 4 rows were never deleted. Measured on production
+    2026-09-13 (read-only): 1,077 non-crypto rows held a sub_smart_money with no
+    stored trade in 90 days - 184 whose newest trade was 92-184 days old, 893
+    with no Form 4 rows at all (629 of them ETFs) - and 773 symbols' stored
+    trades were all older than 90 days, still served by /app/holdings.
+
+    One transaction: the Form 4 rows go, and if the row held a reading it is
+    set to None with the composite and label recomputed from the factors that
+    remain - a factor is never written without its composite. Reason and
+    confidence_pct are recomputed too, as the tick does, except on rows the
+    sheet owns: the sheet writes neither, and its confidence_pct is a
+    conviction grade, not factor coverage. updated_at is held still: no live
+    data changed.
+
+    The cache entry is dropped only after the commit, and the symbol is marked
+    so the tick cannot write the old value back (see `_SMART_MONEY_CLEARED`).
+    If the write fails, nothing has changed and the caller counts a failure.
+
+    Raises FinnhubUnavailableError, changing nothing, when a stored filing
+    contradicts the empty answer; see `_INSIDER_EMPTY_CONTRADICTED_WITHIN`.
+
+    Returns whether the row held a reading.
+    """
+    from app.models import InsiderTransaction
+    from app.services.finnhub_feed import (
+        FinnhubUnavailableError,
+        clear_cached_smart_money_score,
+    )
+
+    sym = symbol.upper()
+    sheet_owned = _sheet_governed_symbols if _sheet_is_scoring_source() else frozenset()
+    held = False
+    async with session_scope() as session:
+        newest = await session.scalar(
+            select(func.max(func.nullif(InsiderTransaction.transaction_date, "")))
+            .where(InsiderTransaction.symbol == sym)
+        )
+        recent = (date.today() - _INSIDER_EMPTY_CONTRADICTED_WITHIN).isoformat()
+        if newest is not None and newest >= recent:
+            raise FinnhubUnavailableError(
+                "stock/insider-transactions",
+                f"empty answer contradicts a stored filing dated {newest}",
+            )
+        await session.execute(
+            delete(InsiderTransaction).where(InsiderTransaction.symbol == sym)
+        )
+        row = (await session.execute(
+            select(
+                Ticker.sector, Ticker.price,
+                *(getattr(Ticker, col) for col in FACTOR_COLUMNS),
+            ).where(Ticker.symbol == sym)
+        )).one_or_none()
+        if row is not None and row.sub_smart_money is not None:
+            held = True
+            values = _merged_factor_set(
+                {"symbol": sym, "sector": row.sector, "price": row.price},
+                {col: getattr(row, col) for col in FACTOR_COLUMNS},
+                cleared=_SMART_MONEY_ONLY,
+            )
+            if sym in sheet_owned:
+                # Only what sheet_feed.upsert_tickers itself writes.
+                del values["confidence_pct"], values["reason"]
+            await session.execute(
+                update(Ticker)
+                .where(Ticker.symbol == sym)
+                .values({**values, "updated_at": Ticker.updated_at})
+            )
+    clear_cached_smart_money_score(sym)
+    return held
+
+
 async def _refresh_insider_cache(
     limit: int | None = None, *, deadline: float | None = None,
 ) -> bool:
@@ -3438,6 +3561,9 @@ async def _refresh_insider_cache(
     Pre-fetch of Finnhub insider Form 4 transactions. Populates
     _SMART_MONEY_SCORE_CACHE so polygon_feed reads a real sub_smart_money per
     tick, and stamps `last_smart_money_at` so the next run resumes.
+
+    An EMPTY answer retires the symbol's reading and its stored Form 4 rows;
+    see `_clear_smart_money_reading`. None is not an answer.
 
     Same per-call budget and the same gaps-first selection as
     _refresh_fundamentals_cache — see `_select_factor_symbols` for why the old
@@ -3465,6 +3591,7 @@ async def _refresh_insider_cache(
 
     logger.info("insider.refresh_started count=%d", len(symbols))
     refreshed = 0
+    cleared = 0
     attempted = 0
     throttled_in_a_row = 0
     recent_failures: deque[bool] = deque(maxlen=_FACTOR_FAILURE_WINDOW)
@@ -3480,7 +3607,9 @@ async def _refresh_insider_cache(
             break
         sym = symbols[i]
         try:
-            txns = await fetch_insider_transactions(sym, days_back=90, raise_failures=True)
+            txns = await fetch_insider_transactions(
+                sym, days_back=_INSIDER_WINDOW_DAYS, raise_failures=True,
+            )
             if txns:
                 score = compute_smart_money_score(txns)
                 set_cached_smart_money_score(sym, score)
@@ -3488,6 +3617,10 @@ async def _refresh_insider_cache(
                 # the api machine can read what the worker writes).
                 await set_recent_insider_transactions_db(sym, txns)
                 refreshed += 1
+            elif txns is not None and await _clear_smart_money_reading(sym):
+                # [] is Finnhub answering "no filings in 90 days". None is no
+                # answer at all (no key); failures raise above.
+                cleared += 1
         except FinnhubThrottledError as exc:
             # Same rule as the fundamentals pass: a throttle is not an answer.
             throttled_in_a_row += 1
@@ -3550,8 +3683,8 @@ async def _refresh_insider_cache(
     except Exception:
         feed_size = -1
     logger.info(
-        "insider.refreshed scored=%d attempted=%d score_cache=%d feed_size=%d",
-        refreshed, attempted, smart_money_cache_size(), feed_size,
+        "insider.refreshed scored=%d cleared=%d attempted=%d score_cache=%d feed_size=%d",
+        refreshed, cleared, attempted, smart_money_cache_size(), feed_size,
     )
     return stopped
 
