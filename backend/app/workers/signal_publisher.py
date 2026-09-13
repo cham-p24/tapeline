@@ -3422,7 +3422,7 @@ async def _backfill_key_statistics(cap: int = 2500) -> None:
             return 0
         try:
             async with session_scope() as session:
-                # Bulk UPDATE ... WHERE symbol = :b_symbol, executemany'd.
+                # One UPDATE per record, all in one short transaction.
                 #
                 # This used to be the ORM's bulk-UPDATE-by-primary-key form,
                 # `session.execute(update(Ticker), batch)`. That form offers
@@ -3432,13 +3432,20 @@ async def _backfill_key_statistics(cap: int = 2500) -> None:
                 # "this row's live data was refreshed". An explicit statement
                 # can hold it still. See the comment on Ticker.updated_at.
                 #
-                # Grouped by column set so each executemany binds identical
-                # parameters, which is what the ORM form did internally; today
-                # fetch_key_statistics always returns the same five keys, so
-                # this is one group. Each record keeps `symbol` as well as
-                # `b_symbol`: an executemany against the ORM entity still runs
-                # SQLAlchemy's bulk-by-primary-key path, which refuses records
-                # without the key — measured on 2.0.49 as InvalidRequestError
+                # NOT an executemany, although it is handed a list of
+                # parameter sets. Because the statement is built on the ORM
+                # entity, SQLAlchemy routes it through its bulk-by-primary-key
+                # path, which issues one UPDATE per record — measured on 2.0.49
+                # with a before_cursor_execute probe: 5 records, 5 cursor
+                # executions, executemany=False each. Fine at this batch size;
+                # a statement built on Ticker.__table__ would be a true
+                # executemany (1 execution for the same 5 records).
+                #
+                # Grouped by column set because each statement has one fixed
+                # SET clause; today fetch_key_statistics always returns the
+                # same five keys, so this is one group. Each record keeps
+                # `symbol` as well as `b_symbol`: the bulk-by-primary-key path
+                # refuses records without the key — measured on 2.0.49 as InvalidRequestError
                 # "No primary key value supplied for column(s) tickers.symbol".
                 # _flush would swallow that and write nothing, so the
                 # key-statistics test in test_ticker_updated_at_means_live_data
@@ -3460,9 +3467,10 @@ async def _backfill_key_statistics(cap: int = 2500) -> None:
                             **{c: bindparam(c) for c in cols},
                             "updated_at": Ticker.updated_at,
                         })
-                        # Same reason as the tick's upsert: an executemany
-                        # UPDATE with WHERE criteria cannot synchronize
-                        # in-session objects, and SQLAlchemy raises if asked.
+                        # Same reason as the tick's upsert: an UPDATE with
+                        # WHERE criteria run against a list of parameter sets
+                        # cannot synchronize in-session objects, and SQLAlchemy
+                        # raises if asked.
                         .execution_options(synchronize_session=None),
                         params,
                     )

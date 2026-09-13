@@ -882,8 +882,14 @@ async def status() -> dict[str, object]:
                 #
                 # `Ticker.updated_at` is advanced by LIVE-DATA writers: the
                 # tick's score upsert, the sheet refresh (sheet_feed's ORM
-                # upserts, and only when a CSV has changed) and the daily
-                # crypto refresh. The metadata `update(Ticker)` writes — the
+                # upserts, which run only when a CSV has changed) and the daily
+                # crypto refresh. Two known exceptions still move it without
+                # new live data: sheet_feed's asset-class repair pass, which
+                # runs on EVERY sheet refresh and touches only rows whose class
+                # is dirty, and brand-new reference rows inserted by the weekly
+                # universe reconciliation (unscored, but this max() is
+                # unfiltered). Both are small and bounded; neither can hold the
+                # value fresh through a long stall. The metadata `update(Ticker)` writes — the
                 # factor-attempt and aggregates stamps, the sector /
                 # market-cap / key-statistics backfills, the universe
                 # reconciliation — deliberately hold it still, which

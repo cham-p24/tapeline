@@ -301,7 +301,7 @@ async def test_market_cap_backfill_holds_updated_at(monkeypatch: pytest.MonkeyPa
 async def test_key_statistics_backfill_holds_updated_at(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Also pins that the Core executemany preserved what the ORM bulk form
+    """Also pins that the explicit per-record statement preserved what the ORM bulk form
     wrote: every field, Nones included, with the date column typed."""
     from app.services import finnhub_feed
 
@@ -392,7 +392,7 @@ def _snapshot(symbol: str, price: float) -> dict[str, Any]:
 async def test_the_real_tick_advances_updated_at(
     monkeypatch: pytest.MonkeyPatch, ticker_update_log: guard.Recorder,
 ) -> None:
-    """Runs `signal_publisher.tick()` — its own statement, its own executemany,
+    """Runs `signal_publisher.tick()` — its own statement, its own execution path,
     both of its batches — instead of a copy of the statement.
 
     This replaced a test that executed a hand-copied statement. Review of #813
