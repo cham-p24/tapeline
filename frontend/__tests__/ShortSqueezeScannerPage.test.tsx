@@ -51,7 +51,7 @@ describe("/short-squeeze-scanner", () => {
     expect(screen.getByTestId("squeeze-empty-state")).toHaveTextContent(EMPTY);
     expect(container.querySelector("table")).toBeNull();
     for (const t of INVENTED_TICKERS) {
-      expect(text).not.toMatch(new RegExp(`\b${t}\b`));
+      expect(text).not.toMatch(new RegExp(String.raw`\b${t}\b`));
     }
     expect(text).not.toMatch(/Live preview/i);
     expect(text).not.toMatch(/\blive snapshot\b/i);

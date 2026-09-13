@@ -310,21 +310,28 @@ def _mock_writes_enabled() -> bool:
 def _mock_squeeze_writes_enabled() -> bool:
     """May `mock_feed.fetch_squeezes` rows be written to SqueezeSetup?
 
-    Stricter than `_mock_writes_enabled()`, and it fails CLOSED. That check
-    only refuses when APP_ENV is literally "production"; `app_env` defaults to
-    "development", so a worker booted without APP_ENV would write invented
-    squeeze setups (and wipe the table first). The 15 mock rows production
-    still holds (all dated 2026-07-18) were written before any gate existed,
-    and were served as live setups until services/squeeze_integrity.
+    Stricter than `_mock_writes_enabled()`. That check only refuses when
+    APP_ENV is literally "production"; `app_env` defaults to "development", so
+    a worker booted without APP_ENV would write invented squeeze setups (and
+    wipe the table first). The 15 mock rows production still holds (all dated
+    2026-07-18 UTC) were served as live setups until services/squeeze_integrity.
 
-    Mock squeeze writes now require BOTH an explicit development env AND not
-    running on Fly (Fly sets FLY_APP_NAME on every machine; verified on
-    tapeline-backend 2026-09-14). The real SPIKE INTELLIGENCE sheet writer
-    (sheet_feed.upsert_spikes) is not gated by this.
+    Mock squeeze writes require ALL of:
+      - app_env == "development" (note: that is also the default when APP_ENV
+        is unset, so this condition alone does not block anything);
+      - no FLY_APP_NAME (Fly sets it on every machine; verified on
+        tapeline-backend 2026-09-14). This is what blocks production today;
+      - a SQLite database URL. Production runs on Postgres (Neon), so a
+        machine off Fly with APP_ENV missing but a Postgres URL refuses.
+    The real SPIKE INTELLIGENCE sheet writer (sheet_feed.upsert_spikes) is not
+    gated by this.
     """
     if os.environ.get("FLY_APP_NAME"):
         return False
-    return _mock_writes_enabled() and get_settings().app_env == "development"
+    settings = get_settings()
+    if not str(getattr(settings, "database_url", "")).startswith("sqlite"):
+        return False
+    return _mock_writes_enabled() and settings.app_env == "development"
 
 
 def _sheet_is_scoring_source() -> bool:
@@ -404,9 +411,9 @@ async def tick() -> None:
     # wired for either). Don't even generate them in production — see
     # `_mock_writes_enabled()`.
     mock_writes = _mock_writes_enabled()
-    # Squeeze mock writes have their own fail-closed guard (see
-    # `_mock_squeeze_writes_enabled`): a missing APP_ENV must not publish
-    # invented squeeze setups.
+    # Squeeze mock writes have their own stricter guard (see
+    # `_mock_squeeze_writes_enabled`): on Fly or on Postgres, even with APP_ENV
+    # missing, no invented squeeze setups are written.
     mock_squeeze_writes = _mock_squeeze_writes_enabled()
     squeezes: list[dict] = []
     new_trades: list[dict] = []

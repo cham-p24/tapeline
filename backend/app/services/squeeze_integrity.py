@@ -1,10 +1,10 @@
 """One freshness rule for every place a squeeze setup reaches a user.
 
 Why: on 2026-09-14 production's `squeeze_setups` held 15 rows, all written at
-2026-07-18 14:53:19 UTC by a `mock_feed.fetch_squeezes` tick. The only real
-writer (the SPIKE INTELLIGENCE sheet tab) has never been configured, so those
-invented rows were served as current setups on the public page, the free
-preview, the Pro feed and the squeeze alert evaluator. A row is publishable
+2026-07-18 14:53:19 UTC by a `mock_feed.fetch_squeezes` tick. No real writer
+is configured: SPIKE_INTELLIGENCE_CSV_URL was unset on the worker when checked
+on 2026-09-14. Those invented rows were served as current setups on the public
+page, the free preview, the Pro feed and the squeeze alert evaluator. A row is publishable
 only if it was written after mock writes stopped (2026-07-19) AND in the last
 48 hours; anything else is not a current setup and is not shown. Rows are
 suppressed, not deleted — deleting production data is a separate decision.

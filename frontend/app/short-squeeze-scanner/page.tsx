@@ -9,15 +9,16 @@ import { ssrInternalHeaders } from "@/lib/ssrHeaders";
  * /short-squeeze-scanner — HONEST EMPTY STATE (integrity fix, T-01).
  *
  * Until this change the page showed rows as a "Live preview". In production
- * those rows were 15 mock-tick rows written on 2026-07-18 (no real squeeze
- * source has ever been configured), and when the API returned nothing the page
- * fell back to a hardcoded SHOWCASE_ROWS table instead. Both are gone:
+ * those rows were 15 mock-tick rows written on 2026-07-18 UTC (no real writer is
+ * configured: SPIKE_INTELLIGENCE_CSV_URL was unset on the worker when checked on
+ * 2026-09-14), and when the API returned nothing the page fell back to a
+ * hardcoded SHOWCASE_ROWS table labelled "Recent example". Both are gone:
  *
  *   - the backend now serves only publishable rows
  *     (backend/app/services/squeeze_integrity.py: written after 2026-07-19 and
  *     in the last 48 hours), so today the API returns an empty list;
  *   - an empty list, an API error or a timeout all render the same empty state.
- *     There is no fallback table, ever.
+ *     There is no fallback table.
  *
  * The page is noindex while no data source exists. Remove the `robots` override
  * only once a real writer is configured AND this page has shown real rows.
@@ -100,7 +101,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Did this page show squeeze data before?",
-    a: "Yes, and it wasn't real. Rows produced by test code, not market data, were shown here as if they were current setups. The latest of those rows were written on 18 July 2026. They have been removed from this page and from the in-app Squeeze Watch list, and squeeze alerts can no longer use them.",
+    a: "Yes, and it wasn't real. Rows produced by test code, not market data, were shown here as if they were current setups. The latest of those rows were written on 18 July 2026 (UTC). When those rows could not load, the page showed a hand-typed example table instead. Both have been removed from this page and from the in-app Squeeze Watch list, and squeeze alerts can no longer use them.",
   },
   {
     q: "What happens to a squeeze alert I already set?",
@@ -133,8 +134,9 @@ export default async function ShortSqueezeScannerPage() {
               <p className="text-base font-medium">{EMPTY_STATE_TEXT}</p>
               <p className="mt-3 text-sm text-muted">
                 Correction: this page used to show squeeze rows produced by test
-                code (the latest written on 18 July 2026) as if they were current
-                setups. They were not market data, and we have removed them.
+                code (the latest written on 18 July 2026, UTC) as if they were current
+                setups and, when data could not load, a hand-typed example table.
+                Neither was market data, and we have removed both.
               </p>
             </div>
           ) : (

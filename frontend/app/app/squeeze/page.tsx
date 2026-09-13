@@ -161,17 +161,22 @@ export default function SqueezePage() {
       </FilterBar>
       )}
 
+      {showEmptyState ? (
+      <div className="card mt-4 p-8 text-center text-muted">
+        <p data-testid="squeeze-empty-state">{SQUEEZE_EMPTY_STATE}</p>
+      </div>
+      ) : (
       <div className="card mt-4 overflow-x-auto">
         <table className="w-full text-sm nums">
           <thead className="text-xs uppercase text-muted">
             <tr>
               <th className="px-4 py-2 text-left">Ticker</th>
-              <th className="px-4 py-2 text-right" title="Composite squeeze score, 0-100. 75+ is meaningful.">Score</th>
+              <th className="px-4 py-2 text-right" title="Composite squeeze score, 0-100.">Score</th>
               <th className="px-4 py-2 text-right" title="Days the Bollinger Bands have been compressed">Days quiet</th>
               <th className="px-4 py-2 text-right" title="Today's volume relative to the 20-day average">Volume vs avg</th>
               <th className="px-4 py-2 text-left" title="On-Balance Volume direction — accumulation vs distribution">OBV</th>
               <th className="px-4 py-2 text-left">Pattern</th>
-              <th className="px-4 py-2 text-left" title="Rough timing guide for when the squeeze typically resolves">Likely window</th>
+              <th className="px-4 py-2 text-left" title="Rough timing guide. Not a forecast.">Likely window</th>
               <th className="px-4 py-2 text-left">Why</th>
             </tr>
           </thead>
@@ -196,11 +201,7 @@ export default function SqueezePage() {
                     <button onClick={resetFilters} className="mt-3 text-xs text-accent hover:underline">Clear filters</button>
                   </>
                 ) : (
-                  showEmptyState ? (
-                    <p data-testid="squeeze-empty-state">{SQUEEZE_EMPTY_STATE}</p>
-                  ) : (
-                    <p>Loading squeeze data&hellip;</p>
-                  )
+                  <p>Loading squeeze data&hellip;</p>
                 )}
               </td></tr>
             ) : visibleRows.map((r) => (
@@ -220,6 +221,7 @@ export default function SqueezePage() {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Free-tier locked section — the 3 rows above are REAL data; this
           states the real remaining count (from the backend, not invented)

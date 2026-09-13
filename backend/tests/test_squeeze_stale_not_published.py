@@ -276,20 +276,29 @@ async def test_other_alert_types_still_evaluate_with_stale_squeeze_rows() -> Non
 
 # ── the mock writer cannot run in production ─────────────────────────────────
 
+_SQLITE = "sqlite:///./tapeline_dev.sqlite"
+_PG = "postgresql+asyncpg://u:p@db.example/tapeline"
+
+
 @pytest.mark.parametrize(
-    ("app_env", "fly_app", "expected"),
+    ("app_env", "fly_app", "db_url", "expected"),
     [
-        ("production", None, False),
-        ("staging", None, False),
-        ("development", "tapeline-backend", False),  # APP_ENV unset on Fly
-        ("production", "tapeline-backend", False),
-        ("development", None, True),
+        ("production", None, _SQLITE, False),
+        ("staging", None, _SQLITE, False),
+        ("development", "tapeline-backend", _SQLITE, False),  # APP_ENV unset on Fly
+        ("production", "tapeline-backend", _PG, False),
+        # APP_ENV unset (defaults to development), off Fly, pointed at Postgres.
+        ("development", None, _PG, False),
+        ("development", None, "", False),
+        ("development", None, _SQLITE, True),
     ],
 )
-def test_mock_squeeze_writer_is_fail_closed(monkeypatch, app_env, fly_app, expected) -> None:
+def test_mock_squeeze_writer_guard(monkeypatch, app_env, fly_app, db_url, expected) -> None:
     from app.workers import signal_publisher as sp
 
-    monkeypatch.setattr(sp, "get_settings", lambda: SimpleNamespace(app_env=app_env))
+    monkeypatch.setattr(
+        sp, "get_settings", lambda: SimpleNamespace(app_env=app_env, database_url=db_url)
+    )
     if fly_app is None:
         monkeypatch.delenv("FLY_APP_NAME", raising=False)
     else:

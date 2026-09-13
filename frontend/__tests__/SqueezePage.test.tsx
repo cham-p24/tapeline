@@ -145,7 +145,9 @@ describe("SqueezePage", () => {
         );
       });
       const text = container.textContent ?? "";
-      expect(text).not.toMatch(/Live/);
+      // No table shell (headers, column tooltips) over an empty list.
+      expect(container.querySelector("table")).toBeNull();
+      expect(text).not.toMatch(/\bLive\b/);
       expect(text).not.toContain("FCX");
       expect(text).not.toContain("BKNG");
       expect(screen.queryByText(/shown on Free/)).not.toBeInTheDocument();
