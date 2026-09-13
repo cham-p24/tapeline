@@ -46,9 +46,11 @@ import pathlib
 
 from app.workers import signal_publisher
 
+#: The two composite-factor passes now run inside `_run_factor_phase`, which the
+#: chain calls as one stage; test_the_factor_phase_still_runs_both_passes pins
+#: what is inside it.
 _STAGES = (
-    "_refresh_fundamentals_cache",
-    "_refresh_insider_cache",
+    "_run_factor_phase",
     "_backfill_market_cap",
     "_backfill_key_statistics",
     "_backfill_sectors",
@@ -95,7 +97,7 @@ def test_every_stage_is_still_in_the_chain():
 
 def test_the_composite_factors_run_before_the_display_columns():
     order = _call_order()
-    factors = ["_refresh_fundamentals_cache", "_refresh_insider_cache"]
+    factors = ["_run_factor_phase"]
     columns = ["_backfill_market_cap", "_backfill_key_statistics", "_backfill_sectors"]
     last_factor = max(order.index(c) for c in factors)
     first_column = min(order.index(c) for c in columns)
@@ -105,6 +107,18 @@ def test_the_composite_factors_run_before_the_display_columns():
         f"rows had no fundamentals and no smart-money reading, and the public "
         f"record contained no mega-caps."
     )
+
+
+def test_the_factor_phase_still_runs_both_passes():
+    tree = ast.parse(
+        pathlib.Path(inspect.getfile(signal_publisher)).read_text(encoding="utf-8")
+    )
+    phase = next(
+        n for n in tree.body
+        if isinstance(n, ast.AsyncFunctionDef) and n.name == "_run_factor_phase"
+    )
+    called = {getattr(s.func, "id", None) for s in ast.walk(phase) if isinstance(s, ast.Call)}
+    assert {"_refresh_fundamentals_cache", "_refresh_insider_cache"} <= called
 
 
 def test_market_cap_runs_first_among_the_column_backfills():

@@ -216,7 +216,12 @@ async def test_a_symbol_the_vendor_has_nothing_for_is_not_refetched_forever(
         "app.services.universe.ACTIVE_UNIVERSE_SIZE", 2, raising=False,
     )
 
-    async def _fake_financials(sym: str) -> dict[str, float] | None:
+    fetched: list[str] = []
+
+    async def _fake_financials(
+        sym: str, *, raise_failures: bool = False,
+    ) -> dict[str, float] | None:
+        fetched.append(sym)
         return {"roe": 20.0} if sym == "REAL" else None
 
     monkeypatch.setattr(
@@ -224,6 +229,9 @@ async def test_a_symbol_the_vendor_has_nothing_for_is_not_refetched_forever(
     )
 
     await signal_publisher._refresh_fundamentals_cache()
+    # Without this the stamps below prove nothing: a fetch that raised before
+    # returning is caught by the pass and stamped all the same.
+    assert sorted(fetched) == ["ETFX", "REAL"], f"the vendor was not asked: {fetched}"
 
     stamps = await _stamps("last_fundamentals_at")
     assert stamps["ETFX"] is not None, (
@@ -257,7 +265,9 @@ async def test_two_consecutive_fundamentals_runs_cover_different_symbols(
     )
     fetched: list[str] = []
 
-    async def _fake_financials(sym: str) -> dict[str, float]:
+    async def _fake_financials(
+        sym: str, *, raise_failures: bool = False,
+    ) -> dict[str, float]:
         fetched.append(sym)
         return {"roe": 15.0}
 
@@ -288,7 +298,12 @@ async def test_the_insider_pass_stamps_its_own_column(
         "app.services.universe.ACTIVE_UNIVERSE_SIZE", 1, raising=False,
     )
 
-    async def _fake_txns(sym: str, days_back: int = 90) -> list[dict[str, Any]]:
+    asked: list[str] = []
+
+    async def _fake_txns(
+        sym: str, days_back: int = 90, *, raise_failures: bool = False,
+    ) -> list[dict[str, Any]]:
+        asked.append(sym)
         return []
 
     monkeypatch.setattr(
@@ -297,6 +312,7 @@ async def test_the_insider_pass_stamps_its_own_column(
 
     await signal_publisher._refresh_insider_cache()
 
+    assert asked == ["INSD"], f"the vendor was not asked: {asked}"
     assert (await _stamps("last_smart_money_at"))["INSD"] is not None
     assert (await _stamps("last_fundamentals_at"))["INSD"] is None, (
         "the insider pass must not stamp the fundamentals frontier"

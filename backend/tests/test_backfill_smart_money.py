@@ -302,26 +302,38 @@ async def test_verify_reports_what_is_left_and_what_moved() -> None:
 
 # ── Why the worker must restart after --apply ───────────────────────────────
 
-async def test_a_worker_warmed_after_apply_holds_the_rebuilt_value(
+async def test_a_worker_warmed_before_apply_already_holds_the_rebuilt_value(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The restart step: the sheet upsert writes whatever the process cache
-    holds, INCLUDING None. A process warmed before --apply holds nothing for
-    the symbol; one warmed after holds the rebuilt value."""
+    """This test used to assert the opposite, and why it changed matters.
+
+    The sheet upsert writes whatever the process cache holds, INCLUDING None.
+    When this script shipped, a process warmed before --apply held nothing for
+    a lost reading, so the run order said: apply, then restart the worker.
+
+    The boot warm now rebuilds that reading itself, from the same stored rows by
+    the same rule (finnhub_feed.insider_rows_are_the_stamped_fetch, which
+    test_factor_refresh_what_is_due.py holds equal to `_classify` here). So a
+    warm alone recovers it, and after --apply the row and the cache agree.
+    """
     monkeypatch.setattr(finnhub_feed, "_SMART_MONEY_SCORE_CACHE", {})
     monkeypatch.setattr(finnhub_feed, "_FUND_SCORE_CACHE", {})
     await _ticker("WARM")
     await _txns("WARM", [(1000, 10.0)])
 
     await finnhub_feed.warm_factor_caches_from_db()
-    assert finnhub_feed.get_cached_smart_money_score("WARM") is None
+    assert finnhub_feed.get_cached_smart_money_score("WARM") == 90.0, (
+        "the boot warm must rebuild a reading the pass computed but never saved"
+    )
 
     await bsm.amain(["--apply"])
-    assert finnhub_feed.get_cached_smart_money_score("WARM") is None, (
-        "a process warmed before the backfill does not see it without a restart"
-    )
+    assert (await _row("WARM")).sub_smart_money == 90.0
+
+    monkeypatch.setattr(finnhub_feed, "_SMART_MONEY_SCORE_CACHE", {})
     await finnhub_feed.warm_factor_caches_from_db()
-    assert finnhub_feed.get_cached_smart_money_score("WARM") == 90.0
+    assert finnhub_feed.get_cached_smart_money_score("WARM") == 90.0, (
+        "once the row holds the value, the warm loads it from the row"
+    )
 
 
 def test_the_tick_merge_keeps_a_stored_value_over_a_cold_cache() -> None:

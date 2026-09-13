@@ -79,12 +79,25 @@ def _chain_node() -> ast.AsyncFunctionDef:
     raise AssertionError("_serial_finnhub_refreshes not found")
 
 
+def _phase_node() -> ast.AsyncFunctionDef:
+    """The factor phase moved out of the chain into its own module-level
+    function, so it can be driven by a test. The chain still calls it - see
+    test_the_chain_runs_the_factor_phase."""
+    tree = ast.parse(
+        pathlib.Path(inspect.getfile(signal_publisher)).read_text(encoding="utf-8")
+    )
+    for node in tree.body:
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_run_factor_phase":
+            return node
+    raise AssertionError("_run_factor_phase not found at module level")
+
+
 _FACTOR_PASSES = ("_refresh_fundamentals_cache", "_refresh_insider_cache")
 
 
 def _factor_calls() -> dict[str, ast.Call]:
     found: dict[str, ast.Call] = {}
-    for sub in ast.walk(_chain_node()):
+    for sub in ast.walk(_phase_node()):
         if isinstance(sub, ast.Call) and getattr(sub.func, "id", None) in _FACTOR_PASSES:
             found[sub.func.id] = sub
     return found
@@ -116,7 +129,7 @@ def test_the_factor_passes_run_inside_a_loop_so_they_alternate() -> None:
     process and the ~11,800-row universe would never converge.
     """
     loops = [
-        node for node in ast.walk(_chain_node())
+        node for node in ast.walk(_phase_node())
         if isinstance(node, (ast.While, ast.For, ast.AsyncFor))
     ]
     assert loops, "the factor phase is not a loop, so coverage cannot converge"
@@ -129,6 +142,18 @@ def test_the_factor_passes_run_inside_a_loop_so_they_alternate() -> None:
     assert looped == set(_FACTOR_PASSES), (
         f"only {sorted(looped)} runs inside the alternating loop; both passes "
         f"must, or the one left outside gets a single slice per process"
+    )
+
+
+def test_the_chain_runs_the_factor_phase() -> None:
+    """Moving the loop out must not drop it from the chain."""
+    called = {
+        getattr(sub.func, "id", None)
+        for sub in ast.walk(_chain_node()) if isinstance(sub, ast.Call)
+    }
+    assert "_run_factor_phase" in called, (
+        "_serial_finnhub_refreshes no longer runs the factor phase, so neither "
+        "factor pass runs at all"
     )
 
 
@@ -158,7 +183,7 @@ async def test_limit_bounds_the_fundamentals_pass(
     )
     seen: list[str] = []
 
-    async def _fake(sym: str) -> dict[str, float]:
+    async def _fake(sym: str, *, raise_failures: bool = False) -> dict[str, float]:
         seen.append(sym)
         return {"roe": 15.0}
 
@@ -182,7 +207,9 @@ async def test_limit_bounds_the_insider_pass(
     )
     seen: list[str] = []
 
-    async def _fake(sym: str, days_back: int = 90) -> list[dict[str, Any]]:
+    async def _fake(
+        sym: str, days_back: int = 90, *, raise_failures: bool = False,
+    ) -> list[dict[str, Any]]:
         seen.append(sym)
         return []
 
@@ -194,18 +221,19 @@ async def test_limit_bounds_the_insider_pass(
     assert len(seen) == 3
 
 
-async def test_gap_counts_report_each_column_independently() -> None:
-    """The loop's exit condition.
+async def test_due_counts_report_each_column_independently() -> None:
+    """The phase's exit condition.
 
-    A shared or swapped count would let a closed fundamentals frontier declare
-    smart-money done - the exact confusion that produced 1,320 stamps against 0.
+    A shared or swapped count would let a finished fundamentals rotation
+    declare smart-money done - the exact confusion that produced 1,320 stamps
+    against 0. A never-attempted row is always due.
     """
     await _seed(["GAPA", "GAPB"])
-    assert await signal_publisher._factor_gap_counts() == (2, 2)
+    assert await signal_publisher._factor_due_counts() == (2, 2)
 
     await signal_publisher._stamp_factor_attempts(
         "last_fundamentals_at", ["GAPA", "GAPB"], datetime.now(UTC),
     )
-    assert await signal_publisher._factor_gap_counts() == (0, 2), (
-        "stamping fundamentals must not clear the smart-money gap"
+    assert await signal_publisher._factor_due_counts() == (0, 2), (
+        "stamping fundamentals must not clear the smart-money count"
     )
