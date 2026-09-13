@@ -869,7 +869,7 @@ export default function BillingPage() {
             <>
               <div className="mt-2 text-2xl font-bold nums">$0 <span className="text-sm font-normal text-muted">today</span></div>
               <ul className="mt-3 space-y-1 text-xs text-muted">
-                <li>· Full 6,900-ticker live universe</li>
+                <li>· Full {ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker universe</li>
                 <li>· Watchlist of 200 with smart alerts</li>
                 <li>· Recent insider buys (SEC Form 4)</li>
               </ul>

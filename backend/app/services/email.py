@@ -85,7 +85,7 @@ from app.services.tier import (
     FREE_WEB_PUSH_ALERTS,
     free_has_watchlist,
 )
-from app.services.universe import ACTIVE_UNIVERSE_SIZE
+from app.services.universe import SCORED_TICKERS_IN_COPY
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -465,7 +465,7 @@ def render_welcome_email(
                 f"""
                 <ol style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
                   <li><strong>Scanner</strong> — every ticker scored; hover any score for the 6-factor breakdown</li>
-                  <li><strong>Public scorecard</strong> — every call we've ever made, with the original reasoning</li>
+                  <li><strong>Public scorecard</strong> — each daily top 10 we've recorded, losing days included</li>
                   <li><strong>Watchlist</strong> — save up to {FREE_WATCHLIST_TICKERS} tickers and watch their scores move in one place</li>
                 </ol>
                 """
@@ -707,7 +707,7 @@ def render_trial_day7_email(user_name: str, summary: dict | None = None) -> str:
         + _trial_summary_block(summary)
         + muted_paragraph(
             f"When the trial ends, your account drops to Free — the scanner cuts "
-            f"from the full ~{ACTIVE_UNIVERSE_SIZE:,}-ticker universe to the top "
+            f"from the full scored universe (about {SCORED_TICKERS_IN_COPY:,} US stocks and ETFs) to the top "
             f"{FREE_SCANNER_ROWS} rows, ticker look-ups cap at "
             f"{FREE_DAILY_LOOKUPS} a day, "
             + (
@@ -1875,15 +1875,16 @@ def render_re_engagement_email(
 
     away = f" — roughly {days} sessions —" if days else ","
     scanner_line = (
-        f"Every trading day you were away{away} the scanner re-scored the full "
-        f"~{ACTIVE_UNIVERSE_SIZE:,}-ticker universe on the same six published "
-        "factors. It never paused."
+        f"While you were away{away} the scanner kept scoring about "
+        f"{SCORED_TICKERS_IN_COPY:,} US stocks and ETFs on the same six published "
+        "factors."
     )
     scorecard_line = (
-        (f"The public scorecard grew by about {rows} dated rows over the same stretch — one "
-         if rows else "The public scorecard kept appending a new dated row every trading day — one ")
-        + "per session, back-checked the next open and left on the page whether the day went "
-        "well or badly. Winning days and losing days are recorded identically; nothing is pruned."
+        (f"The public scorecard grew by about {rows} dated rows over the same stretch"
+         if rows else "The public scorecard kept adding dated rows")
+        + " — each day's top 10 is back-checked against SPY the next session and left on "
+        "the page whether the day went well or badly. Winning days and losing days are "
+        "recorded the same way, and nothing is deleted."
     )
     lookup_line = (
         f"On your side, your free daily look-ups have reset — the full {daily_lookups} are "
@@ -2188,7 +2189,8 @@ def render_winback_email(
             + (proof or paragraph(
                 "The public "
                 f'<a href="https://tapeline.io/scorecard?utm_source=email&utm_campaign=winback_60&utm_medium=transactional" style="color:{ACCENT};">scorecard</a> '
-                "shows every call we've made — hits and misses, no survivor bias."
+                "shows each daily top 10 we've recorded — hits and misses, with "
+                "corrections dated on the page."
             ))
             + muted_paragraph(
                 "If Tapeline didn't earn its keep last time, the scorecard is the "
@@ -2199,7 +2201,7 @@ def render_winback_email(
                 "https://tapeline.io/scorecard?utm_source=email&utm_campaign=winback_60&utm_medium=transactional",
             )
             + footnote("One more note next month, then I'll stop emailing. — Christian, founder."),
-            preheader="Every call we've made since you left — public, back-checked vs SPY.",
+            preheader="The daily top 10s since you left — public, back-checked vs SPY.",
         )
     # wb90 — last call, with the returning-customer discount.
     return shell(
@@ -2291,7 +2293,7 @@ def render_activation_watchlist_email(user_name: str, has_watchlist: bool = True
             <ol style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
               {first_step}
               <li><strong>Run one scan</strong> — rank US equities on the six measured factors and read why each name matched, with the numbers next to every row.</li>
-              <li><strong>See the public scorecard</strong> — every daily call we've logged, winning and losing days alike, each with the original reasoning.</li>
+              <li><strong>See the public scorecard</strong> — every daily top 10 we've logged, winning and losing days alike, each with its next-session result.</li>
             </ol>
             """
         )
@@ -2329,9 +2331,9 @@ def render_activation_alert_email(user_name: str) -> str:
         )
         + paragraph(
             'The <a href="https://tapeline.io/scorecard" '
-            f'style="color:{ACCENT};">public scorecard</a> is every daily call '
-            "we've logged — winning and losing days alike, each with the score "
-            "and the reasoning it was published on. It's free, and it's the "
+            f'style="color:{ACCENT};">public scorecard</a> is every daily top 10 '
+            "we've logged — winning and losing days alike, each with its rank and "
+            "recorded score, and any correction dated on the page. It's free, and it's the "
             "honest way to read the scanner before you rely on it."
         )
         + paragraph(
@@ -2825,8 +2827,10 @@ def render_free_trial_last_invite_email(user_name: str) -> str:
         )
         + paragraph(
             "Most screeners show you a score and never mention what happened "
-            "next. We log every daily top-ten pick, append the following "
-            "session's move against SPY, and never edit it — losses included. "
+            "next. We log each day's top ten, append the following session's "
+            "move against SPY, and keep the losses on the page. We have corrected "
+            "recorded values twice (prices on 25 August 2026, and scores from 18 May "
+            "to 12 June capped on 15 June 2026), and both corrections are dated there. "
             "Without a paid plan the day-by-day rows reach you on a seven-day "
             "delay; the headline stats are live for everyone."
         )
@@ -3084,7 +3088,8 @@ def render_carded_trial_setup_email(
         + paragraph(
             "If you only do one thing: put five tickers you already follow on "
             "your watchlist. Every one of them is scored after each close, and "
-            "the watchlist view shows how each has moved since you added it."
+            "the watchlist view shows each one's score next to its score on the "
+            "day you added it."
         )
         + button(
             "Open the scanner",
@@ -3115,14 +3120,15 @@ def render_carded_trial_value_email(
             "underneath it is the reason to trust the number."
         )
         + paragraph(
-            "Every day Tapeline writes down its top ten and never edits the "
-            "row again. The next session it records what each pick did and "
-            "what SPY did. That whole history is public, and your watchlist "
-            "has its own version of it: how each name you saved has scored "
-            "since the day you added it."
+            "Each trading day Tapeline writes down its top ten. The next "
+            "session it records what each pick did and what SPY did. That "
+            "history is public, losing days included, and the two corrections "
+            "we have made to recorded values are dated on the page. Your "
+            "watchlist shows a smaller version of the same idea: each saved "
+            "name's score today next to its score on the day you added it."
         )
         + button(
-            "See your watchlist's record",
+            "Open your watchlist",
             "https://tapeline.io/app/watchlist?utm_source=email&utm_campaign=carded_trial_value&utm_medium=transactional",
         )
         + muted_paragraph(
@@ -3134,7 +3140,7 @@ def render_carded_trial_value_email(
             "Tapeline reports what the factors measure. It doesn't tell you "
             "what to buy. \u2014 Christian, founder."
         ),
-        preheader="Your watchlist keeps its own scored record. Here is where to read it.",
+        preheader="Your watchlist shows how each saved name's score has moved since you added it.",
     )
 
 

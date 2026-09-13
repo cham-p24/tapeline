@@ -20,7 +20,7 @@ import {
  * really work", "how to tell if a stock screener works"). Distinct from
  * /transparent-stock-screener (the honesty positioning) and /verify (verify OUR
  * record): this page answers the CATEGORY question and teaches how to evaluate
- * any screener, using Tapeline's own unedited record as the worked example.
+ * any screener, using Tapeline's own public record as the worked example.
  *
  * Positioning is deliberately NOT performance. Every figure carries the same
  * descriptive, not-a-forecast framing as the live /scorecard, for compliance.
@@ -39,7 +39,7 @@ import {
 export const metadata = pageMeta({
   title: "Do stock screeners actually work? The evidence | Tapeline",
   description:
-    "A stock screener reliably filters stocks to a rules-based shortlist — but whether its picks beat SPY is rarely proven, because almost none publish a dated, unedited, benchmarked record. Here's how to tell, and what one public record actually shows.",
+    "A stock screener reliably filters stocks to a rules-based shortlist — but whether its picks beat SPY is rarely proven, because almost none publish a dated, benchmarked record that keeps its losses and dates its corrections. Here's how to tell, and what one public record actually shows.",
   path: "/do-stock-screeners-work",
 });
 
@@ -185,7 +185,7 @@ function buildFaq(f: RecordFigures | null): FaqItem[] {
     },
     {
       q: "Why don't most stock screeners publish a track record?",
-      a: "Because a public record is a liability. Selective memory flatters every tool, and an unedited log — losing picks kept at the same weight as winners — removes the room to quietly forget the misses. Publishing one is uncomfortable, so most screeners show an aggregate marketing figure or nothing per-pick. That absence is itself the answer to whether they can prove they work.",
+      a: "Because a public record is a liability. Selective memory flatters every tool, and a dated log — losing picks kept at the same weight as winners, corrections dated — removes the room to quietly forget the misses. Publishing one is uncomfortable, so most screeners show an aggregate marketing figure or nothing per-pick. That absence is itself the answer to whether they can prove they work.",
     },
     {
       q: "How large a sample do I need before trusting a screener's record?",
@@ -207,8 +207,8 @@ const HOWTO_STEPS = [
     text: "A single headline like '72% win rate' with no picks behind it can't be checked. Look for every pick, dated the day it printed — an aggregate figure is a claim, a dated list is evidence.",
   },
   {
-    name: "Check that losers are included and nothing is edited",
-    text: "A record that shows only winners is marketing. The misses have to be there, frozen the day they printed, never re-ranked or removed. If the losing picks aren't visible, assume they were dropped.",
+    name: "Check that losers are included and corrections are dated",
+    text: "A record that shows only winners is marketing. The misses have to be there, frozen the day they printed, never re-ranked or removed, and any correction to a recorded value dated. If the losing picks aren't visible, assume they were dropped.",
   },
   {
     name: "Confirm every pick is benchmarked",
@@ -245,7 +245,7 @@ export default async function DoStockScreenersWorkPage() {
   const howto = howToJsonLd({
     name: "How to tell if a stock screener actually works",
     description:
-      "A five-step check for whether a stock screener's picks can be trusted: look for a dated per-pick record, confirm losses are included and unedited, check the SPY benchmark, download the raw data, and judge the sample size honestly.",
+      "A five-step check for whether a stock screener's picks can be trusted: look for a dated per-pick record, confirm losses are included and corrections dated, check the SPY benchmark, download the raw data, and judge the sample size honestly.",
     url: "https://tapeline.io/do-stock-screeners-work",
     totalTime: "PT5M",
     steps: HOWTO_STEPS,
@@ -273,7 +273,7 @@ export default async function DoStockScreenersWorkPage() {
           thousands of stocks down to a shortlist by rules you set (momentum, value, growth, technicals). That part
           works. Whether the shortlist then <strong className="text-fg">beats a benchmark like SPY</strong> is a
           separate question, and it&rsquo;s the one almost no screener answers, because answering it means publishing a
-          dated, unedited, benchmarked record of every pick &mdash; losers included. So the real question isn&rsquo;t
+          dated, benchmarked record of every pick &mdash; losers included. So the real question isn&rsquo;t
           &ldquo;do screeners work,&rdquo; it&rsquo;s <strong className="text-fg">&ldquo;can this screener prove
           it&rdquo;</strong> &mdash; and you can check that in about five minutes.
         </p>
@@ -309,9 +309,9 @@ export default async function DoStockScreenersWorkPage() {
             than with a remembered one. */}
         <h2 className="mt-12 text-2xl font-semibold tracking-tight">A worked example: one screener that shows its record</h2>
         <p className="mt-3 leading-relaxed text-muted">
-          Tapeline was built around the check above. A six-factor composite scores ~6,900 US stocks daily; the top 10
-          are frozen the moment they print, and each pick&rsquo;s next-session result versus SPY is recorded 24 hours
-          later. Nothing is edited or removed, and the full archive downloads as CSV and JSON. The newest picks are
+          Tapeline was built around the check above. A six-factor composite scores about 11,500 US stocks and ETFs;
+          each day&rsquo;s top 10 is frozen when it prints, and each pick&rsquo;s next-session result versus SPY is
+          recorded a session later. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026. The full archive downloads as CSV and JSON. The newest picks are
           logged the day they print and back-checked one session later, so the back-checked count below always trails
           the full log by a day or so of picks.
         </p>
@@ -331,8 +331,10 @@ export default async function DoStockScreenersWorkPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="font-mono text-3xl font-bold nums">100%</div>
-                  <div className="mt-1 text-sm text-muted">published &mdash; losses included, never edited</div>
+                  <div className="font-mono text-3xl font-bold nums">2</div>
+                  <div className="mt-1 text-sm text-muted">
+                    corrections to recorded values, both dated on the scorecard &mdash; losses included
+                  </div>
                 </div>
               </div>
               <p className="mt-5 text-sm leading-relaxed text-muted">
@@ -341,13 +343,13 @@ export default async function DoStockScreenersWorkPage() {
                 {figures.shareWord} &mdash; and {medianClause(figures)} (median {figures.median} vs SPY;{" "}
                 {denominatorClause(figures)}). These are <strong className="text-fg">descriptive measures of the raw
                 archive &mdash; not a return, a forecast, or an investable strategy</strong>, and at this sample they do not distinguish the
-                ranking from chance. That the numbers are published at all, unedited and whichever way they fall, is the
+                ranking from chance. That the numbers are published at all, whichever way they fall and with corrections dated, is the
                 point &mdash; it&rsquo;s what &ldquo;works&rdquo; looks like when it&rsquo;s honest about itself.
               </p>
             </>
           ) : (
             <p className="text-sm leading-relaxed text-muted">
-              The record &mdash; every pick, dated the day it printed, with its next-session result against SPY and the
+              The record &mdash; each recorded pick, dated the day it printed, with its next-session result against SPY and the
               losses left in &mdash; is published in full on the public scorecard, with the raw CSV and JSON alongside
               it so the arithmetic is checkable off-site.
             </p>
@@ -404,7 +406,7 @@ export default async function DoStockScreenersWorkPage() {
             </li>
             <li>
               <Link href="/transparent-stock-screener" className="text-accent hover:underline">The most transparent stock screener</Link>
-              <span className="text-muted"> &mdash; every pick published, losses included, never edited.</span>
+              <span className="text-muted"> &mdash; each daily top 10 published, losses included, corrections dated.</span>
             </li>
           </ul>
         </div>

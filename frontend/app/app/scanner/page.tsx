@@ -890,7 +890,7 @@ export default function ScannerPage() {
           <span className="text-muted">
             Free plan — showing live scores for the top{" "}
             <strong className="text-fg">{meta.rowCap}</strong> rows.
-            Pro unlocks the full ~6,900-ticker universe, real-time.
+            Pro unlocks the full scored universe of about 11,500 US stocks and ETFs, real-time.
             {/* The row cap this line quotes CHANGES ON ITS OWN. Open-access
                 month lifts a signed-in Free account to the Pro cap and reverts
                 with no deploy, so on the revert date this same sentence goes

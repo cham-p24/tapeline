@@ -188,7 +188,7 @@ export default function PricingPage() {
               Check the record before you pay.
             </h2>
             <p className="mt-2 text-sm text-muted">
-              Every pick is logged same-day and never edited. These numbers are live.
+              Each day&rsquo;s top 10 is logged the same day. Losing days stay, and corrections are dated in the changelog. These numbers are live.
             </p>
           </div>
           <div className="mx-auto mt-8 max-w-2xl">

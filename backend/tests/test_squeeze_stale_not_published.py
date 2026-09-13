@@ -303,12 +303,12 @@ def test_mock_squeeze_writer_guard(monkeypatch, app_env, fly_app, db_url, expect
         monkeypatch.delenv("FLY_APP_NAME", raising=False)
     else:
         monkeypatch.setenv("FLY_APP_NAME", fly_app)
-    assert sp._mock_squeeze_writes_enabled() is expected
+    assert sp._mock_feed_writes_enabled() is expected
 
 
 def test_tick_gates_every_squeeze_write_on_the_strict_guard() -> None:
     """Source check: the delete, insert, fetch and SSE announce all key off
-    `mock_squeeze_writes`, never the looser `mock_writes` flag."""
+    `mock_feed_writes`, never the looser `_mock_writes_enabled()` check."""
     import ast
     import inspect
 
@@ -325,7 +325,7 @@ def test_tick_gates_every_squeeze_write_on_the_strict_guard() -> None:
             or "squeeze_updated" in body_src
         )
         if touches_squeeze:
-            assert ast.unparse(node.test) == "mock_squeeze_writes", ast.unparse(node.test)
+            assert ast.unparse(node.test) == "mock_feed_writes", ast.unparse(node.test)
 
 
 def test_module_is_documented() -> None:

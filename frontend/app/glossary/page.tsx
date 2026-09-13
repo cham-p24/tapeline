@@ -132,7 +132,7 @@ export default function GlossaryIndexPage() {
             >
               public scorecard
             </ContentCtaLink>{" "}
-            is the unedited record of every daily top-10, and{" "}
+            is the dated record of each daily top 10, losing days kept and corrections dated, and{" "}
             <Link href="/limitations" className="link">
               limitations
             </Link>{" "}

@@ -49,7 +49,7 @@ const SCREENERS: FreeScreener[] = [
     trackRecord: "Public scorecard",
     noCard: "Yes",
     summary:
-      "The only US scanner that names all six of its scoring factors AND keeps every losing day on a public scorecard. That scorecard currently trails SPY — we publish it anyway, unedited, because a record you can audit is worth more than a marketing number you can't. There are two free paths here, and they are worth separating. Reading asks for nothing at all: the composite score, the plain-English Why, the daily Top 10 and the whole downloadable record are open to anyone. Running the scanner asks for an email and a password and nothing else — the free plan is live, not delayed, and shows you the top ten scored rows of whatever scan you build, with one saved screen and a five-symbol watchlist. A card is what turns on the rest of the matching rows, alerts, CSV export and the filings feeds, and adding one starts the 30-day Premium trial ($0 that day, first charge on day 30, one click to cancel).",
+      "The only US scanner that names all six of its scoring factors AND keeps every losing day on a public scorecard. That scorecard currently trails SPY — we publish it anyway, losing days and dated corrections included, because a record you can audit is worth more than a marketing number you can't. There are two free paths here, and they are worth separating. Reading asks for nothing at all: the composite score, the plain-English Why, the daily Top 10 and the whole downloadable record are open to anyone. Running the scanner asks for an email and a password and nothing else — the free plan is live, not delayed, and shows you the top ten scored rows of whatever scan you build, with one saved screen and a five-symbol watchlist. A card is what turns on the rest of the matching rows, alerts, CSV export and SEC Form 4 insider filings, and adding one starts the 30-day Premium trial ($0 that day, first charge on day 30, one click to cancel).",
   },
   {
     name: "Finviz (free)",
@@ -98,7 +98,7 @@ const FAQ = [
   },
   {
     q: "Does any free screener show a real track record?",
-    a: "Only Tapeline, and it's important to be straight about what it shows: every top-10 daily pick is logged to a public scorecard at /scorecard and back-checked against SPY the next session, with no edits. Right now that record trails SPY. We publish it anyway — an honest, auditable record is the point, not a flattering one. The other free screeners publish no first-party track record.",
+    a: "Only Tapeline, and it's important to be straight about what it shows: each day's top-10 picks are logged to a public scorecard at /scorecard and back-checked against SPY the next session. Losing days stay, corrections to recorded values are dated (prices on 25 August 2026, scores capped on 15 June 2026), and the four sessions with no top 10 are listed. Right now that record trails SPY. We publish it anyway — an honest, auditable record is the point, not a flattering one. The other free screeners publish no first-party track record.",
   },
   {
     q: "How did you compare these free screeners?",
@@ -146,7 +146,7 @@ export default function BestFreeStockScreenerPage() {
         <p className="mt-4 text-lg text-muted">
           Tapeline is the only US scanner that names all six of its scoring factors
           <em> and</em> keeps every losing day on a public scorecard. That scorecard currently
-          trails SPY — and we leave it up unedited, because a record you can audit beats a
+          trails SPY — and we leave it up, losing days included, because a record you can audit beats a
           marketing number you can&apos;t. Below is an honest, feature-only comparison of the
           genuinely free stock screeners worth your time in 2026 — what each free path includes,
           whether it publishes its methodology, and whether it needs a card. No performance
@@ -295,7 +295,7 @@ export default function BestFreeStockScreenerPage() {
               <Link href="/scorecard" className="text-accent hover:underline">
                 The public scorecard →
               </Link>{" "}
-              <span className="text-muted">— every top-10 pick vs SPY, unedited (it trails SPY).</span>
+              <span className="text-muted">— each recorded top-10 pick vs SPY, losses kept and corrections dated (it trails SPY).</span>
             </li>
           </ul>
         </section>

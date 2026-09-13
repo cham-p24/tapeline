@@ -261,8 +261,8 @@ export default function HoldingsPage() {
             Pinned by __tests__/insiderRefreshCadenceCopy.test.tsx. */}
         Source: SEC Form 4 filings, through a data vendor that can run behind SEC
         EDGAR. Each stock&rsquo;s filings are re-checked about every two days
-        (ETFs and other non-stocks about monthly) across the top ~6,900
-        most-liquid US tickers. Codes: P = open-market buy, S = open-market sale, A = grant/award,
+        (ETFs and other non-stocks about monthly) across the tickers we track.
+        Codes: P = open-market buy, S = open-market sale, A = grant/award,
         M = option exercise, G = gift, F = payment of tax via shares.
       </p>
     </div>

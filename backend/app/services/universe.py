@@ -62,6 +62,19 @@ import os as _os
 
 ACTIVE_UNIVERSE_SIZE = int(_os.environ.get("ACTIVE_UNIVERSE_SIZE", "12000"))
 
+# The number that belongs in COPY (emails, MCP text): how many US stocks and
+# ETFs an unfiltered scan returns, rounded DOWN. NOT ACTIVE_UNIVERSE_SIZE, which
+# is a snapshot ceiling set above the whole table and counts nothing — the
+# re-engagement and day-7 emails used to print it as "~12,000-ticker universe".
+#
+# Measured 2026-09-13 22:33 UTC (read-only): /api/scanner with
+# min_dollar_volume=0&include_leveraged=true returned total_matched 11,501;
+# 11,546 non-crypto rows carry a score. Matches the founder-approved product
+# update email ("about 11,500 stocks and ETFs"). Mirrors ACTIVE_SCORED_TICKERS
+# in frontend/lib/universe.ts; frontend/__tests__/universeSizeIsSingleSourced
+# asserts the two agree. Re-measure before changing either.
+SCORED_TICKERS_IN_COPY = 11_500
+
 # Extra slots handed to NEVER-SCORED tickers on every refresh, on top of
 # ACTIVE_UNIVERSE_SIZE.
 #

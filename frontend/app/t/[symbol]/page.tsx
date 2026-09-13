@@ -606,7 +606,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `Where can I see the historical track record for Tapeline scores?`,
-      a: `Every Tapeline top-10 daily pick is auto-published with the next-day return vs SPY at /scorecard. The scorecard is immutable — every call is preserved with its original context for accountability.`,
+      a: `Each day's Tapeline top 10 is published with its next-day return vs SPY at /scorecard. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026.`,
     },
     {
       q: `What does the ${signal} signal mean for ${sym}?`,

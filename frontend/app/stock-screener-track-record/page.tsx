@@ -144,7 +144,7 @@ export async function generateMetadata() {
   return pageMeta({
     title: "Stock screeners with a public track record | Tapeline",
     description:
-      "Most stock screeners publish no per-pick track record at all. Here's what a real one must contain — dated, unedited, benchmarked, downloadable — and " +
+      "Most stock screeners publish no per-pick track record at all. Here's what a real one must contain — dated, benchmarked, downloadable, corrections disclosed — and " +
       record,
     path: "/stock-screener-track-record",
   });
@@ -156,8 +156,8 @@ const CRITERIA = [
     p: "Not an aggregate win-rate figure — the actual list, with each pick stamped the day it printed. Aggregates can't be audited; a dated list can. If you can't see individual picks with their dates, there is no track record, only a claim.",
   },
   {
-    h: "2. Losing picks kept, and nothing edited",
-    p: "The misses must be present at the same size and weight as the winners, frozen the day they printed, never re-ranked or quietly deleted. A record you can edit after the fact isn't a record — it's a highlight reel.",
+    h: "2. Losing picks kept, and corrections dated",
+    p: "The misses must be present at the same size and weight as the winners, frozen the day they printed, never re-ranked or quietly deleted. If a recorded value is ever corrected, the correction has to be dated and explained where the record lives. A record that can change silently after the fact isn't a record — it's a highlight reel.",
   },
   {
     h: "3. Every pick benchmarked against SPY",
@@ -170,9 +170,9 @@ const CRITERIA = [
 ];
 
 const COMPARE: { label: string; tapeline: string; others: string }[] = [
-  { label: "Per-pick record, dated", tapeline: "Yes — every daily top-10", others: "Rarely published" },
+  { label: "Per-pick record, dated", tapeline: "Yes — each recorded daily top 10 (four sessions have none; they are listed on the scorecard)", others: "Rarely published" },
   { label: "Losing picks shown", tapeline: "Yes — kept at equal weight", others: "Usually omitted" },
-  { label: "Never edited or back-filled", tapeline: "Yes — frozen the day it prints", others: "No public commitment" },
+  { label: "Record not re-ranked, back-filled or deleted", tapeline: "Yes — and corrections to recorded values are dated (prices 25 Aug 2026; scores capped 15 Jun 2026)", others: "No public commitment" },
   { label: "Benchmarked vs SPY", tapeline: "Yes — next session, per pick", others: "Seldom" },
   { label: "Raw data downloadable", tapeline: "Yes — CSV + JSON, full archive", others: "No" },
 ];
@@ -190,9 +190,10 @@ export default async function StockScreenerTrackRecordPage() {
   // Size and age of the archive as one clause. Unquantified when the API did
   // not answer, rather than falling back to a number.
   const sizeClause = figures
-    ? `${figures.since ? `It runs from ${figures.since} and is` : "It is"} append-only — ` +
-      `${figures.picks} back-checked picks over ${figures.days} market days, and it grows every trading session.`
-    : "It is append-only and grows every trading session.";
+    ? `${figures.since ? `It runs from ${figures.since}: ` : ""}` +
+      `${figures.picks} back-checked picks over ${figures.days} market days, and it grows with each recorded session. ` +
+      "Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026."
+    : "It grows with each recorded session. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026.";
 
   // The vs-SPY answer, assembled from live figures with the sample disclosed
   // (Rule 3) and no wording that depends on the sign of the median.
@@ -210,7 +211,7 @@ export default async function StockScreenerTrackRecordPage() {
   const FAQ = [
     {
       q: "Which stock screeners publish a track record?",
-      a: "Very few publish one you can actually check. Most show an aggregate win-rate or nothing per-pick, because a public record is a liability. Tapeline is built around publishing one: every daily top-10 pick, dated the day it prints, benchmarked against SPY the next session, losses kept, and downloadable as raw data.",
+      a: "Very few publish one you can actually check. Most show an aggregate win-rate or nothing per-pick, because a public record is a liability. Tapeline is built around publishing one: each daily top-10 pick, dated the day it prints, benchmarked against SPY the next session, losses kept, corrections dated, and downloadable as raw data.",
     },
     {
       q: "Is a screener's win rate the same as a track record?",
@@ -218,7 +219,7 @@ export default async function StockScreenerTrackRecordPage() {
     },
     {
       q: "Can I download Tapeline's track record?",
-      a: "Yes. The complete append-only archive is downloadable as CSV and JSON, with the methodology attached, so you can re-check every entry against any price source you trust. Tapeline invites corrections — the point of publishing raw data is that anyone can find an error in it.",
+      a: "Yes. The full archive is downloadable as CSV and JSON, with the methodology and the dated corrections attached, so you can re-check every entry against any price source you trust. Tapeline invites corrections — the point of publishing raw data is that anyone can find an error in it.",
     },
     {
       q: "How far back does the record go, and how big is it?",
@@ -248,7 +249,7 @@ export default async function StockScreenerTrackRecordPage() {
         {/* Answer-first — the passage an assistant lifts verbatim. */}
         <p className="mt-4 text-lg leading-relaxed text-muted">
           Almost no stock screener publishes a track record you can check &mdash; most show a marketing win-rate or
-          nothing per-pick. <strong className="text-fg">Tapeline</strong> publishes every daily top-10 pick
+          nothing per-pick. <strong className="text-fg">Tapeline</strong> publishes its daily top-10 picks
           {figures ? (
             <>
               ,{" "}
@@ -299,8 +300,10 @@ export default async function StockScreenerTrackRecordPage() {
               </>
             )}
             <div>
-              <div className="font-mono text-3xl font-bold nums">100%</div>
-              <div className="mt-1 text-sm text-muted">published &mdash; losses included, never edited</div>
+              <div className="font-mono text-3xl font-bold nums">2</div>
+              <div className="mt-1 text-sm text-muted">
+                corrections to recorded values, both dated on the scorecard &mdash; losses included
+              </div>
             </div>
           </div>
           <p className="mt-5 text-sm leading-relaxed text-muted">

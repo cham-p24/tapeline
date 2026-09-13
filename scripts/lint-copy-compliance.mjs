@@ -579,6 +579,48 @@ export const RULES = [
       /\b(?:if|when|because)\s+your\s+(?:trades?|picks?|positions?|investments?|portfolio)\b[^.?!<>\n]{0,28}?\b(?:keep\s+)?(?:los\w+|fail\w*|go\s+wrong|tank\w*|crash\w*)\b/i,
     ],
   },
+  {
+    id: "record-never-edited",
+    skipNegationGuard: true,
+    brief:
+      "Integrity 2026-09-14 — never claim the public record is unedited, append-only or immutable",
+    message:
+      "The public record has been corrected twice: on 15 June 2026 every recorded " +
+      "score above 100 was set to 100 with the originals not kept (18 May - 12 June " +
+      "2026), and on 25 August 2026 recorded prices were restated. It also stores " +
+      "no per-pick reasoning. Say what is true instead, e.g. \"Entries are not " +
+      "re-ranked or deleted. We have corrected recorded values twice, and said so: " +
+      "prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June " +
+      "2026.\" or the short form \"logged same-day; corrections dated\". Dated history " +
+      "(the changelog, a published post) is corrected with a new dated note and " +
+      "allowlisted with a reason, never silently rewritten.",
+    /*
+     * Why this is its own rule (founder-approved integrity wave, 2026-09-14).
+     *
+     * "never edited" was the record's headline trust claim and it was false on
+     * ~30 surfaces at once: pricing and signup badges, SEO landers, the
+     * glossary, llms.txt, the MCP server text, emails, a growth post. #821 and
+     * this change removed it; the rule keeps a growth edit from putting it back.
+     *
+     * Precision: every pattern names the record-immutability idea itself.
+     * "edit" alone is not matched — "Edit or delete it whenever you like" is a
+     * watchlist feature. "append-only" and "immutable" are matched in copy only;
+     * comments and Python docstrings, where engineers describe real append-only
+     * tables (cap_events, funnel_events), are stripped before scanning.
+     */
+    patterns: [
+      /\bnever[\s-]+(?:been\s+)?edited\b/i,
+      /\bnever\s+edits?\s+(?:it|the\s+(?:row|record|entry|entries))\b/i,
+      /\bun-?edited\b/i,
+      /\bno[\s-]+edits\b/i,
+      /\bappend[\s-]only\b/i,
+      /\bimmutable\s+(?:record|reference|scorecard|archive|log)\b/i,
+      /\b(?:scorecard|record)\s+is\s+immutable\b/i,
+      /\bno\s+hindsight\s+(?:edit|rewrit)\w*/i,
+      /\bcan(?:'|’|&rsquo;)?t\s+go\s+back\s+and\s+edit\b/i,
+      /\bwith\s+(?:the|its)\s+original\s+reasoning\b/i,
+    ],
+  },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -1304,7 +1346,9 @@ export function scanSource(text, filePath = "<input>", options = {}) {
     const { line, col: column } = lineAndColOf(code, index);
     const inline = inlineAllowed.get(line);
     if (inline && (inline === "*" || inline === rule.id)) return;
-    if (isNegated(code, index)) return;
+    // record-never-edited claims are negations themselves ("no edits",
+    // "never edited"), so the negation guard would suppress the claim it polices.
+    if (!rule.skipNegationGuard && isNegated(code, index)) return;
     const finding = {
       file: filePath,
       line,

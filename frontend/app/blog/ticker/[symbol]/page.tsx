@@ -405,7 +405,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
       a:
         scorecard && scorecard.appearances > 0
           ? `${t.symbol} has been in Tapeline's top-10 cohort ${scorecard.appearances} time${scorecard.appearances === 1 ? "" : "s"} since the public scorecard started forward-testing${scorecard.median_alpha_vs_spy !== null ? `, with a median 1-day alpha of ${scorecard.median_alpha_vs_spy >= 0 ? "+" : ""}${scorecard.median_alpha_vs_spy.toFixed(2)}% vs SPY` : ""}. Full per-day history at tapeline.io/scorecard/${t.symbol}.`
-          : `Every market day, Tapeline freezes the top 10 composite scores and logs each name's next-day return versus SPY. ${t.symbol} hasn't been in a top-10 cohort yet; the universe-wide history lives at tapeline.io/scorecard.`,
+          : `Each trading day, Tapeline freezes the top 10 composite scores and logs each name's next-day return versus SPY (four sessions have no top 10; they are listed on the scorecard). ${t.symbol} hasn't been in a top-10 cohort yet; the universe-wide history lives at tapeline.io/scorecard.`,
     },
     {
       q: `What does ${t.symbol}'s confidence percentage mean?`,
@@ -647,10 +647,10 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
         <section className="mt-12">
           <h2 className="text-2xl font-semibold tracking-tight">How to Track {t.symbol} Live on Tapeline</h2>
           <p className="mt-3 text-base text-fg leading-relaxed">
-            The interactive {t.symbol} page lives at <Link href={`/t/${t.symbol}`} className="text-accent hover:underline">/t/{t.symbol}</Link> — same data, plus a live radar chart, news feed, and watchlist add. The full scanner covering ~6,900 US tickers is at <Link href="/app/scanner" className="text-accent hover:underline">/app/scanner</Link>.
+            The interactive {t.symbol} page lives at <Link href={`/t/${t.symbol}`} className="text-accent hover:underline">/t/{t.symbol}</Link> — same data, plus a live radar chart, news feed, and watchlist add. The full scanner covering about 11,500 US stocks and ETFs is at <Link href="/app/scanner" className="text-accent hover:underline">/app/scanner</Link>.
           </p>
           <p className="mt-3 text-base text-fg leading-relaxed">
-            The public pages — this one, /t/{t.symbol}, the daily Top 10 and the full scorecard — are free to read with no account, which is enough to evaluate the methodology. Pro ($8.25/mo billed annually, or $9.99 monthly) unlocks the full ~6,900-ticker real-time scanner with unlimited look-ups, watchlist alerts on score moves, and the IPO/earnings calendar. Premium ($16.58/mo annually, $19.99 monthly) adds Congressional trades, recent insider buys (SEC Form 4). A new account takes an email and a password and lands on the free plan — the top ten scored rows of any scan, live. The 30-day Premium trial is a separate step, and that step takes a card: $0 charged that day, first charge on day 30, cancel in one click before then.
+            The public pages — this one, /t/{t.symbol}, the daily Top 10 and the full scorecard — are free to read with no account, which is enough to evaluate the methodology. Pro ($8.25/mo billed annually, or $9.99 monthly) unlocks the full scanner (about 11,500 US stocks and ETFs) with unlimited look-ups, watchlist alerts on score moves, and the IPO/earnings calendar. Premium ($16.58/mo annually, $19.99 monthly) adds recent insider buys (SEC Form 4). A new account takes an email and a password and lands on the free plan — the top ten scored rows of any scan, live. The 30-day Premium trial is a separate step, and that step takes a card: $0 charged that day, first charge on day 30, cancel in one click before then.
           </p>
         </section>
 

@@ -33,7 +33,7 @@ from app.models import (
 # Squeeze detection and congress trades have NO real source wired: both come from
 # mock_feed, which fabricates rows (including invented trades attributed to real,
 # named politicians). Those generators are therefore only ever PERSISTED outside
-# production — see `_mock_writes_enabled()`. In production the SqueezeSetup table
+# production — see `_mock_feed_writes_enabled()`. In production the SqueezeSetup table
 # is owned by the SPIKE INTELLIGENCE sheet tab (sheet_feed.upsert_spikes) and the
 # congress_trades table simply stops accruing rows until a real disclosure feed
 # is wired.
@@ -335,37 +335,43 @@ _sheet_governed_symbols: frozenset[str] = frozenset()
 
 
 def _mock_writes_enabled() -> bool:
-    """May fabricated (mock_feed) rows be PERSISTED to the DB?
+    """Loose environment check: is APP_ENV anything other than "production"?
 
-    Only outside production. `mock_feed.fetch_squeezes` /
-    `fetch_congress_trades` invent rows on every call — the congress generator
-    attributes randomly-generated trades to real, named politicians. Persisting
-    those in production publishes fabrication as fact (routers/congress.py
-    serves them as disclosures, services/alerts.py emails users about them), so
-    the write path is gated to dev/test where mock data is the point.
-
-    When a real source for either dataset is wired, gate on that source's
-    config here instead of (or in addition to) the env check.
+    This alone is NOT enough to persist fabricated rows: `app_env` defaults to
+    "development", so a worker booted without APP_ENV passes it. The tick keys
+    every mock_feed write off the stricter `_mock_feed_writes_enabled()`, which
+    requires this AND more. Kept as a separate function because tests patch it
+    to switch mock writes off, and calendar_feed / polygon_feed mirror it.
     """
     return get_settings().app_env != "production"
 
 
-def _mock_squeeze_writes_enabled() -> bool:
-    """May `mock_feed.fetch_squeezes` rows be written to SqueezeSetup?
+def _mock_feed_writes_enabled() -> bool:
+    """May fabricated `mock_feed` rows be written to the database?
 
-    Stricter than `_mock_writes_enabled()`. That check only refuses when
-    APP_ENV is literally "production"; `app_env` defaults to "development", so
-    a worker booted without APP_ENV would write invented squeeze setups (and
-    wipe the table first). The 15 mock rows production still holds (all dated
-    2026-07-18 UTC) were served as live setups until services/squeeze_integrity.
+    One guard for both mock writers:
+      - `mock_feed.fetch_squeezes` → SqueezeSetup (the tick also wipes that
+        table first);
+      - `mock_feed.fetch_congress_trades` → CongressTrade. That generator
+        attributes randomly generated trades to real, named politicians.
 
-    Mock squeeze writes require ALL of:
-      - app_env == "development" (note: that is also the default when APP_ENV
-        is unset, so this condition alone does not block anything);
+    Stricter than `_mock_writes_enabled()`, which only refuses when APP_ENV is
+    literally "production". The 15 mock squeeze rows production still holds
+    (all dated 2026-07-18 UTC) were served as live setups until
+    services/squeeze_integrity, and the 338,015 congress_trades rows are all
+    test output (services/congress_integrity). Before 2026-09-14 the congress
+    writer used only the loose check, so a worker booted without APP_ENV would
+    have written invented congress trades.
+
+    Mock writes require ALL of:
+      - `_mock_writes_enabled()` and app_env == "development" (note: that is
+        also the default when APP_ENV is unset, so this condition alone does
+        not block anything);
       - no FLY_APP_NAME (Fly sets it on every machine; verified on
         tapeline-backend 2026-09-14). This is what blocks production today;
       - a SQLite database URL. Production runs on Postgres (Neon), so a
         machine off Fly with APP_ENV missing but a Postgres URL refuses.
+    CI e2e (SQLite, APP_ENV=development, not on Fly) still gets mock rows.
     The real SPIKE INTELLIGENCE sheet writer (sheet_feed.upsert_spikes) is not
     gated by this.
     """
@@ -451,19 +457,17 @@ async def tick() -> None:
     )
 
     # Squeezes + congress trades are FABRICATED by mock_feed (no real source is
-    # wired for either). Don't even generate them in production — see
-    # `_mock_writes_enabled()`.
-    mock_writes = _mock_writes_enabled()
-    # Squeeze mock writes have their own stricter guard (see
-    # `_mock_squeeze_writes_enabled`): on Fly or on Postgres, even with APP_ENV
-    # missing, no invented squeeze setups are written.
-    mock_squeeze_writes = _mock_squeeze_writes_enabled()
+    # wired for either). Both writers share one strict guard (see
+    # `_mock_feed_writes_enabled`): on Fly or on Postgres, even with APP_ENV
+    # missing, no invented squeeze setups or congress trades are generated or
+    # written.
+    mock_feed_writes = _mock_feed_writes_enabled()
     squeezes: list[dict] = []
     new_trades: list[dict] = []
     _set_stage("mock_writes")
-    if mock_squeeze_writes:
+    if mock_feed_writes:
         squeezes = await fetch_squeezes() if inspect.iscoroutinefunction(fetch_squeezes) else fetch_squeezes()
-    if mock_writes:
+    if mock_feed_writes:
         new_trades = (
             await fetch_congress_trades()
             if inspect.iscoroutinefunction(fetch_congress_trades)
@@ -725,7 +729,7 @@ async def tick() -> None:
         # (5-min throttle, skipped entirely when the CSV is unchanged), so
         # wiping it every 60s here deleted real data and served ~15 fabricated
         # setups in its place.
-        if mock_squeeze_writes:
+        if mock_feed_writes:
             await session.execute(delete(SqueezeSetup))
             for s in squeezes:
                 session.add(SqueezeSetup(**s))
@@ -746,27 +750,28 @@ async def tick() -> None:
         # direction + amount band) so a real disclosure feed re-reporting the
         # same filing can't duplicate it. Existing rows are never deleted here
         # — purging the fabricated backlog is an operator decision.
-        for t in new_trades:
-            dupe = await session.execute(
-                select(CongressTrade.id)
-                .where(
-                    CongressTrade.politician == t["politician"],
-                    CongressTrade.symbol == t["symbol"],
-                    CongressTrade.trade_date == t["trade_date"],
-                    CongressTrade.direction == t["direction"],
-                    CongressTrade.amount_min == t["amount_min"],
-                    CongressTrade.amount_max == t["amount_max"],
+        if mock_feed_writes:
+            for t in new_trades:
+                dupe = await session.execute(
+                    select(CongressTrade.id)
+                    .where(
+                        CongressTrade.politician == t["politician"],
+                        CongressTrade.symbol == t["symbol"],
+                        CongressTrade.trade_date == t["trade_date"],
+                        CongressTrade.direction == t["direction"],
+                        CongressTrade.amount_min == t["amount_min"],
+                        CongressTrade.amount_max == t["amount_max"],
+                    )
+                    .limit(1)
                 )
-                .limit(1)
-            )
-            if dupe.scalar_one_or_none() is None:
-                session.add(CongressTrade(**t))
+                if dupe.scalar_one_or_none() is None:
+                    session.add(CongressTrade(**t))
 
     # Publish to SSE
     _set_stage("publish")
     await broker.publish("scores_updated", {"ts": started.isoformat(), "count": len(snapshots)})
     await broker.publish("regime_updated", regime)
-    if mock_squeeze_writes:
+    if mock_feed_writes:
         # Only announce a squeeze change when this tick actually wrote one —
         # otherwise the event carried count=0 while the table held real rows.
         await broker.publish("squeeze_updated", {"count": len(squeezes)})

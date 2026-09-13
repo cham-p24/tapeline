@@ -150,7 +150,7 @@ export function TrialEndedModal() {
             ))}
           </ul>
           <p className="mt-3 text-xs text-muted">
-            Premium adds unlimited look-ups, the full ~6,900-ticker scanner,
+            Premium adds unlimited look-ups, the full scanner (about 11,500 US stocks and ETFs),
             email alerts, recent insider buys (SEC Form 4), CSV export and
             API access.
           </p>

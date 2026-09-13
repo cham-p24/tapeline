@@ -56,7 +56,7 @@ const SCANNERS: Scanner[] = [
     publicFormula: "Yes",
     trackRecord: "Public scorecard",
     summary:
-      `The only US scanner here that names all six of its scoring factors and their weight ordering AND leaves every losing day on a public scorecard you can download. You can read all of it without an account: the daily Top 10 at /daily-picks, the whole record at /scorecard, a page per ticker, and the raw CSV and JSON behind them. Be clear-eyed about that record — it currently trails SPY, and we leave it up unedited, because an auditable record is the whole point. Since 30 August 2026 you can also run the scanner yourself for nothing: signing up takes an email and a password, no card, and the free plan is live rather than delayed — the top ten scored rows of any scan you build, one saved screen, a five-symbol watchlist and twelve ticker deep-pages a day. What a card buys is every matching row instead of the first ten, a second saved screen, alerts by email and web push, CSV export, the 200-symbol watchlist and SEC Form 4 insider filings. Adding one starts the 30-day Premium trial through Stripe Checkout — $0 charged that day, the exact first-charge date shown before you confirm, an email ${PRECHARGE_NOTICE_PHRASE} the charge, and one click to cancel.`,
+      `The only US scanner here that names all six of its scoring factors and their weight ordering AND leaves every losing day on a public scorecard you can download. You can read all of it without an account: the daily Top 10 at /daily-picks, the whole record at /scorecard, a page per ticker, and the raw CSV and JSON behind them. Be clear-eyed about that record — it currently trails SPY, and we leave it up, losing days and dated corrections included, because an auditable record is the whole point. Since 30 August 2026 you can also run the scanner yourself for nothing: signing up takes an email and a password, no card, and the free plan is live rather than delayed — the top ten scored rows of any scan you build, one saved screen, a five-symbol watchlist and twelve ticker deep-pages a day. What a card buys is every matching row instead of the first ten, a second saved screen, alerts by email and web push, CSV export, the 200-symbol watchlist and SEC Form 4 insider filings. Adding one starts the 30-day Premium trial through Stripe Checkout — $0 charged that day, the exact first-charge date shown before you confirm, an email ${PRECHARGE_NOTICE_PHRASE} the charge, and one click to cancel.`,
   },
   {
     name: "StockAnalysis.io",
@@ -109,11 +109,11 @@ const FAQ = [
   {
     q: "Does Tapeline still have a free tier?",
     // copy-compliance-allow card-required-signup -- narrates the 22-30 Aug window in the past tense and states the current state first
-    a: "Yes — and since 30 August 2026 it is a logged-in one again, not only a published one. The record stays free and always will be: /daily-picks, /scorecard, a page per ticker, and the raw CSV/JSON export are open to anyone with no account and no card. On top of that, signing up takes an email and a password, and the account lands on a free plan that runs the live scanner: the top ten scored rows of any scan, live data, one saved screen, a five-symbol watchlist, twelve ticker deep-pages a day. (For eight days in August a new account did have to add a card at first sign-in. That requirement was removed on 30 August 2026.) A card is what starts the 30-day Premium trial and turns on every matching row, a second saved screen, alerts, CSV export and the filings feeds — $0 charged that day, the first charge on day 30 at the plan price you pick, and one click cancels before then.",
+    a: "Yes — and since 30 August 2026 it is a logged-in one again, not only a published one. The record stays free and always will be: /daily-picks, /scorecard, a page per ticker, and the raw CSV/JSON export are open to anyone with no account and no card. On top of that, signing up takes an email and a password, and the account lands on a free plan that runs the live scanner: the top ten scored rows of any scan, live data, one saved screen, a five-symbol watchlist, twelve ticker deep-pages a day. (For eight days in August a new account did have to add a card at first sign-in. That requirement was removed on 30 August 2026.) A card is what starts the 30-day Premium trial and turns on every matching row, a second saved screen, alerts, CSV export and SEC Form 4 insider filings — $0 charged that day, the first charge on day 30 at the plan price you pick, and one click cancels before then.",
   },
   {
     q: "Does the no-card record still show real results?",
-    a: "Yes, and it's important to be straight about it: every top-10 daily pick is logged to a public scorecard at /scorecard and back-checked against SPY the next session, with no edits. Right now that record trails SPY. We keep it public anyway — an honest, auditable record is the point, not a flattering headline. You can download the whole thing as CSV or JSON and check the arithmetic yourself, without an account. The other scanners on this page publish no first-party track record at all.",
+    a: "Yes, and it's important to be straight about it: each day's top-10 picks are logged to a public scorecard at /scorecard and back-checked against SPY the next session. Losing days stay, corrections to recorded values are dated (prices on 25 August 2026, scores capped on 15 June 2026), and the four sessions with no top 10 are listed. Right now that record trails SPY. We keep it public anyway — an honest, auditable record is the point, not a flattering headline. You can download the whole thing as CSV or JSON and check the arithmetic yourself, without an account. The other scanners on this page publish no first-party track record at all.",
   },
   {
     q: "How did you decide which scanners qualify?",
@@ -164,7 +164,7 @@ export default function FreeStockScannerNoCreditCardPage() {
           <em> and</em> leaves every losing day on a public scorecard — and you can read
           all of it without an account or a card: the daily Top 10, the whole record, a
           page per ticker, and the raw CSV and JSON behind them. Be clear-eyed about the
-          record: it currently trails SPY, and we leave it up unedited, because a track
+          record: it currently trails SPY, and we leave it up, losing days included, because a track
           record you can audit beats a marketing number you can&apos;t. Since 30 August 2026
           you can run the scanner itself on a free account too — an email and a password,
           no card — showing the top ten scored rows of any scan you build. Below is an
@@ -252,8 +252,8 @@ export default function FreeStockScannerNoCreditCardPage() {
             What Tapeline gives you with no account and no card
           </h2>
           <p className="mt-2 text-sm text-muted leading-relaxed">
-            None of the following asks for an email, an account or a card. They are the
-            same numbers the signed-in product runs on.
+            None of the following asks for an email, an account or a card. They
+            come from the same scoring the signed-in product uses.
           </p>
           <ul className="mt-4 space-y-2 text-sm">
             <li>
@@ -269,8 +269,8 @@ export default function FreeStockScannerNoCreditCardPage() {
                 The public scorecard &rarr;
               </Link>{" "}
               <span className="text-muted">
-                — every top-10 pick ever published, back-checked against SPY the next
-                session, unedited (it trails SPY).
+                — every top-10 pick recorded so far, back-checked against SPY the next
+                session, losses kept and corrections dated (it trails SPY).
               </span>
             </li>
             <li>
@@ -412,7 +412,7 @@ export default function FreeStockScannerNoCreditCardPage() {
               <Link href="/scorecard" className="text-accent hover:underline">
                 The public scorecard →
               </Link>{" "}
-              <span className="text-muted">— every top-10 pick vs SPY, unedited (it trails SPY).</span>
+              <span className="text-muted">— each recorded top-10 pick vs SPY, losses kept and corrections dated (it trails SPY).</span>
             </li>
           </ul>
         </section>

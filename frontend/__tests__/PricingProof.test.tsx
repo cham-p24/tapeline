@@ -29,8 +29,11 @@ describe("PricingProof", () => {
     expect(await screen.findByText("42")).toBeInTheDocument();
     expect(screen.getByText(/days on the record/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/logged same-day, never edited/i),
+      screen.getByText(/logged same-day; corrections dated/i),
     ).toBeInTheDocument();
+    // Recorded values were corrected on 15 June and 25 August 2026, so the
+    // block must not claim the record was never edited.
+    expect(document.body.textContent).not.toMatch(/never edited/i);
     // The whole block is a link to the auditable record.
     expect(screen.getByRole("link")).toHaveAttribute("href", "/scorecard");
   });

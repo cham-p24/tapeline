@@ -10,7 +10,7 @@ import { PaywallModal } from "@/components/Paywall";
 /**
  * "Track record" section on /app/watchlist — the Premium blend of the watchlist
  * and the scorecard. For each watched ticker it shows the live score plus the
- * ticker's own next-day-vs-SPY record (frozen daily, never edited), reusing the
+ * ticker's own next-day-vs-SPY record (frozen daily), reusing the
  * public scorecard's row shape + colour rules.
  *
  * Gating: a canUse() branch (NOT a <Paywall> blur) — Free/Pro get a real
@@ -225,7 +225,7 @@ export function WatchlistTrackRecord() {
       <h2 className="text-lg font-semibold tracking-tight">Track record</h2>
       <p className="mt-1 text-sm text-muted">
         How each of your watched tickers has done since you added it — next-day
-        move vs SPY, frozen and never edited. Same method as the public scorecard.
+        move vs SPY, frozen each session. Same method as the public scorecard.
       </p>
       {!anyRecord && (
         <p className="mt-2 text-xs text-subtle">

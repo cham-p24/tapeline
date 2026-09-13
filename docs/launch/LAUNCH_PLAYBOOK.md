@@ -60,7 +60,7 @@ Self-contained reference for the launch push. Drafted 2026-05-13 alongside the e
 
 ### Title (keep ≤ 80 chars; HN hides what doesn't fit)
 
-> **Show HN: Tapeline – one score per stock, with a public, unedited track record**
+> **Show HN: Tapeline – one score per stock, with a public, dated track record**
 
 ### Body (paste verbatim into the URL field is wrong — HN needs the URL in the URL slot, the body goes in "text")
 
@@ -105,7 +105,7 @@ Reddit hates self-promo. Substance + transparency + responding to every comment 
 
 ### r/algotrading (~700K subs, quant-savvy)
 
-**Title**: `I built a 6-factor composite stock score with a public, unedited daily back-check vs SPY`
+**Title**: `I built a 6-factor composite stock score with a public daily back-check vs SPY`
 
 **Body**:
 ```

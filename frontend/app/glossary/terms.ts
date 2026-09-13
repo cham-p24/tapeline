@@ -329,7 +329,7 @@ export const TERMS: GlossaryTerm[] = [
     matters:
       "Alpha is the vocabulary for 'did this do anything the market did not already do', which is the only version of the question that survives a market-wide move up or down. The measurement caution for a swing trader is that alpha over a single short window is mostly noise — one session's difference against a benchmark tells you almost nothing, and the number stabilises only across a large sample.",
     tapeline:
-      "Tapeline's public scorecard records each daily top-10 pick's realised next-session return alongside the benchmark's over the same session, with the sample size disclosed and losing days published unedited.",
+      "Tapeline's public scorecard records each daily top-10 pick's realised next-session return alongside the benchmark's over the same session, with the sample size disclosed, losing days kept on the record and corrections to recorded values dated.",
     related: { href: "/scorecard", label: "The public scorecard record" },
     see: ["beta", "relative-strength", "drawdown", "composite-score"],
   },
