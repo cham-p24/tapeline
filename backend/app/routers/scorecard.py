@@ -25,6 +25,7 @@ from app.db import SessionLocal, get_session
 from app.models import DailyScorecardEntry, Ticker, User
 from app.services import scorecard_export
 from app.services.auth import current_user_optional
+from app.services.scorecard_backcheck import missing_trading_sessions
 
 router = APIRouter()
 
@@ -197,11 +198,31 @@ async def get_scorecard(
     total_logged = (await session.execute(
         select(func.count()).select_from(DailyScorecardEntry)
     )).scalar() or 0
+    # Trading days with no top 10, computed from the rows (not typed by hand):
+    # four went missing in Aug/Sep 2026 without the page saying so.
+    present_sessions = (await session.execute(
+        select(DailyScorecardEntry.as_of).distinct()
+    )).scalars().all()
+    last_tracked = max(present_sessions) if present_sessions else None
+    missing = missing_trading_sessions(first_tracked, last_tracked, present_sessions)
+
+    # The headline is computed over EVERY back-checked row, but the public
+    # download stops at the publication-delay cutoff. Say how many of the
+    # headline's rows are newer than the download, so a reader recomputing
+    # from the CSV knows why their n differs instead of concluding the page is
+    # wrong. Counted over the same outlier-filtered set the rates use.
+    export_cutoff = _export_cutoff()
+    newer_than_export = sum(
+        1 for e in all_scored if not _is_outlier(e) and e.as_of > export_cutoff
+    )
     summary = {
         "days_tracked": int(total_days),
         "first_tracked_date": first_tracked.isoformat() if first_tracked else None,
         "entries_logged": int(total_logged),
         **_summary_stats(all_scored),
+        "missing_sessions": [d.isoformat() for d in missing],
+        "export_cutoff": export_cutoff.isoformat(),
+        "entries_scored_after_export_cutoff": newer_than_export,
     }
 
     # Non-paying viewers see picks delayed N days. Filter `by_date` after the
@@ -278,6 +299,15 @@ async def _export_meta(session: AsyncSession, cutoff) -> dict:
         select(func.min(DailyScorecardEntry.as_of), func.max(DailyScorecardEntry.as_of))
         .where(DailyScorecardEntry.as_of <= cutoff)
     )).one()
+    present_sessions = (await session.execute(
+        select(DailyScorecardEntry.as_of).distinct()
+        .where(DailyScorecardEntry.as_of <= cutoff)
+    )).scalars().all()
+    not_back_checked = (await session.execute(
+        select(func.count()).select_from(DailyScorecardEntry)
+        .where(DailyScorecardEntry.as_of <= cutoff)
+        .where(DailyScorecardEntry.price_next_day.is_(None))
+    )).scalar_one()
     return scorecard_export.dataset_meta(
         row_count=row_count or 0,
         session_count=session_count or 0,
@@ -285,6 +315,8 @@ async def _export_meta(session: AsyncSession, cutoff) -> dict:
         first_date=bounds[0],
         last_date=bounds[1],
         cutoff=cutoff,
+        present_sessions=present_sessions,
+        rows_not_back_checked=not_back_checked or 0,
     )
 
 
@@ -349,9 +381,10 @@ def _export_filename(ext: str) -> str:
 
 # Registered in app/main.py via add_api_route (see the note there).
 async def export_scorecard_csv(since: str | None = None) -> StreamingResponse:
-    """The full append-only archive as CSV, with the context in the file.
+    """The full archive as CSV, with the context in the file.
 
-    Leading `#` comment lines carry the methodology URL, the append-only and
+    Leading `#` comment lines carry the methodology URL, the record policy,
+    every restatement, the missing sessions, the known limitations, the
     publication-delay explanation, the sample size, the general-information
     statement and the past-performance statement — because a CSV gets opened
     later, elsewhere, by someone who never saw this site.
@@ -373,7 +406,7 @@ async def export_scorecard_csv(since: str | None = None) -> StreamingResponse:
 
 # Registered in app/main.py via add_api_route (see the note there).
 async def export_scorecard_json(since: str | None = None) -> StreamingResponse:
-    """The full append-only archive as JSON: `{"meta": {...}, "rows": [...]}`.
+    """The full archive as JSON: `{"meta": {...}, "rows": [...]}`.
 
     Same payload and same constraints as the CSV. `meta` is emitted before
     `rows` so a streaming consumer reads the methodology, the delay and the

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Button } from "@/components/Button";
 import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
@@ -5,9 +6,9 @@ import { ScoreRadial } from "@/components/ScoreRadial";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "What's new in Tapeline — MCP server, open access, more",
+  title: "What's new in Tapeline — MCP server, score badges, more",
   description:
-    "The latest Tapeline upgrades: a public MCP server for AI assistants, embeddable score badges, ticker pages rebuilt as a decision aid, sign-up down to an email and a password, and the ranked scanner open on Free until 8 September.",
+    "Recent Tapeline changes: a public MCP server for AI assistants, embeddable score badges, ticker pages rebuilt as a decision aid, sign-up down to an email and a password, and the August open-access month, now ended.",
   path: "/whats-new",
 });
 
@@ -154,7 +155,7 @@ function TrialMock() {
   const rows: [string, string][] = [
     ["Due today", "$0.00"],
     ["First charge", "day 30 · the plan you pick"],
-    ["Reminder email", "three days before"],
+    ["Reminder email", "seven days before"],
   ];
   return (
     <div className="mx-auto max-w-[300px] space-y-1.5">
@@ -184,8 +185,8 @@ function OpenAccessMock() {
     <div>
       <div className="flex items-center justify-between">
         <span className="font-mono text-[11px] text-subtle">Scanner · Free plan</span>
-        <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
-          until 8 September
+        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-subtle">
+          ended 8 September
         </span>
       </div>
       <div className="mt-2 space-y-1.5">
@@ -201,7 +202,7 @@ function OpenAccessMock() {
         ))}
       </div>
       <div className="mt-2 text-center font-mono text-[10px] text-subtle">
-        1,000 ranked rows · was top 10
+        1,000 ranked rows · back to top 10
       </div>
     </div>
   );
@@ -244,7 +245,7 @@ function SearchMock() {
 function SidebarMock() {
   const groups: { label: string; items: { name: string; active?: boolean }[] }[] = [
     { label: "Trade", items: [{ name: "Scanner", active: true }, { name: "Watchlist" }, { name: "Alerts" }] },
-    { label: "Signals", items: [{ name: "Heatmap" }, { name: "Squeeze" }, { name: "Regime" }] },
+    { label: "Signals", items: [{ name: "Heatmap" }, { name: "Regime" }] },
   ];
   return (
     <div className="flex min-h-[220px] gap-0 overflow-hidden rounded-lg border border-border">
@@ -365,9 +366,11 @@ export default function WhatsNewPage() {
           <p className="mt-4 text-lg leading-relaxed text-muted">
             The latest round: a public MCP server so AI assistants can read the record directly,
             embeddable score badges, ticker pages rebuilt as a decision aid, sign-up down to an
-            email and a password with the card moved onto the trial, and the ranked scanner open on
-            the Free plan until 8 September. Same transparent six-factor scores and the same public
-            record behind everything; here&rsquo;s what changed and where to find it.
+            email and a password with the card moved onto the trial, and an open-access month on the
+            Free plan that ended on 8 September 2026. Same transparent six-factor scores and the same
+            public record behind everything; here&rsquo;s what changed and where to find it. For
+            corrections to the record itself, including the ones disclosed on 14 September 2026, see the{" "}
+            <Link href="/changelog" className="link">changelog</Link>.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button href="/signup" variant="primary" shape="rounded">
@@ -387,8 +390,8 @@ export default function WhatsNewPage() {
             <>
               Tapeline now runs a <strong className="text-fg">public MCP server</strong> at
               api.tapeline.io/mcp. Connect it and your assistant can pull a ticker&rsquo;s six-factor
-              score, today&rsquo;s published top 10, and the full never-edited track record — losing
-              picks included — through five public tools. Free, no account, no API key; setup
+              score, today&rsquo;s published top 10, and the full track record — losing picks
+              included — through five public tools. Free, no account, no API key; setup
               instructions at tapeline.io/mcp.
             </>
           }
@@ -441,9 +444,9 @@ export default function WhatsNewPage() {
               <strong className="text-fg">top ten scored rows</strong> — live data, no delay — plus
               one saved screen, a 5-symbol watchlist and 12 ticker pages a day. A card is the
               separate step that starts the 30-day Premium trial, and it is what turns on every
-              matching row, a second saved screen, alerts, CSV export and the filings feeds:{" "}
+              matching row, a second saved screen, alerts, CSV export and insider filings:{" "}
               <strong className="text-fg">$0 charged today</strong>, first charge on day 30 at the
-              plan you pick. We email you <strong className="text-fg">three days before</strong> that
+              plan you pick. We email you <strong className="text-fg">seven days before</strong> that
               charge, and cancelling is one click on the first screen — cancel before day 30 and you
               are never charged. The published record stays free to read with no account.
             </>
@@ -453,13 +456,14 @@ export default function WhatsNewPage() {
 
         <FeatureRow
           where="the scanner, on the Free plan"
-          title="Open-access month: the ranked scanner, open on Free"
+          title="Open-access month (ended 8 September 2026)"
           body={
             <>
-              Until <strong className="text-fg">8 September</strong>, signed-in Free accounts see{" "}
+              From 20 August to 8 September 2026, signed-in Free accounts saw{" "}
               <strong className="text-fg">1,000 ranked scanner rows</strong> instead of the top 10 —
-              the same row cap the paid plans use. On 8 September the cap simply returns to the top
-              10; nothing else about the Free plan changes.
+              the same row cap the paid plans use. That period has ended: since 8 September the Free
+              plan shows the <strong className="text-fg">top 10</strong> rows again, and nothing
+              else about the Free plan changed.
             </>
           }
           mock={<OpenAccessMock />}
@@ -477,8 +481,8 @@ export default function WhatsNewPage() {
           title="Search anything, instantly"
           body={
             <>
-              Jump straight to any ticker by <strong className="text-fg">symbol or company name</strong>,
-              now across the full ~2,500-stock universe — on desktop and mobile. Type two symbols like
+              Jump straight to a ticker by <strong className="text-fg">symbol or company name</strong>,
+              on desktop and mobile. Type two symbols like
               &ldquo;AAPL MSFT&rdquo; to open a head-to-head, or start typing a page to jump there.
             </>
           }
@@ -533,8 +537,7 @@ export default function WhatsNewPage() {
             <>
               We consolidated alerts onto the two channels people actually use —{" "}
               <strong className="text-fg">email</strong> and <strong className="text-fg">browser push</strong>.
-              Same score, squeeze and regime triggers; if you&rsquo;d set up the retired Telegram channel,
-              these two carry the same alerts.
+              If you&rsquo;d set up the retired Telegram channel, these two carry the same alert rules.
             </>
           }
           mock={<AlertsMock />}

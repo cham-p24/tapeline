@@ -57,7 +57,7 @@ export default async function OG() {
             What we shipped, when.
           </div>
           <div style={{ fontSize: "26px", color: "#a1a1aa", lineHeight: 1.4, display: "flex", maxWidth: "950px" }}>
-            Every release, ordered newest first. Past entries never edited.
+            Every release and correction, ordered newest first, each dated.
           </div>
         </div>
 

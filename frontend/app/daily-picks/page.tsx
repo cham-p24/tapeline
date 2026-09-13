@@ -139,11 +139,12 @@ export default async function DailyPicksPage() {
             <NewsletterCapture source="homepage" heading="" sub="" />
           </div>
           <p className="mt-3 text-xs text-muted">
-            Same numbers anyone can read on{" "}
+            Past daily lists, and how each name moved against SPY the next
+            session, are on{" "}
             <Link href="/scorecard" className="hover:text-fg underline-offset-2 hover:underline">
               the public scorecard
-            </Link>
-            .
+            </Link>{" "}
+            7 days after each session, with every correction dated.
           </p>
         </div>
       </section>

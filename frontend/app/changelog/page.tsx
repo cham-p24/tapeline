@@ -7,7 +7,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline Changelog — Methodology Changes, Corrections, Releases",
   description:
-    "Public, append-only Tapeline log: methodology changes, data errors, scorecard corrections and disclosure changes, each with the date it landed — plus every shipped release. No marketing spin.",
+    "Public Tapeline log: methodology changes, data errors, scorecard corrections and disclosure changes, each dated — plus every shipped release. Wrong entries are corrected by later ones.",
   path: "/changelog",
 });
 
@@ -41,6 +41,46 @@ type LogEntry = {
 };
 
 const METHODOLOGY_LOG: LogEntry[] = [
+  // ── Integrity wave, approved by the founder on 2026-09-14 ──────────────
+  // The entries dated 2026-09-14 below are disclosures made on that date. The
+  // entries dated 2026-09-10, 2026-09-06 (#766), 2026-08-23 and 2026-06-15
+  // are dated to their fix PR's merge date, per rule 2, but were ADDED on
+  // 2026-09-14 — each body says so, so nobody reads them as timely.
+  // Facts verified against the repository history and the production database
+  // on 2026-09-14; see backend/app/services/scorecard_export.py
+  // (RESTATEMENTS, KNOWN_LIMITATIONS) for the same facts in the download.
+  {
+    date: "2026-09-14",
+    kind: "correction",
+    title: "Entries on this page said no recorded value had ever been changed. That was wrong",
+    body:
+      "Several entries below say that no historical entry was altered, that every past day stands exactly as it was recorded, or that we don't rewrite the record: the 2026-09-06 entries for #761 and #762, the 2026-07-09 entry, and the 2026-07-10 release note. Those statements were false when they were written. On 15 June 2026 the recorded scores for the 190 entries from 18 May to 12 June 2026 were capped at 100 and the original values were not kept (see the 2026-06-15 entry). The 2026-08-24 entry also says 688 rows were rebased: 684 of the 688 were, and 4 were left as first recorded because the data vendor no longer returns prices for them. We are leaving those entries as written, because this log corrects rather than rewrites. What is true: entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026.",
+    ref: "this PR",
+  },
+  {
+    date: "2026-09-14",
+    kind: "disclosure",
+    title: "Four US trading days have no top 10 on the record",
+    body:
+      "No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026. On 9 September our system stopped writing data at 15:36 UTC and did not recover before the daily list was due. The cause for the other three days has not been established, so we are not stating one. None of the four days was filled in afterwards, and none will be. The scorecard page now lists every trading day with no entry, computed from the record itself, and the CSV and JSON downloads carry the same list as missing_sessions.",
+    ref: "this PR",
+  },
+  {
+    date: "2026-09-10",
+    kind: "correction",
+    title: "Three of the six factors were not refreshed from 6 to 10 September",
+    body:
+      "Added on 14 September 2026. From 6 September until the fixes merged on 10 September 2026, the refresh of the trend, relative-strength and momentum inputs did not complete, so those factors kept using price data fetched on 6 September, and score updates written by the main loop were being discarded. Nothing marked the scores as stale. The daily list for 8 September 2026 was ranked while this was happening. Whether the refresh had caught up before the 10 September list was recorded was not verified. No recorded entry was changed.",
+    ref: "#798, #800",
+  },
+  {
+    date: "2026-09-06",
+    kind: "correction",
+    title: "Renamed spreadsheet columns made many scores too high until 7 September",
+    body:
+      "Added on 14 September 2026. The scoring spreadsheet renamed three columns (3-month, 6-month and 1-year return). Our reader did not recognise the new names, so those returns were treated as missing and scored as neutral, and nothing raised an alarm. When the reader was fixed, a dry run against the live spreadsheet changed 4,088 of 4,112 spreadsheet-based scores: 3,233 went down and 855 went up. The corrected scores took effect on 7 September 2026. Our stored score history begins on 24 August 2026 and shows the problem from that day, so it lasted from at least 24 August; when it started is not known. Lists recorded in that time were ranked on those scores and have not been changed.",
+    ref: "#766",
+  },
   {
     date: "2026-09-06",
     kind: "scope",
@@ -64,6 +104,14 @@ const METHODOLOGY_LOG: LogEntry[] = [
     body:
       "The scorecard freezes each day's top ten at 21:15 UTC and records what the price did by the next close. The price captured at the freeze was the last trade INCLUDING extended hours, not the official close — and 21:15 UTC is 17:15 New York, inside after-hours. So one leg of every comparison was an after-hours print while the other, SPY's move, came from official daily closes. The measurement now reads the official close on both legs. This was not only fixed forward: every affected historical row was recomputed and republished with both legs rebased, rather than leaving the old numbers standing or quietly dropping them. 688 rows were rebased. The archive stayed append-only throughout — no entry was deleted, and the restatement is disclosed on the scorecard page and inside the citable export rather than only here.",
     ref: "#643",
+  },
+  {
+    date: "2026-08-23",
+    kind: "correction",
+    title: "Before this fix, some tickers could be scored from random placeholder numbers",
+    body:
+      "Added on 14 September 2026. Tickers not covered by our scoring spreadsheet get their factor readings from caches that are empty after every restart of our system and were refilled by a once-daily pass. Until this fix, a missing reading kept a random placeholder value instead of being left blank, so after each restart those tickers were scored from random numbers until the daily pass ran. Since this fix a missing reading stays blank and no score is produced from it. Daily lists recorded before 24 August 2026 could include names scored that way. Our stored score history only begins on 24 August 2026, so we cannot show whether any listed name was affected. No recorded entry was changed.",
+    ref: "#620",
   },
   {
     date: "2026-08-23",
@@ -114,6 +162,14 @@ const METHODOLOGY_LOG: LogEntry[] = [
     ref: "#329, #330",
   },
   {
+    date: "2026-06-15",
+    kind: "correction",
+    title: "Recorded scores from 18 May to 12 June were capped at 100, and the originals were not kept",
+    body:
+      "Added on 14 September 2026; this change was not disclosed anywhere until then. A bug let raw factor values, which are not on the 0-100 scale, into the stored score. The daily top 10 is chosen by ranking on that score, so the lists for the 19 sessions from 18 May to 12 June 2026 were ranked on faulty values, and the 190 entries recorded on those days held scores above 100 (values of 120 to 137 were observed). On 15 June 2026 a one-off database change set every recorded score above 100 to exactly 100, and the write path was fixed so no later entry can exceed 100. The original values were not kept and cannot be recovered, so every score in that window now reads 100. The lists were not re-ranked and no entry was removed: those days still show the ten names chosen on the faulty values. Prices and next-session results were not touched, and the summary figures on the scorecard do not use the score. This change is listed as a restatement on the scorecard page and in the CSV and JSON downloads.",
+    ref: "#286",
+  },
+  {
     date: "2026-05-17",
     kind: "correction",
     title: "Smart Money was described as 13F holdings; it reads SEC Form 4",
@@ -149,7 +205,7 @@ const ENTRIES: Entry[] = [
     title: "The card moved off the front door — sign up with an email and a password",
     body: [
       "Signing up takes an email and a password. The account it makes lands on the Free plan and opens the live scanner straight away: the top ten scored rows of any scan, on live data, no delay. Free also carries one saved screen, a 5-symbol watchlist, and 12 ticker deep-pages a day.",
-      "A card is what starts the 30-day Premium trial, and it is what turns on every matching row instead of the first ten, a second saved screen, alerts on email and browser push, CSV export, the 200-symbol watchlist, and congressional-trade and insider filings. Free now carries no alerts on any channel, browser push included.",
+      "A card is what starts the 30-day Premium trial, and it is what turns on every matching row instead of the first ten, a second saved screen, alerts on email and browser push, CSV export, the 200-symbol watchlist, and congressional-trade and insider filings. Free now carries no alerts on any channel, browser push included. (Correction added 14 September 2026: no congressional-trade feed with real data is available, so a card does not turn one on.)",
       "The trial terms are unchanged: $0 charged that day, the exact first-charge date shown before you confirm, an email three days before the charge, and one click to cancel.",
       // copy-compliance-allow card-required-signup -- dated changelog entry; it states the superseded arrangement, and says so
       "This supersedes the arrangement in the 22 August 2026 entry below, where a new account added a card at first sign-in before the logged-in product opened. That entry stands as a record of what shipped then. The published record — daily top 10, scorecard, per-ticker pages, CSV/JSON — is unchanged and still needs no account.",
@@ -211,7 +267,7 @@ const ENTRIES: Entry[] = [
     tag: "improvement",
     title: "Telegram alerts retired; alerts consolidated on email + browser push",
     body: [
-      "The Telegram alert channel has been retired. Score-change, squeeze and regime alerts now go out over email and browser push, which cover the same triggers. Existing rules keep firing on those channels — nothing about your watchlist, billing or the feeds changes.",
+      "The Telegram alert channel has been retired. Score-change, squeeze and regime alerts now go out over email and browser push, which cover the same triggers. Existing rules keep firing on those channels — nothing about your watchlist, billing or the feeds changes. (Correction added 14 September 2026: the squeeze data behind squeeze alerts had not been updated since 18 July 2026.)",
     ],
   },
   {
@@ -221,7 +277,7 @@ const ENTRIES: Entry[] = [
     title: "Rankings + scorecard now filter out untradeable names",
     body: [
       "The scanner and the public scorecard now apply a liquidity floor. High-scoring names that barely trade — a bond or single-strategy ETF changing hands a few hundred dollars a day — no longer top the ranked list or get frozen onto the scorecard. A score you can't realistically act on isn't useful, so the tradeable names come first now.",
-      "Methodology note, in keeping with our published practice: this only changes which names qualify going forward. No past scorecard day is touched — every historical pick, winner or loser, stays exactly as it was recorded. We don't rewrite the record.",
+      "Methodology note, in keeping with our published practice: this only changes which names qualify going forward. No past scorecard day is touched — every historical pick, winner or loser, stays exactly as it was recorded. We don't rewrite the record. (Correction added 14 September 2026: the last two sentences were not true. Recorded scores from 18 May to 12 June 2026 had been capped at 100 on 15 June 2026 — see the 2026-06-15 and 2026-09-14 entries in the methodology log above.)",
       "Names with no volume reading are left in, so the filter only ever removes rows that are genuinely untradeable. On the scanner you can still turn the liquidity floor off to browse the entire scored universe.",
     ],
   },
@@ -418,9 +474,9 @@ export default function ChangelogPage() {
         <p className="eyebrow">Changelog</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">What changed, and when.</h1>
         <p className="mt-4 text-lg text-muted">
-          Two logs, both ordered newest first, both append-only. First the changes
+          Two logs, both ordered newest first. First the changes
           to the measurement itself &mdash; methodology, corrections and data
-          errors. Then every shipped release. Past entries are never edited.
+          errors. Then every shipped release. When a past entry turns out to be wrong, a later dated entry says so.
           For every signal call we&rsquo;ve made, see the{" "}
           <Link href="/scorecard" className="link">public scorecard</Link>.
         </p>

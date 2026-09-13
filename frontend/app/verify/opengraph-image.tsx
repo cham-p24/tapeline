@@ -61,7 +61,7 @@ export default async function OG() {
             The record. Downloadable.
           </div>
           <div style={{ fontSize: "26px", color: "#a1a1aa", lineHeight: 1.4, display: "flex", maxWidth: "900px" }}>
-            Every daily top-10 pick, its six factors, and how it did the next session. Append-only &mdash; losing days kept.
+            Every daily top-10 pick, its score, and how it did the next session. Losing days kept, corrections dated.
           </div>
         </div>
 
@@ -85,7 +85,7 @@ export default async function OG() {
           <span style={{ display: "flex" }}>
             <span style={{ color: "#22c55e" }}>GET</span>
             <span style={{ color: "#e4e4e7" }}>{`  /api/scorecard.csv`}</span>
-            <span style={{ color: "#71717a" }}>{`   full append-only archive`}</span>
+            <span style={{ color: "#71717a" }}>{`   full archive, corrections listed`}</span>
           </span>
           <span style={{ display: "flex" }}>
             <span style={{ color: "#22c55e" }}>GET</span>

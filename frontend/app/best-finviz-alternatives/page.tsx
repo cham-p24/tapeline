@@ -97,7 +97,6 @@ const TOOLS: Tool[] = [
       "Six named scoring factors, published methodology — no black-box",
       "Public scorecard back-checking every top-10 pick vs SPY",
       "Plain-English Why on every row — no upgrade gates the reasoning",
-      "Congressional trades + recent insider buys on Premium",
       "Sub-60s refresh cadence during US market hours",
       "A free plan runs the live scanner — ten scored rows per scan, live data",
       "Daily picks, full scorecard and raw CSV/JSON readable with no account",
@@ -373,7 +372,7 @@ const WHY_LOOK_BEYOND = [
   },
   {
     title: "You want an audit-able track record, not just self-reported stats",
-    body: "Finviz doesn't publish a scorecard of its screener results vs SPY. Most competitors report aggregate statistics that can't be reconciled to individual calls. Tapeline auto-logs every top-10 daily pick at /scorecard with the original score, signal label, plain-English reasoning, and the realized next-session return vs SPY. No edits, no cherry-picking — the JSON-LD Dataset emits live counts that anyone can verify.",
+    body: "Finviz doesn't publish a scorecard of its screener results vs SPY. Most competitors report aggregate statistics that can't be reconciled to individual calls. Tapeline auto-logs every top-10 daily pick at /scorecard with its rank, score and price, and the realized next-session return vs SPY, losing picks included and downloadable as CSV. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026.",
   },
   {
     title: "You want plain-English explanations, not just data",
@@ -382,10 +381,6 @@ const WHY_LOOK_BEYOND = [
   {
     title: "You want intraday speed without paying Trade Ideas pricing",
     body: "Finviz Elite refreshes most fields every 1 minute, which is fine for swing trading but a beat slower than dedicated intraday tools. Trade Ideas runs sub-second but costs $120-240/mo. Tapeline runs sub-60-second during US market hours at $8.25/mo annual — the middle ground that most retail traders actually need.",
-  },
-  {
-    title: "You want congressional trades + insider buys in one feed",
-    body: "Finviz surfaces insider trading reports but not Congressional disclosures. Tapeline Premium combines SEC Form 4 insider buys + Congressional trade filings + ETF flows in a single 'Smart Money' factor — one of the six named factors in the composite. The factor IS visible (not hidden behind a paywall on the score) — Premium just gets the per-trade detail feeds.",
   },
 ];
 
@@ -448,7 +443,7 @@ const FAQ = [
   },
   {
     q: "Is there a Finviz alternative that beats it on raw screener filter count?",
-    a: "Stock Rover offers more fundamental fields (650+) than Finviz; TradingView's screener is comparably broad on technicals. Few tools target raw filter count as a feature — most modern alternatives focus on synthesis or specialised data (smart money, congressional trades, alternative-data signals). If raw filter count is the deciding factor, stay on Finviz Elite — none of these tools is trying to win that comparison.",
+    a: "Stock Rover offers more fundamental fields (650+) than Finviz; TradingView's screener is comparably broad on technicals. Few tools target raw filter count as a feature — most modern alternatives focus on synthesis or specialised data (insider filings, alternative-data signals). If raw filter count is the deciding factor, stay on Finviz Elite — none of these tools is trying to win that comparison.",
   },
   {
     q: "How much does Finviz Elite cost vs the alternatives in 2026?",
@@ -593,7 +588,7 @@ export default function BestFinvizAlternativesPage() {
         <p className="mt-4 text-lg text-muted">
           Finviz Elite is excellent if you want raw filter fields and you build your own thesis
           from the data. It&apos;s less useful if you want a synthesised composite score, an audit-able
-          public scorecard, or specialised feeds like Congressional trades and recent insider buys.
+          public scorecard.
           Here are the 8 alternatives we&apos;ve actually used, ranked by what each does best — with
           honest verdicts about which competitor wins for which specific workflow.
         </p>

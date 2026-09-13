@@ -206,18 +206,35 @@ async def _send_welcome(*, email: str, token: str) -> None:
         "?utm_source=newsletter&utm_campaign=welcome&utm_medium=email"
     )
 
+    # What this email must NOT say (integrity wave, 2026-09-14): that the
+    # digest carries "the same public numbers anyone can see on
+    # tapeline.io/scorecard". The public record shows each day's list 7 days
+    # later, and its recorded values have been corrected twice. The digest and
+    # the record are described separately, and the corrections are named.
+    # Pinned by tests/test_record_claims_newsletter_welcome.py.
+    record_note = (
+        "Our public record at tapeline.io/scorecard shows each past daily top 10 "
+        "and how each name moved against SPY the next session. Entries appear "
+        "there 7 days after the session. Entries are not re-ranked or deleted. "
+        "We have corrected recorded values twice, and said so: prices on "
+        "25 August 2026, and scores from 18 May to 12 June capped on "
+        "15 June 2026."
+    )
+    record_note_html = record_note.replace(
+        "tapeline.io/scorecard",
+        f'<a href="{scorecard_url}" style="color:#fb923c;">tapeline.io/scorecard</a>',
+    )
     text = (
         "Welcome to the Tapeline daily Top 10.\n\n"
         "Every market day morning we send the 10 highest-scoring US tickers "
-        "from our 6-factor composite — the same public numbers anyone can see on "
-        "tapeline.io/scorecard, just delivered straight to your inbox before "
+        "from our 6-factor composite, delivered straight to your inbox before "
         "the open.\n\n"
-        f"Today's scorecard: {scorecard_url}\n"
+        f"{record_note}\n\n"
+        f"The public record: {scorecard_url}\n"
         f"How the scoring works: {how_url}\n\n"
         "No tip-sheet hype, no \"BUY NOW\" labels — just the composite score, "
-        "the one-sentence read, and the back-checked track record vs SPY. "
-        "If a stock is up there one day and gone the next, you'll see it "
-        "happen in public.\n\n"
+        "the one-sentence read, and the back-checked record vs SPY, misses "
+        "included.\n\n"
         "— Christian\n"
         "Founder, Tapeline\n\n"
         f"Unsubscribe: {unsub_url}\n"
@@ -229,19 +246,18 @@ async def _send_welcome(*, email: str, token: str) -> None:
     <h1 style="margin:0 0 16px;font-size:22px;font-weight:600;">You're in.</h1>
     <p style="margin:0 0 16px;line-height:1.55;color:#d4d4d8;">
       Every market day morning, we send the 10 highest-scoring US tickers
-      from our 6-factor composite — the same public numbers anyone can see on
-      <a href="{scorecard_url}" style="color:#fb923c;">tapeline.io/scorecard</a>,
-      delivered straight to your inbox before the open.
+      from our 6-factor composite, delivered straight to your inbox before the open.
+    </p>
+    <p style="margin:0 0 16px;line-height:1.55;color:#d4d4d8;">
+      {record_note_html}
     </p>
     <p style="margin:0 0 16px;line-height:1.55;color:#d4d4d8;">
       No tip-sheet hype, no "BUY NOW" labels — just the composite score,
-      the one-sentence read, and the back-checked track record vs SPY.
-      If a stock is up there one day and gone the next, you see it happen
-      in public.
+      the one-sentence read, and the back-checked record vs SPY, misses included.
     </p>
     <div style="margin:24px 0;padding:16px;background:#0a0a0a;border:1px solid #27272a;border-radius:8px;">
       <div style="font-size:12px;color:#9ca3af;margin-bottom:8px;">Want to dig in now?</div>
-      <a href="{scorecard_url}" style="display:inline-block;background:#fb923c;color:#0a0a0a;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px;font-size:14px;">View today's scorecard →</a>
+      <a href="{scorecard_url}" style="display:inline-block;background:#fb923c;color:#0a0a0a;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px;font-size:14px;">View the public record →</a>
       <a href="{how_url}" style="color:#fb923c;font-size:13px;">How scoring works</a>
     </div>
     <p style="margin:24px 0 0;color:#9ca3af;font-size:13px;line-height:1.55;">

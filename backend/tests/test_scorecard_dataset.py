@@ -237,7 +237,8 @@ async def test_csv_preamble_carries_the_context_offsite(client):
             r = await client.get("/api/scorecard.csv")
         preamble = "\n".join(_split_csv(r.text)[0]).lower()
         assert scorecard_export.METHODOLOGY_URL.lower() in preamble
-        assert "append-only" in preamble
+        assert "record policy:" in preamble
+        assert "not re-ranked, back-filled or deleted" in preamble
         assert "publication delay" in preamble
         assert "rows:" in preamble and "sessions:" in preamble
         assert "general information only" in preamble

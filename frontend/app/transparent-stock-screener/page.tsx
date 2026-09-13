@@ -20,7 +20,7 @@ import {
  *
  * Positioning is deliberately NOT performance — Tapeline's published record does
  * not beat SPY at this sample, and it says so. The citable, defensible,
- * uncopyable fact is the RADICAL TRANSPARENCY itself: an unedited, loss-included,
+ * uncopyable fact is the RADICAL TRANSPARENCY itself: a dated-corrections, loss-included,
  * downloadable record. Every performance figure carries the same descriptive,
  * not-a-forecast framing as the live /scorecard, for compliance.
  *
@@ -157,7 +157,7 @@ function buildFaq(scale: RecordScale | null, spy: SpyFigures | null): { q: strin
     },
     {
       q: "How is Tapeline’s track record verified?",
-      a: "It’s self-verifiable rather than self-reported. Each pick is published same-day with its price and six-factor score; the next-day close and SPY’s move over the same two closes are recorded a day later; and the full archive is downloadable as raw CSV and JSON with the methodology attached. You can re-check every number against any price source you trust — Tapeline invites corrections.",
+      a: "It’s self-verifiable rather than self-reported. Each day’s top 10 is recorded at that session’s close with its price and six-factor composite score; the next-day close and SPY’s move over the same two closes are recorded a day later; entries appear on the public record 7 days after the session; and the archive is downloadable as raw CSV and JSON with the methodology, every dated correction and the days with no list attached. You can re-check every number against any price source you trust — Tapeline invites corrections.",
     },
     {
       q: "Does Tapeline’s record beat SPY?",
@@ -169,7 +169,7 @@ function buildFaq(scale: RecordScale | null, spy: SpyFigures | null): { q: strin
     },
     {
       q: "What makes a stock screener 'transparent'?",
-      a: "Three things: a published methodology (which factors, how they’re weighted), a track record that includes losing picks and is never edited or back-filled, and raw data you can download and check yourself. Most screeners publish none of these and show only aggregate marketing claims. Tapeline publishes all three, and keeps the record even when it’s unflattering.",
+      a: "Three things: a published methodology (which factors, how they’re weighted), a track record that includes losing picks, is not re-ranked, back-filled or deleted, and dates every correction, and raw data you can download and check yourself. Most screeners publish none of these and show only aggregate marketing claims. Tapeline publishes all three, and keeps the record even when it’s unflattering.",
     },
   ];
 }
@@ -192,7 +192,7 @@ export async function generateMetadata() {
     : "";
   return pageMeta({
     title: "The stock screener that publishes its losing picks",
-    description: `Tapeline is the stock screener that publishes every daily top-10 pick — ${scaleClause}frozen the day it printed, never edited, each checked against SPY the next session, losing days included and downloadable as raw data.`,
+    description: `Tapeline is the stock screener that publishes every daily top-10 pick — ${scaleClause}frozen the day it printed, not re-ranked or deleted, each checked against SPY the next session, losing days included, corrections dated, downloadable as raw data.`,
     path: "/transparent-stock-screener",
   });
 }
@@ -200,7 +200,7 @@ export async function generateMetadata() {
 const COMPARE: { label: string; tapeline: string; others: string }[] = [
   { label: "Public per-pick track record", tapeline: "Yes — every daily top-10, dated", others: "Not published" },
   { label: "Losing picks shown", tapeline: "Yes — kept at equal weight", others: "Rarely; usually omitted" },
-  { label: "Record never edited or back-filled", tapeline: "Yes — frozen the day it prints", others: "No public commitment" },
+  { label: "Record not re-ranked, back-filled or deleted", tapeline: "Yes — and corrections to recorded values are dated (prices 25 Aug 2026; scores capped 15 Jun 2026)", others: "No public commitment" },
   { label: "Raw data downloadable (CSV / JSON)", tapeline: "Yes — full archive", others: "No" },
   { label: "Methodology published", tapeline: "Yes — six named factors", others: "Usually a black box" },
   { label: "Admits when it underperforms", tapeline: "Yes — states it openly", others: "Aggregate claims only" },
@@ -244,10 +244,12 @@ export default async function TransparentScreenerPage() {
               {scale.since ? ` since ${scale.since}` : ""}
             </>
           )}{" "}
-          &mdash; frozen the day it prints and never edited, with each pick&rsquo;s next-session result
-          versus SPY recorded, <strong className="text-fg">losing days included</strong>. The full archive is
-          downloadable as raw CSV and JSON, so anyone can check the arithmetic. No other major screener publishes
-          an unedited, loss-included record.
+          &mdash; frozen the day it prints, with each pick&rsquo;s next-session result versus SPY recorded,{" "}
+          <strong className="text-fg">losing days included</strong>. Entries are not re-ranked or deleted. We have
+          corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June
+          capped on 15 June 2026. Entries appear publicly 7 days after the session, and the archive is downloadable
+          as raw CSV and JSON, so anyone can check the arithmetic. We know of no other major screener that publishes a
+          per-pick record with its losses.
         </p>
 
         {/* Quotable stats — the citation magnet. Honest, descriptive framing.
@@ -260,7 +262,7 @@ export default async function TransparentScreenerPage() {
               <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <div><div className="font-mono text-3xl font-bold nums">{scale.entries}</div><div className="mt-1 text-sm text-muted">picks back-checked vs SPY</div></div>
                 <div><div className="font-mono text-3xl font-bold nums">{scale.days}</div><div className="mt-1 text-sm text-muted">{scale.since ? `market days, since ${scale.since}` : "market days on the record"}</div></div>
-                <div><div className="font-mono text-3xl font-bold nums">100%</div><div className="mt-1 text-sm text-muted">published &mdash; losses included, never edited</div></div>
+                <div><div className="font-mono text-3xl font-bold nums">2</div><div className="mt-1 text-sm text-muted">corrections to recorded values, both dated on the record</div></div>
               </div>
             </>
           )}

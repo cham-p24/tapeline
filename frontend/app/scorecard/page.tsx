@@ -35,8 +35,8 @@ import {
   jsonLdScript,
   scorecardDatasetJsonLd,
 } from "@/lib/jsonld";
-import type { CitableSummary } from "@/lib/scorecardCitation";
-import { CitableRecord } from "./CitableRecord";
+import { CitableRecord, type ScorecardSummary } from "./CitableRecord";
+import { KnownLimitations } from "./KnownLimitations";
 import { ScorecardClient } from "./ScorecardClient";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 import RestatementNotice from "./RestatementNotice";
@@ -60,7 +60,7 @@ const API_BASE =
  * page (the client component still fetches its own data), so the page just
  * renders without the static block until the next revalidate.
  */
-async function fetchSummary(): Promise<CitableSummary | null> {
+async function fetchSummary(): Promise<ScorecardSummary | null> {
   try {
     const res = await fetch(`${API_BASE}/api/scorecard?days=1`, {
       next: { revalidate: 1800 },
@@ -68,7 +68,7 @@ async function fetchSummary(): Promise<CitableSummary | null> {
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
-    const body = (await res.json()) as { summary?: CitableSummary };
+    const body = (await res.json()) as { summary?: ScorecardSummary };
     return body?.summary ?? null;
   } catch {
     return null;
@@ -83,7 +83,7 @@ async function fetchSummary(): Promise<CitableSummary | null> {
  * frozen, what it is checked against, that losing days stay), never the
  * outcome. No hit rate, no alpha, no percentage.
  */
-function ScorecardHero() {
+function ScorecardHero({ liveMissing }: { liveMissing?: readonly string[] | null }) {
   return (
     <>
       <h1 className="text-4xl font-bold tracking-tight">
@@ -92,10 +92,11 @@ function ScorecardHero() {
       <p className="mt-3 max-w-2xl text-muted">
         At each US market close the six-factor composite produces a ranking. We write the top 10 down &mdash;
         symbol, rank, score, price &mdash; and the membership of that list is fixed from that moment. The next
-        session we record what the price did and what SPY did over the same two closes. Entries are never
-        re-ranked, back-filled or removed, so what is here is what was published on the day, whichever way it
-        went. When a recorded price turns out to have been read wrong, we correct it and say so &mdash; see the
-        restatement note below.
+        session we record what the price did and what SPY did over the same two closes. Entries are not
+        re-ranked, back-filled or removed, whichever way they went. Recorded values have been corrected twice,
+        and both corrections are dated in the restatement note below: prices on 25 August 2026, and scores from
+        18 May to 12 June capped on 15 June 2026. Trading days with no list, and other problems we know affected
+        past lists, are under &ldquo;Gaps and known limitations&rdquo;.
       </p>
 
       {/* SERVER-rendered, deliberately.
@@ -108,6 +109,10 @@ function ScorecardHero() {
           and that pointer must not dangle. It has no data dependency, so
           there is no reason for it to wait on one. */}
       <RestatementNotice />
+      {/* SERVER-rendered for the same reason as the note above: gaps and
+          known limitations are owed to the raw-HTML reader. Renders its
+          verified list even when the summary fetch failed. */}
+      <KnownLimitations liveMissing={liveMissing} />
       {/* Offer + price + CTA. Server-rendered so a paid ad landing page has an
           in-body CTA and a price at first paint. LandingCta is
           descriptive-only (offer/pricing facts, no performance claims), so it
@@ -141,7 +146,7 @@ export default async function ScorecardPage() {
       />
       <MarketingNav />
       <div className="mx-auto max-w-5xl px-6 py-10">
-        <ScorecardHero />
+        <ScorecardHero liveMissing={summary?.missing_sessions ?? null} />
         {/* The static, citable record — the block non-JS crawlers read.
             Renders nothing when the fetch failed or the archive is empty. */}
         {summary && <CitableRecord summary={summary} />}
