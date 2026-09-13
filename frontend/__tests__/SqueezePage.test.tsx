@@ -12,6 +12,10 @@
  *      with an upgrade link to /app/billing?intent=pro.
  *   3. A failed load renders an error state with a retry — never the
  *      "No squeeze setups" empty state.
+ *   4. No publishable rows (production today: the only rows are mock rows from
+ *      2026-07-18, which the backend no longer serves) renders the honest
+ *      empty state for every tier — no Live badge, no upgrade pitch over an
+ *      empty list, no stale tickers.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -23,6 +27,10 @@ vi.mock("@/components/UserContext", () => ({
 
 // The page subscribes to the backend SSE stream — jsdom has no EventSource,
 // and the re-poll behaviour is covered by asserting which api.* fn is called.
+vi.mock("@/components/LiveBadge", () => ({
+  LiveBadge: () => <span>Live</span>,
+}));
+
 vi.mock("@/lib/useLiveStream", () => ({
   useLiveStream: () => ({ status: "live", lastUpdate: null }),
 }));
@@ -121,4 +129,29 @@ describe("SqueezePage", () => {
     expect(screen.queryByText(/No squeeze setups right now/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Try again/ })).toBeInTheDocument();
   });
+
+  it.each(["free", "pro"] as const)(
+    "shows the honest empty state with no Live badge when the %s feed is empty",
+    async (tier) => {
+      setUser(tier);
+      mockedSqueeze.mockResolvedValue({ count: 0, items: [] });
+      mockedPreview.mockResolvedValue({
+        count: 0, preview: true, limit: 3, total_setups: 0, items: [],
+      });
+      const { container } = render(<SqueezePage />);
+      await waitFor(() => {
+        expect(screen.getByTestId("squeeze-empty-state")).toHaveTextContent(
+          "No squeeze data right now. We don't have a live source for this list, so we aren't showing one.",
+        );
+      });
+      const text = container.textContent ?? "";
+      // No table shell (headers, column tooltips) over an empty list.
+      expect(container.querySelector("table")).toBeNull();
+      expect(text).not.toMatch(/\bLive\b/);
+      expect(text).not.toContain("FCX");
+      expect(text).not.toContain("BKNG");
+      expect(screen.queryByText(/shown on Free/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Upgrade to Pro/ })).not.toBeInTheDocument();
+    },
+  );
 });

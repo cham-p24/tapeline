@@ -7,7 +7,8 @@ debounce prevents spam.
 
 Rule types:
 - score:    fires when a ticker's composite score >= threshold
-- squeeze:  fires when a ticker has a SqueezeSetup with spike_score >= threshold
+- squeeze:  fires when a ticker has a PUBLISHABLE SqueezeSetup (see
+            services/squeeze_integrity) with spike_score >= threshold
 - regime:   fires when market regime matches rule.symbol (e.g. "BEAR")
 - congress: fires when a new congress trade is disclosed for rule.symbol
             (or any ticker if rule.symbol is None)
@@ -39,6 +40,7 @@ from app.models import (
 from app.models.news import exclude_mock_clause
 from app.services.congress_integrity import is_publishable
 from app.services.email import render_alert_email, render_watchlist_alert_email, send_email
+from app.services.squeeze_integrity import publishable_clause as squeeze_publishable
 
 logger = logging.getLogger(__name__)
 
@@ -251,13 +253,20 @@ async def evaluate_score_rules(session: AsyncSession) -> int:
 
 
 async def evaluate_squeeze_rules(session: AsyncSession) -> int:
-    """Fire when a ticker has a SqueezeSetup with spike_score >= rule.threshold."""
+    """Fire when a ticker has a publishable SqueezeSetup with spike_score >= rule.threshold.
+
+    Stale or mock rows (services/squeeze_integrity) are never candidates, so a
+    stored squeeze rule stays stored but cannot fire until real, fresh data
+    exists. Every other rule type is unaffected.
+    """
     now = datetime.now(UTC)
     rules = await _enabled_rules(session, "squeeze")
     if not rules:
         return 0
 
-    squeezes_result = await session.execute(select(SqueezeSetup))
+    squeezes_result = await session.execute(
+        select(SqueezeSetup).where(squeeze_publishable(now))
+    )
     squeezes = {s.symbol: s for s in squeezes_result.scalars().all()}
 
     fired = 0
