@@ -42,7 +42,7 @@ re-engagement must not be reached through the mailing list instead.
 
 WHY IT CANNOT DOUBLE-SEND
 -------------------------
-Four layers, because each one covers a failure the others do not.
+Five layers, because each one covers a failure the others do not.
 
   1. PER-RECIPIENT COMMIT. It runs over `flyctl ssh`. If that session drops
      mid-run, an end-of-run commit would roll back every token AFTER the emails
@@ -61,7 +61,17 @@ Four layers, because each one covers a failure the others do not.
      no trace, so without it a re-run would mail the list a second time. A crash
      therefore under-sends rather than double-sends. `--force-newsletter` is
      for a human who has checked Resend's log first.
-  4. A DATABASE LOCK. The token makes a RETRY safe and does nothing about two
+  4. AN ERROR AFTER THE REQUEST LEFT IS STAMPED, NOT RETRIED. `send_email`
+     posts to Resend with a 10-second timeout and then raise_for_status(). A
+     read timeout, a connection dropped mid-response, or a 5xx can all arrive
+     after Resend has queued the email. Treating those as failures left the
+     account unstamped, and the retry this docstring recommends mailed them a
+     second time (reproduced: ReadTimeout on the first call, two deliveries
+     across two runs). So `_outcome_unknown` errors are stamped and counted
+     as `unknown`, apart from `failed`: `failed` means Resend never had it
+     (connect error, 4xx, anything raised before the POST) and a retry is the
+     fix; `unknown` means check Resend's log, and a retry will not resend.
+  5. A DATABASE LOCK. The token makes a RETRY safe and does nothing about two
      runs at once — both read "not sent" before either commits. The workflow's
      concurrency group stops two scheduled runs overlapping, not a manual
      `flyctl ssh` started at the same moment. `dblock.one_machine_at_a_time`
@@ -81,7 +91,16 @@ SAFETY
     built from it), and unless SESSION_SECRET can sign an unsubscribe link —
     without it every account holder's footer and plain-text part would carry
     no working opt-out.
-  * Honours the shared lifecycle frequency governor, like the reminder.
+  * The shared lifecycle governor is consulted, but it is NOT a frequency cap
+    here. Its send ledger (`lifecycle._GLOBAL_LEDGER`) is an in-memory dict
+    per process, and this runs in a fresh `flyctl ssh` process, so the 20-hour
+    gap and the weekly cap see none of the worker's sends. What it can still
+    enforce is global opt-out (email_prefs == 0), undeliverable and sunset,
+    which `collect_accounts` already excludes with a counted reason; it is a
+    second layer for those, and a test pins that layer. Spacing from the
+    worker's own digests is done by the send TIME instead: see the header of
+    .github/workflows/product-update-send.yml, and the test that reads the
+    worker's send hours from its source.
 
 Usage:
     python -m app.scripts.update_send                   # dry run
@@ -187,6 +206,46 @@ async def collect_newsletter_only(session) -> tuple[list, list]:
     return recipients, skipped
 
 
+def _outcome_unknown(exc: BaseException) -> bool:
+    """Whether Resend may have accepted the email even though the send raised.
+
+    True only for errors that can happen AFTER the request reached Resend: a
+    timeout or broken connection while writing the request or reading the
+    response, a malformed response, or a 5xx (a gateway can answer 502/504
+    after the upstream queued the email). False for anything that proves
+    Resend never took it: a connect or pool timeout, a refused connection, a
+    4xx rejection, or an error raised before the POST, such as a render bug.
+    See layer 4 in the module docstring for why the distinction matters.
+    """
+    import httpx
+
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code >= 500
+    return isinstance(exc, (
+        httpx.ReadTimeout, httpx.WriteTimeout,
+        httpx.ReadError, httpx.WriteError, httpx.CloseError,
+        httpx.RemoteProtocolError, httpx.DecodingError,
+    ))
+
+
+async def _stamp(session, user_id: str) -> None:
+    """Append UPDATE_TOKEN in SQL and commit at once — layers 1 and 2."""
+    from sqlalchemy import case, or_, update
+
+    from app.models import User
+
+    await session.execute(
+        update(User)
+        .where(User.id == user_id)
+        .values(drip_state=case(
+            (or_(User.drip_state.is_(None), User.drip_state == ""), UPDATE_TOKEN),
+            else_=User.drip_state + "," + UPDATE_TOKEN,
+        ))
+        .execution_options(synchronize_session=False)
+    )
+    await session.commit()
+
+
 def _tally(skipped: list) -> str:
     counts: dict[str, int] = {}
     for _row, reason in skipped:
@@ -197,8 +256,6 @@ def _tally(skipped: list) -> str:
 @one_machine_at_a_time(LOCK_PRODUCT_UPDATE, "product_update", default_factory=dict)
 async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False) -> dict:
     """Send (or dry-run) the product update. See the module docstring."""
-    from sqlalchemy import case, or_, update
-
     from app.config import get_settings
     from app.db import session_scope
     from app.models import User
@@ -231,8 +288,12 @@ async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False
 
     counts = {
         "accounts_sent": 0, "newsletter_sent": 0, "would_send": 0,
-        "governed": 0, "not_sent": 0, "failed": 0,
+        "governed": 0, "not_sent": 0, "failed": 0, "unknown": 0,
     }
+    # Accounts this run stamped, whether delivered or outcome-unknown. Layer 3
+    # asks whether a re-run could tell this run happened, and either kind of
+    # stamp answers yes; `accounts_sent` alone would not count the second.
+    stamped = 0
 
     async with session_scope() as session:
         # Decided BEFORE anything is sent, and parsed in Python — see layer 2.
@@ -273,37 +334,42 @@ async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False
                     unsubscribe_user_id=u.id,
                     unsubscribe_category="re_engagement",
                 )
-            except Exception:
-                counts["failed"] += 1
-                # An id, never the address: this output can be public.
-                logger.exception("product_update.send_failed user=%s", u.id)
-                show(f"  FAILED      {u.email}")
-                continue
-            if res.get("skipped"):
-                counts["not_sent"] += 1
-                show(f"  NOT SENT    {u.email} ({res.get('reason')})")
-                continue
+            except Exception as exc:
+                if not _outcome_unknown(exc):
+                    counts["failed"] += 1
+                    # An id, never the address: this output can be public.
+                    logger.exception("product_update.send_failed user=%s", u.id)
+                    show(f"  FAILED      {u.email}")
+                    continue
+                # Resend may have it — layer 4. Stamped below like a delivery.
+                logger.warning(
+                    "product_update.send_outcome_unknown user=%s stamped=yes",
+                    u.id, exc_info=True,
+                )
+                outcome = "unknown"
+            else:
+                if res.get("skipped"):
+                    counts["not_sent"] += 1
+                    show(f"  NOT SENT    {u.email} ({res.get('reason')})")
+                    continue
+                outcome = "sent"
 
-            await session.execute(
-                update(User)
-                .where(User.id == u.id)
-                .values(drip_state=case(
-                    (or_(User.drip_state.is_(None), User.drip_state == ""), UPDATE_TOKEN),
-                    else_=User.drip_state + "," + UPDATE_TOKEN,
-                ))
-                .execution_options(synchronize_session=False)
-            )
-            await session.commit()  # per recipient — layer 1
+            await _stamp(session, u.id)  # per recipient — layer 1
             governor.record(u)
-            counts["accounts_sent"] += 1
-            show(f"  SENT        {u.email}")
+            stamped += 1
+            if outcome == "sent":
+                counts["accounts_sent"] += 1
+                show(f"  SENT        {u.email}")
+            else:
+                counts["unknown"] += 1
+                show(f"  UNKNOWN     {u.email} (stamped; check Resend's log)")
 
         # Layer 3. Dry runs report what the first real run would do.
         if force_newsletter:
             run_news, why = True, "FORCED by --force-newsletter"
         elif not first_run:
             run_news, why = False, "SKIPPED: an earlier run already stamped accounts"
-        elif send and counts["accounts_sent"] == 0:
+        elif send and stamped == 0:
             run_news, why = False, (
                 "SKIPPED: this run stamped no account, so a re-run could not tell "
                 "the list had been mailed"
@@ -334,10 +400,21 @@ async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False
                         persona="sales",
                         headers=_list_unsubscribe_headers(sub.unsubscribe_token),
                     )
-                except Exception:
-                    counts["failed"] += 1
-                    logger.exception("product_update.newsletter_send_failed id=%s", sub.id)
-                    show(f"  FAILED      {sub.email}")
+                except Exception as exc:
+                    # No per-row marker to stamp (layer 3), so the two kinds
+                    # differ only in the count — which is what tells the
+                    # operator whether Resend's log needs checking.
+                    if _outcome_unknown(exc):
+                        counts["unknown"] += 1
+                        logger.warning(
+                            "product_update.newsletter_outcome_unknown id=%s",
+                            sub.id, exc_info=True,
+                        )
+                        show(f"  UNKNOWN     {sub.email} (check Resend's log)")
+                    else:
+                        counts["failed"] += 1
+                        logger.exception("product_update.newsletter_send_failed id=%s", sub.id)
+                        show(f"  FAILED      {sub.email}")
                     continue
                 if res.get("skipped"):
                     counts["not_sent"] += 1

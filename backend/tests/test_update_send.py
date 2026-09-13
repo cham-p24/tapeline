@@ -5,27 +5,38 @@ nobody watching, into a log that is world-readable on this public repo. So every
 property a human would normally eyeball in a dry run is pinned here instead:
 
   * a dry run sends nothing; --send stamps each recipient; a re-run is a no-op;
+  * a send whose outcome is unknown (Resend may have it) is stamped, not retried;
   * the RE_ENGAGEMENT opt-out, undeliverable, sunset and Resend suppression hold;
   * newsletter-only subscribers are deduplicated against EVERY account;
   * the open-access sentence reaches account holders only;
-  * the copy is the approved copy, word for word, in both parts;
+  * the copy is the approved copy, word for word and in order, in both parts,
+    with nothing added around it;
   * nothing address-shaped reaches the output under --quiet;
-  * the workflow passes --send --quiet, and cannot fire on the reminder's day;
+  * every update_send command in the workflow passes --quiet; the window step,
+    run for real, opens only inside its window; nothing but the schedule or a
+    manual dispatch triggers it; the send stays clear of the worker's own
+    digests (read from the worker's source) and off the reminder's day;
   * a registered, unique lock stops two runs sending at once.
 """
 from __future__ import annotations
 
+import ast
 import asyncio
 import fnmatch
 import inspect
 import json
 import logging
+import os
 import pathlib
 import re
-from datetime import UTC, date, datetime
+import shutil
+import subprocess
+from datetime import UTC, date, datetime, time, timedelta
 from html import unescape
 
+import httpx
 import pytest
+import yaml
 from sqlalchemy import select
 
 from app.db import session_scope
@@ -38,6 +49,7 @@ from app.services.email_prefs import DEFAULT_PREFS, EmailPref
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github" / "workflows" / "product-update-send.yml"
 REMINDER_WORKFLOW = ROOT / ".github" / "workflows" / "survey-reminder.yml"
+WORKER = ROOT / "backend" / "app" / "workers" / "signal_publisher.py"
 
 #: The survey reminder goes out at 13:07 UTC on this day. The update must never
 #: land on the same UTC day: two emails from one small sender inside a few hours
@@ -145,6 +157,35 @@ def _visible_text(html: str) -> str:
 
 def _squash(text: str) -> str:
     return " ".join(text.split())
+
+
+def _split_rendered(html: str) -> tuple[str, str]:
+    """(body, unsubscribe slot) of a rendered update, proving everything else is
+    exactly the shared shell.
+
+    The chrome is derived from email_design.shell() itself, rendered around a
+    sentinel, so nothing here restates its markup. Anything added above the body
+    (a preheader), below the footer, or between the body and the footer's
+    divider lands outside the two returned pieces and fails the prefix and
+    suffix checks.
+    """
+    from app.services.email_design import UNSUB_PLACEHOLDER, shell
+
+    sentinel = "TL-TEST-BODY-SENTINEL"
+    head, tail = shell(sentinel).split(sentinel)
+    footer_top, footer_rest = tail.split(UNSUB_PLACEHOLDER)
+    assert html.startswith(head), "something was added above the body — a preheader?"
+    assert html.endswith(footer_rest), "the footer below the unsubscribe line was changed"
+    body, divider, slot = html[len(head): len(html) - len(footer_rest)].rpartition(footer_top)
+    assert divider, "the footer's divider is missing"
+    return body, slot
+
+
+def _paragraph_texts(body: str) -> list[str]:
+    return [
+        _squash(unescape(re.sub(r"<[^>]+>", " ", inner)))
+        for inner in re.findall(r"<p\b[^>]*>(.*?)</p>", body, re.S)
+    ]
 
 
 # ── Account audience ────────────────────────────────────────────────────────
@@ -290,10 +331,14 @@ async def test_a_second_run_sends_nothing(https, outbox: list[dict]) -> None:
 async def test_a_retry_after_a_partial_failure_does_not_mail_the_list_again(
     https, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The realistic re-run: Resend fails one account, a human re-dispatches the
-    workflow, and the retry stamps that account. "This run stamped someone" is
-    then true again, so only the first-run check stops the list being mailed a
-    second time."""
+    """The realistic re-run: Resend cannot be reached for one account, a human
+    re-dispatches the workflow, and the retry stamps that account. "This run
+    stamped someone" is then true again, so only the first-run check stops the
+    list being mailed a second time.
+
+    The failure is a refused connection on purpose: Resend never had that
+    email, so sending it again is the right recovery. An error that could come
+    after Resend accepted it is the next test's case, and is not retried."""
     calls: list[str] = []
     fail_once = {"flaky@example.com"}
 
@@ -301,7 +346,7 @@ async def test_a_retry_after_a_partial_failure_does_not_mail_the_list_again(
         calls.append(kw["to"])
         if kw["to"] in fail_once:
             fail_once.discard(kw["to"])
-            raise RuntimeError("resend 503")
+            raise httpx.ConnectError("connection refused")
         return {"id": "re_ok"}
 
     monkeypatch.setattr("app.services.email.send_email", _flaky)
@@ -322,6 +367,173 @@ async def test_a_retry_after_a_partial_failure_does_not_mail_the_list_again(
     calls.clear()
     await us.run(send=True, quiet=True, force_newsletter=True)
     assert calls == ["reader@example.com"]
+
+
+_REQ = httpx.Request("POST", "https://api.resend.com/emails")
+
+
+def _status(code: int) -> httpx.HTTPStatusError:
+    """What send_email's resp.raise_for_status() raises for this status."""
+    return httpx.HTTPStatusError(
+        f"HTTP {code}", request=_REQ, response=httpx.Response(code, request=_REQ),
+    )
+
+
+#: Errors that can arrive after Resend has queued the email. send_email posts
+#: with timeout=10.0, then raise_for_status(), so each of these can follow an
+#: accepted request.
+OUTCOME_UNKNOWN = {
+    "read_timeout": lambda: httpx.ReadTimeout("timed out", request=_REQ),
+    "write_timeout": lambda: httpx.WriteTimeout("timed out", request=_REQ),
+    "dropped_mid_response": lambda: httpx.RemoteProtocolError("server disconnected", request=_REQ),
+    "reset_mid_response": lambda: httpx.ReadError("connection reset", request=_REQ),
+    "http_500": lambda: _status(500),
+    "http_504": lambda: _status(504),
+}
+
+#: Errors that prove Resend never had the email, so a retry must send it.
+NEVER_REACHED_RESEND = {
+    "connect_timeout": lambda: httpx.ConnectTimeout("timed out", request=_REQ),
+    "connection_refused": lambda: httpx.ConnectError("refused", request=_REQ),
+    "http_422_rejected": lambda: _status(422),
+    "http_429_rate_limited": lambda: _status(429),
+    "raised_before_the_post": lambda: RuntimeError("render failed"),
+}
+
+
+@pytest.mark.parametrize("make_error", OUTCOME_UNKNOWN.values(), ids=OUTCOME_UNKNOWN.keys())
+async def test_an_error_after_resend_may_have_accepted_is_stamped_not_retried(
+    https, monkeypatch: pytest.MonkeyPatch, make_error,
+) -> None:
+    """The reproduced double-send: the fake DELIVERS, then raises, on the first
+    call. Before the fix run 1 counted failed=1 and left no stamp, and run 2 —
+    the recovery the retry test above recommends — delivered it again."""
+    delivered: list[str] = []
+
+    async def _accepts_then_raises(**kw):
+        delivered.append(kw["to"])
+        if len(delivered) == 1:
+            raise make_error()
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _accepts_then_raises)
+    async with session_scope() as s:
+        await _user(s, "slow@example.com")
+
+    first = await us.run(send=True, quiet=True)
+    assert (first["unknown"], first["failed"], first["accounts_sent"]) == (1, 0, 0), first
+    assert us.UPDATE_TOKEN in await _state("slow@example.com")
+
+    await us.run(send=True, quiet=True)
+    assert delivered == ["slow@example.com"], f"delivered {delivered}"
+
+
+@pytest.mark.parametrize("make_error", NEVER_REACHED_RESEND.values(), ids=NEVER_REACHED_RESEND.keys())
+async def test_an_error_that_proves_resend_never_had_it_is_retried(
+    https, monkeypatch: pytest.MonkeyPatch, make_error,
+) -> None:
+    """The other side of the line: stamping these would mean a customer who
+    was never mailed is never mailed, with the result line saying nothing."""
+    calls: list[str] = []
+
+    async def _fails_once(**kw):
+        calls.append(kw["to"])
+        if len(calls) == 1:
+            raise make_error()
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _fails_once)
+    async with session_scope() as s:
+        await _user(s, "refused@example.com")
+
+    first = await us.run(send=True, quiet=True)
+    assert (first["failed"], first["unknown"]) == (1, 0), first
+    assert us.UPDATE_TOKEN not in await _state("refused@example.com")
+
+    await us.run(send=True, quiet=True)
+    assert calls == ["refused@example.com", "refused@example.com"]
+    assert us.UPDATE_TOKEN in await _state("refused@example.com")
+
+
+def test_every_httpx_error_is_classified_on_purpose() -> None:
+    """Enumerated from httpx itself, not from a list kept here: an httpx
+    upgrade that adds an error type fails this until someone decides whether
+    it can follow an accepted request."""
+    exported = [getattr(httpx, name) for name in httpx.__all__]
+    errors = {c for c in exported if isinstance(c, type) and issubclass(c, Exception)}
+    leaves = {c for c in errors if not any(o is not c and issubclass(o, c) for o in errors)}
+    # Self-test: the enumeration reaches the classes this guard exists for.
+    assert {httpx.ReadTimeout, httpx.ConnectTimeout, httpx.HTTPStatusError} <= leaves
+
+    after_the_request = {
+        httpx.ReadTimeout, httpx.WriteTimeout, httpx.ReadError, httpx.WriteError,
+        httpx.CloseError, httpx.RemoteProtocolError, httpx.DecodingError,
+    }
+    before_resend_has_it = {
+        httpx.ConnectTimeout, httpx.PoolTimeout, httpx.ConnectError,
+        httpx.LocalProtocolError, httpx.UnsupportedProtocol, httpx.ProxyError,
+        httpx.TooManyRedirects, httpx.InvalidURL, httpx.CookieConflict,
+        httpx.StreamConsumed, httpx.StreamClosed, httpx.ResponseNotRead,
+        httpx.RequestNotRead,
+    }
+    unclassified = leaves - after_the_request - before_resend_has_it - {httpx.HTTPStatusError}
+    assert not unclassified, f"decide which side these are on: {sorted(c.__name__ for c in unclassified)}"
+    # Classified by type, so an instance built without its constructor is enough.
+    for cls in after_the_request:
+        assert us._outcome_unknown(cls.__new__(cls)), cls.__name__
+    for cls in before_resend_has_it:
+        assert not us._outcome_unknown(cls.__new__(cls)), cls.__name__
+    for code in (400, 401, 403, 404, 409, 422, 429, 499):
+        assert not us._outcome_unknown(_status(code)), code
+    for code in (500, 502, 503, 504, 599):
+        assert us._outcome_unknown(_status(code)), code
+
+
+async def test_a_run_whose_only_stamp_is_outcome_unknown_still_mails_the_list(
+    https, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Layer 3 asks whether a re-run could tell this run happened. An
+    outcome-unknown stamp answers yes, so a re-run would skip the list; if this
+    run skipped it too, the list would never be mailed without a human."""
+    sent: list[str] = []
+
+    async def _account_times_out(**kw):
+        sent.append(kw["to"])
+        if kw["to"] == "slow@example.com":
+            raise httpx.ReadTimeout("timed out", request=_REQ)
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _account_times_out)
+    async with session_scope() as s:
+        await _user(s, "slow@example.com")
+        await _sub(s, "reader@example.com")
+    counts = await us.run(send=True, quiet=True)
+    assert sent == ["slow@example.com", "reader@example.com"]
+    assert (counts["unknown"], counts["newsletter_sent"]) == (1, 1), counts
+
+
+@pytest.mark.parametrize(
+    ("make_error", "key"),
+    [(OUTCOME_UNKNOWN["read_timeout"], "unknown"), (NEVER_REACHED_RESEND["connect_timeout"], "failed")],
+    ids=["unknown", "failed"],
+)
+async def test_a_newsletter_error_is_counted_by_what_it_means(
+    https, monkeypatch: pytest.MonkeyPatch, make_error, key: str,
+) -> None:
+    """There is no per-subscriber stamp, so the count is the only thing that
+    tells the operator whether Resend's log needs checking."""
+    async def _list_send_raises(**kw):
+        if kw["to"] == "reader@example.com":
+            raise make_error()
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _list_send_raises)
+    async with session_scope() as s:
+        await _user(s, "one@example.com")
+        await _sub(s, "reader@example.com")
+    counts = await us.run(send=True, quiet=True)
+    other = {"unknown": "failed", "failed": "unknown"}[key]
+    assert (counts[key], counts[other], counts["newsletter_sent"]) == (1, 0, 0), counts
 
 
 async def test_a_run_that_stamps_no_account_does_not_mail_the_list(
@@ -380,6 +592,29 @@ async def test_a_skipped_send_is_not_stamped(https, monkeypatch: pytest.MonkeyPa
     counts = await us.run(send=True, quiet=True)
     assert counts["not_sent"] == 1
     assert us.UPDATE_TOKEN not in await _state("notyet@example.com")
+
+
+async def test_the_send_loop_still_refuses_what_the_governor_can_see(
+    https, outbox: list[dict], monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """In this process the governor's ledger is empty (it is per process, and
+    this runs over a fresh `flyctl ssh`), so its gap and weekly cap never fire.
+    What it can still see — global opt-out, undeliverable, sunset — is a second
+    layer behind collect_accounts. This pins that layer: with the collection
+    bypassed, the loop alone must still hold all three back."""
+    async with session_scope() as s:
+        await _user(s, "allout@example.com", email_prefs=0)
+        await _user(s, "dead@example.com", email_undeliverable_at=datetime(2026, 9, 1, tzinfo=UTC))
+        await _user(s, "dormant@example.com", tokens=("re14", "re24", "re_sunset"))
+        await _user(s, "fine@example.com")
+
+    async def _unfiltered(session):
+        return list((await session.execute(select(User))).scalars().all()), []
+
+    monkeypatch.setattr(us, "collect_accounts", _unfiltered)
+    counts = await us.run(send=True, quiet=True)
+    assert [m["to"] for m in outbox] == ["fine@example.com"]
+    assert counts["governed"] == 3, counts
 
 
 async def test_send_refuses_a_non_https_app_url(monkeypatch: pytest.MonkeyPatch, outbox) -> None:
@@ -456,9 +691,20 @@ def test_both_parts_carry_the_approved_copy_verbatim(audience: str) -> None:
         "Sam", scorecard_url=SCORECARD, audience=audience,
         newsletter_unsubscribe_url="https://tapeline.io/api/newsletter/unsubscribe?token=t",
     )
-    visible = _visible_text(html)
-    for block in expected.split("\n\n"):
-        assert _squash(block) in visible, f"{audience} HTML is missing: {block[:60]!r}"
+    body, slot = _split_rendered(html)
+    # EQUAL, not "contains": an added sentence, a reordered section or a block
+    # moved below the sign-off all pass a containment check.
+    assert _visible_text(body) == _squash(expected), f"{audience} HTML body is not the approved copy"
+    assert _paragraph_texts(body) == [_squash(b) for b in expected.split("\n\n")]
+    assert re.fullmatch(r"(?:\s*<p\b[^>]*>.*?</p>)*\s*", body, re.S), "the body holds more than paragraphs"
+    assert "display:none" not in html, "hidden text in an email nobody approved line by line"
+
+    from app.services.email_design import UNSUB_PLACEHOLDER
+
+    if audience == "account":
+        assert slot == UNSUB_PLACEHOLDER  # send_email resolves it for account holders
+    else:
+        assert _visible_text(slot) == "Unsubscribe — one click, no sign-in needed."
 
 
 def test_the_section_headings_are_bold_in_html() -> None:
@@ -516,17 +762,25 @@ def test_the_update_sells_nothing(audience: str) -> None:
     """The consent basis is a relationship plus a message that promotes nothing.
     ("you should" is not banned here, unlike the survey: the copy's only use is
     "you should hear about from us", which is not advice.)"""
-    from app.services.email import render_product_update_text
+    from app.services.email import render_product_update_email, render_product_update_text
 
     text = render_product_update_text(
         "Sam", scorecard_url=SCORECARD, audience=audience, unsubscribe_url="https://x/u",
     ).split("Not investment advice")[0]
-    for banned in (
-        r"\bbuy\b", r"\bsell\b", r"\brecommend", r"last chance", r"hurry",
-        r"limited time", r"expire", r"free trial", r"\$\s?\d", r"discount",
-        r"\boffer\b", r"upgrade", r"beat the market", r"guarantee",
-    ):
-        assert not re.search(banned, text, re.I), f"{audience}: {banned!r} in the update"
+    # The HTML body is checked on its own: a line added to the HTML renderer
+    # alone never reaches the text part. The footer is left out because
+    # _split_rendered proves it is the shared shell's, which says "recommendation".
+    html_body, _slot = _split_rendered(render_product_update_email(
+        "Sam", scorecard_url=SCORECARD, audience=audience, newsletter_unsubscribe_url="https://x/u",
+    ))
+    for part, content in (("text", text), ("html", _visible_text(html_body))):
+        for banned in (
+            r"\bbuy\b", r"\bsell\b", r"\brecommend", r"last chance", r"hurry",
+            r"limited time", r"expire", r"free trial", r"\$\s?\d", r"discount",
+            r"\boffer\b", r"upgrade", r"beat the market", r"guarantee",
+            r"\bsave\b", r"\d+\s?% off", r"act now",
+        ):
+            assert not re.search(banned, content, re.I), f"{audience} {part}: {banned!r} in the update"
 
 
 def test_the_copy_lives_where_the_copy_linter_reads() -> None:
@@ -611,85 +865,337 @@ def test_main_quiet_routes_logs_through_the_redactor(
 
 # ── The workflow ────────────────────────────────────────────────────────────
 
-def _workflow_code(raw: str) -> str:
-    """The workflow with comments removed. Its header prose discusses --quiet
-    and the dates at length, so a guard that could match prose would pass with
-    the flag or the window deleted from the code."""
-    lines = []
-    for line in raw.splitlines():
-        if line.lstrip().startswith("#"):
-            continue
-        lines.append(re.sub(r"\s+#.*$", "", line))
-    return "\n".join(lines)
+def _workflow_doc(raw: str | None = None) -> dict:
+    """The workflow as GitHub reads it. Parsed, not pattern-matched: YAML drops
+    comments, and the header prose discusses --quiet, the dates and the
+    triggers at length, so a guard that could match prose would pass with any
+    of them deleted from the code."""
+    doc = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8") if raw is None else raw)
+    # YAML 1.1 reads a bare `on:` key as the boolean True.
+    if True in doc:
+        doc["on"] = doc.pop(True)
+    return doc
 
 
-def _command_argv(raw: str) -> list[str]:
-    m = re.search(r'-C\s+"([^"]+)"', _workflow_code(raw))
-    assert m, "no `flyctl ssh console -C` command found in the workflow"
-    return m.group(1).split()
+def _steps(doc: dict) -> list[dict]:
+    jobs = doc["jobs"]
+    assert len(jobs) == 1, f"jobs {sorted(jobs)}: a second job would run without the window step"
+    (job,) = jobs.values()
+    return job["steps"]
+
+
+def _window_step(doc: dict) -> dict:
+    (step,) = [s for s in _steps(doc) if s.get("id") == "window"]
+    return step
+
+
+def _update_send_commands(doc: dict) -> list[str]:
+    """Every shell line, in every step of every job, that runs update_send."""
+    commands = []
+    for job in doc["jobs"].values():
+        for step in job["steps"]:
+            script = (step.get("run") or "").replace("\\\n", " ")
+            commands += [
+                line.strip() for line in script.splitlines()
+                if "update_send" in line and not line.lstrip().startswith("#")
+            ]
+    return commands
+
+
+def _flags(command: str) -> set[str]:
+    return set(re.findall(r"(?<![\w-])--[a-z][\w-]*", command))
 
 
 def _window(raw: str) -> tuple[datetime, datetime]:
-    code = _workflow_code(raw)
-    start = re.search(r'start=\$\(date -u -d "([^"]+)"', code)
-    end = re.search(r'end=\$\(date -u -d "([^"]+)"', code)
-    assert start and end, "no date window found in the workflow code"
+    run = _window_step(_workflow_doc(raw))["run"]
+    start = re.search(r'start=\$\(date -u -d "([^"]+)"', run)
+    end = re.search(r'end=\$\(date -u -d "([^"]+)"', run)
+    assert start and end, "no date window found in the window step"
     parse = lambda s: datetime.fromisoformat(s.replace("Z", "+00:00"))  # noqa: E731
     return parse(start.group(1)), parse(end.group(1))
 
 
+def _cron_fire(raw: str) -> datetime:
+    (entry,) = _workflow_doc(raw)["on"]["schedule"]
+    m = re.fullmatch(r"(\d+) (\d+) (\d+) (\d+) \*", entry["cron"])
+    assert m, f"not a single-date cron: {entry['cron']!r}"
+    minute, hour, dom, month = map(int, m.groups())
+    return datetime(_window(raw)[0].year, month, dom, hour, minute, tzinfo=UTC)
+
+
 def test_the_workflow_sends_quietly() -> None:
-    argv = _command_argv(WORKFLOW.read_text(encoding="utf-8"))
-    assert argv[:3] == ["python", "-m", "app.scripts.update_send"], argv
-    assert "--send" in argv, f"{argv} — without --send the scheduled run is a dry run"
-    assert "--quiet" in argv, f"{argv} — without --quiet every address lands in a public log"
+    commands = _update_send_commands(_workflow_doc())
+    assert commands, "no update_send command found in the workflow"
+    for command in commands:
+        assert "--quiet" in _flags(command), (
+            f"{command} — without --quiet every address lands in a public log"
+        )
+    sending = [c for c in commands if "--send" in _flags(c)]
+    assert len(sending) == 1, f"{commands} — without --send the scheduled run is a dry run"
+    assert '-C "python -m app.scripts.update_send ' in sending[0], sending[0]
 
 
-def test_the_comment_stripper_cannot_be_fooled_by_prose() -> None:
-    """Self-test: the broken shape is the flag removed from the real command
-    while a commented-out copy of the old command still carries it."""
+def test_the_command_detector_cannot_be_fooled() -> None:
+    """Self-test, on both broken shapes: the flag dropped from the real command
+    while a commented-out copy still carries it, and a second step that runs
+    update_send without it — which reading only the first `-C` missed."""
     raw = WORKFLOW.read_text(encoding="utf-8").replace("\r\n", "\n")
-    real = '          flyctl ssh console -a tapeline-backend \\\n            -C "python -m app.scripts.update_send --send --quiet"'
+    real = (
+        '          flyctl ssh console -a tapeline-backend \\\n'
+        '            -C "python -m app.scripts.update_send --send --quiet"'
+    )
     assert raw.count(real) == 1, "the detector's fixture no longer matches the workflow"
-    broken = raw.replace(
+
+    commented = raw.replace(
         real,
         '          # flyctl ssh console -a tapeline-backend -C "python -m app.scripts.update_send --send --quiet"\n'
         + real.replace(" --quiet", ""),
     )
-    assert "--quiet" in broken
-    assert "--quiet" not in _command_argv(broken)
+    assert "--quiet" in commented
+    assert ["--quiet" in _flags(c) for c in _update_send_commands(_workflow_doc(commented))] == [False]
+
+    second_step = raw.rstrip("\n") + (
+        "\n\n      - name: Dry run as well\n"
+        "        if: steps.window.outputs.go == 'true'\n"
+        '        run: flyctl ssh console -a tapeline-backend -C "python -m app.scripts.update_send"\n'
+    )
+    assert ["--quiet" in _flags(c) for c in _update_send_commands(_workflow_doc(second_step))] == [True, False]
+
+
+def test_only_the_schedule_or_a_manual_dispatch_can_start_it() -> None:
+    """A `push` trigger would send on merge whatever the cron says, leaving the
+    window as the only thing between a merge and the list."""
+    on = _workflow_doc()["on"]
+    assert set(on) == {"schedule", "workflow_dispatch"}, sorted(on)
+    assert not on["workflow_dispatch"], "workflow_dispatch must take no inputs"
+    assert len(on["schedule"]) == 1
+
+
+def test_a_second_run_queues_behind_the_first_and_never_cancels_it() -> None:
+    """cancel-in-progress would kill a run mid-loop by dropping its `flyctl ssh`
+    session: the failure layer 1 exists to survive, not one to cause on purpose.
+    Without the group, two runs overlap and only the database lock is left."""
+    assert _workflow_doc()["concurrency"] == {
+        "group": "product-update-send", "cancel-in-progress": False,
+    }
+
+
+def test_every_step_after_the_window_is_gated_by_it() -> None:
+    steps = _steps(_workflow_doc())
+    assert steps[0].get("id") == "window", "the window step must run before anything else"
+    for step in steps[1:]:
+        assert step.get("if") == "steps.window.outputs.go == 'true'", (
+            f"step {step.get('name')!r} runs whether or not the window is open"
+        )
+
+
+def _bash() -> str:
+    bash = shutil.which("bash")
+    # Failed, not skipped: CI runs on Linux, where bash is always present, and a
+    # skipped guard is one nobody notices has stopped guarding.
+    assert bash, "bash is needed to run the workflow's window step"
+    return bash
+
+
+#: Stands in for `date` inside the step: a call that parses a date string goes
+#: to the real GNU date, so the step's own arithmetic runs; the "now" call gets
+#: FAKE_NOW. A shell function rather than a PATH stub, so it behaves the same
+#: under Git Bash on Windows.
+_DATE_STUB = (
+    'date() { case " $* " in *" -d "*|*" --date"*) command date "$@" ;; '
+    '*) echo "$FAKE_NOW" ;; esac; }\n'
+)
+
+
+def _run_window_step(run: str, now: datetime, tmp_path: pathlib.Path) -> str:
+    output = tmp_path / f"github_output_{int(now.timestamp())}"
+    output.write_text("")
+    proc = subprocess.run(
+        [_bash(), "-c", _DATE_STUB + run],
+        env={**os.environ, "FAKE_NOW": str(int(now.timestamp())), "GITHUB_OUTPUT": output.as_posix()},
+        capture_output=True, text=True, timeout=60, check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    return output.read_text().strip()
+
+
+def test_the_window_step_opens_only_inside_its_window(tmp_path: pathlib.Path) -> None:
+    """Runs the step's own shell, so the comparison is tested — not only the
+    two date strings, which a swapped echo, a deleted condition or an inverted
+    operator all leave exactly as they were. The go=true cases fall outside
+    the real clock on any day but 15 Sep 2026 and the go=false ones inside it,
+    so between them they also prove the stub, not the clock, decided."""
+    raw = WORKFLOW.read_text(encoding="utf-8")
+    run = _window_step(_workflow_doc(raw))["run"]
+    start, end = _window(raw)
+    fires = _cron_fire(raw)
+    second = timedelta(seconds=1)
+    expected = {
+        start - second: "go=false",
+        start: "go=true",
+        fires: "go=true",
+        end - second: "go=true",
+        end: "go=false",
+        fires.replace(year=fires.year + 1): "go=false",       # the cron has no year field
+        datetime(2026, 9, 14, 13, 7, tzinfo=UTC): "go=false",  # the first draft's slot
+    }
+    got = {when: _run_window_step(run, when, tmp_path) for when in expected}
+    assert got == expected
+
+
+def test_the_window_harness_catches_swapped_outputs(tmp_path: pathlib.Path) -> None:
+    """Self-test: the broken shape is the two echoes swapped, which leaves both
+    date strings, all the earlier test read, untouched."""
+    raw = WORKFLOW.read_text(encoding="utf-8")
+    run = _window_step(_workflow_doc(raw))["run"]
+    assert run.count('"go=false"') == 1 and run.count('"go=true"') == 1
+    swapped = (
+        run.replace('"go=false"', '"go=SWAP"')
+        .replace('"go=true"', '"go=false"')
+        .replace('"go=SWAP"', '"go=true"')
+    )
+    assert _run_window_step(swapped, _cron_fire(raw), tmp_path) == "go=false"
+
+
+#: Importing one of these is what sending customer mail looks like in the worker.
+CUSTOMER_MAIL_MODULES = frozenset({"app.services.email", "app.services.newsletter"})
+
+
+def _customer_mail_hours(source: str) -> set[int]:
+    """UTC hours from which the worker sends customer mail by the clock, read
+    from its source: every `if ... <x>.hour >= N ...:` whose body imports a mail
+    module, directly or through a function defined in the same file (the Daily
+    Top 10 is dispatched as `_spawn(_run_daily_newsletter(...))`)."""
+    tree = ast.parse(source)
+    local = {
+        n.name: n for n in ast.walk(tree)
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+    def imports_mail(node: ast.AST) -> bool:
+        if isinstance(node, ast.ImportFrom) and node.module:
+            names = {node.module} | {f"{node.module}.{a.name}" for a in node.names}
+            return bool(names & CUSTOMER_MAIL_MODULES)
+        if isinstance(node, ast.Import):
+            return any(a.name in CUSTOMER_MAIL_MODULES for a in node.names)
+        return False
+
+    def sends_mail(node: ast.AST, seen: set[str]) -> bool:
+        for sub in ast.walk(node):
+            if imports_mail(sub):
+                return True
+            if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name):
+                name = sub.func.id
+                if name in local and name not in seen:
+                    seen.add(name)
+                    if sends_mail(local[name], seen):
+                        return True
+        return False
+
+    hours: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.If):
+            continue
+        gates = {
+            c.comparators[0].value
+            for c in ast.walk(node.test)
+            if isinstance(c, ast.Compare) and len(c.ops) == 1 and isinstance(c.ops[0], ast.GtE)
+            and isinstance(c.left, ast.Attribute) and c.left.attr == "hour"
+            and isinstance(c.comparators[0], ast.Constant) and isinstance(c.comparators[0].value, int)
+        }
+        if gates and any(sends_mail(stmt, set()) for stmt in node.body):
+            hours |= gates
+    return hours
+
+
+def test_the_mail_hour_detector_matches_the_shapes_it_must() -> None:
+    """Self-test: a gate reached through a spawned local function and a gate
+    with a direct import are found; a gate that mails only the founder is not."""
+    synthetic = (
+        "async def tick(started):\n"
+        "    if started.hour >= 5 and started.weekday() < 5:\n"
+        "        _spawn(_send_list(started), key='x')\n"
+        "    if started.hour >= 7:\n"
+        "        from app.services.growth_bot import run_daily_growth_tick\n"
+        "    if iso_dow == 1 and started.hour >= 9:\n"
+        "        from app.services import email\n"
+        "async def _send_list(started):\n"
+        "    from app.services.newsletter import run_daily_digest\n"
+    )
+    assert _customer_mail_hours(synthetic) == {5, 9}
+
+
+#: How far EVERY moment of the window stays from the worker's customer mail —
+#: the whole window, not only the cron, because the manual fallback can be
+#: dispatched at any moment inside it.
+WINDOW_CLEARANCE = timedelta(hours=2)
+
+#: How far the scheduled fire stays from it. The worker's hours are 13:00 and
+#: 21:00 UTC and the list is mostly US (survey-reminder.yml), so 4 hours from
+#: each, at 17:00, is the most US business hours allow. Less 15 minutes,
+#: because the cron sits a few minutes off :00 on purpose (Actions bunches
+#: scheduled runs at the hour), and 17:07 is 3h53 from 21:00.
+FIRE_CLEARANCE = timedelta(hours=4) - timedelta(minutes=15)
+
+
+def test_the_send_stays_clear_of_the_workers_own_mail() -> None:
+    """The first draft fired at 13:07 UTC on a Monday, 7 minutes after the
+    worker starts the weekly digest and the Daily Top 10. The script cannot
+    space itself from them: the governor's ledger is per process, and the
+    `flyctl ssh` process this runs in starts with it empty."""
+    hours = _customer_mail_hours(WORKER.read_text(encoding="utf-8"))
+    # Self-test on the real worker: its 13:00 UTC sends are still found.
+    assert 13 in hours, f"the detector no longer finds the worker's 13:00 UTC sends: {hours}"
+    raw = WORKFLOW.read_text(encoding="utf-8")
+    start, end = _window(raw)
+    fires = _cron_fire(raw)
+    day = start.date() - timedelta(days=1)
+    while day <= end.date() + timedelta(days=1):
+        for hour in sorted(hours):
+            mail = datetime.combine(day, time(hour), tzinfo=UTC)
+            assert mail <= start - WINDOW_CLEARANCE or mail >= end + WINDOW_CLEARANCE, (
+                f"the worker sends at {mail}, within {WINDOW_CLEARANCE} of the window [{start}, {end})"
+            )
+            assert abs(fires - mail) >= FIRE_CLEARANCE, (
+                f"the cron fires at {fires}, {abs(fires - mail)} from the worker's send at {mail}"
+            )
+        day += timedelta(days=1)
 
 
 def test_the_window_can_never_reach_the_survey_reminder_day() -> None:
-    start, end = _window(WORKFLOW.read_text(encoding="utf-8"))
+    from app.services.lifecycle import MIN_LIFECYCLE_GAP_HOURS
+
+    raw = WORKFLOW.read_text(encoding="utf-8")
+    start, end = _window(raw)
     reminder_day_starts = datetime.combine(SURVEY_REMINDER_DAY, datetime.min.time(), tzinfo=UTC)
     assert start < end
     assert end <= reminder_day_starts, f"window ends {end}, on or after the reminder's day"
     assert end < datetime(2026, 9, 16, 13, 0, tzinfo=UTC)
     if REMINDER_WORKFLOW.exists():  # deleted after the reminder goes; the constant then stands
-        r_start, _ = _window(REMINDER_WORKFLOW.read_text(encoding="utf-8"))
+        r_raw = REMINDER_WORKFLOW.read_text(encoding="utf-8")
+        r_start, _ = _window(r_raw)
         assert r_start.date() == SURVEY_REMINDER_DAY
         assert end <= r_start
+        # The gap the governor would enforce between two lifecycle emails, had
+        # both gone through one process's ledger.
+        gap = _cron_fire(r_raw) - _cron_fire(raw)
+        assert gap >= timedelta(hours=MIN_LIFECYCLE_GAP_HOURS), f"the reminder follows only {gap} later"
 
 
 def test_the_schedule_fires_inside_its_own_window() -> None:
     raw = WORKFLOW.read_text(encoding="utf-8")
-    code = _workflow_code(raw)
-    m = re.search(r'cron:\s*"(\d+) (\d+) (\d+) (\d+) \*"', code)
-    assert m, "no single-date cron found"
-    minute, hour, dom, month = map(int, m.groups())
     start, end = _window(raw)
-    fires = datetime(start.year, month, dom, hour, minute, tzinfo=UTC)
+    fires = _cron_fire(raw)
     assert start <= fires < end, f"cron fires {fires}, outside [{start}, {end})"
-    assert "inputs:" not in code, "workflow_dispatch must take no inputs"
 
 
 def test_the_workflow_is_marked_held_and_pinned() -> None:
     raw = WORKFLOW.read_text(encoding="utf-8")
     assert "HELD PENDING FOUNDER APPROVAL" in raw
     assert "DELETE THIS FILE" in raw
-    pin = re.search(r"uses:\s*superfly/flyctl-actions/setup-flyctl@([0-9a-f]{40})\b", _workflow_code(raw))
-    assert pin, "flyctl action is not pinned to a commit SHA"
+    (uses,) = [s["uses"] for s in _steps(_workflow_doc(raw)) if "uses" in s]
+    pin = re.fullmatch(r"superfly/flyctl-actions/setup-flyctl@([0-9a-f]{40})", uses)
+    assert pin, f"flyctl action is not pinned to a commit SHA: {uses}"
     if REMINDER_WORKFLOW.exists():
         r_pin = re.search(r"setup-flyctl@([0-9a-f]{40})", REMINDER_WORKFLOW.read_text(encoding="utf-8"))
         assert r_pin and r_pin.group(1) == pin.group(1)
