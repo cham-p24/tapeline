@@ -123,7 +123,8 @@ describe("LookupMeterPill", () => {
   describe("it states no anonymous allowance (T-08, 2026-09-14)", () => {
     // This block used to require "Without an account it is 2 a day". That was
     // false: /api/ticker/{symbol} does not meter anonymous callers, and three
-    // anonymous GETs of tapeline.io/t/AAPL on 2026-09-14 all rendered the full
+    // anonymous GETs of tapeline.io/t/AAPL at 2026-09-13 ~21:04 UTC (14 Sep
+    // AEST) all rendered the full
     // page. The founder chose to correct the copy, not the enforcement, so the
     // meter must not name a no-account number at all.
     it("does not claim a no-account daily cap", () => {

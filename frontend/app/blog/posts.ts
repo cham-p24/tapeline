@@ -208,7 +208,7 @@ export const POSTS: BlogPost[] = [
 <p>None of this makes the squeeze useless. It makes it a <em>timing</em> observation, not a <em>direction</em> one. Treating "the bands are tight" as a reason to expect a specific outcome is the mistake.</p>
 
 <h2>Squeeze is not the same as short squeeze</h2>
-<p>Worth clearing up, because the words collide: a Bollinger Band squeeze is a volatility-contraction pattern on the chart. A <em>short</em> squeeze is a completely different thing — a crowded short position forced to cover, mechanically driving price up. They can occur together, but they are measured from entirely different data. Tapeline's <a href="/short-squeeze-scanner">short-squeeze scanner</a> reads short interest, float, and crowding, not band width. Don't conflate the two.</p>
+<p>Worth clearing up, because the words collide: a Bollinger Band squeeze is a volatility-contraction pattern on the chart. A <em>short</em> squeeze is a completely different thing — a crowded short position forced to cover, mechanically driving price up. They can occur together, but they are measured from entirely different data. A short squeeze is measured from short interest, float and borrow cost, not band width. Don't conflate the two.</p>
 
 <h2>How Tapeline reads the context around a squeeze</h2>
 <p>Tapeline does <strong>not</strong> have a dedicated "squeeze" score, and this post isn't going to invent one. What the scanner provides is the directional context a squeeze itself can't: a 0–100 composite built from <a href="/how-it-works">six named factors</a> — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum.</p>
@@ -374,10 +374,11 @@ export const POSTS: BlogPost[] = [
 
       <h2>The data source behind the factor</h2>
       <p><em>Corrected 14 September 2026: an earlier version of this post
-      said the factor also read congressional (STOCK Act) disclosures and
-      that Premium exposed a congressional trades feed. Tapeline has never
-      had a real source of congressional disclosures, so neither was true.
-      The factor reads SEC Form 4 filings only.</em></p>
+      said the factor reads congressional (STOCK Act) disclosures and that
+      Premium includes a congressional trades feed. Neither is true today:
+      Tapeline has no current source of congressional disclosures, no plan
+      includes a congressional trades feed, and the factor reads SEC Form 4
+      filings.</em></p>
       <p>Smart Money is a 0–100 sub-score built from one data stream,
       with its own lag and signal-to-noise characteristics:</p>
       <ol>
@@ -680,8 +681,8 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       out. NVDA doesn't do that. Look at the spread:</p>
 
       <ul>
-        <li><strong>Smart Money 97</strong> (top 3%) — insiders are
-        net-accumulating on SEC Form 4 filings.</li>
+        <li><strong>Smart Money 97</strong> (top 3%) — the factor was
+        reading strong accumulation.</li>
         <li><strong>Momentum 87</strong> (top 13%) — short-term price action
         is accelerating, volume is confirming, breakouts are recent.</li>
         <li><strong>Trend 41</strong> (below median) — but the multi-timeframe

@@ -163,3 +163,17 @@ def test_the_precharge_email_headline_states_the_date_not_a_day_count():
     )
     assert "Your trial ends on Friday, October 9." in html
     assert "ends in 3 days" not in html
+
+
+def test_the_precharge_email_guards_the_dateless_webhook_fallback():
+    """webhooks.py passes charge_date_label="when your trial ends" when Stripe
+    sends no trial_end. The email must not read "ends on when your trial ends"."""
+    html = email_mod.render_trial_precharge_reminder_email(
+        "Sam", tier="premium", amount_label="$19.99 USD/month",
+        charge_date_label="when your trial ends",
+    )
+    flat = " ".join(html.split())
+    assert "on when your trial ends" not in flat
+    assert "ends when your trial ends" not in flat
+    assert "Your trial is ending soon." in flat
+    assert "When your trial ends the card you added is charged" in flat

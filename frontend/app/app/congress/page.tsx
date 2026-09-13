@@ -6,7 +6,7 @@ import Link from "next/link";
  * Until 14 September 2026 this page loaded GET /api/congress (Premium) or
  * GET /api/congress/preview and described "every disclosed House and Senate
  * trade", synced "multiple times per day". No real congressional disclosure
- * has ever been ingested: every `congress_trades` row is mock-generator
+ * is being ingested today: every `congress_trades` row is mock-generator
  * output, and services/congress_integrity.py filters all of them out, so both
  * endpoints return nothing. The page was selling an empty feed.
  *

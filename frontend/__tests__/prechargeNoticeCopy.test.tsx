@@ -38,6 +38,8 @@ describe("/legal/refund", () => {
     const text = (note.textContent ?? "").replace(/\s+/g, " ");
     expect(text).toMatch(/^Updated 14 September 2026:/);
     expect(text).toContain(`goes out ${PRECHARGE_NOTICE_PHRASE} that charge, not three days before`);
+    expect(text).toContain("a backup reminder goes out about three days before the charge instead");
+    expect(text).not.toMatch(/second reminder/);
   });
 });
 

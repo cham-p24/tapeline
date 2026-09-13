@@ -98,7 +98,8 @@ export const FREE_LIMITS = {
  * true: GET /api/ticker/{symbol} does not meter anonymous callers at all
  * (backend/app/routers/ticker.py — the per-IP cap 402'd our own SSR renders of
  * /t/{symbol}, so it was switched off), and three anonymous GETs of
- * https://tapeline.io/t/AAPL on 2026-09-14 all returned the full page. The
+ * https://tapeline.io/t/AAPL at 2026-09-13 ~21:04 UTC (14 Sep AEST) all
+ * returned the full page. The
  * founder chose to correct the copy, not the enforcement, so the constant and
  * the sentence are gone. `tier.ANON_DAILY_LOOKUPS` survives in the backend as
  * a dormant utility only. Do not reintroduce a no-account number in copy unless

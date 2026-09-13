@@ -641,10 +641,11 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
 
         # No squeeze read (integrity fix, founder-approved 2026-09-14). Every
         # `squeeze_setups` row in production is mock-generator output last
-        # written 2026-07-18 — the real writer (the SPIKE sheet tab) has never
-        # been configured — and this endpoint was handing those rows to the
-        # in-app ticker page as "Squeeze detected". The payload keeps its
-        # `squeeze` key (always null) so no client breaks. Restore the read
+        # written 2026-07-18 — the real writer (the SPIKE sheet tab) is not
+        # configured (unset since 2026-07-26) — and this endpoint was handing
+        # those rows to the in-app ticker page as "Squeeze detected". The
+        # payload keeps its `squeeze` key (always null) so no client breaks.
+        # Restore the read
         # only behind services/squeeze_integrity.is_publishable().
         sq: SqueezeSetup | None = None
 

@@ -10,7 +10,7 @@ import { SITE_URL } from "@/lib/seo";
  * Until 14 September 2026 this route was a feature landing page: five
  * hardcoded placeholder rows and FAQ copy describing a live House + Senate
  * feed, hourly ingestion and per-senator alerts. None of that existed. No real
- * congressional disclosure has ever been ingested — every row in
+ * congressional disclosure is being ingested today — every row in
  * `congress_trades` is mock-generator output, and
  * backend/app/services/congress_integrity.py already refuses to publish them.
  *

@@ -4,11 +4,12 @@ Integrity fix, founder-approved 2026-09-14 (ticket T-02 and the squeeze sell
 copy). Evidence: C:/Tapeline/brand/deepdive/01_ground_truth.md sections 1.5
 and 3.3.
 
-* No real congressional disclosure has ever been ingested. Every
+* No real congressional disclosure is being ingested today. Every
   `congress_trades` row in production is mock output, and
   services/congress_integrity.py already refuses to publish them.
 * Every `squeeze_setups` row in production is mock output last written
-  2026-07-18; the production writer has never been configured.
+  2026-07-18; the production writer is not configured
+  (unset since 2026-07-26).
 
 Both were still sold in the trial tour (day 3), the day-7/13 conversion
 emails, the win-back, checkout recovery, the free-invite list, the carded
@@ -17,7 +18,9 @@ changelog, the inbox pricing/trial replies and the daily briefing.
 
 This test renders EVERY `render_*` function in services/email.py with
 synthesised arguments, so a renderer added later is covered without anyone
-remembering to list it. What it deliberately does NOT cover: the per-rule
+remembering to list it. A renderer the synthesiser cannot drive FAILS the
+test (it is never skipped): give it explicit arguments in EXPLICIT_CASES.
+What it deliberately does NOT cover: the per-rule
 alert email (`render_alert_email`), whose job is to name the rule type a user
 already set up. That is a notification about an existing rule, not a benefit
 claim.
@@ -37,6 +40,29 @@ BANNED = re.compile(r"congress|squeeze", re.I)
 
 # Notifications about a rule the user already created, not benefit claims.
 NOT_A_SELL_SURFACE = {"render_alert_email"}
+
+# Renderers whose arguments cannot be synthesised from annotations alone (a
+# Literal audience that must be valid). Every audience is rendered.
+EXPLICIT_CASES: dict[str, list[dict[str, object]]] = {
+    "render_product_update_email": [
+        {
+            "greeting_name": "Sam",
+            "scorecard_url": "https://tapeline.io/scorecard",
+            "audience": audience,
+            "newsletter_unsubscribe_url": "https://tapeline.io/unsubscribe",
+        }
+        for audience in ("account", "newsletter")
+    ],
+    "render_product_update_text": [
+        {
+            "greeting_name": "Sam",
+            "scorecard_url": "https://tapeline.io/scorecard",
+            "audience": audience,
+            "unsubscribe_url": "https://tapeline.io/unsubscribe",
+        }
+        for audience in ("account", "newsletter")
+    ],
+}
 
 
 def _value_for(p: inspect.Parameter):
@@ -74,6 +100,28 @@ def _renderers():
 RENDERERS = _renderers()
 
 
+def _cases():
+    out = []
+    for name, fn in RENDERERS:
+        explicit = EXPLICIT_CASES.get(name)
+        if explicit is None:
+            kwargs = {
+                p.name: _value_for(p)
+                for p in inspect.signature(fn).parameters.values()
+                if p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)
+            }
+            out.append(pytest.param(name, fn, kwargs, id=name))
+        else:
+            for i, kwargs in enumerate(explicit):
+                out.append(pytest.param(name, fn, kwargs, id=f"{name}[{i}]"))
+    return out
+
+
+def test_explicit_cases_name_real_renderers():
+    names = {n for n, _ in RENDERERS}
+    assert set(EXPLICIT_CASES) <= names, set(EXPLICIT_CASES) - names
+
+
 def test_the_renderer_sweep_found_the_emails_it_is_meant_to_cover():
     names = {n for n, _ in RENDERERS}
     for expected in (
@@ -93,19 +141,17 @@ def test_the_renderer_sweep_found_the_emails_it_is_meant_to_cover():
         assert expected in names, f"{expected} is no longer swept"
 
 
-@pytest.mark.parametrize("name,fn", RENDERERS, ids=[n for n, _ in RENDERERS])
-async def test_no_email_renderer_claims_congress_or_squeeze(name, fn):
-    kwargs = {
-        p.name: _value_for(p)
-        for p in inspect.signature(fn).parameters.values()
-        if p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)
-    }
+@pytest.mark.parametrize("name,fn,kwargs", _cases())
+async def test_no_email_renderer_claims_congress_or_squeeze(name, fn, kwargs):
     try:
         out = fn(**kwargs)
         if inspect.isawaitable(out):
             out = await out
-    except Exception as exc:  # a renderer the synthesiser cannot drive
-        pytest.skip(f"{name} could not be rendered with synthesised args: {exc!r}")
+    except Exception as exc:  # never a silent skip: an unswept email is a gap
+        pytest.fail(
+            f"{name} could not be rendered with synthesised args ({exc!r}); "
+            "add explicit arguments to EXPLICIT_CASES"
+        )
     text = out if isinstance(out, str) else str(out)
     hits = [m.group(0) for m in re.finditer(r".{0,50}(?:congress|squeeze).{0,50}", text, re.I)]
     assert not hits, f"{name} still mentions congress/squeeze: {hits[:3]}"

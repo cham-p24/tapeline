@@ -2,7 +2,7 @@
  * No congress or squeeze benefit is sold, linked or navigated to (T-02 and the
  * squeeze sell copy, founder-approved 2026-09-14).
  *
- * Why: no real congressional disclosure has ever been ingested, and every
+ * Why: no real congressional disclosure is being ingested today, and every
  * squeeze row in production is mock output last written 2026-07-18. Both
  * were still sold on /pricing, /signup, /app/start, in emails and in the
  * plan tables, and both were in the sitemap and the app sidebar.
@@ -105,6 +105,7 @@ describe("sell surfaces, as source", () => {
     "components/TrialEndedModal.tsx",
     "components/TrialOfferPanel.tsx",
     "components/UpgradeNudge.tsx",
+    "components/Paywall.tsx",
     "lib/seo.ts",
     "lib/pricing.ts",
     "public/llms.txt",
@@ -123,5 +124,25 @@ describe("sell surfaces, as source", () => {
     );
     const hits = src.split(/\r?\n/).filter((l) => BANNED.test(l));
     expect(hits).toEqual([]);
+  });
+});
+
+describe("blog posts", () => {
+  it("no post links to /short-squeeze-scanner, /congressional-trades or the in-app pages", async () => {
+    const { POSTS } = await import("@/app/blog/posts");
+    expect(POSTS.length).toBeGreaterThan(0);
+    for (const post of POSTS) {
+      const blob = JSON.stringify(post);
+      expect(blob, post.slug).not.toMatch(
+        /short-squeeze-scanner|congressional-trades|\/app\/congress|\/app\/squeeze/,
+      );
+    }
+  });
+
+  it("the smart-money correction does not assert an unverified history", async () => {
+    const { POSTS } = await import("@/app/blog/posts");
+    const blob = JSON.stringify(POSTS);
+    expect(blob).not.toMatch(/never had a real source of congressional/i);
+    expect(blob).not.toMatch(/neither was true/i);
   });
 });

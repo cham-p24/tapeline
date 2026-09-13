@@ -626,7 +626,7 @@ const HEADLINE_RULE = {
  *
  * WHY THIS EXISTS (integrity fix, founder-approved 2026-09-14)
  * ------------------------------------------------------------
- * No real congressional disclosure has ever been ingested: every
+ * No real congressional disclosure is being ingested today: every
  * `congress_trades` row in production is mock output, filtered out by
  * backend/app/services/congress_integrity.py. Every `squeeze_setups` row is
  * mock output last written 2026-07-18. Both were nonetheless SOLD — on
@@ -668,6 +668,15 @@ export const SELL_SURFACE_GLOBS = [
   "frontend/lib/seo.ts",
   "frontend/lib/appNav.ts",
   "frontend/public/llms.txt",
+  // Added on review (PR #820): surfaces the sweep fixed by hand.
+  "frontend/app/layout.tsx",
+  "frontend/app/opengraph-image.tsx",
+  "frontend/app/t/[symbol]/page.tsx",
+  "frontend/app/free-stock-scanner-no-credit-card/**",
+  "frontend/app/market-regime/**",
+  "frontend/app/stock-market-heatmap/**",
+  "frontend/app/data-sources/**",
+  "frontend/components/Paywall.tsx",
   "backend/app/services/email.py",
   "backend/app/services/inbox_templates.py",
 ];
@@ -678,7 +687,7 @@ const UNBACKED_FEATURE_RULE = {
   message:
     "Congressional trades or squeeze detection named on a surface that sells " +
     "a plan, a trial or what a card buys. Neither has real data behind it: no " +
-    "congressional disclosure has ever been ingested, and the squeeze rows were " +
+    "congressional disclosure is being ingested today, and the squeeze rows were " +
     "mock output frozen on 2026-07-18 (founder-approved removal, 2026-09-14). " +
     "Remove the claim. If a real source now writes rows, lift this rule for the " +
     "surface in the same change and say so.",

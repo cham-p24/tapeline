@@ -598,7 +598,7 @@ def render_trial_day3_email(user_name: str, _summary: dict | None = None) -> str
         # Squeeze Watch and Congress Trades cards removed 2026-09-14 (integrity
         # fix, founder-approved): neither has real data behind it. The squeeze
         # rows were mock output frozen on 2026-07-18 and no congressional
-        # disclosure has ever been ingested.
+        # disclosure is being ingested today.
         + card(
             f'<div style="font-weight:600;color:{ACCENT};font-size:14px;font-family:{FONT_SANS};">Recent insider buys</div>'
             f'<div class="tl-muted" style="margin-top:4px;color:{LIGHT_MUTED};font-size:14px;line-height:1.5;font-family:{FONT_SANS};">SEC Form 4 transactions across the universe — date, insider, shares, value.</div>'
@@ -2973,19 +2973,31 @@ def render_trial_precharge_reminder_email(
     stop, the job of this email is to help them stop.
     """
     tier_label = tier.capitalize()
+    # The webhook falls back to charge_date_label="when your trial ends" when
+    # Stripe sends no trial_end. Never print "ends on when your trial ends".
+    has_date = not charge_date_label.strip().lower().startswith("when")
+    if has_date:
+        headline = f"Your trial ends on {charge_date_label}."
+        ends_phrase = f"ends on <strong>{charge_date_label}</strong>"
+        charge_moment = f"On {charge_date_label}"
+        preheader_when = charge_date_label
+    else:
+        headline = "Your trial is ending soon."
+        ends_phrase = "is ending soon"
+        charge_moment = "When your trial ends"
+        preheader_when = "soon"
     return shell(
-        h1(f"Your trial ends on {charge_date_label}.")
+        h1(headline)
         + lead(
             f"{user_name}, a heads-up before anything is charged: your "
-            f"<strong>{tier_label}</strong> trial ends on "
-            f"<strong>{charge_date_label}</strong>."
+            f"<strong>{tier_label}</strong> trial {ends_phrase}."
         )
         + card(
             f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;'
             f'letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">What happens next</div>'
             f'<div class="tl-fg" style="margin-top:8px;color:{LIGHT_FG};font-size:14px;'
             f'line-height:1.7;font-family:{FONT_SANS};">'
-            f"On {charge_date_label} the card you added is charged "
+            f"{charge_moment} the card you added is charged "
             f"<strong>{amount_label}</strong> and {tier_label} continues.<br>"
             f"Cancel before then and you are charged <strong>nothing at all</strong>."
             f"</div>",
@@ -3002,7 +3014,7 @@ def render_trial_precharge_reminder_email(
             "receive our other email."
         ),
         preheader=(
-            f"Your trial ends {charge_date_label} — {amount_label} then, "
+            f"Your trial ends {preheader_when} — {amount_label} then, "
             f"or cancel in one click and pay nothing."
         ),
     )

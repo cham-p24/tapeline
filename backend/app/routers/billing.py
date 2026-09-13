@@ -59,8 +59,8 @@ _CANCEL_REASONS = frozenset(
 # costs. It is also what the card buys: every matching row instead of the
 # first ten, a second saved screen, alerts on every channel, CSV export, the
 # 200-symbol watchlist, SEC Form 4 insider filings. (Until 2026-09-14 this list
-# also said "congressional filings"; no real congressional data has ever been
-# ingested, so the claim was removed everywhere it was made.) We open the same
+# also said "congressional filings"; there is no current source of congressional
+# data, so the claim was removed everywhere it was made.) We open the same
 # Stripe Checkout the paid flow uses, in mode=subscription with
 # subscription_data.trial_end TRIAL_DAYS out. Stripe charges $0 today, bills the first real amount at
 # trial_end, and the subscription is cancellable in one click from the

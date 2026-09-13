@@ -1,7 +1,7 @@
 /**
  * Congressional trades: the honest "not available" state (T-02, 2026-09-14).
  *
- * No real congressional disclosure has ever been ingested. Every
+ * No real congressional disclosure is being ingested today. Every
  * `congress_trades` row in production is mock-generator output, and
  * backend/app/services/congress_integrity.py already refuses to publish them.
  * Until this change the public /congressional-trades page showed five

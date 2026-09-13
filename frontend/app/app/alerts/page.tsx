@@ -37,7 +37,7 @@ function humanizeGateError(e: TierGateError, channel: Channel): string {
 
 // The rule types a user can CREATE. "squeeze" and "congress" were removed
 // from this list on 2026-09-14 (integrity fix, founder-approved): no real
-// congressional disclosure has ever been ingested, and the squeeze rows were
+// congressional disclosure is being ingested today, and the squeeze rows were
 // mock output frozen on 2026-07-18, so offering an alert on either sold
 // something that could not truthfully fire. The backend still accepts both
 // types (entitlements unchanged), and a rule a user already has keeps its

@@ -33,7 +33,8 @@ export default function RefundPolicyPage() {
       <div className="mx-auto max-w-3xl px-6 py-10">
         <h1 className="text-4xl font-bold tracking-tight">Refund &amp; cancellation policy</h1>
         <p className="mt-3 text-sm text-muted">
-          Last updated: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+          {/* Pinned, not the render date: this page carries dated revisions. */}
+          Last updated: September 14, 2026
         </p>
 
         <p className="mt-6 text-base leading-relaxed text-fg">
@@ -91,10 +92,11 @@ export default function RefundPolicyPage() {
               silently rewritten. The timing reads lib/trial.ts, the same
               constant the backend drip window is pinned to. */}
           <p data-testid="refund-precharge-revision">
-            <strong className="text-fg">Updated 14 September 2026:</strong> the reminder email
-            before your first charge now goes out {PRECHARGE_NOTICE_PHRASE} that charge, not three
-            days before. This replaces the timing in the paragraph above. If that email cannot be
-            sent, a second reminder goes out about three days before the charge.
+            <strong className="text-fg">Updated 14 September 2026:</strong> since 6 September 2026
+            the reminder email before your first charge goes out {PRECHARGE_NOTICE_PHRASE} that
+            charge, not three days before. This replaces the timing in the paragraph above. If that
+            email cannot be sent, a backup reminder goes out about three days before the charge
+            instead.
           </p>
           <p>
             A note on history, because it changes what people were told at sign-up: between

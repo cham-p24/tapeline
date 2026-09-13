@@ -921,8 +921,8 @@ test("llms.txt stays inside the default lint scope", () => {
 /* ------------------------------------------------------------------ *
  * unbacked-feature-claim — congress / squeeze on a sell surface.
  *
- * Founder-approved 2026-09-14: no real congressional disclosure has ever been
- * ingested, and the squeeze rows were mock output. The rule is path-scoped to
+ * Founder-approved 2026-09-14: no real congressional disclosure is being
+ * ingested today, and the squeeze rows were mock output. The rule is path-scoped to
  * the surfaces that sell a plan, a trial or what a card buys.
  * ------------------------------------------------------------------ */
 
@@ -964,4 +964,20 @@ test("unbacked-feature-claim stays out of honest and educational pages", () => {
   assert.ok(
     !fires("squeezePreviewRows: 3,", "unbacked-feature-claim", "frontend/lib/pricing.ts"),
   );
+});
+
+test("unbacked-feature-claim covers the surfaces added on review (PR #820)", () => {
+  const bad = [
+    ['keywords: ["stock screener", "short squeeze scanner"],', "frontend/app/layout.tsx"],
+    ["<div>Squeeze · Regime · Heatmap</div>", "frontend/app/opengraph-image.tsx"],
+    ["Start a trial for squeeze alerts on this ticker", "frontend/app/t/[symbol]/page.tsx"],
+    ["<li>Squeeze preview on the free plan</li>", "frontend/app/free-stock-scanner-no-credit-card/page.tsx"],
+    ["<p>Pro adds squeeze setups and the regime history.</p>", "frontend/app/market-regime/page.tsx"],
+    ["<p>Premium adds congressional trades.</p>", "frontend/app/stock-market-heatmap/page.tsx"],
+    ['name: "Congressional disclosures",', "frontend/app/data-sources/page.tsx"],
+    ['"congress": "Congressional trades",', "frontend/components/Paywall.tsx"],
+  ];
+  for (const [src, file] of bad) {
+    assert.ok(fires(src, "unbacked-feature-claim", file), `missed in ${file}: ${src}`);
+  }
 });

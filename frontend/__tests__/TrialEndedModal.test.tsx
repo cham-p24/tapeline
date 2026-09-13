@@ -61,7 +61,7 @@ describe("TrialEndedModal", () => {
     // same idiom as backend tests/test_upgrade_nudge.py.
     expect(text).toContain(`top ${freeScannerRows({ authenticated: true })} scanner rows`);
     // Integrity fix 2026-09-14: the squeeze preview is not a benefit (mock
-    // rows), and congressional trades never existed.
+    // rows), and there is no real congressional trades feed.
     expect(text).not.toMatch(/squeeze|congress/i);
     // #683: Free keeps no alerts on any channel, so the "what you keep" list
     // names the saved screen instead of a push-alert count.

@@ -153,10 +153,21 @@ describe("PaywallModal", () => {
 
   it("falls back to the '<feature> is on <tier>' heading and trial copy for signed-out viewers", () => {
     mockedUseUser.mockReturnValue(signedOut);
-    render(<PaywallModal open onClose={() => {}} feature="squeeze" />);
-    expect(screen.getByText(/Squeeze Watch is on Pro/)).toBeInTheDocument();
+    render(<PaywallModal open onClose={() => {}} feature="csv_export" />);
+    expect(screen.getByText(/CSV export is on Pro/)).toBeInTheDocument();
     expect(
       screen.getByText(new RegExp(`${TRIAL_DAYS}-day Premium trial — \\$0 today`, "i")),
     ).toBeInTheDocument();
+  });
+
+  it("never names squeeze or congress as a paid feature (integrity fix, 2026-09-14)", () => {
+    mockedUseUser.mockReturnValue(signedOut);
+    for (const feature of ["squeeze", "congress"] as const) {
+      const { container, unmount } = render(
+        <PaywallModal open onClose={() => {}} feature={feature} />,
+      );
+      expect(container.textContent ?? "").not.toMatch(/squeeze|congress/i);
+      unmount();
+    }
   });
 });

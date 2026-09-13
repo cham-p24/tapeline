@@ -637,7 +637,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `Can I get alerts when ${sym}'s score changes?`,
-      a: `Yes, on a paid plan — Pro gets email alerts on configurable triggers (score crosses a threshold, signal label changes), and Premium removes the daily email-alert cap. Alerts are one of the lines between the plans: the free plan sends none, on any channel. What it does give you is live scores on the top ${FREE_LIMITS.scannerRows} scanner rows, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""} and ${FREE_LIMITS.dailyLookups} look-ups a day, so ${sym} alerts specifically need the 30-day Premium trial or a paid plan.`,
+      a: `Yes, on a paid plan — Pro gets email alerts on configurable triggers (score crosses a threshold, market regime changes, news on a ticker), and Premium removes the daily email-alert cap. Alerts are one of the lines between the plans: the free plan sends none, on any channel. What it does give you is live scores on the top ${FREE_LIMITS.scannerRows} scanner rows, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""} and ${FREE_LIMITS.dailyLookups} look-ups a day, so ${sym} alerts specifically need the 30-day Premium trial or a paid plan.`,
     },
     {
       q: `How does ${sym}'s Tapeline Score compare to a Finviz screener result?`,

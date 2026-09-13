@@ -21,8 +21,8 @@ truthy in the string slot (or None) and you get the site-wide layout.
 SQUEEZE SECTION REMOVED 2026-09-14 (integrity fix, founder-approved). Both
 modes used to add "Squeeze setups" rows read straight from `squeeze_setups`.
 Every one of those rows was mock-generator output last written 2026-07-18: the
-production writer (the SPIKE sheet tab) has never been configured. The
-briefing was emailing invented setups to paying users as a morning read. It
+production writer (the SPIKE sheet tab) is not configured (unset since
+2026-07-26). The briefing was emailing invented setups to paying users as a morning read. It
 now queries nothing from that table and renders no squeeze block. Do not
 restore it without a publishability filter on real, fresh rows
 (services/squeeze_integrity.py, owned by the squeeze integrity change).

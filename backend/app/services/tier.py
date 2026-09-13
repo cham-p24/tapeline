@@ -11,7 +11,7 @@ Tier gating — three-tier model (Free / Pro / Premium).
 
 The `squeeze.full` and `congress.feed` keys below are entitlement keys and are
 left exactly as they are. As of 2026-09-14 neither is described to customers
-as a benefit: no real congressional data has ever been ingested, and the
+as a benefit: no real congressional data is being ingested today, and the
 squeeze rows were mock output. What a tier is ENTITLED to did not change; what
 we CLAIM it includes did.
 

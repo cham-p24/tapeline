@@ -9,10 +9,10 @@
  *
  * Squeeze and Congress are deliberately absent (integrity fix, founder-approved
  * 2026-09-14): neither has real data behind it. The squeeze rows were mock
- * output frozen on 2026-07-18 and no congressional disclosure has ever been
- * ingested. The routes still resolve (the congress page states that the data
+ * output frozen on 2026-07-18 and no congressional disclosure is being
+ * ingested today. The routes still resolve (the congress page states that the data
  * is not available); they are simply not advertised. Do not re-add either
- * until a real source is writing rows. Pinned by __tests__/appNav.test.ts.
+ * until a real source is writing rows. Pinned by __tests__/sellCopyIntegrity.test.tsx.
  *
  * Copy note: hints are plain descriptions of the destination — no performance,
  * return, or urgency claims.

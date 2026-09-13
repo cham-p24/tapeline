@@ -224,10 +224,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     //
     // /short-squeeze-scanner and /congressional-trades are deliberately NOT
     // listed (integrity fix, founder-approved 2026-09-14). Neither has real
-    // data behind it: no congressional disclosure has ever been ingested, and
+    // data behind it: no congressional disclosure is being ingested today, and
     // the squeeze rows were mock output frozen on 2026-07-18. The congress
     // route is now a noindex "not available" page. Do not re-add either until
-    // a real source is writing rows. Pinned by __tests__/sitemap.test.ts.
+    // a real source is writing rows. Pinned by __tests__/sellCopyIntegrity.test.tsx.
     { url: `${base}/insider-buying`,            lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
     { url: `${base}/stock-market-heatmap`,      lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
     { url: `${base}/market-regime`,             lastModified: STATIC_LAST_MODIFIED, priority: 0.85 },
