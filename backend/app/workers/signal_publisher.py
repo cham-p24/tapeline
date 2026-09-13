@@ -556,6 +556,11 @@ async def tick() -> None:
             # any Ticker is resident in the session — which is exactly what
             # took the worker down for 4h on 2026-08-23 (tick.failure loop).
             # Nothing in the tick relies on in-session Ticker state afterwards.
+            #
+            # updated_at is deliberately NOT in this SET: this is the live-data
+            # write, so the column's onupdate must fire and advance it. It is
+            # the one update(Ticker) allowed to — see the comment on
+            # Ticker.updated_at and tests/test_ticker_updated_at_means_live_data.py.
             stmt = (
                 update(Ticker)
                 .where(Ticker.symbol == bindparam("b_symbol"))
@@ -2710,7 +2715,9 @@ async def _stamp_factor_attempts(
             await session.execute(
                 update(Ticker)
                 .where(Ticker.symbol.in_(symbols))
-                .values({column: now})
+                # A bookkeeping stamp, not a data refresh: hold updated_at
+                # still. See the comment on Ticker.updated_at.
+                .values({column: now, "updated_at": Ticker.updated_at})
             )
     except Exception:
         logger.exception("factor_stamp.failed column=%s size=%d", column, len(symbols))
@@ -3035,12 +3042,20 @@ async def _refresh_aggregates_cache() -> bool:
         # slice on every run, starving the rest exactly the way the old
         # ordering did. What this column records is "we have tried this one",
         # which is what a fair rotation needs.
+        #
+        # And the stamp must NOT advance updated_at. This batch covers every
+        # symbol the pass selected, crypto pairs included, whether or not any
+        # bars came back — so letting the column's onupdate fire here made a
+        # row with no fresh data look freshly refreshed to live_clauses.
+        # Measured in production 2026-09-13: 59 of the 100 crypto rows owed
+        # their updated_at to this stamp, not to the crypto refresh that
+        # actually writes their data.
         now = datetime.now(UTC)
         async with session_scope() as session:
             await session.execute(
                 update(Ticker)
                 .where(Ticker.symbol.in_(batch))
-                .values(last_aggregates_at=now)
+                .values(last_aggregates_at=now, updated_at=Ticker.updated_at)
             )
 
         logger.info(
@@ -3207,9 +3222,12 @@ async def _backfill_sectors(cap: int = 2500) -> None:
                         values["is_leveraged"] = is_leveraged_fund(
                             name, asset_class,
                         )
+                    # A name or sector is reference data, not a refresh of
+                    # the row's live numbers: hold updated_at still. See the
+                    # comment on Ticker.updated_at.
                     await session.execute(
                         update(Ticker).where(Ticker.symbol == sym)
-                        .values(**values)
+                        .values(**values, updated_at=Ticker.updated_at)
                     )
             return len(batch)
         except Exception:
@@ -3313,9 +3331,12 @@ async def _backfill_market_cap(cap: int = 2500) -> None:
         try:
             async with session_scope() as session:
                 for sym, cap_usd in batch:
+                    # Filling a NULL from a 7-day profile cache is not a
+                    # refresh of the row's score or price: hold updated_at
+                    # still. See the comment on Ticker.updated_at.
                     await session.execute(
                         update(Ticker).where(Ticker.symbol == sym)
-                        .values(market_cap=cap_usd)
+                        .values(market_cap=cap_usd, updated_at=Ticker.updated_at)
                     )
             return len(batch)
         except Exception:
@@ -3401,9 +3422,58 @@ async def _backfill_key_statistics(cap: int = 2500) -> None:
             return 0
         try:
             async with session_scope() as session:
-                # Bulk UPDATE ... WHERE symbol = :symbol, executemany'd —
-                # same primary-key-keyed form the tick loop uses.
-                await session.execute(update(Ticker), batch)
+                # One UPDATE per record, all in one short transaction.
+                #
+                # This used to be the ORM's bulk-UPDATE-by-primary-key form,
+                # `session.execute(update(Ticker), batch)`. That form offers
+                # nowhere to put a SET expression, so the column's onupdate
+                # fired and a beta or P/E read from a 7-day-cached blob
+                # advanced updated_at — the timestamp live_clauses reads as
+                # "this row's live data was refreshed". An explicit statement
+                # can hold it still. See the comment on Ticker.updated_at.
+                #
+                # NOT an executemany, although it is handed a list of
+                # parameter sets. Because the statement is built on the ORM
+                # entity, SQLAlchemy routes it through its bulk-by-primary-key
+                # path, which issues one UPDATE per record — measured on 2.0.49
+                # with a before_cursor_execute probe: 5 records, 5 cursor
+                # executions, executemany=False each. Fine at this batch size;
+                # a statement built on Ticker.__table__ would be a true
+                # executemany (1 execution for the same 5 records).
+                #
+                # Grouped by column set because each statement has one fixed
+                # SET clause; today fetch_key_statistics always returns the
+                # same five keys, so this is one group. Each record keeps
+                # `symbol` as well as `b_symbol`: the bulk-by-primary-key path
+                # refuses records without the key — measured on 2.0.49 as InvalidRequestError
+                # "No primary key value supplied for column(s) tickers.symbol".
+                # _flush would swallow that and write nothing, so the
+                # key-statistics test in test_ticker_updated_at_means_live_data
+                # is what catches it. Emitted SQL (SQLite): UPDATE tickers SET beta=?,
+                # ..., updated_at=tickers.updated_at WHERE tickers.symbol = ?
+                # AND tickers.symbol = ?
+                groups: dict[tuple[str, ...], list[dict]] = {}
+                for row in batch:
+                    cols = tuple(sorted(k for k in row if k != "symbol"))
+                    groups.setdefault(cols, []).append(
+                        {"symbol": row["symbol"], "b_symbol": row["symbol"],
+                         **{c: row[c] for c in cols}}
+                    )
+                for cols, params in groups.items():
+                    await session.execute(
+                        update(Ticker)
+                        .where(Ticker.symbol == bindparam("b_symbol"))
+                        .values({
+                            **{c: bindparam(c) for c in cols},
+                            "updated_at": Ticker.updated_at,
+                        })
+                        # Same reason as the tick's upsert: an UPDATE with
+                        # WHERE criteria run against a list of parameter sets
+                        # cannot synchronize in-session objects, and SQLAlchemy
+                        # raises if asked.
+                        .execution_options(synchronize_session=None),
+                        params,
+                    )
             return len(batch)
         except Exception:
             logger.exception("key_stats_backfill.flush_failed size=%d", len(batch))
@@ -3577,8 +3647,12 @@ async def _refresh_universe() -> None:
             async with session_scope() as s2:
                 for r in batch:
                     vals = {k: v for k, v in r.items() if k != "symbol"}
+                    # A rename or reclassification is reference data, not a
+                    # refresh of the row's live numbers: hold updated_at
+                    # still. See the comment on Ticker.updated_at.
                     await s2.execute(
-                        update(Ticker).where(Ticker.symbol == r["symbol"]).values(**vals)
+                        update(Ticker).where(Ticker.symbol == r["symbol"])
+                        .values(**vals, updated_at=Ticker.updated_at)
                     )
             return len(batch)
         except Exception:

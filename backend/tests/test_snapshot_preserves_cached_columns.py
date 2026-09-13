@@ -83,10 +83,13 @@ def test_every_guarded_column_exists_and_is_nullable():
 def test_the_tick_loop_uses_no_unguarded_bulk_update():
     """`session.execute(update(Ticker), batch)` is the shape that wiped the data.
 
-    Scoped to the TICK loop deliberately. The same plain form is correct inside
-    _backfill_key_statistics, which writes values it has just fetched — a NULL
-    there means Finnhub has no coverage for that symbol, not that a cache was
-    cold. Only the 60-second tick reads from caches that empty on restart.
+    Scoped to the TICK loop deliberately. Writing a NULL plainly is correct
+    inside _backfill_key_statistics, which writes values it has just fetched —
+    a NULL there means Finnhub has no coverage for that symbol, not that a
+    cache was cold. Only the 60-second tick reads from caches that empty on
+    restart. (That backfill no longer uses this exact form either, for an
+    unrelated reason: it cannot hold Ticker.updated_at still — see
+    test_ticker_updated_at_means_live_data.py.)
     """
     start = SRC.index("cache_derived = CACHE_DERIVED_COLUMNS")
     tick_region = SRC[start - 3000:SRC.index("# --- Replace squeeze setups ---", start)]
