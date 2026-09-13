@@ -1,0 +1,101 @@
+name: Product update (one-shot, 2026-09-15)
+
+# FOUNDER-APPROVED 2026-09-13 ("do it all now", in reply to "Reply yes and
+# I'll merge it for Tuesday"). Before merge, two sentences about the public
+# record were cut because an integrity review verified them false (PR #814).
+# Merging this file SCHEDULES THE SEND. To stop it, disable this workflow in
+# GitHub Actions or delete this file before the window below opens.
+#
+# Sends the September 2026 product update, ONCE, unattended, at 17:07 UTC on
+# Tuesday 15 September 2026: 1:07pm New York, 3:07am Wednesday Melbourne. Off
+# the :00 mark because Actions cron is best-effort and bunches at the hour.
+#
+# WHY THIS TIME, AND NOT 13:07 UTC ON MONDAY 14 SEPTEMBER (the first draft).
+# The worker sends its own customer mail by the clock
+# (backend/app/workers/signal_publisher.py): the Daily Top 10 to the whole
+# newsletter list on weekdays from 13:00 UTC, the weekly digest to opted-in
+# accounts on Mondays from 13:00 UTC, and the watchlist digest on trading days
+# from 21:00 UTC. The first draft fired 7 minutes after the Monday 13:00 burst,
+# so a newsletter reader would have had the Top 10 and this within minutes,
+# and an opted-in account the weekly digest and this. Nothing in the script
+# could hold it off: the lifecycle governor's send ledger lives in the
+# worker's memory, and this runs in a fresh `flyctl ssh` process whose ledger
+# is empty. So the spacing is done here, by the clock:
+#   * 17:07 is the middle of the only gap US business hours allow between the
+#     13:00 and 21:00 sends (the list is mostly US; see survey-reminder.yml),
+#     so it is 4 hours from each;
+#   * Tuesday has no weekly digest, so account holders get nothing else at 13:00;
+#   * the survey reminder (survey-reminder.yml, 13:07 UTC Wed 16 Sep) is 20
+#     hours later, the same gap the governor enforces between two lifecycle
+#     emails (lifecycle.MIN_LIFECYCLE_GAP_HOURS).
+# The founder may pick another time. If so, change the cron and the window in
+# the same commit; the tests read the worker's send hours from its source and
+# fail if either lands too close to them.
+#
+# WHAT RUNS: `update_send --send --quiet` on the deployed backend over
+# `flyctl ssh`, so it uses prod's database, Resend key and APP_URL without any
+# of them touching the runner. Who it reaches, and why it cannot double-send,
+# is documented at the top of backend/app/scripts/update_send.py.
+#
+# --quiet IS NOT OPTIONAL. This repo is public, so this job's log is
+# world-readable, and without --quiet the script prints every recipient's
+# address. backend/tests/test_update_send.py fails the build if any
+# update_send command in this file lacks the flag.
+#
+# ONE-SHOT: GitHub cron has no year field, so "7 17 15 9 *" would fire every
+# 15 September. The date window below makes any run outside 15:00-19:00 UTC on
+# 15 Sep 2026 a no-op, including an accidental early manual dispatch. The
+# window, not just the cron, stays 2 hours clear of the worker's 13:00 and
+# 21:00 sends, because a manual fallback can be dispatched at any moment
+# inside it. It closes the day before the survey reminder. The tests run the
+# window step itself at its boundaries, so they pin the comparison, not only
+# the two date strings.
+#
+# DELETE THIS FILE once the update has gone.
+#
+# Takes no inputs, so it cannot become an arbitrary-command runner.
+
+on:
+  schedule:
+    - cron: "7 17 15 9 *"
+  workflow_dispatch:   # Fallback if the scheduled run does not fire. Same window applies.
+
+concurrency:
+  group: product-update-send
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Only inside the authorised window
+        id: window
+        run: |
+          set -euo pipefail
+          now=$(date -u +%s)
+          start=$(date -u -d "2026-09-15T15:00:00Z" +%s)
+          end=$(date -u -d "2026-09-15T19:00:00Z" +%s)
+          if [ "$now" -lt "$start" ] || [ "$now" -ge "$end" ]; then
+            echo "::notice title=Outside window::The product update is authorised for 15:00-19:00 UTC on 15 Sep 2026 only. Nothing sent."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup flyctl
+        if: steps.window.outputs.go == 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      - name: Send the product update
+        if: steps.window.outputs.go == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "::error title=No token::FLY_API_TOKEN secret is not set."
+            exit 1
+          fi
+          flyctl ssh console -a tapeline-backend \
+            -C "python -m app.scripts.update_send --send --quiet"

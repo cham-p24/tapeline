@@ -66,6 +66,7 @@ LOCK_CHECKOUT_RECOVERY = 6
 LOCK_ACTIVATION_NUDGE = 7
 LOCK_SEO_DIGEST = 8
 LOCK_SURVEY_REMINDER = 9
+LOCK_PRODUCT_UPDATE = 10
 
 
 async def try_xact_lock(session: AsyncSession, objid: int) -> bool:

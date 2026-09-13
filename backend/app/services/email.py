@@ -6076,3 +6076,184 @@ def render_survey_reminder_email(
         preheader="A short follow-up. One tap, or just reply.",
     )
 
+
+# ── Product update, September 2026 ──────────────────────────────────────────
+#
+# Sent once by scripts/update_send.py. HELD: the copy and the send date both
+# need the founder's approval before .github/workflows/product-update-send.yml
+# is merged, because merging it schedules the send.
+#
+# The copy lives HERE, not in the script, for one reason: this module is inside
+# scripts/lint-copy-compliance.mjs's include globs and backend/app/scripts/ is
+# not. A subject line kept in the script would be the one piece of the email no
+# linter ever read.
+#
+# ONE SOURCE FOR BOTH PARTS. The HTML and the plain-text alternative are built
+# from the same constants below, so a copy edit cannot land in one part and not
+# the other — a reader whose client shows the text part would otherwise get a
+# different email from the one that was approved.
+
+PRODUCT_UPDATE_SUBJECT = "What changed at Tapeline last week — including what broke"
+
+_PRODUCT_UPDATE_OPENER = (
+    "A lot changed at Tapeline over the past week, and part of it went wrong in "
+    "a way you should hear about from us rather than notice for yourself."
+)
+
+#: (heading, body). Bold in the HTML part; own line in the text part.
+PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
+    (
+        "Scores and prices stopped updating for about a day.",
+        "From 15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner "
+        "kept showing numbers that were not being refreshed. Over the following "
+        "day it stalled several more times before recovering on its own. The "
+        "cause was our own code plus a server that could not keep up with the "
+        "larger universe described below. Both are fixed: scoring now runs on a "
+        "dedicated machine, and it has not stalled since 11 September.",
+    ),
+    (
+        "The scanner now covers about 11,500 stocks and ETFs.",
+        "At the start of the month it was about 2,000. That is not new data we "
+        "bought. It is data we already had and were not refreshing. Search for "
+        "TSM, Sony or Toyota and they are there.",
+    ),
+    (
+        "Crypto is in: 100 pairs, updated once a day.",
+        "Coins sit in their own list and are never ranked against stocks, because "
+        "two of our six factors — company fundamentals and insider buying — "
+        "cannot exist for a coin. Prices update daily, not live. Our data plan "
+        "does not include live crypto prices, and we would rather tell you that "
+        'than label a day-old number "live".',
+    ),
+    (
+        "Scores moved on 7 September, mostly down.",
+        "A renamed column in one of our data sources meant some inputs went "
+        "missing, and a missing input was being scored as neutral, which "
+        "flattered most stocks. We recalculated 4,112 scores and 3,233 of them "
+        "went down. If a score you watch dropped that week, the lower number is "
+        "the accurate one.",
+    ),
+)
+
+#: ACCOUNT HOLDERS ONLY. A newsletter-only subscriber never had a free account,
+#: so telling them "free accounts are back to 10 rows" describes a loss that is
+#: not theirs. The two facts in it — the promo end date and the row cap — are
+#: pinned to services/tier.py by test_update_send.py, so a founder decision to
+#: extend the promo before the send fails the build instead of mailing a
+#: sentence that has stopped being true.
+PRODUCT_UPDATE_ACCOUNT_ONLY = (
+    "And one thing that is not an improvement: the open-access month ended on 8 "
+    "September, as scheduled. Free accounts are back to the top 10 rows per scan."
+)
+
+_PRODUCT_UPDATE_RECORD_LEAD = "The record is still free to read, with no account:"
+_PRODUCT_UPDATE_SIGNOFF = "— Christian"
+
+ProductUpdateAudience = Literal["account", "newsletter"]
+
+
+def _product_update_link_text(scorecard_url: str) -> str:
+    """The link's visible text, as the copy writes it, derived from the real link.
+
+    Derived rather than typed, so the words a reader sees and the place the
+    link goes cannot disagree — and on a machine whose APP_URL is localhost
+    the dry run shows the localhost link instead of a reassuring
+    "tapeline.io". (update_send refuses to SEND without https either way.)
+    """
+    return scorecard_url.split("://", 1)[-1].split("?", 1)[0]
+
+
+def render_product_update_email(
+    greeting_name: str,
+    *,
+    scorecard_url: str,
+    audience: ProductUpdateAudience,
+    newsletter_unsubscribe_url: str | None = None,
+) -> str:
+    """HTML part of the September 2026 product update.
+
+    `greeting_name` is scripts.survey_send.first_name() of the stored name —
+    "Hi David," not "Hi David Eley," — and is HTML-escaped, because it is the
+    one value in this email a stranger typed.
+
+    UNSUBSCRIBE, PER AUDIENCE. An account holder's footer keeps the shared
+    UNSUB_PLACEHOLDER, which send_email resolves into a signed one-click link
+    (the audited path every other lifecycle email uses). A newsletter-only
+    subscriber is not a `users` row, so that path cannot address them and would
+    strip the placeholder to nothing. Their list's own link is written into the
+    placeholder here instead — inside the footer, where the survey reminder
+    appended it after `</html>`. Refuses to render a newsletter copy without
+    one, because a broadcast with no working opt-out is the thing the Spam Act
+    is about.
+
+    NO PREHEADER. Every other line of this email was approved word for word; a
+    preheader would be the one sentence nobody approved.
+    """
+    from html import escape as _html_escape
+
+    from app.services.email_design import UNSUB_PLACEHOLDER
+
+    if audience not in ("account", "newsletter"):
+        raise ValueError(f"unknown product-update audience {audience!r}")
+    if audience == "newsletter" and not newsletter_unsubscribe_url:
+        raise ValueError("a newsletter copy needs the list's own unsubscribe link")
+
+    sections = "".join(
+        paragraph(f"<strong>{heading}</strong><br>{body}")
+        for heading, body in PRODUCT_UPDATE_SECTIONS
+    )
+    link = (
+        f'<a href="{scorecard_url}" style="color:{ACCENT};text-decoration:underline;">'
+        f"{_product_update_link_text(scorecard_url)}</a>"
+    )
+    html = shell(
+        lead(f"Hi {_html_escape(greeting_name)},")
+        + paragraph(_PRODUCT_UPDATE_OPENER)
+        + sections
+        + (paragraph(PRODUCT_UPDATE_ACCOUNT_ONLY) if audience == "account" else "")
+        + paragraph(f"{_PRODUCT_UPDATE_RECORD_LEAD} {link}")
+        + paragraph(_PRODUCT_UPDATE_SIGNOFF),
+    )
+    if audience == "newsletter":
+        html = html.replace(
+            UNSUB_PLACEHOLDER,
+            f'<p class="tl-subtle" style="margin:0 0 10px;font-size:11px;'
+            f'line-height:1.6;color:{LIGHT_SUBTLE};font-family:{FONT_SANS};">'
+            f'<a href="{newsletter_unsubscribe_url}" class="tl-link-subtle" '
+            f'style="color:{LIGHT_SUBTLE};text-decoration:underline;">Unsubscribe</a>'
+            " — one click, no sign-in needed.</p>",
+        )
+    return html
+
+
+def render_product_update_text(
+    greeting_name: str,
+    *,
+    scorecard_url: str,
+    audience: ProductUpdateAudience,
+    unsubscribe_url: str,
+) -> str:
+    """Plain-text part of the same email, from the same constants.
+
+    send_email resolves the unsubscribe placeholder in the HTML part only, so
+    the text part carries its opt-out link explicitly — for both audiences.
+    """
+    if audience not in ("account", "newsletter"):
+        raise ValueError(f"unknown product-update audience {audience!r}")
+    if not unsubscribe_url:
+        raise ValueError("the text part needs a working unsubscribe link")
+
+    blocks = [f"Hi {greeting_name},", _PRODUCT_UPDATE_OPENER]
+    blocks += [f"{heading}\n{body}" for heading, body in PRODUCT_UPDATE_SECTIONS]
+    if audience == "account":
+        blocks.append(PRODUCT_UPDATE_ACCOUNT_ONLY)
+    blocks.append(f"{_PRODUCT_UPDATE_RECORD_LEAD} {_product_update_link_text(scorecard_url)}")
+    blocks.append(_PRODUCT_UPDATE_SIGNOFF)
+    blocks.append(
+        "--\n"
+        f"Unsubscribe (one click, no sign-in needed): {unsubscribe_url}\n"
+        "Not investment advice. Tapeline is informational software — every "
+        "score, signal, and headline is a data point, not a recommendation."
+    )
+    return "\n\n".join(blocks) + "\n"
+
