@@ -60,9 +60,9 @@ const METHODOLOGY_LOG: LogEntry[] = [
   {
     date: "2026-09-14",
     kind: "correction",
-    title: "Release notes described congressional-trade and squeeze data that was never real",
+    title: "Release notes described congressional-trade and squeeze features that did not work as described",
     body:
-      "Three release notes below describe features whose data was not real. The 2026-05-17 note says the Smart Money factor explanation was updated to cover congressional disclosures, and the 2026-08-30 note says a card turns on congressional-trade filings. No real congressional-trade data has ever been loaded into Tapeline: all 338,015 rows in our congressional-trades table were test output, and no real source ever wrote one. The 2026-08-12 note says squeeze alerts go out over email and browser push. The squeeze data behind squeeze alerts was not real market data. It was test output last written on 18 July 2026, and no real squeeze feed was running. We have left the wording of those release notes in place and are correcting them here.",
+      "Three release notes below describe congressional-trade and squeeze features that did not work as described. The 2026-08-30 note says a card turns on congressional-trade filings: all 338,015 rows in our congressional-trades table were test output, not real filings. The 2026-05-17 note says the Smart Money factor explanation was updated to cover congressional disclosures. Starting in May 2026 the factor also read a count from a spreadsheet tab that listed congressional trades among other signals. We cannot now check what that tab held, that input is not connected today (checked 13 September 2026), and the factor is now computed from SEC Form 4 insider filings only. The 2026-08-12 note says squeeze alerts go out over email and browser push. The squeeze data behind squeeze alerts was not real market data: it was test output, last written on 18 July 2026. We have left the wording of those release notes in place and are correcting them here.",
     ref: "#821",
   },
   {
