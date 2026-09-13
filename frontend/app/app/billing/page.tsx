@@ -869,7 +869,7 @@ export default function BillingPage() {
             <>
               <div className="mt-2 text-2xl font-bold nums">$0 <span className="text-sm font-normal text-muted">today</span></div>
               <ul className="mt-3 space-y-1 text-xs text-muted">
-                <li>· Full 6,900-ticker live universe</li>
+                <li>· Full {ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker universe</li>
                 <li>· Watchlist of 200 with smart alerts</li>
                 <li>· Recent insider buys (SEC Form 4)</li>
               </ul>
@@ -1004,7 +1004,7 @@ export default function BillingPage() {
               note={billingPeriod === "annual" ? `${usd(TIER_META.premium.annual)}/yr · billed annually · save $${annualSaving(TIER_META.premium)}${isCardlessTrial ? ` · or ${usd(TIER_META.premium.monthly)}/mo monthly` : ""}` : "billed monthly"}
               proPlus
               items={[
-                `Recent insider buys — live SEC Form 4 across ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} tickers`,
+                `Recent insider buys — SEC Form 4 filings across ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} tickers`,
                 "Email alerts · unlimited (Pro: 10/day)",
                 "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
                 "Priority support · same-day reply",

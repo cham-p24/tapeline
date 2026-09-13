@@ -46,7 +46,7 @@ const FACT_SHEET = [
   // "Premium trial", never "Free trial": the trial is the one thing that takes a card,
   // and its length comes from lib/trial.ts so this line cannot say two numbers at once again.
   { label: "Premium trial",   value: `${TRIAL_DAYS}-day Premium; card required, $0 charged today, first charge on day ${TRIAL_DAYS}` },
-  { label: "Universe scored", value: "~6,900 active US tickers (top by daily $-volume, from the full liquid US universe)" },
+  { label: "Universe scored", value: "About 11,500 US-listed stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs scored separately and updated once a day" },
   { label: "Update cadence",  value: "Sub-60 seconds during US market hours" },
   { label: "Data categories", value: "Live market data, fundamentals, macro indicators, SEC filings, news wire" },
   { label: "Integrations",    value: "Public MCP server for AI assistants (tapeline.io/mcp) · CSV export · API (tapeline.io/developers)" },
@@ -59,7 +59,7 @@ const ONE_LINER =
 
 // Prices interpolate from lib/pricing.ts so a future reprice can't strand a
 // stale figure in the most-copied paragraph on the site.
-const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every ticker in the active US universe (~6,900, selected by daily dollar volume) gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — updated sub-60s during US market hours. Every top-10 daily pick auto-publishes to a public scorecard with the realized next-day return vs SPY, immutable and back-checked. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin, priced annual-first at Pro ${usdCompact(PRICING.pro.annual)}/yr and Premium ${usdCompact(PRICING.premium.annual)}/yr, with a concierge Trader tier at ${usdCompact(PRICING.trader.annual)}/yr.`;
+const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every ticker in the scored universe (about 11,500 US-listed stocks and ETFs) gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — updated sub-60s during US market hours. Each day's top-10 picks are published to a public scorecard and back-checked against SPY the next session. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin, priced annual-first at Pro ${usdCompact(PRICING.pro.annual)}/yr and Premium ${usdCompact(PRICING.premium.annual)}/yr, with a concierge Trader tier at ${usdCompact(PRICING.trader.annual)}/yr.`;
 
 const PULL_QUOTES = [
   {
@@ -149,7 +149,7 @@ const SCREENSHOTS = [
   },
   {
     label: "Public scorecard",
-    desc: "Immutable record of every top-10 daily pick with realized next-day return vs SPY.",
+    desc: "Dated record of each daily top-10 pick with its next-session return vs SPY; losses kept, corrections dated.",
     href: "/scorecard",
   },
 ];
@@ -422,15 +422,15 @@ export default function PressPage() {
               composite score uses six named factors documented
               at <Link href="/how-it-works" className="text-accent hover:underline">/how-it-works</Link>,
               with each factor&apos;s contribution shown on every ticker.
-              The factor set is versioned in the public changelog and never edited
-              retroactively. No proprietary ML rerank step is applied
+              No proprietary ML rerank step is applied
               between the composite and the displayed number.
             </li>
             <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
-              <strong className="text-fg">Not crypto, not options, not futures.</strong>{" "}
-              US equities and ETFs only (~6,900 actively scored). The
-              underlying data feed supports broader asset classes but
-              Tapeline&rsquo;s scoring model is calibrated for cash equities.
+              <strong className="text-fg">Not options.</strong>{" "}
+              About 11,500 US-listed stocks and ETFs are scored. About 100
+              crypto pairs are scored in a separate list, updated once a day,
+              from four of the six factors, and are never ranked against
+              stocks.
             </li>
           </ul>
         </section>

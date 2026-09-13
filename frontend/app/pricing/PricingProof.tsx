@@ -12,7 +12,7 @@ import { api } from "@/lib/api";
  *
  * What it shows and why: the one thing that is unambiguously true and
  * on-brand at the moment of purchase decision — the SIZE and DISCIPLINE
- * of the public record (days tracked, same-day, no edits). Deliberately
+ * of the public record (days tracked, logged same-day, corrections dated). Deliberately
  * NOT the hit-rate / alpha headline numbers: over a short single-regime
  * sample those are weak, and anchoring the buy on them would be neither
  * honest nor effective. The full record — winners and losers — is one
@@ -61,12 +61,12 @@ export function PricingProof() {
           <span className="ml-1 text-xs text-muted">days on the record</span>
         </span>
         <span className="text-fg">
-          <span className="text-base font-semibold">every pick</span>
-          <span className="ml-1 text-xs text-muted">logged same-day, never edited</span>
+          <span className="text-base font-semibold">daily top 10</span>
+          <span className="ml-1 text-xs text-muted">logged same-day; corrections dated</span>
         </span>
       </div>
       <div className="mt-2 text-xs text-muted">
-        See every call and how it did vs SPY &mdash; winners and losers &rarr;
+        See each recorded pick and how it did vs SPY &mdash; winners and losers &rarr;
       </div>
     </Link>
   );

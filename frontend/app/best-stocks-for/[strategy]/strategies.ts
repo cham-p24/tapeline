@@ -30,7 +30,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Best Stocks to Day Trade — Today's Top 30 by Move + Composite Score",
     metaTitle: "Best Stocks to Day Trade Today — Live Top 30 | Tapeline",
     metaDescription:
-      "30 US stocks with the biggest moves today that also score 60+ on Tapeline's 6-factor composite — momentum confirmed by trend and relative strength. Sub-60s refresh. Public scorecard, no edits.",
+      "30 US stocks with the biggest moves today that also score 60+ on Tapeline's 6-factor composite — momentum confirmed by trend and relative strength. Sub-60s refresh. Public scorecard, losses kept.",
     lede:
       "Day trading lives or dies on confluence: setups where the score, the trend, the relative strength, and the day's price action all point the same direction. The list below ranks today's US tickers sorted by today's 1-day move, filtered to names with a Tapeline composite at or above 60. The tape is fresh — the underlying scores re-tick sub-60 seconds during market hours.",
     apiParams: { sort: "change_pct_1d", order: "desc", min_score: "60", limit: "30" },
@@ -46,7 +46,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What's the difference between this and your live scanner?",
-        a: "This page is a SEO-friendly opinionated view: top 30 by today's move, filtered to score 60+. The live scanner at /app/scanner is the full ~6,900-ticker universe with every filter exposed (sort by any factor, threshold any sub-score, filter by sector or signal label). This page is for surfacing candidates; the scanner is for working through them.",
+        a: "This page is a SEO-friendly opinionated view: top 30 by today's move, filtered to score 60+. The live scanner at /app/scanner is the full scored universe (about 11,500 US stocks and ETFs) with every filter exposed (sort by any factor, threshold any sub-score, filter by sector or signal label). This page is for surfacing candidates; the scanner is for working through them.",
       },
       {
         q: "Why filter to score 60+ rather than just 'biggest movers'?",
@@ -93,7 +93,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What's the public scorecard?",
-        a: "Every top-10 daily pick gets auto-published at /scorecard with the original composite score, signal label, and one-sentence reasoning. Twenty-four hours later, the next-session realised return vs SPY is appended — no edits, no deletions. It's the public track record so you can see whether the model's high-conviction calls are actually delivering positive alpha over time.",
+        a: "Each day's top-10 picks are published at /scorecard with their rank, composite score and the price they were flagged at. One session later, the next-session realised return vs SPY is appended. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. It's the public track record so you can see whether the model's high-conviction calls are actually delivering positive alpha over time.",
       },
     ],
   },
@@ -132,7 +132,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "How long do momentum setups typically run?",
-        a: "Tapeline's scorecard back-checks each daily top-10 pick against next-day return and keeps the full record — winners and losers — public at /scorecard. It's an unedited track record versus SPY, which it currently trails; it is not a claim about how long any setup runs or how it will perform.",
+        a: "Tapeline's scorecard back-checks each daily top-10 pick against next-day return and keeps the full record — winners and losers — public at /scorecard. It's a track record versus SPY, with losing days kept and corrections dated, which it currently trails; it is not a claim about how long any setup runs or how it will perform.",
       },
       {
         q: "Should I trade pure momentum or wait for confluence?",
@@ -367,7 +367,7 @@ export const STRATEGIES: StrategyConfig[] = [
     metaDescription:
       "The 30 US stocks scoring highest on Tapeline's composite score — HIGH CONVICTION tier (score 85+). Live ranking, daily public scorecard.",
     lede:
-      "The HIGH CONVICTION tier is the top 1-3% of the universe at any time — names where Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum all agree. The list below ranks them by composite score. Every name here is back-checked daily against next-session SPY return at /scorecard, no edits. This is the most concentrated view of the model's strongest signals.",
+      "The HIGH CONVICTION tier is the top 1-3% of the universe at any time — names where Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum all agree. The list below ranks them by composite score. The daily top 10 across the whole universe is back-checked against next-session SPY return at /scorecard, losses kept. This is the most concentrated view of the model's strongest signals.",
     apiParams: { sort: "score", order: "desc", signal: "HIGH CONVICTION", limit: "30" },
     factorEmphasis: "score 85+ across all six factors",
     faq: [
@@ -381,7 +381,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What's the scorecard performance of HIGH CONVICTION picks?",
-        a: "Every daily top-10 pick is back-checked against next-day SPY return. The full record — winners and losers — is at /scorecard, including the days the model called HIGH CONVICTION on names that then underperformed. We don't edit the record, and it currently trails SPY. The scorecard is a descriptive track record, not a performance target or a forecast.",
+        a: "Every daily top-10 pick is back-checked against next-day SPY return. The full record — winners and losers — is at /scorecard, including the days the model called HIGH CONVICTION on names that then underperformed. Losing days stay on the record, corrections to recorded values are dated there, and it currently trails SPY. The scorecard is a descriptive track record, not a performance target or a forecast.",
       },
       {
         q: "Is HIGH CONVICTION a buy recommendation?",

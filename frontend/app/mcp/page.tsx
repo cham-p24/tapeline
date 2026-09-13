@@ -20,7 +20,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Tapeline MCP server — the public record in Claude",
   description:
-    "Connect Tapeline to any MCP-compatible AI assistant. Ask for a stock's six-factor score, today's published picks, or the full never-edited track record — losing picks included. Free, no account, no API key.",
+    "Connect Tapeline to any MCP-compatible AI assistant. Ask for a stock's six-factor score, today's published picks, or the public track record — losing picks included, corrections dated. Free, no account, no API key.",
   path: "/mcp",
 });
 
@@ -153,10 +153,13 @@ export default function McpPage() {
         <section className="mt-14 rounded-2xl border border-border bg-panel p-6 sm:p-8">
           <h2 className="text-xl font-semibold tracking-tight">What it will tell you about us</h2>
           <p className="mt-3 leading-relaxed text-muted">
-            The same thing the site does, including the unflattering part. Every daily top-10 pick
-            is written to a public record the moment it prints and is never re-ranked, edited or
-            removed. One session later each pick&rsquo;s realised move is compared against SPY and
-            appended — losses and all.
+            The same thing the site does, including the unflattering part. Each day&rsquo;s top-10
+            picks are written to a public record when they print, and one session later each
+            pick&rsquo;s realised move is compared against SPY and appended — losses and all.
+            Entries are not re-ranked or deleted. We have corrected recorded values twice, and
+            said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June
+            2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September
+            2026.
           </p>
           <p className="mt-3 leading-relaxed text-muted">
             At the current sample the picks <strong className="text-fg">do not beat SPY</strong>,

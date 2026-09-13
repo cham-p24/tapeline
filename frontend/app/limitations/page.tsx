@@ -115,7 +115,7 @@ const sections = (summary: CitableSummary | null): Section[] => [
       // direction, on the page whose whole job is to be the unflattering one.
       hitRateClause(summary),
       "Tapeline does not publish an annualised return. No Sharpe ratio, no hypothetical profit-and-loss, no backtest, no 'what you would have made'. Deriving a performance summary from a sample this size would imply a precision the data does not support.",
-      "The archive is append-only. Past entries are never edited or removed after the fact, which means the record includes every day the picks went nowhere.",
+      "Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. Losing days stay on the record at the same weight as winning ones, including every day the picks went nowhere. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026.",
     ],
   },
   {

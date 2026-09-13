@@ -64,7 +64,7 @@ English (United States)
 ## Detailed description
 
 ```
-Tapeline scores about 2,500 US stocks every day on six published factors, and logs every daily top-10 pick to a public record that is never edited — including the picks that lose.
+Tapeline scores about 11,500 US stocks and ETFs on six published factors, and logs each day's top-10 picks to a public record that keeps the picks that lose. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026.
 
 This extension puts that on the pages you already read.
 
@@ -103,7 +103,7 @@ HONEST ABOUT THE RECORD
 
 Tapeline's published picks do not currently beat SPY. Just under half beat it the next session, and the median pick trails slightly. The live figures are on the public scorecard at tapeline.io/scorecard, updated as each session resolves.
 
-At the current sample size these numbers do not distinguish the ranking from chance. We publish them unedited anyway — the whole point is a record you can check rather than a claim you have to trust.
+At the current sample size these numbers do not distinguish the ranking from chance. We publish them anyway, losses included and corrections dated — the whole point is a record you can check rather than a claim you have to trust.
 
 Scores are descriptive readings of published data. Not investment advice, price targets or forecasts.
 ```

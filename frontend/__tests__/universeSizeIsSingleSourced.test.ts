@@ -65,6 +65,19 @@ describe("the scanner universe size is single-sourced", () => {
     }
   });
 
+  it("the backend's copy number (emails, MCP) is the same number", () => {
+    // backend/app/services/universe.py SCORED_TICKERS_IN_COPY feeds the
+    // re-engagement and day-7 emails. Before 2026-09-14 those printed
+    // ACTIVE_UNIVERSE_SIZE, a snapshot ceiling, as "~12,000-ticker universe".
+    const py = readFileSync(
+      join(ROOT, "..", "backend", "app", "services", "universe.py"),
+      "utf8",
+    );
+    const m = /^SCORED_TICKERS_IN_COPY\s*=\s*([\d_]+)/m.exec(py);
+    expect(m, "could not read SCORED_TICKERS_IN_COPY from universe.py").toBeTruthy();
+    expect(Number(m![1].replace(/_/g, ""))).toBe(ACTIVE_SCORED_TICKERS);
+  });
+
   it("copy never claims more tickers than the backend can snapshot", () => {
     // This asserted EQUALITY with ACTIVE_UNIVERSE_SIZE while that constant was
     // the number of tickers the worker scored each tick, so the two genuinely

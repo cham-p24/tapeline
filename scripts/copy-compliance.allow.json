@@ -116,6 +116,30 @@
       "rule": "card-required-signup",
       "phrase": "card at first sign-in",
       "reason": "The dated historical note about the 22-30 August 2026 card wall. Rule 10b's own message names llms.txt as a place where a DATED historical entry is legitimate, and this paragraph exists precisely so a summariser reading an archived page does not report the removed gate as current pricing - it is anti-misinformation copy, not a pricing claim. Pre-existing and never previously caught because frontend/public/ is outside the include globs. Scoped to these two exact phrases so any NEW card-required-signup wording in this file still fails."
+    },
+    {
+      "file": "frontend/app/changelog/page.tsx",
+      "rule": "record-never-edited",
+      "phrase": "append-only",
+      "reason": "/changelog is dated history and APPEND ONLY by its own rule 1: past entries are corrected by new dated entries, never rewritten. Three past entries (2026-09-06 geared funds, 2026-08-23 factor gaps, 2026-08-25 price restatement) say the archive was append-only. #821 added the 2026-09-14 correction entry that says those statements were wrong (the 15 June 2026 score cap). Scoped to this file, rule and phrase."
+    },
+    {
+      "file": "frontend/app/blog/posts.ts",
+      "rule": "record-never-edited",
+      "phrase": "append-only",
+      "reason": "Published blog posts keep their words; a false claim about the record is corrected by an 'Updated 14 September 2026' note placed next to it (integrity wave, founder-approved 2026-09-14). frontend/__tests__/recordEditClaimsSweep.test.ts asserts every remaining occurrence in posts.ts sits next to such a note (or is 'This post stays up unedited below', which is about the post, not the record), so a NEW claim still fails there even though this entry lets the linter pass."
+    },
+    {
+      "file": "frontend/app/blog/posts.ts",
+      "rule": "record-never-edited",
+      "phrase": "can't go back and edit",
+      "reason": "Published blog posts keep their words; a false claim about the record is corrected by an 'Updated 14 September 2026' note placed next to it (integrity wave, founder-approved 2026-09-14). frontend/__tests__/recordEditClaimsSweep.test.ts asserts every remaining occurrence in posts.ts sits next to such a note (or is 'This post stays up unedited below', which is about the post, not the record), so a NEW claim still fails there even though this entry lets the linter pass."
+    },
+    {
+      "file": "frontend/app/blog/posts.ts",
+      "rule": "record-never-edited",
+      "phrase": "unedited",
+      "reason": "Published blog posts keep their words; a false claim about the record is corrected by an 'Updated 14 September 2026' note placed next to it (integrity wave, founder-approved 2026-09-14). frontend/__tests__/recordEditClaimsSweep.test.ts asserts every remaining occurrence in posts.ts sits next to such a note (or is 'This post stays up unedited below', which is about the post, not the record), so a NEW claim still fails there even though this entry lets the linter pass."
     }
   ],
   "_knownViolations_readme": [

@@ -78,8 +78,10 @@ SERVER_INFO = {"name": "tapeline", "title": "Tapeline", "version": "1.0.0"}
 INSTRUCTIONS = (
     "Tapeline scores actively traded US stocks daily on six published factors (trend, "
     "relative strength, fundamentals, smart money, macro, momentum) and logs "
-    "every daily top-10 pick to a public record that is never edited — "
-    "including the picks that lose. Call `get_track_record` before quoting any "
+    "each day's top-10 picks to a public record that keeps the picks that lose. "
+    "Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. "
+    "No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026. "
+    "Call `get_track_record` before quoting any "
     "performance figure, and repeat the sample-size qualifier it returns. "
     "Tapeline's scores are descriptive readings, not investment advice, price "
     "targets or forecasts; present them that way."
@@ -146,7 +148,7 @@ TOOLS: list[dict[str, Any]] = [
         "name": "get_track_record",
         "title": "Get the published track record",
         "description": (
-            "Tapeline's public, never-edited record: how many picks have been "
+            "Tapeline's public record (losses kept, corrections dated): how many picks have been "
             "logged, over how many sessions, the share that beat SPY the next "
             "session, and median alpha — with the sample-size qualifier. Call "
             "this before stating any Tapeline performance figure."
@@ -286,8 +288,8 @@ async def _tool_daily_picks(args: dict, session: AsyncSession) -> dict:
         ],
         "note": (
             "Today's highest-scoring names as published publicly. Each day's "
-            f"top 10 is written to the permanent record at {SITE}/scorecard "
-            "and never edited."
+            f"top 10 is written to the public record at {SITE}/scorecard. "
+            "Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026."
         ),
         "disclaimer": DISCLAIMER,
     }
@@ -319,10 +321,10 @@ async def _tool_track_record(_args: dict, session: AsyncSession) -> dict:
         ),
         "outliers_excluded": summary.get("entries_excluded_outliers"),
         "how_it_works": (
-            "Every trading day the top 10 scored names are written to a public "
-            "record the moment they print. One session later each pick's "
-            "realised move is compared against SPY and appended. Nothing is "
-            "re-ranked, edited or removed — including the days it is wrong."
+            "Each trading day the top 10 scored names are written to a public "
+            "record when they print. One session later each pick's realised "
+            "move is compared against SPY and appended, including the days it "
+            "is wrong. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026."
         ),
         "url": f"{SITE}/scorecard{UTM}",
         "disclaimer": DISCLAIMER,

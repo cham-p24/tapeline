@@ -82,7 +82,7 @@ export function CitableRecord({ summary }: { summary: ScorecardSummary }) {
           trail them: at this sample size they do not distinguish the ranking
           from chance, so the reader meets the caveat before the values, not
           after. Nothing is hidden, softened or rounded — the same values
-          follow, unedited, at the same weight. */}
+          follow, unrounded, at the same weight. */}
       <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted">
         Descriptive measures of the raw archive below — not a return, a forecast, or the result of
         any investable strategy. At this sample size they do not distinguish the ranking from

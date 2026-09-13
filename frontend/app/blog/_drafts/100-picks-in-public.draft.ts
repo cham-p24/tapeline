@@ -41,9 +41,9 @@ export const POST_100_PICKS_IN_PUBLIC: BlogPost = {
 
     <p>This is the receipt. As of {{LAUNCH_DATE_HUMAN}}, the public scorecard
     holds <strong>100 top-10 daily picks</strong> — every one logged at session
-    close with the original score, signal label, and reasoning intact, and
-    back-checked against SPY's move the following session. Nothing has been
-    edited, deleted, or "re-scored with the benefit of hindsight." The raw
+    close with its rank and recorded score, and back-checked against SPY's
+    move the following session. Entries are not re-ranked or deleted, and any
+    correction to a recorded value is dated on the scorecard. The raw
     data lives at <a href="/scorecard">/scorecard</a> and will continue to
     live there as long as Tapeline does.</p>
 
@@ -64,13 +64,13 @@ export const POST_100_PICKS_IN_PUBLIC: BlogPost = {
     </ul>
 
     <p>If you're new here: each evening Tapeline auto-publishes the day's
-    top-10 highest-scoring tickers from a universe of ~6,900 active US
-    names. The six factors are named on
+    top-10 highest-scoring tickers from a universe of about 11,500 US
+    stocks and ETFs. The six factors are named on
     <a href="/how-it-works">/how-it-works</a>, along with which carry the most
     weight — most toward Trend and Relative Strength, least toward Momentum;
     the next day, the scorecard
     records where each name actually closed and computes the alpha vs SPY.
-    No hindsight edits, no cherry-picking.</p>
+    Losing picks stay on the record, and corrections are dated.</p>
 
     <h2>What surprised me</h2>
     <p>{{SURPRISE_PARAGRAPH — e.g. "Three things I didn't expect from the first
@@ -102,8 +102,8 @@ export const POST_100_PICKS_IN_PUBLIC: BlogPost = {
       100 picks span a single market regime — broadly trending up with VIX
       mostly under 20. The model has not yet been tested in a 2022-style
       rate-shock or a sustained correction."}}</li>
-      <li><strong>Survivorship.</strong> The universe is the top ~6,900 by
-      daily dollar-volume. Names that fell out of liquidity mid-period got
+      <li><strong>Survivorship.</strong> The universe is about 11,500 US
+      stocks and ETFs. Names that fell out of liquidity mid-period got
       dropped from new picks but their already-logged picks remain in the
       record — see the scorecard for the full list.</li>
     </ul>

@@ -79,6 +79,23 @@
  *   AND confidence_pct IS NOT NULL AND asset_class is a clean ASCII token
  *   AND updated_at >= (latest scored refresh - 7 days)
  * and confirm ACTIVE_UNIVERSE_SIZE in backend/app/services/universe.py.
+ *
+ * ── RE-MEASURED 2026-09-13 22:33 UTC (read-only) ────────────────────────────
+ *
+ * Production database:
+ *   11,918  rows in `tickers`
+ *   11,546  score IS NOT NULL, asset_class <> 'crypto' (5,906 equity, 5,613
+ *           etf, 27 future_commodity), every one updated in the last 2 days
+ *      103  crypto rows with a score (106 crypto rows in total)
+ * Public API, anonymous:
+ *   /api/scanner?min_dollar_volume=0&include_leveraged=true   total_matched 11,501
+ *   /api/scanner?min_dollar_volume=0                          total_matched 10,714
+ *   /api/scanner?asset_class=crypto                           total_matched 103
+ *
+ * So an unfiltered scan (liquidity floor and leveraged-fund exclusion both
+ * switched off) returns 11,501, rounded down to 11,500. That is also the figure
+ * in the founder-approved September product update email ("about 11,500
+ * stocks and ETFs", "100 pairs"), so the site and the email now agree.
  */
 
 /**
@@ -91,22 +108,25 @@
  * backend ceiling, because we cannot score more than we snapshot — and that
  * is what universeSizeIsSingleSourced.test.ts now asserts.
  *
- * MEASURED 2026-09-07 and rounded DOWN, never estimated and never rounded up.
- * `/api/scanner?limit=200&min_dollar_volume=0` returned total_matched = 6,994,
- * which is the same query a reader can run in ten seconds.
+ * MEASURED and rounded DOWN, never estimated and never rounded up.
+ * 2026-09-07: `/api/scanner?limit=200&min_dollar_volume=0` returned 6,994.
+ * 2026-09-13 22:33 UTC: `/api/scanner?limit=1&min_dollar_volume=0&include_leveraged=true`
+ * returned total_matched = 11,501 — the same query a reader can run in ten
+ * seconds.
  *
  * Not 11,852 (rows we merely TRACK, most of them unscored) and not 5,130 (the
  * DEFAULT view, which applies a $1M/day liquidity floor the user can switch
  * off). The claimable number is what an unfiltered scan actually returns.
  */
-export const ACTIVE_SCORED_TICKERS = 6900;
+export const ACTIVE_SCORED_TICKERS = 11500;
 
-/** Rows in `tickers`, scored or merely tracked. Rounded down from 11,852. */
-export const TRACKED_TICKERS = 11800;
+/** Rows in `tickers`, scored or merely tracked. Rounded down from 11,918 (2026-09-13). */
+export const TRACKED_TICKERS = 11900;
 
 /**
- * Crypto pairs, in their own bucket. Rounded down from 79 (measured
- * 2026-09-07 via the same endpoint with `asset_class=crypto`).
+ * Crypto pairs, in their own bucket. Rounded down from 103 (measured
+ * 2026-09-13 22:33 UTC via the same endpoint with `asset_class=crypto`; it was
+ * 79 on 2026-09-07).
  *
  * Deliberately a SEPARATE number, never added to ACTIVE_SCORED_TICKERS. A coin
  * and a stock scoring 70 do not mean the same thing: company fundamentals and
@@ -119,10 +139,10 @@ export const TRACKED_TICKERS = 11800;
  * Crypto also updates DAILY, not sub-60s: the vendor's real-time crypto feed
  * is not on the current plan. Any copy stating a refresh rate must say so.
  */
-export const CRYPTO_PAIRS = 75;
+export const CRYPTO_PAIRS = 100;
 
-/** Display form, e.g. "75". */
+/** Display form, e.g. "100". */
 export const cryptoPairsLabel = CRYPTO_PAIRS.toLocaleString("en-US");
 
-/** Display form for the number that belongs in copy, e.g. "~2,500". */
+/** Display form for the number that belongs in copy, e.g. "~11,500". */
 export const activeScoredLabel = `~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}`;

@@ -296,8 +296,9 @@ _LINKEDIN_TOPIC_ROTATION: list[tuple[str, str]] = [
     ),
     (
         "What the public scorecard actually shows",
-        "Every top-10 daily pick is logged with next-day return vs SPY. "
-        "Append-only. Every miss stays on the page. tapeline.io/scorecard.",
+        "Each day's top 10 is logged with its next-day return vs SPY. "
+        "Every miss stays on the page, and corrections are dated. "
+        "tapeline.io/scorecard.",
     ),
     (
         "The Smart Money sub-score explained",

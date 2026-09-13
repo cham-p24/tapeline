@@ -981,3 +981,48 @@ test("unbacked-feature-claim covers the surfaces added on review (PR #820)", () 
     assert.ok(fires(src, "unbacked-feature-claim", file), `missed in ${file}: ${src}`);
   }
 });
+
+/* ------------------------------------------------------------------ *
+ * record-never-edited — the public record is not unedited.
+ *
+ * Integrity wave, founder-approved 2026-09-14: recorded scores for 18 May -
+ * 12 June 2026 were capped at 100 on 15 June 2026 (originals not kept) and
+ * recorded prices were restated on 25 August 2026. Every line below shipped on
+ * origin/main before this change.
+ * ------------------------------------------------------------------ */
+
+test("record-never-edited fires on the claims that shipped", () => {
+  const bad = [
+    ["<p>Every pick is logged same-day and never edited. These numbers are live.</p>", "frontend/app/pricing/page.tsx"],
+    ['<span className="ml-1 text-xs text-muted">logged same-day, never edited</span>', "frontend/app/signup/SignUpForm.tsx"],
+    ['{ label: "Never edited or back-filled", tapeline: "Yes" },', "frontend/app/stock-screener-track-record/page.tsx"],
+    ['"The archive is append-only. Past entries are removed never.",', "frontend/app/limitations/page.tsx"],
+    ["we leave it up unedited, because a record you can audit", "frontend/app/best-free-stock-screener/page.tsx"],
+    ["back-checked against SPY the next session, with no edits.", "frontend/app/free-stock-scanner-no-credit-card/page.tsx"],
+    ["The scorecard is immutable — every call is preserved.", "frontend/app/t/[symbol]/page.tsx"],
+    ["the scorecard is the canonical, immutable reference.", "frontend/public/llms.txt"],
+    ["no black box, no hidden factors, no hindsight editing.", "frontend/public/llms.txt"],
+    ["The page is append-only — we can't go back and edit it.", "frontend/app/about/page.tsx"],
+    ["<li>Public scorecard — every call we've ever made, with the original reasoning</li>", "backend/app/services/email.py"],
+    ['"Every day Tapeline writes down its top ten and never edits the row again."', "backend/app/services/email.py"],
+  ];
+  for (const [src, file] of bad) {
+    assert.ok(fires(src, "record-never-edited", file), `missed in ${file}: ${src}`);
+  }
+});
+
+test("record-never-edited leaves the replacement wording and ordinary uses alone", () => {
+  const fine = [
+    ["Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026.", "frontend/app/limitations/page.tsx"],
+    ['<span className="ml-1 text-xs text-muted">logged same-day; corrections dated</span>', "frontend/app/pricing/PricingProof.tsx"],
+    // A watchlist feature, not the record.
+    ['"watch. Edit or delete it whenever you like."', "backend/app/services/email.py"],
+    // Engineers describing a real append-only table, in a comment.
+    ["// cap_events is an append-only analytics trail\nconst x = 1;", "frontend/lib/pricing.ts"],
+    ['"""Free-tier cap-hit event — one append-only row each time."""\nx = 1', "backend/app/services/email_prefs.py"],
+    ["<p>Search the record for any ticker.</p>", "frontend/app/scorecard/page.tsx"],
+  ];
+  for (const [src, file] of fine) {
+    assert.ok(!fires(src, "record-never-edited", file), `false positive in ${file}: ${src}`);
+  }
+});

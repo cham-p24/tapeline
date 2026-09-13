@@ -15,15 +15,15 @@ const ITEMS: RoadmapItem[] = [
   // SHIPPED
   { slug: "live-data",              title: "Live market data",          detail: "Real-time prices, volumes, and intraday updates across the universe.",                  status: "shipped" },
   { slug: "live-macro",             title: "Live macro indicators",     detail: "DXY, 10-year yield, VIX pulled live; classified into RISING / FALLING / SIDEWAYS for the regime factor.",             status: "shipped" },
-  { slug: "recent-insider-buys",    title: "Recent insider buys",       detail: "SEC Form 4 transactions (officers, directors, 10%+ owners) across the top ~6,900 most-liquid US tickers. Each stock re-checked about every two days.", status: "shipped" },
+  { slug: "recent-insider-buys",    title: "Recent insider buys",       detail: "SEC Form 4 transactions (officers, directors, 10%+ owners) across the tickers we track. Each stock re-checked about every two days; ETFs about monthly.", status: "shipped" },
   { slug: "browser-push",           title: "Browser push notifications", detail: "Lock-screen alerts on desktop and Android. Free, one click to enable.",                 status: "shipped" },
   { slug: "commodity-universe",     title: "Commodity ETF universe",    detail: "32 commodity ETFs (gold, silver, oil, gas, ag, copper, uranium, miners) with their own sector filter.", status: "shipped" },
   { slug: "annual-pricing",         title: "Annual pricing with savings", detail: "Pro and Premium offered monthly or annually, with the annual price locked forever once subscribed.", status: "shipped" },
   { slug: "public-share-pages",     title: "Per-ticker share pages",    detail: "Every ticker gets a public /t/[symbol] page with the live score and 6-factor breakdown — shareable on X with a live preview card.", status: "shipped" },
-  { slug: "public-scorecard",       title: "Public scorecard from day one", detail: "Every top-10 we publish back-checked against the next-day price move vs SPY.",     status: "shipped" },
+  { slug: "public-scorecard",       title: "Public scorecard from day one", detail: "Each daily top 10 we record back-checked against the next-day price move vs SPY; losses kept, corrections dated.",     status: "shipped" },
   { slug: "watchlist-starter",      title: "Watchlist starter pack",    detail: "Empty watchlist? One click adds 8 mega-caps + SPY so smart alerts can fire from day one.", status: "shipped" },
   { slug: "stripe-checkout",        title: "Card-on-file checkout",     detail: "Card details taken on Stripe's own checkout page to start the trial, then one-click upgrade from trial to paid.",   status: "shipped" },
-  { slug: "universe-expansion",     title: "6,900-ticker active scoring",  detail: "Score the top 2,500 names by daily $-volume — covers everything liquid down to small-caps.", status: "shipped" },
+  { slug: "universe-expansion",     title: "Full-universe scoring",  detail: "About 11,500 US stocks and ETFs scored (an unfiltered scan returned 11,501 on 13 September 2026), up from a 2,500-name cap removed on 7 September 2026.", status: "shipped" },
   { slug: "api-v1",                 title: "Public API v1",              detail: "Read-only REST endpoints at /api/v1 for Premium subscribers, key-authenticated, 1,000 requests/day. Documented at /developers.", status: "shipped" },
 
   // NEXT

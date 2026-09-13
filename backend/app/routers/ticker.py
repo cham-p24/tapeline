@@ -743,7 +743,7 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         #
         # Form 4 ONLY. congress_trades is deliberately absent: in production
         # that table is a FABRICATED backlog from mock_feed.fetch_congress_trades
-        # (see the "_mock_writes_enabled" gate in workers/signal_publisher.py,
+        # (see the "_mock_feed_writes_enabled" gate in workers/signal_publisher.py,
         # whose own comment calls purging it an operator decision). Publishing a
         # count over invented rows on an anonymous, indexable page would be a
         # false claim about what Premium contains. Add it here only once a real

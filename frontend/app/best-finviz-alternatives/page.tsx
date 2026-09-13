@@ -87,8 +87,8 @@ const TOOLS: Tool[] = [
       // account is an email and a password, and it lands on a free plan that
       // runs the live scanner — the top ten scored rows of any scan, live,
       // with one saved screen and a five-symbol watchlist. A card is what
-      // turns on every matching row, alerts, CSV export and the filings
-      // feeds. Separately, the published record — the daily Top 10, the whole
+      // turns on every matching row, alerts, CSV export and SEC Form 4
+      // insider filings. Separately, the published record — the daily Top 10, the whole
       // scorecard and the raw CSV/JSON — still needs no account at all.
       freeTier: "yes",
       mobile: "yes",
@@ -434,7 +434,7 @@ const FAQ = [
   },
   {
     q: "Which Finviz alternative offers a public scorecard?",
-    a: "Tapeline is the only tool on this list that auto-publishes every top-10 daily pick with the realized next-day return vs SPY at /scorecard. Most competitors report aggregate statistics (e.g., 'historical Rank #1 returns'); few preserve every individual call with original context for accountability.",
+    a: "Tapeline is the only tool on this list that auto-publishes every top-10 daily pick with the realized next-day return vs SPY at /scorecard. Most competitors report aggregate statistics (e.g., 'historical Rank #1 returns'); few publish a dated, per-pick record.",
   },
   {
     q: "How was this list ranked?",
@@ -773,7 +773,7 @@ export default function BestFinvizAlternativesPage() {
             a password opens the live scanner on a free plan — the top ten scored rows
             of any scan, live, with one saved screen and a five-symbol watchlist. What
             a card buys is every matching row instead of the first ten, a second saved
-            screen, alerts, CSV export and the filings feeds. Separately again, the
+            screen, alerts, CSV export and SEC Form 4 insider filings. Separately again, the
             published output — the daily Top 10, the full scorecard, a page per scored
             ticker and the raw CSV/JSON — needs no account at all.
           </p>

@@ -64,22 +64,16 @@ const row = (symbol: string, transaction_date: string): Row => ({
 });
 
 /**
- * Visible text plus every attribute and JSON-LD script body.
- *
- * `ownHtml` drops the shared "Other Tapeline features" link list that
- * SeoFeaturePage renders on every feature page. That list (owned outside this
- * page, in components/SeoFeaturePage.tsx) currently links to
- * /congressional-trades; it is flagged as a cross-lane item on the PR rather
- * than hidden here. Everything this page itself says is still checked.
+ * Visible text plus every attribute and JSON-LD script body, including the
+ * shared "Other Tapeline features" link list that SeoFeaturePage renders on
+ * every feature page. That list no longer links to /congressional-trades
+ * (#820), so the whole rendered page is checked, with no carve-out.
  */
 async function renderInsider() {
   const { container } = render(await InsiderBuyingPage());
-  const own = container.cloneNode(true) as HTMLElement;
-  own.querySelector("nav[aria-label=\"Other Tapeline features\"]")?.remove();
   return {
     container,
     html: container.innerHTML,
-    ownHtml: own.innerHTML,
     text: container.textContent ?? "",
   };
 }
@@ -160,10 +154,12 @@ describe("/insider-buying — labels and claims", () => {
     ["unavailable", "reject"],
   ] as const)("contains none of the removed claims (%s feed)", async (_label, feed) => {
     mockFeed(feed as Row[] | "reject");
-    const { ownHtml } = await renderInsider();
+    const { html } = await renderInsider();
+    // The shared feature cross-links are part of what is scanned.
+    expect(html).toContain('aria-label="Other Tapeline features"');
     for (const banned of BANNED_INSIDER) {
-      if (typeof banned === "string") expect(ownHtml).not.toContain(banned);
-      else expect(ownHtml, `matched ${banned}`).not.toMatch(banned);
+      if (typeof banned === "string") expect(html).not.toContain(banned);
+      else expect(html, `matched ${banned}`).not.toMatch(banned);
     }
   });
 

@@ -635,12 +635,12 @@ function SignUpForm() {
                   <span className="ml-1 text-xs text-muted">days on the record</span>
                 </span>
                 <span className="text-fg">
-                  <span className="text-base font-semibold">every pick</span>
-                  <span className="ml-1 text-xs text-muted">logged same-day, never edited</span>
+                  <span className="text-base font-semibold">daily top 10</span>
+                  <span className="ml-1 text-xs text-muted">logged same-day; corrections dated</span>
                 </span>
               </div>
               <div className="mt-2 text-xs text-muted">
-                See every call and how it did vs SPY — winners and losers &rarr;
+                See each recorded pick and how it did vs SPY — winners and losers &rarr;
               </div>
             </Link>
           )}

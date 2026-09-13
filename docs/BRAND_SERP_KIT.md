@@ -195,7 +195,7 @@ bottom of Part A.
 
   The part I care most about: every top-10 daily pick auto-publishes to a public
   scorecard the next day with its realized return vs SPY — winners and losers,
-  unedited. The factor set is out in the open; the moat is the data spine and
+  corrections dated. The factor set is out in the open; the moat is the data spine and
   the receipts.
 
   It's descriptive, not advice — six labels, no buy/sell language. The public
@@ -360,7 +360,7 @@ time.
   quantitative stock scanner with an unusual bet: both the methodology and the
   track record are public. Every US ticker gets one 0-100 score from six named
   factors, and every top-10 daily pick auto-logs to a public scorecard
-  the next day with its realized return vs SPY — winners and losers, unedited.
+  the next day with its realized return vs SPY — winners and losers, corrections dated.
 
   It's descriptive analytics, not advice (no buy/sell language). Bootstrapped,
   launched 2026, built solo.

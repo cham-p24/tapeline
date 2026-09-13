@@ -169,7 +169,7 @@ export const POSTS: BlogPost[] = [
 <p>If you want that composite pre-sorted for a multi-day horizon, the <a href="/best-stocks-for/swing-traders">best swing trade stocks list</a> ranks the US universe by the composite and shows the per-factor breakdown on every row — Trend and Relative Strength included — so you can read where the confluence sits before you do your own chart work.</p>
 
 <h2>The honest caveat</h2>
-<p>Every indicator here is lagging by construction. They summarise what price and volume have already done; none of them forecast, and stacking five of them doesn't turn description into prediction. Tapeline's composite is the same kind of summary — a structured read, not a crystal ball. Its daily top picks are back-checked in public at <a href="/scorecard">the scorecard</a>, unedited, and it currently trails SPY. Treat indicators, factors, and composites as ways to read the tape more carefully, never as a substitute for your own judgement and risk limits — see the <a href="/legal/risk">risk disclosure</a>.</p>`,
+<p>Every indicator here is lagging by construction. They summarise what price and volume have already done; none of them forecast, and stacking five of them doesn't turn description into prediction. Tapeline's composite is the same kind of summary — a structured read, not a crystal ball. Its daily top picks are back-checked in public at <a href="/scorecard">the scorecard</a>, losing days included, and it currently trails SPY. <em>Updated 14 September 2026: this sentence used to say the scorecard had never been changed. Recorded values have been corrected twice, and both corrections are dated on the scorecard: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026.</em> Treat indicators, factors, and composites as ways to read the tape more carefully, never as a substitute for your own judgement and risk limits — see the <a href="/legal/risk">risk disclosure</a>.</p>`,
     howToSteps: [
       { name: "Read the trend with moving averages", text: "Start with the 50- and 200-day moving averages. Their slope and order describe whether the multi-week trend is constructive or deteriorating. Moving averages lag — they confirm a trend, they never call the turn." },
       { name: "Check relative strength vs the benchmark", text: "Compare the stock's move to the S&P 500 and its sector. A name outperforming the index shows leadership; one lagging on an up day is quietly weak. Over a multi-day horizon this is often the densest read on the chart." },
@@ -819,7 +819,7 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       features the product is unusable, the team is incentivised to
       upgrade-trap rather than retain. Tapeline's answer is to put the whole
       published record outside the paywall entirely: the daily Top 10, every
-      pick ever made with its next-session result vs SPY, a page per scored
+      recorded top-10 pick with its next-session result vs SPY, a page per scored
       ticker, and the raw CSV/JSON — no account, no card. A free account is
       an email and a password, and it opens the live scanner at the top ten
       scored rows. The card belongs to the 30-day Premium trial, which is a
@@ -901,11 +901,16 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
     slug: "why-we-score-2500-not-5000",
     title: "Why we score 2,500 tickers, not 5,000.",
     excerpt:
-      "A third-party market-data feed covers thousands of US tickers. We actively score ~2,500 by daily dollar-volume — here's why that cutoff exists, what we do with the rest, and why bigger isn't better.",
+      "Updated 14 September 2026: we now score about 11,500 US stocks and ETFs. As published in May 2026: A third-party market-data feed covers thousands of US tickers. We actively score ~2,500 by daily dollar-volume — here's why that cutoff exists, what we do with the rest, and why bigger isn't better.",
     publishedAt: "2026-05-03",
     author: "Tapeline",
     body: `
       <div class="card border-l-4 border-accent p-4 mb-6">
+        <p class="text-sm"><strong>Update, 14 September 2026:</strong> an
+        unfiltered scan (liquidity floor and leveraged-fund filter switched off)
+        returned 11,501 US stocks and ETFs on 13 September 2026, so the figure
+        is now about 11,500. The 7 September note below gave the count on that
+        day.</p>
         <p class="text-sm"><strong>Update, 7 September 2026 — we were wrong,
         and the number is now ~6,900.</strong></p>
         <p class="text-sm">The argument below defends a 2,500-ticker cutoff on
@@ -1506,7 +1511,8 @@ RSI = 100 - (100 / (1 + RS))</pre>
         <li>Stock Rover free: end-of-day. Essentials: 15-minute delay.</li>
         <li>Zacks free: 20-minute delay. Premium: real-time on most exchanges.</li>
         <li>Tapeline free: live scores (no delay) on the top 10 scanner rows;
-        full ~6,900-ticker universe at ~60-second freshness on Pro+.</li>
+        full universe at ~60-second freshness on Pro+ (about 11,500 US stocks
+        and ETFs as of 14 September 2026; this line said ~6,900 before).</li>
       </ul>
 
       <p>Tapeline gates on breadth rather than freshness — Free is live, just
@@ -1553,6 +1559,12 @@ RSI = 100 - (100 / (1 + RS))</pre>
       <a href="/scorecard">tapeline.io/scorecard</a>. The losers stay
       on the page. The hit rate, median alpha, and best/worst days
       update automatically.</p>
+      <p><em>Updated 14 September 2026: the description of that log in
+      the paragraph above was wrong. Entries are not re-ranked or deleted, but we have
+      corrected recorded values twice, and said so: prices on 25 August
+      2026, and scores from 18 May to 12 June capped on 15 June 2026. No
+      top 10 was recorded for 31 August, 2 September, 4 September or 9
+      September 2026.</em></p>
 
       <p>Stock Rover and Zacks both publish historical performance for
       their internal ranks (Stock Rover's Premier list, Zacks #1
@@ -1780,7 +1792,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
     title: "How to evaluate a stock scanner you can actually trust (5 criteria most fail).",
     metaTitle: "How to evaluate a stock scanner you can trust",
     excerpt:
-      "Every stock scanner claims to beat the market. Almost none publish a daily, append-only, back-checked track record you can audit. Here are the five tests we'd put any scanner through before paying — and how to read between the lines when the answers get vague.",
+      "Every stock scanner claims to beat the market. Almost none publish a daily, back-checked track record you can audit. Here are the five tests we'd put any scanner through before paying — and how to read between the lines when the answers get vague.",
     publishedAt: "2026-05-21",
     author: "Tapeline",
     body: `
@@ -1812,6 +1824,14 @@ RSI = 100 - (100 / (1 + RS))</pre>
       date, with the next-day return and the original score visible.
       The page is append-only — we can't go back and edit it. You can
       see every win and every miss."</em></p>
+
+      <p><em>Updated 14 September 2026: we used to hold Tapeline's own
+      scorecard up as that answer, and it is not quite it. Our entries are
+      not re-ranked or deleted, but we have corrected recorded values twice,
+      and said so: prices on 25 August 2026, and scores from 18 May to 12
+      June capped on 15 June 2026. The answer to look for is a record whose
+      corrections are dated and explained, not one that claims it can never
+      change. (This post's summary said the same until today.)</em></p>
 
       <p>The wrong answer looks like: <em>"Our algorithm has a 67%
       win rate based on internal testing"</em> with no link to the
