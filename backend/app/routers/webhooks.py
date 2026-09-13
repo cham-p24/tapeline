@@ -1,6 +1,7 @@
 """Webhooks from Clerk (user sync) and Stripe (billing sync)."""
 from __future__ import annotations
 
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 
@@ -78,10 +79,13 @@ async def clerk_webhook(
         "svix-timestamp": svix_timestamp or "",
         "svix-signature": svix_signature or "",
     }
+    # verify() checks the signature only; the body is parsed explicitly. See
+    # the same block in resend_webhook for why its return value is not used.
     try:
-        payload = Webhook(settings.clerk_webhook_secret).verify(body, headers)
+        Webhook(settings.clerk_webhook_secret).verify(body, headers)
     except WebhookVerificationError as exc:
         raise HTTPException(400, f"Invalid signature: {exc}") from exc
+    payload = json.loads(body)
 
     evt_type = payload.get("type")
     data = payload.get("data", {})
@@ -1447,10 +1451,23 @@ async def resend_webhook(
         "svix-timestamp": svix_timestamp or "",
         "svix-signature": svix_signature or "",
     }
+    # verify() checks the SIGNATURE ONLY. The body is parsed explicitly below,
+    # and verify()'s return value is deliberately ignored.
+    #
+    # svix 2.x changed verify() to return None; 1.x returned the parsed
+    # payload. pyproject pins only `svix>=1.40.0`, so production resolved
+    # 2.4.0 while the local venv still had 1.91.1, and `payload.get(...)`
+    # raised AttributeError on every correctly signed event. Found on
+    # 2026-09-13, the day RESEND_WEBHOOK_SECRET was first set: every real
+    # bounce and complaint 500'd, Resend retried and gave up, and nothing
+    # was ever marked undeliverable. It hid because no test had ever sent a
+    # correctly signed request. Guard:
+    # tests/test_svix_webhooks_ignore_verify_return.py
     try:
-        payload = Webhook(settings.resend_webhook_secret).verify(body, headers)
+        Webhook(settings.resend_webhook_secret).verify(body, headers)
     except WebhookVerificationError as exc:
         raise HTTPException(400, f"Invalid signature: {exc}") from exc
+    payload = json.loads(body)
 
     evt_type = payload.get("type", "")
     data = payload.get("data", {}) or {}
