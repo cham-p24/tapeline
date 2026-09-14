@@ -121,6 +121,12 @@ export const LIMITATIONS: Limitation[] = [
     body:
       "As of 14 September 2026, 32 entries from this period have no next-session back-check. Their result columns are blank rather than estimated, and they are not in the summary figures.",
   },
+  {
+    date: "2026-09-14",
+    period: "Entries from 24 August to 11 September 2026 (16 entries)",
+    body:
+      "16 entries were ranked while the ticker held a Smart Money value with no SEC Form 4 filing on file: BBH on 24, 25, 26 and 28 August and 1, 3 and 8 September; BBP on 25, 26 and 28 August and 1 September; BIB on 26 August and 1 September; PLX on 8, 10 and 11 September. The same tickers appear in 7 earlier entries (BBH on 19 and 21 August, BBP on 20 August, BIB on 7, 12, 13 and 20 August), where whether they held such a value cannot be checked. At 13:30 UTC on 14 September 2026, 856 tickers held such a value: 629 ETFs, 222 stocks and 5 commodity futures contracts. 42 of those values were below 10 or above 90, which the Form 4 calculation cannot produce. Where the values came from has not been established. From 14 September 2026 (#824) an empty Form 4 answer removes the value, unless a filing we already hold from that source records a transaction in the last 80 days, and such tickers become due for a re-check at the next daily run, ahead of other Smart Money re-checks (#833). Lists not changed.",
+  },
 ];
 
 /** "2026-09-09" -> "9 September 2026". Deterministic, no locale APIs. */

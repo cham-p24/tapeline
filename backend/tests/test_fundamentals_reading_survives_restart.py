@@ -30,7 +30,7 @@ import pytest
 from sqlalchemy import select, update
 
 from app.db import session_scope
-from app.models import Ticker
+from app.models import InsiderTransaction, Ticker
 from app.services import finnhub_feed
 from app.services.finnhub_feed import FinnhubThrottledError, compute_fundamentals_score
 from app.services.mock_feed import _signal_from_score
@@ -418,7 +418,17 @@ async def test_the_smart_money_rotation_is_untouched(monkeypatch: pytest.MonkeyP
 
     Smart money has its own dated rule (`_SMART_MONEY_EDGAR_SINCE`, tested in
     tests/test_edgar_form4.py), which this stamp would also match; it is moved
-    out of the way so this test still measures the fundamentals rule only."""
+    out of the way so this test still measures the fundamentals rule only.
+
+    META's reading has a Form 4 filing on file for the same reason: a
+    smart-money value with none is due at once under its own rule (see
+    signal_publisher._UNBACKED_SMART_MONEY_RECHECK_AFTER), which this test is
+    not about."""
     monkeypatch.setattr(sp, "_SMART_MONEY_EDGAR_SINCE", datetime(1970, 1, 1, tzinfo=UTC))
     await _seed("META", last_fundamentals_at=AT, last_smart_money_at=CUT - 2 * H)
+    async with session_scope() as s:
+        s.add(InsiderTransaction(
+            symbol="META", insider_name="Jane Q Insider", transaction_date="2026-09-01",
+            share_change=-500, transaction_price=20.0, transaction_value=10_000.0, code="S",
+        ))
     assert (await sp._factor_due_counts(now=AT))[1] == 0

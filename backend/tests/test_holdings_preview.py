@@ -157,3 +157,16 @@ async def test_premium_full_feed_unchanged(client, monkeypatch):
             assert {i["symbol"] for i in r2.json()["items"]} == {_SYMBOLS[0]}
     finally:
         await _delete_filings()
+
+
+@pytest.mark.asyncio
+async def test_the_full_feed_lookback_stops_at_the_insider_window(client, monkeypatch):
+    """The worker asks Finnhub for 90 days. Since #824 a symbol's older stored rows
+    are deleted at its next empty answer and kept until then, so a longer lookback
+    would return a different window per symbol. Mutation: le=180."""
+    _patch_signup_gates(monkeypatch)
+    async with client:
+        cookies = await _signup(client, "premium")
+        assert (await client.get("/api/holdings?days=90", cookies=cookies)).status_code == 200
+        r = await client.get("/api/holdings?days=91", cookies=cookies)
+        assert r.status_code == 422, r.text
