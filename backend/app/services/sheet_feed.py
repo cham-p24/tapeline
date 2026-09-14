@@ -37,6 +37,7 @@ import csv
 import io
 import logging
 import re
+from collections import Counter
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -788,6 +789,18 @@ def _approx_sub_rs(row: dict[str, Any]) -> float | None:
     return max(0.0, min(100.0, avg))
 
 
+def _warn_collapsed_duplicates(rows: list[dict[str, Any]], event: str) -> None:
+    """Say out loud when one parse carried a symbol more than once.
+
+    Before the upserts kept one row per symbol, a duplicate new symbol failed
+    the whole commit. It now resolves silently to the later sheet row, so this
+    is the only trace that the workbook disagreed with itself.
+    """
+    dupes = sorted(s for s, n in Counter(r["symbol"] for r in rows).items() if n > 1)
+    if dupes:
+        logger.warning("%s symbols=%s (later sheet row kept)", event, dupes)
+
+
 async def upsert_tickers(
     session: AsyncSession, rows: list[dict[str, Any]]
 ) -> dict[str, int]:
@@ -900,6 +913,7 @@ async def upsert_tickers(
                     "sub_smart_money", "sub_macro", "sub_momentum"):
             setattr(t, key, r.get(key))
 
+    _warn_collapsed_duplicates(rows, "sheet_feed.duplicate_symbols_collapsed")
     await session.commit()
     return {"inserted": inserted, "updated": updated, "total": inserted + updated}
 
@@ -1258,6 +1272,7 @@ async def upsert_etfs(
         if r["change_pct_3m"] is not None:
             t.change_pct_1m = r["change_pct_3m"] / 3.0
 
+    _warn_collapsed_duplicates(rows, "sheet_feed.etf_duplicate_symbols_collapsed")
     await session.commit()
     return {"inserted": inserted, "updated": updated, "total": inserted + updated}
 

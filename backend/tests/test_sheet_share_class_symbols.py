@@ -3,9 +3,10 @@
 WHAT PRODUCTION LOOKS LIKE (read-only, 2026-09-14)
 --------------------------------------------------
 * The workbook has spelled class shares Yahoo-style in the past. The BRK-A and
-  BRK-B rows exist, and the sheet last wrote them before 2026-08-24: their
-  trend, RS and momentum are identical in every daily snapshot since. Their
-  price is NULL, because the vendor does not answer for the hyphen spelling.
+  BRK-B rows exist, and the sheet has not written them since at least
+  2026-08-24, the first daily score snapshot (their trend, RS and momentum are
+  identical in every snapshot since). Their price is NULL, because the vendor
+  does not answer for the hyphen spelling.
 * As of 2026-09-14 the workbook writes BRK.A and BRK.B. ALL SIGNALS has no
   hyphenated tickers, and BRK.B and BRK.A are already sheet-governed.
 * So on today's data this mapping changes nothing. It keeps a return to
@@ -16,6 +17,8 @@ redirecting /t/BRK-A and /t/BRK-B, is a production data change for the founder
 to decide.
 """
 from __future__ import annotations
+
+import logging
 
 import pytest
 from sqlalchemy import select
@@ -129,17 +132,22 @@ def test_the_other_three_tabs_key_class_shares_the_same_way() -> None:
         assert found == {"BRK.B"}, f"the {tab} tab keyed Berkshire as {found}"
 
 
-async def test_the_sheet_upsert_lands_on_the_vendor_row_and_creates_no_twin() -> None:
+async def test_the_sheet_upsert_lands_on_the_vendor_row_and_creates_no_twin(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """End to end: the workbook row updates the priced vendor row, and no
-    second Berkshire is inserted. Mutation: the parser left on _clean_symbol."""
+    second Berkshire is inserted. A parse with no duplicates warns about none.
+    Mutations: the parser left on _clean_symbol; warning on every symbol."""
     async with session_scope() as s:
         s.add(Ticker(
             symbol="BRK.B", name="Berkshire Hathaway", sector="Financials",
             asset_class="equity", score=64.0, price=514.83, volume=2_479_063,
         ))
 
-    async with session_scope() as s:
-        await upsert_tickers(s, parse_all_signals_csv(_all_signals("BRK-B")))
+    with caplog.at_level(logging.WARNING, logger="app.services.sheet_feed"):
+        async with session_scope() as s:
+            await upsert_tickers(s, parse_all_signals_csv(_all_signals("BRK-B")))
+    assert "duplicate_symbols_collapsed" not in caplog.text
 
     async with session_scope() as s:
         found = {
@@ -151,10 +159,13 @@ async def test_the_sheet_upsert_lands_on_the_vendor_row_and_creates_no_twin() ->
     assert set(found) == {"BRK.B"}, f"the sheet created a second Berkshire: {sorted(found)}"
 
 
-async def test_a_workbook_carrying_both_spellings_updates_one_row() -> None:
+async def test_a_workbook_carrying_both_spellings_updates_one_row(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """If the workbook ever carries BRK-B and BRK.B together, both parse to
-    BRK.B and one row is written, the later sheet row winning. Mutation: the
-    parser left on _clean_symbol, which writes a BRK-B twin."""
+    BRK.B and one row is written, the later sheet row winning, with a warning
+    that says so. Mutations: the parser left on _clean_symbol, which writes a
+    BRK-B twin; the collapse left silent."""
     csv_text = (
         _ALL_SIGNALS_HEADER + "\n"
         + _all_signals_row("BRK-B", price="500.00")
@@ -163,8 +174,10 @@ async def test_a_workbook_carrying_both_spellings_updates_one_row() -> None:
     rows = parse_all_signals_csv(csv_text)
     assert [r["symbol"] for r in rows] == ["BRK.B", "BRK.B"]
 
-    async with session_scope() as s:
-        await upsert_tickers(s, rows)
+    with caplog.at_level(logging.WARNING, logger="app.services.sheet_feed"):
+        async with session_scope() as s:
+            await upsert_tickers(s, rows)
+    assert "sheet_feed.duplicate_symbols_collapsed symbols=['BRK.B']" in caplog.text
 
     async with session_scope() as s:
         found = (await s.execute(
@@ -173,9 +186,12 @@ async def test_a_workbook_carrying_both_spellings_updates_one_row() -> None:
     assert [(sym, price) for sym, price in found] == [("BRK.B", 514.83)]
 
 
-async def test_the_etf_tab_carrying_both_spellings_updates_one_row() -> None:
-    """The ETF BENCHMARKS upsert is the other path that inserts rows. Mutation:
-    dropping its per-call symbol map, which adds the same new key twice."""
+async def test_the_etf_tab_carrying_both_spellings_updates_one_row(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The ETF BENCHMARKS upsert is the other path that inserts rows. Mutations:
+    dropping its per-call symbol map, which adds the same new key twice; the
+    collapse left silent."""
     rows = parse_etf_benchmarks_csv(
         "Ticker,Name,unused,Note,Score,Signal,3M Return %,6M Return %,1Y Return %,Above 200DMA,"
         "Beats SPY (6M),vs SPY 6M %,Action\n"
@@ -184,8 +200,10 @@ async def test_the_etf_tab_carrying_both_spellings_updates_one_row() -> None:
     )
     assert [r["symbol"] for r in rows] == ["BRK.B", "BRK.B"]
 
-    async with session_scope() as s:
-        await upsert_etfs(s, rows)
+    with caplog.at_level(logging.WARNING, logger="app.services.sheet_feed"):
+        async with session_scope() as s:
+            await upsert_etfs(s, rows)
+    assert "sheet_feed.etf_duplicate_symbols_collapsed symbols=['BRK.B']" in caplog.text
 
     async with session_scope() as s:
         found = (await s.execute(
