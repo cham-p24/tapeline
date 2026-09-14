@@ -14,9 +14,18 @@ re-verify everything. Two failure modes accumulate silently:
      founder needs a Monday-morning summary that surfaces these
      without them having to open GSC.
 
-This module owns both. Functions are pure async + return structured
-results so they can be called from the worker (signal_publisher tick)
-OR from a CLI for ad-hoc inspection.
+This module owns both. Neither runs in the worker: a full-sitemap crawl in
+the tick's process wedged production for ~3h on 2026-08-24. The daily audit
+runs from .github/workflows/stale-link-audit.yml and the weekly digest from
+.github/workflows/seo-weekly-digest.yml, each on the Fly machine over
+`flyctl ssh`.
+
+NEVER HOLD A DATABASE SESSION ACROSS THE CRAWL. Production Postgres has
+idle_in_transaction_session_timeout = 5min and the crawl takes longer (4 to
+14 minutes, 2026-09-06 to 09-12). A session that has run a query and then
+waits on the crawl is killed, and its next statement fails. That is why the
+daily audit failed on every run from 2026-09-07 to 09-12, each ending in
+"received 2 results from command 'COMMIT'".
 
 DELIVERY: results go to the founder's Telegram chat (via the existing
 services/telegram.py send_message). The chat_id is sourced from the
@@ -29,9 +38,12 @@ Tools. The weekly digest pulls from internal DB + sitemap fetch.
 """
 from __future__ import annotations
 
+import asyncio
+import enum
 import logging
 import re
-from datetime import UTC, datetime
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from xml.etree import ElementTree as ET
 
 import httpx
@@ -39,10 +51,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.db import session_scope
 from app.models import Ticker, User
-from app.services.dblock import (
-    LOCK_SEO_DIGEST,
-    one_machine_at_a_time,
+from app.services.job_claims import (
+    Claim,
+    ClaimStatus,
+    claim_period,
+    complete_period,
+    release_period,
 )
 from app.services.telegram import send_message
 
@@ -337,31 +353,133 @@ async def render_weekly_digest(
     lines.append("  • Check GSC `Pages → Why not indexed` for new buckets")
     lines.append("  • Skim Performance → Queries for keywords newly in top 20")
     lines.append("")
-    lines.append("_This digest fires every Monday around 09:00 UTC._")
+    lines.append("_Sent once a week, from Monday 09:00 UTC._")
 
     return "\n".join(lines)
 
 
-@one_machine_at_a_time(
-    LOCK_SEO_DIGEST, "seo_digest", default_factory=int,
-)
-async def run_weekly_digest(session: AsyncSession) -> bool:
-    """Render + send the weekly SEO digest. Returns True on success."""
-    chat_id = await _owner_chat_id(session)
+#: The durable claim key for the weekly digest (services/job_claims).
+DIGEST_JOB = "seo_weekly_digest"
+
+#: A run that has not rendered its digest within this long of claiming the week
+#: sends nothing. It sits well inside job_claims.STALE_CLAIM_AFTER, so by the
+#: time a run sends, no other run can have taken the week over.
+DIGEST_BUDGET = timedelta(minutes=45)
+
+#: Attempts at recording a sent digest before giving up. After a send, the claim
+#: is never released: a failure to record it risks one duplicate a day later,
+#: while releasing it would re-send on the next run.
+COMPLETE_ATTEMPTS = 3
+COMPLETE_RETRY_SECONDS = 2.0
+
+#: The first ISO week the claim governs. Until this change the worker sent the
+#: digest from a process-memory latch, which leaves no record. The first Actions
+#: run after the merge must not send a week the worker may already have sent.
+FIRST_CLAIMED_WEEK = (2026, 39)
+
+
+class DigestOutcome(enum.Enum):
+    NOT_YET = "not_yet"                  # before Monday 09:00 UTC of this ISO week
+    NO_RECIPIENT = "no_recipient"        # no bot token, or no owner chat id
+    ALREADY_SENT = "already_sent"
+    IN_FLIGHT = "in_flight"              # another run holds a fresh claim
+    SENT = "sent"
+    SENT_UNRECORDED = "sent_unrecorded"  # sent, but the claim could not be completed
+    FAILED = "failed"                    # nothing sent; the week is released to retry
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+async def _release(claim: Claim) -> None:
+    try:
+        await release_period(claim)
+    except Exception:
+        # The claim goes stale after job_claims.STALE_CLAIM_AFTER and is taken
+        # over then, so a failed release delays the retry but does not lose it.
+        logger.exception("seo_digest.release_failed period=%s", claim.period)
+
+
+async def run_weekly_digest(*, clock: Callable[[], datetime] = _utcnow) -> DigestOutcome:
+    """Send the weekly SEO digest at most once per ISO week.
+
+    Run daily by .github/workflows/seo-weekly-digest.yml. Any run from Monday
+    09:00 UTC to the end of the ISO week sends the week's digest if no earlier
+    run has, so a run lost to a deploy or to Actions' late schedule is retried
+    the next day. The week is claimed in job_period_claims before the crawl:
+
+      DONE      the week was sent; nothing else happens, and nothing is crawled.
+      BUSY      another run holds a fresh claim; this one stops.
+      CLAIMED   crawl, render, send, then record the week as done.
+
+    Nothing sent (a crawl error, a render that misses DIGEST_BUDGET, Telegram
+    refusing the message) releases the week to the next run. A sent digest is
+    never released; see COMPLETE_ATTEMPTS.
+    """
+    started = clock()
+    iso_year, iso_week, iso_dow = started.isocalendar()
+    if (iso_year, iso_week) < FIRST_CLAIMED_WEEK or (iso_dow, started.hour) < (1, 9):
+        logger.info("seo_digest.not_yet at=%s", started.isoformat())
+        return DigestOutcome.NOT_YET
+
+    if not settings.telegram_bot_token:
+        logger.info("seo_digest.skipped no_bot_token")
+        return DigestOutcome.NO_RECIPIENT
+    async with session_scope() as session:
+        chat_id = await _owner_chat_id(session)
     if not chat_id:
         logger.info("seo_digest.skipped no_owner_chat_id")
-        return False
+        return DigestOutcome.NO_RECIPIENT
 
-    # Run audit once, pass into digest renderer.
-    stale = await run_stale_link_audit()
-    text = await render_weekly_digest(session, stale_audit=stale)
-    sent = await send_message(chat_id, text)
-    if sent:
-        logger.info(
-            "seo_digest.sent broken=%d healthy=%d",
-            len(stale.get("broken", [])), stale.get("healthy", 0),
+    period = f"{iso_year}W{iso_week:02d}"
+    claim = await claim_period(DIGEST_JOB, period, now=started)
+    if claim.status is ClaimStatus.DONE:
+        logger.info("seo_digest.already_sent period=%s", period)
+        return DigestOutcome.ALREADY_SENT
+    if claim.status is ClaimStatus.BUSY:
+        logger.info("seo_digest.in_flight_elsewhere period=%s", period)
+        return DigestOutcome.IN_FLIGHT
+
+    deadline = started + DIGEST_BUDGET
+    try:
+        # No session is open across the crawl; see the module docstring.
+        stale = await asyncio.wait_for(
+            run_stale_link_audit(),
+            timeout=max((deadline - clock()).total_seconds(), 0.0),
         )
-    return sent
+        async with session_scope() as session:
+            text = await render_weekly_digest(session, stale_audit=stale)
+        if clock() >= deadline:
+            raise TimeoutError(f"digest rendered after its {DIGEST_BUDGET} budget")
+        sent = await send_message(chat_id, text)
+    except Exception:
+        logger.exception("seo_digest.failed period=%s", period)
+        await _release(claim)
+        return DigestOutcome.FAILED
+
+    if not sent:
+        # send_message returns False on a Telegram non-200. The bot token was
+        # checked above, so this is a refusal, not a missing configuration.
+        logger.warning("seo_digest.send_refused period=%s", period)
+        await _release(claim)
+        return DigestOutcome.FAILED
+
+    logger.info(
+        "seo_digest.sent period=%s broken=%d healthy=%d",
+        period, len(stale.get("broken", []) or []), stale.get("healthy", 0),
+    )
+    for attempt in range(1, COMPLETE_ATTEMPTS + 1):
+        try:
+            if await complete_period(claim):
+                return DigestOutcome.SENT
+            logger.error("seo_digest.claim_lost_after_send period=%s", period)
+            return DigestOutcome.SENT_UNRECORDED
+        except Exception:
+            logger.exception("seo_digest.complete_failed period=%s attempt=%d", period, attempt)
+            if attempt < COMPLETE_ATTEMPTS:
+                await asyncio.sleep(COMPLETE_RETRY_SECONDS * attempt)
+    return DigestOutcome.SENT_UNRECORDED
 
 
 async def run_stale_audit_alert(session: AsyncSession) -> bool:
@@ -370,6 +488,10 @@ async def run_stale_audit_alert(session: AsyncSession) -> bool:
     lightweight pager — no broken links = no Telegram noise.
     """
     chat_id = await _owner_chat_id(session)
+    # End the read before the crawl. Left open, the transaction sat idle for the
+    # whole crawl, Postgres killed it at 5 minutes, and the caller's commit
+    # failed after every crawl from 2026-09-07 to 09-12.
+    await session.commit()
     if not chat_id:
         logger.info("stale_audit.skipped no_owner_chat_id")
         return False

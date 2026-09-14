@@ -136,7 +136,8 @@ def test_the_five_fixed_ones_claim_before_and_roll_back():
     for var, prev in (
         ("_last_eod_digest_date", "_eod_prev"),
         ("_last_weekly_newsletter_token", "_weekly_prev"),
-        ("_last_seo_digest_token", "_seo_prev"),
+        # _last_seo_digest_token was one of the five. The digest has since
+        # left the tick for seo-weekly-digest.yml, taking its latch with it.
         ("_last_growth_tick_date", "_growth_prev"),
         # The fifth. A hand-written regex sweep found four; this one is nested
         # inside the 21:15 freeze block, so the sweep's backward walk to the

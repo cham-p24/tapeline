@@ -32,9 +32,10 @@ on:
   workflow_dispatch:        # Manual "run one now" from the Actions tab
 
 # A crawl that overruns must never overlap itself. This is the failure mode
-# that caused the incident; the in-worker version had no such guard.
+# that caused the incident; the in-worker version had no such guard. The group
+# is shared with seo-weekly-digest.yml, which crawls the same sitemap.
 concurrency:
-  group: stale-link-audit
+  group: sitemap-crawl
   cancel-in-progress: false
 
 jobs:
@@ -44,7 +45,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # Pinned to the same immutable SHA as every other workflow that holds the
+      # production Fly token.
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
 
       - name: Crawl the sitemap and alert only on broken URLs
         env:

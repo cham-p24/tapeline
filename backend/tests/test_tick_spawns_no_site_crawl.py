@@ -48,6 +48,34 @@ def test_the_tick_module_cannot_start_a_sitemap_crawl():
     )
 
 
+def _code_only(source: str) -> str:
+    """The module's source with comments and docstrings removed, so a comment
+    explaining where the digest went cannot satisfy or trip the check. The AST
+    carries no comments; docstrings are dropped by hand."""
+    import ast
+
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if (
+            isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            and body and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str)
+        ):
+            node.body = body[1:] or [ast.Pass()]
+    return ast.unparse(tree)
+
+
+def test_the_tick_module_does_not_send_the_weekly_seo_digest():
+    """The digest crawls the same sitemap. It ran inline in the tick until
+    2026-09-14, when the first Monday tick after each deploy was killed at
+    stage=seo_digest_token. It runs from seo-weekly-digest.yml now. Mutation:
+    restoring the tick's digest block."""
+    code = _code_only(SRC)
+    for banned in ("run_weekly_digest", "seo_digest", "_last_seo_digest_token"):
+        assert banned not in code, f"the worker references {banned} again"
+
+
 def test_no_module_global_latch_gates_a_long_job():
     """A module global re-arms on every deploy — that is what made it a storm."""
     assert not hasattr(signal_publisher, "_last_stale_audit_date"), (
