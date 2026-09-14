@@ -77,7 +77,11 @@ import sys
 
 from sqlalchemy import select
 
-from app.services.broadcast_safety import configure_quiet_logging, outcome_unknown
+from app.services.broadcast_safety import (
+    configure_quiet_logging,
+    outcome_unknown,
+    room_for_token,
+)
 from app.services.dblock import LOCK_SURVEY_REMINDER, one_machine_at_a_time
 
 logger = logging.getLogger(__name__)
@@ -415,6 +419,23 @@ async def run_newsletter(
 # `unknown` means check Resend's log, and a retry will not resend. The same
 # classification the product update uses (#814), from the same module.
 #
+# WHY AN OUTAGE STOPS THE RUN: stamping every unknown outcome means that if
+# Resend answers 5xx or times out on every request, the run stamps the whole
+# audience and nobody is ever reminded. So UNKNOWN_OUTCOME_LIMIT unknown
+# outcomes in a row (with no delivery between them) stop the account phase:
+# the accounts after them are not attempted, carry no stamp, and are counted
+# as `accounts_held` for a re-run. The newsletter half is held too, even under
+# --force-newsletter, because this run has just seen Resend failing and that
+# list has no marker to retry from.
+#
+# WHY A RUN THAT FELL SHORT EXITS NON-ZERO: nobody watches the 17:07 run, and a
+# green check is all anyone will look at. So `main` exits 1 when the lock was
+# refused, or any eligible person was left `failed`, `unknown`, `not_sent`
+# (e.g. no Resend key), `accounts_held`, or `newsletter_held` (the list was
+# held because this run stamped no account or stopped). GitHub then notifies
+# the owner. A later re-run that finds everyone reminded, and leaves the list
+# to the first run, is not a shortfall and stays green.
+#
 # WHY THE NEWSLETTER HALF HAS A RUN-LEVEL GUARD: `newsletter_subscribers` has no
 # per-row marker column, and the original newsletter send stamped nothing. So the
 # newsletter phase runs only when no account carried REMINDER_TOKEN before this
@@ -442,6 +463,13 @@ async def run_newsletter(
 # anything address-shaped.
 
 REMINDER_TOKEN = "survey_2026_09_r"
+
+#: Unknown outcomes in a row that stop the account phase — see the block comment.
+UNKNOWN_OUTCOME_LIMIT = 2
+
+#: Counts that mean an eligible person was not (knowably) reminded by this run.
+#: Any of them non-zero makes `main` exit 1 — see the block comment.
+FELL_SHORT = ("failed", "unknown", "not_sent", "accounts_held", "newsletter_held")
 
 #: Newsletter subscribers created before this instant received the original.
 #:
@@ -530,6 +558,10 @@ async def collect_reminder_accounts(session) -> tuple[list, list]:
             skipped.append((u, "answered"))
         elif not wants(u, EmailPref.RE_ENGAGEMENT):
             skipped.append((u, "opted_out"))
+        elif not room_for_token(u.drip_state, REMINDER_TOKEN):
+            # The stamp is written after the email has gone; one the column
+            # cannot hold would leave this person mailed and unstamped.
+            skipped.append((u, "no_room_for_token"))
         else:
             recipients.append(u)
     return recipients, skipped
@@ -618,11 +650,16 @@ async def run_reminder(
     counts = {
         "accounts_sent": 0, "newsletter_sent": 0, "would_send": 0,
         "governed": 0, "not_sent": 0, "failed": 0, "unknown": 0,
+        "accounts_held": 0, "newsletter_held": 0,
     }
     # Accounts this run stamped, delivered or outcome-unknown. The newsletter
     # guard asks whether a re-run could tell this run happened, and either kind
     # of stamp answers yes; `accounts_sent` alone would not count the second.
     stamped = 0
+    # Unknown outcomes since the last delivery, and whether they stopped the
+    # account phase — see "WHY AN OUTAGE STOPS THE RUN".
+    unknown_streak = 0
+    stopped = False
 
     async with session_scope() as session:
         # Decided BEFORE anything is sent. Parsed in Python, not with LIKE:
@@ -642,7 +679,7 @@ async def run_reminder(
         print(f"newsletter: {len(news)} eligible; skipped: {_tally(n_skipped)}")
 
         governor = worker_governor()
-        for u in accounts:
+        for position, u in enumerate(accounts, start=1):
             if not send:
                 counts["would_send"] += 1
                 show(f"  WOULD SEND  {u.email:<40} Hi {first_name(u.name)},")
@@ -687,15 +724,33 @@ async def run_reminder(
             governor.record(u)
             stamped += 1
             if outcome == "sent":
+                unknown_streak = 0
                 counts["accounts_sent"] += 1
                 show(f"  SENT        {u.email}")
-            else:
-                counts["unknown"] += 1
-                show(f"  UNKNOWN     {u.email} (stamped; check Resend's log)")
+                continue
+            unknown_streak += 1
+            counts["unknown"] += 1
+            show(f"  UNKNOWN     {u.email} (stamped; check Resend's log)")
+            if unknown_streak >= UNKNOWN_OUTCOME_LIMIT:
+                stopped = True
+                counts["accounts_held"] = len(accounts) - position
+                print(
+                    f"STOPPED: {unknown_streak} sends in a row had an unknown outcome, "
+                    f"so Resend looks unhealthy. {counts['accounts_held']} account(s) "
+                    "after them were not attempted and carry no stamp: re-run once "
+                    "Resend is healthy."
+                )
+                break
 
         # The run-level newsletter guard — see the block comment. Dry runs
         # report what the first real run would do.
-        if force_newsletter:
+        if stopped:
+            run_news, why = False, (
+                "HELD: the account phase stopped on unknown outcomes. Check Resend's "
+                "log, then run with --force-newsletter over flyctl ssh"
+            )
+            counts["newsletter_held"] = len(news)
+        elif force_newsletter:
             run_news, why = True, "FORCED by --force-newsletter"
         elif not first_run:
             run_news, why = False, "SKIPPED: an earlier reminder run already stamped accounts"
@@ -704,6 +759,7 @@ async def run_reminder(
                 "SKIPPED: this run stamped no account, so a re-run could not tell "
                 "the list had been mailed"
             )
+            counts["newsletter_held"] = len(news)
         else:
             run_news, why = True, "running"
         print(f"newsletter phase: {why}")
@@ -819,6 +875,14 @@ def main(argv: list[str] | None = None) -> None:
             # refused run would show nothing at all.
             print("\nrefused: another survey reminder run holds the lock; "
                   "this run sent nothing.\n")
+            sys.exit(1)
+        short = {k: counts[k] for k in FELL_SHORT if counts.get(k)}
+        if short:
+            # Counts only, never an address. See "WHY A RUN THAT FELL SHORT
+            # EXITS NON-ZERO" above run_reminder.
+            print(f"FELL SHORT: {short} — exiting 1 so this run shows red. Read "
+                  "the result line before re-running.\n")
+            sys.exit(1)
         return
 
     async def _go() -> None:

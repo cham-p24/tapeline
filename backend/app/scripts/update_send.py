@@ -56,9 +56,9 @@ Five layers, because each one covers a failure the others do not.
      has no per-row marker (`last_sent_at` belongs to the daily digest, which
      would stop sending if this job wrote it). So accounts always go first, and
      the newsletter phase runs only when no account carried the token before
-     this run AND this run stamped at least one. The second condition closes a
-     hole the survey reminder's guard has: a run that stamps no account leaves
-     no trace, so without it a re-run would mail the list a second time. A crash
+     this run AND this run stamped at least one. The second condition matters:
+     a run that stamps no account leaves no trace, so without it a re-run would
+     mail the list a second time. A crash
      therefore under-sends rather than double-sends. `--force-newsletter` is
      for a human who has checked Resend's log first.
   4. AN ERROR AFTER THE REQUEST LEFT IS STAMPED, NOT RETRIED. `send_email`
@@ -126,6 +126,7 @@ from app.services.broadcast_safety import (  # noqa: F401 — RedactAddresses is
     RedactAddresses,
     configure_quiet_logging,
     outcome_unknown,
+    room_for_token,
 )
 from app.services.dblock import LOCK_PRODUCT_UPDATE, one_machine_at_a_time
 
@@ -181,29 +182,11 @@ async def collect_accounts(session) -> tuple[list, list]:
 def _room_for_token(drip_state: str | None) -> bool:
     """Whether appending UPDATE_TOKEN still fits `users.drip_state`.
 
-    The column is VARCHAR(255) and this has already bitten once: weekly tokens
-    overran it and Postgres raised StringDataRightTruncation on commit (see
-    email.run_weekly_newsletter). Here the stamp is written AFTER the email is
-    delivered and outside the send's try, so an overflow would abort the run
-    with that person mailed but unstamped — and every retry would mail them
-    again. Skipping them, counted, is the only order that cannot double-send.
-    SQLite does not enforce the length, so the test suite could never see the
-    failure; the capacity is read from the model rather than restated here.
+    Here the stamp is written AFTER the email is delivered and outside the
+    send's try, so an overflow would leave that person mailed but unstamped.
+    Shared with the survey reminder; see `broadcast_safety.room_for_token`.
     """
-    from sqlalchemy import String
-
-    from app.models import User
-
-    # Narrowed with isinstance so mypy knows `.length` exists (a bare
-    # TypeEngine does not declare it). Text subclasses String with
-    # length=None, i.e. no limit, so a future Text column never blocks a send.
-    col_type = User.__table__.c.drip_state.type
-    capacity = col_type.length if isinstance(col_type, String) else None
-    if capacity is None:
-        return True
-    current = drip_state or ""
-    needed = len(current) + (1 if current else 0) + len(UPDATE_TOKEN)
-    return needed <= capacity
+    return room_for_token(drip_state, UPDATE_TOKEN)
 
 
 async def collect_newsletter_only(session) -> tuple[list, list]:

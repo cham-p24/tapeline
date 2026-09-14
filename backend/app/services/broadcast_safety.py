@@ -17,6 +17,9 @@ Two properties follow, and both scripts need exactly the same answer to each:
     errors after which Resend may already have queued the email (stamp it, so a
     retry does not send it again) from errors that prove Resend never had it
     (leave it unstamped, so a retry is the fix).
+  * THE STAMP MUST FIT. It is written after the email has gone, so a stamp the
+    column cannot hold aborts the run with that person mailed and unstamped.
+    `room_for_token` lets a collector skip them, counted, before anything sends.
 
 Extracted from `update_send.py` (#814) so the survey reminder uses the same
 implementation rather than a second copy, and so neither send depends on the
@@ -24,6 +27,7 @@ other script still existing: both workflows are deleted once they have run.
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 import sys
@@ -79,6 +83,11 @@ def outcome_unknown(exc: BaseException) -> bool:
     treating the first group as failures leaves the recipient unstamped and the
     retry mails them a second time (reproduced for the product update: a
     ReadTimeout on the first call, two deliveries across two runs).
+
+    A malformed response includes a 2xx whose body is not JSON: `send_email`
+    ends `resp.raise_for_status(); return resp.json()`, so a JSONDecodeError
+    can only be raised after Resend accepted the email. Nothing before the
+    POST parses JSON, so a render bug cannot raise it.
     """
     import httpx
 
@@ -88,4 +97,33 @@ def outcome_unknown(exc: BaseException) -> bool:
         httpx.ReadTimeout, httpx.WriteTimeout,
         httpx.ReadError, httpx.WriteError, httpx.CloseError,
         httpx.RemoteProtocolError, httpx.DecodingError,
+        json.JSONDecodeError,
     ))
+
+
+def room_for_token(drip_state: str | None, token: str) -> bool:
+    """Whether appending `token` still fits `users.drip_state`.
+
+    The column is VARCHAR(255) and this has already bitten once: weekly tokens
+    overran it and Postgres raised StringDataRightTruncation on commit (see
+    email.run_weekly_newsletter). A broadcast writes its stamp AFTER the email
+    is delivered and outside the send's try, so an overflow would abort the run
+    with that person mailed but unstamped — and every retry would mail them
+    again. Skipping them, counted, is the only order that cannot double-send.
+    SQLite does not enforce the length, so the test suite could never see the
+    failure; the capacity is read from the model rather than restated here.
+    """
+    from sqlalchemy import String
+
+    from app.models import User
+
+    # Narrowed with isinstance so mypy knows `.length` exists (a bare
+    # TypeEngine does not declare it). Text subclasses String with
+    # length=None, i.e. no limit, so a future Text column never blocks a send.
+    col_type = User.__table__.c.drip_state.type
+    capacity = col_type.length if isinstance(col_type, String) else None
+    if capacity is None:
+        return True
+    current = drip_state or ""
+    needed = len(current) + (1 if current else 0) + len(token)
+    return needed <= capacity
