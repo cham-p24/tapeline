@@ -324,6 +324,20 @@ _last_universe_refresh: datetime | None = None
 _last_sheet_refresh: datetime | None = None
 _last_crypto_refresh: datetime | None = None
 _last_active_universe_refresh: datetime | None = None
+
+#: How often the snapshot list is rebuilt from the table.
+#:
+#: It was hourly, so a row added or first scored mid-session waited up to an
+#: hour for its first minute-by-minute price. The rebuild is one indexed read of
+#: the tickers table (no vendor call), so five minutes costs nothing measurable.
+ACTIVE_UNIVERSE_REFRESH_SECONDS = 300
+
+
+def _active_universe_refresh_due(now: datetime) -> bool:
+    """True when the snapshot list should be rebuilt on this tick."""
+    return _last_active_universe_refresh is None or (
+        now - _last_active_universe_refresh
+    ).total_seconds() >= ACTIVE_UNIVERSE_REFRESH_SECONDS
 _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run (UTC)
 _last_weekly_newsletter_token: str | None = None  # "weekly_YYYYWww" of last newsletter run
 _last_daily_newsletter_date: str | None = None  # "YYYY-MM-DD" of last Daily Top 10 digest run (UTC)
@@ -1161,14 +1175,12 @@ async def tick() -> None:
         _last_universe_refresh = started
         _spawn(_refresh_universe(), key="universe_refresh")
 
-    # Hourly active-scoring-universe refresh (top-N by daily $-volume from
-    # the DB-tracked 5,757). Cheap query — keeps the cache that
-    # polygon_feed.fetch_snapshots reads each tick within an hour of fresh.
+    # Active universe refresh, every ACTIVE_UNIVERSE_REFRESH_SECONDS. Cheap
+    # query - keeps the list polygon_feed.fetch_snapshots reads each tick within
+    # minutes of the table.
     _set_stage("active_universe_refresh")
     global _last_active_universe_refresh
-    if _last_active_universe_refresh is None or (
-        started - _last_active_universe_refresh
-    ).total_seconds() >= 3600:
+    if _active_universe_refresh_due(started):
         from app.services.universe import refresh_active_universe
         # Stamped before the work — see the news refresh.
         _last_active_universe_refresh = started
@@ -4803,6 +4815,15 @@ async def main() -> None:
     try:
         n = await refresh_active_universe()
         logger.info("active_universe.warmed count=%d", n)
+        # The first tick would otherwise rebuild the list it was just given -
+        # but only if it WAS given one. refresh_active_universe never raises:
+        # a failed read logs and returns the size of the cache, which is 0 on
+        # a fresh process. Stamping then would hold the rebuild back for
+        # ACTIVE_UNIVERSE_REFRESH_SECONDS while every tick priced the 112-symbol
+        # fallback, instead of retrying on the first tick as it always did.
+        if n > 0:
+            global _last_active_universe_refresh
+            _last_active_universe_refresh = datetime.now(UTC)
     except Exception:
         # Never block the worker on this: an empty cache degrades to the mock
         # fallback, which is bad but survivable, whereas not starting is not.
@@ -4816,8 +4837,9 @@ async def main() -> None:
     #
     # It is a HANG detector, not a pacing knob, and the distinction is what the
     # old value got wrong. Ticks are strictly sequential — `await wait_for(tick())`
-    # then `await sleep(interval)` — so a slow tick delays the next one and can
-    # never overlap it. Nothing is protected by keeping the ceiling tight.
+    # then a sleep until the next cycle is due — so a slow tick delays the next
+    # one and can never overlap it. Nothing is protected by keeping the ceiling
+    # tight.
     #
     # 60 was pure headroom when a healthy tick was ~6s at 2,500 symbols. At
     # 12,000 (#763) the MANDATORY snapshot write alone approaches it, so the
@@ -4833,6 +4855,7 @@ async def main() -> None:
 
     while True:
         cycle_started = datetime.now(UTC)
+        cycle_clock = monotonic()
         try:
             await asyncio.wait_for(tick(), timeout=TICK_TIMEOUT_SECONDS)
             consecutive_timeouts = 0
@@ -4874,7 +4897,34 @@ async def main() -> None:
                     logger.exception("tick.timeout_streak.sentry_capture_failed")
         except Exception:
             logger.exception("tick.failure")
-        await asyncio.sleep(settings.score_refresh_seconds)
+        await asyncio.sleep(_seconds_until_next_cycle(monotonic() - cycle_clock))
+
+
+#: The shortest pause between two cycles, even after one that overran.
+#: A breath for the background jobs sharing this event loop, not a pacing knob.
+_MIN_CYCLE_PAUSE_SECONDS = 1.0
+
+
+def _seconds_until_next_cycle(elapsed: float) -> float:
+    """How long to sleep so cycles START every `score_refresh_seconds`.
+
+    The loop used to sleep the whole interval AFTER each tick, so the real
+    period was the interval plus the tick. Measured in production on
+    2026-09-14: ticks of 11-16 seconds put passes 71-76 seconds apart, and no
+    ticker was ever refreshed once a minute. Sleeping only the remainder
+    makes the interval the period.
+
+    A cycle that took the whole interval or longer starts the next one after
+    `_MIN_CYCLE_PAUSE_SECONDS`, and says so: an overrun means a minute was
+    missed, and that should be visible in the logs rather than absorbed.
+    """
+    interval = float(settings.score_refresh_seconds)
+    if elapsed >= interval:
+        logger.warning(
+            "tick.overrun elapsed=%.1fs interval=%.0fs — the next cycle starts now",
+            elapsed, interval,
+        )
+    return max(_MIN_CYCLE_PAUSE_SECONDS, interval - elapsed)
 
 
 if __name__ == "__main__":
