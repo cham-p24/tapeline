@@ -92,6 +92,19 @@ FORM4_TYPES = frozenset({"4", "4/A"})
 #: version are fetched and parsed again.
 PARSE_VERSION = 1
 
+#: The largest share change `insider_transactions.share_change` can hold: it is
+#: a 32-bit INTEGER on Postgres (SQLite, which the tests run on, does not
+#: enforce it). A line beyond it is dropped, with a warning, when a symbol's
+#: transactions are assembled - not at parse time, so the cached filing keeps
+#: what the document says.
+#:
+#: Found on the first production run, 2026-09-14: SVRE's filing by VisionWave
+#: Holdings reports one "J" line of 16,608,240,000 shares at $6.93 (a $115B
+#: "transaction" for a small cap - evidently mis-scaled). The insert raised on
+#: every re-read, so the symbol counted as a failed call forever. No real
+#: single-line transaction comes near 2.1 billion shares.
+MAX_STORABLE_SHARES = 2_147_483_647
+
 _TICKER_MAP_TTL_SECONDS = 24 * 3600
 _TIMEOUT = httpx.Timeout(20.0)
 
@@ -430,8 +443,15 @@ async def _fetch(symbol: str, days_back: int) -> list[dict[str, Any]]:
         if meta["form"] == "4" and (reading["owner_cik"], meta["filing_date"]) in amended:
             continue
         for line in reading["lines"] or []:
-            if line["transaction_date"] >= cutoff:
-                transactions.append({"filer_name": reading["owner_name"], **line})
+            if line["transaction_date"] < cutoff:
+                continue
+            if abs(line["share_change"]) > MAX_STORABLE_SHARES:
+                logger.warning(
+                    "edgar_form4.share_count_unstorable symbol=%s accession=%s shares=%d",
+                    symbol, meta["accession"], line["share_change"],
+                )
+                continue
+            transactions.append({"filer_name": reading["owner_name"], **line})
     return transactions
 
 
