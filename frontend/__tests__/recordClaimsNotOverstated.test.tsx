@@ -235,6 +235,12 @@ describe("rendered static pages", () => {
       "Only the common-stock table of each filing is counted",
       "change over at its next successful re-check",
       "95 stored filing lines from the vendor remained, for 6 tickers",
+      // Correction to the #835 entry (append-only: the entry itself is unchanged).
+      "Corrections to the entry on the switch to SEC EDGAR",
+      "the Insider tab on a ticker's page in the app still lists filings from the data vendor",
+      "the whole non-derivative table of each filing is counted",
+      "A ticker whose re-check fails is tried again on its usual schedule",
+      "that wording predates the change",
     ]) {
       expect(text).toContain(needle);
     }

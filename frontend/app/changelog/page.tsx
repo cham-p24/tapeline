@@ -41,6 +41,19 @@ type LogEntry = {
 };
 
 const METHODOLOGY_LOG: LogEntry[] = [
+  // Corrects the #835 entry below, which was already published when a review
+  // found these problems. Rule 1: corrected by a new entry, not by editing it.
+  // Verified 2026-09-14: routers/ticker.py still serves the Insider tab from
+  // finnhub_feed.fetch_insider_transactions; edgar_form4.parse_form4_xml reads
+  // every nonDerivativeTable/nonDerivativeTransaction line.
+  {
+    date: "2026-09-14",
+    kind: "correction",
+    title: "Corrections to the entry on the switch to SEC EDGAR",
+    body:
+      "Added on 14 September 2026, the same evening as the entry below titled \"Insider Form 4 filings now come from SEC EDGAR instead of a data vendor\". That entry needs four corrections. First, it overstates the scope: the Smart Money factor and the insider filings we store are read from SEC EDGAR, but the Insider tab on a ticker's page in the app still lists filings from the data vendor. Second, the whole non-derivative table of each filing is counted (Table I, which is mostly common stock), not only common stock; the table of options and other derivative securities is still left out. Third, the switch made every ticker due for a re-check at once, and a ticker's stored filings and Smart Money value change over at its next successful re-check. A ticker whose re-check fails is tried again on its usual schedule, about every two days for a stock and about monthly for an ETF or futures contract; the 95 stored filing lines from the vendor that remained at 21:48 UTC, for 6 tickers, were all for stocks. Fourth, on 14 September 2026 the Smart Money methodology page, the data sources page and the insider pages still said these filings come through a data vendor that can run weeks behind SEC EDGAR; that wording predates the change. No recorded entry was changed.",
+    ref: "#848",
+  },
   // Smart Money values with no filing behind them. Counts verified read-only
   // against the production database on 2026-09-14 (13:30 UTC); the same facts
   // are in backend/app/services/scorecard_export.py KNOWN_LIMITATIONS.
