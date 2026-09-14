@@ -53,8 +53,21 @@ from app.services.score import compute_tapeline_composite
 # so the canonical implementation lives in app.services.symbols. Re-exported
 # under the original private name for the four tab parsers below + the tests.
 from app.services.symbols import clean_symbol as _clean_symbol
+from app.services.symbols import vendor_share_class_symbol
 
 logger = logging.getLogger(__name__)
+
+
+def _sheet_symbol(raw_ticker: Any) -> str | None:
+    """A workbook Ticker cell as the symbol our rows are keyed by, or None.
+
+    Validated by `_clean_symbol`, then class shares are spelled the vendor's way
+    (BRK-B -> BRK.B), so the sheet's composite lands on the row the vendor
+    prices instead of on a second, never-priced Berkshire. See
+    symbols.vendor_share_class_symbol.
+    """
+    symbol = _clean_symbol(raw_ticker)
+    return vendor_share_class_symbol(symbol) if symbol is not None else None
 
 
 # Tapeline's descriptive signal labels, mapped from the composite 0-100
@@ -581,7 +594,7 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
     # full of blanks.
     _log_header_drift(reader.fieldnames)
     for raw in reader:
-        symbol = _clean_symbol(_cell(raw, "Ticker"))
+        symbol = _sheet_symbol(_cell(raw, "Ticker"))
         # _clean_symbol drops the header, blanks, dividers, summary rows, and
         # emoji/space-decorated cells like "🏆 IVV". None → skip the row.
         if symbol is None:
@@ -988,7 +1001,7 @@ def parse_spike_intelligence_csv(text: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     reader = csv.DictReader(io.StringIO(text))
     for raw in reader:
-        symbol = _clean_symbol(raw.get("Ticker"))
+        symbol = _sheet_symbol(raw.get("Ticker"))
         # None → header, blank, category divider, or emoji/space-decorated cell.
         if symbol is None:
             continue
@@ -1147,7 +1160,7 @@ def parse_etf_benchmarks_csv(text: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     reader = csv.DictReader(io.StringIO(text))
     for raw in reader:
-        symbol = _clean_symbol(raw.get("Ticker"))
+        symbol = _sheet_symbol(raw.get("Ticker"))
         # None → header, blank, section divider, or emoji/space-decorated cell.
         if symbol is None:
             continue
@@ -1491,7 +1504,7 @@ def parse_smart_money_csv(text: str) -> list[dict[str, Any]]:
     appearances: dict[str, int] = {}
     reader = csv.DictReader(io.StringIO(text))
     for raw in reader:
-        symbol = _clean_symbol(raw.get("Ticker"))
+        symbol = _sheet_symbol(raw.get("Ticker"))
         category = (raw.get("Category") or "").strip()
         # None → header, blank, em-dash, divider, or emoji/space-decorated cell.
         if symbol is None:

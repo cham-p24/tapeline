@@ -97,3 +97,34 @@ def crypto_display_symbol(symbol: Any) -> str | None:
     if not VALID_CRYPTO_SYMBOL_RE.match(s):
         return None
     return s[2:-3]
+
+
+#: A class share as Yahoo-style sources write it: BRK-B. The market-data vendor,
+#: and so every row discovery creates, spells it BRK.B.
+_HYPHEN_CLASS_SHARE_RE = re.compile(r"^([A-Z]{1,5})-([A-Z])$")
+
+
+def vendor_share_class_symbol(symbol: str) -> str:
+    """Spell a class share the vendor's way: "BRK-B" -> "BRK.B". Anything else is
+    returned unchanged.
+
+    For symbols read from the signal-system workbook, which writes class shares
+    Yahoo-style. Measured 2026-09-14 (read-only): the sheet's BRK-A and BRK-B
+    sat beside the vendor rows BRK.A and BRK.B as separate Berkshire tickers.
+    The vendor never prices the hyphen form, so each minute's snapshot wrote
+    their price NULL. Every sheet change wrote the sheet's price back, so the
+    price flipped between the two. /t/BRK-B rendered Berkshire with a dash for
+    a price. The hyphen form was the only one in the table: 11,774 plain, 26
+    dotted and 10 dot-PR symbols, and exactly two hyphenated, both Berkshire.
+    So this cannot collide with a symbol the vendor spells with a hyphen.
+
+    Deliberately narrow: a one-letter class after one to five letters. A longer
+    suffix is not a class share and is left alone, and so are preferred shares
+    (BAC.PRL), foreign listings (FFH.TO) and futures (CL=F).
+
+    NOT applied to the serving path. `clean_symbol` still returns "BRK-B", so
+    /t/BRK-B keeps resolving the row that exists until someone decides what to
+    do with it.
+    """
+    m = _HYPHEN_CLASS_SHARE_RE.match(symbol)
+    return f"{m.group(1)}.{m.group(2)}" if m else symbol
