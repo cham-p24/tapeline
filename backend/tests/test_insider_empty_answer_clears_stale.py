@@ -125,6 +125,11 @@ def _naive(ts: datetime) -> datetime:
     return ts.astimezone(UTC).replace(tzinfo=None) if ts.tzinfo else ts
 
 
+class _RunawayError(BaseException):
+    """A BaseException, so a pass's `except Exception` cannot swallow it: a
+    mutation that loops forever fails the test instead of hanging the suite."""
+
+
 def _vendor(monkeypatch: pytest.MonkeyPatch, outcome: str) -> list[str]:
     """fetch_insider_transactions honouring its real contract."""
     calls: list[str] = []
@@ -133,6 +138,8 @@ def _vendor(monkeypatch: pytest.MonkeyPatch, outcome: str) -> list[str]:
         sym: str, days_back: int = 90, *, raise_failures: bool = False,
     ) -> list[dict[str, Any]] | None:
         calls.append(sym)
+        if len(calls) > 300:
+            raise _RunawayError(f"{len(calls)} calls")
         if outcome == "empty":
             return []
         if outcome == "no_key":
@@ -532,3 +539,264 @@ async def test_the_warm_keeps_a_reading_that_has_form4_rows_on_file() -> None:
     assert finnhub_feed.get_cached_smart_money_score(SYM) == 70.0
     assert finnhub_feed.get_cached_smart_money_score("NOROWS") is None
     assert smart == 0
+
+
+# ===========================================================================
+# 5. A value with no Form 4 row on file is due now (#824 follow-up).
+#
+# Measured 2026-09-14 (read-only): 856 non-crypto rows held a smart-money value
+# with no Form 4 row on file - 629 ETFs, 222 equities, 5 futures - and 16 of the
+# 100 entries recorded from 24 Aug to 11 Sep were ranked with one. #824 retires
+# a value only when the symbol is asked again, and ETFs are asked every 30 days.
+# ===========================================================================
+
+H = timedelta(hours=1)
+NOW = datetime.now(UTC)
+
+
+async def test_a_value_with_no_form4_row_on_file_is_due_whatever_the_horizon(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mutations: no unbacked clause (UNBACKED not due, count 0); no Form 4
+    condition (BACKED due); no floor (RECENT due)."""
+    common = {"asset_class": "etf", "last_fundamentals_at": NOW}
+    await _seed("UNBACKED", last_smart_money_at=NOW - 72 * H, **common)
+    await _seed("BACKED", last_smart_money_at=NOW - 72 * H, **common)
+    await _seed("RECENT", last_smart_money_at=NOW - H, **common)
+    await _seed("NOVALUE", last_smart_money_at=NOW - 72 * H,
+                **{**common, "sub_smart_money": None, "score": AFTER})
+    await _seed_form4("BACKED")
+
+    assert (await sp._factor_due_counts())[1] == 1
+    assert await sp._select_factor_symbols(Ticker.last_smart_money_at, 10) == ["UNBACKED"]
+
+    _vendor(monkeypatch, "empty")
+    await sp._refresh_insider_cache(limit=10)
+
+    t = await _row("UNBACKED")
+    assert (t.sub_smart_money, t.score, t.signal) == (None, AFTER, "CONSTRUCTIVE")
+    assert (await sp._factor_due_counts())[1] == 0
+    assert (await _row("BACKED")).sub_smart_money == 90.0
+
+
+async def test_an_unbacked_value_whose_call_fails_is_not_asked_again_that_phase(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed call is stamped and the value stays, so without a floor the row
+    would be handed straight back every round until the budget ran out.
+    Mutation: a zero floor (runaway)."""
+    await _seed("FAILS", asset_class="etf", last_fundamentals_at=NOW,
+                last_smart_money_at=NOW - 72 * H)
+    calls = _vendor(monkeypatch, "down")
+
+    await sp._run_factor_phase()
+
+    assert calls == ["FAILS"]
+    assert (await _row("FAILS")).sub_smart_money == 90.0
+    assert (await sp._factor_due_counts())[1] == 0
+
+
+# ===========================================================================
+# 6. Crypto pairs are outside the insider pass.
+# ===========================================================================
+
+
+async def test_crypto_pairs_are_never_selected_counted_or_cleared() -> None:
+    """Mutations: the gap query without the scope (X:ZZUSD selected); the due
+    clause without it (X:OLDUSD counted); the clear without its early return
+    (the pair's score recomputed as an equity composite)."""
+    await _seed("X:ZZUSD", asset_class="crypto", last_fundamentals_at=NOW)
+    await _seed("X:OLDUSD", asset_class="crypto", last_fundamentals_at=NOW,
+                last_smart_money_at=NOW - 60 * 24 * H)
+    await _seed("EQGAP", last_fundamentals_at=NOW)
+
+    assert (await sp._factor_due_counts())[1] == 1
+    assert await sp._select_factor_symbols(Ticker.last_smart_money_at, 10) == ["EQGAP"]
+
+    assert await sp._clear_smart_money_reading("X:ZZUSD") == (False, False)
+    t = await _row("X:ZZUSD")
+    assert (t.sub_smart_money, t.score) == (90.0, BEFORE)
+
+
+def test_the_new_due_sql_compiles_on_postgres() -> None:
+    from sqlalchemy.dialects import postgresql
+
+    sql = str(
+        select(func.count()).select_from(Ticker)
+        .where(sp._factor_due_clause(Ticker.last_smart_money_at, NOW))
+        .compile(dialect=postgresql.dialect())
+    )
+    assert "NOT (EXISTS (SELECT insider_transactions.id" in sql
+    assert "tickers.symbol NOT LIKE" in sql
+
+
+# ===========================================================================
+# 7. Only an explicit `data` list is an answer.
+# ===========================================================================
+
+
+class _Resp:
+    def __init__(self, payload: Any) -> None:
+        self.status_code = 200
+        self._payload = payload
+
+    def json(self) -> Any:
+        return self._payload
+
+
+@pytest.fixture
+def http_vendor(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> Any:
+    monkeypatch.setattr(finnhub_feed.settings, "finnhub_api_key", "test_key", raising=False)
+    monkeypatch.setattr(finnhub_feed, "CACHE_DIR", tmp_path)
+
+    def _use(payload: Any) -> list[int]:
+        calls: list[int] = []
+
+        class _Client:
+            def __init__(self, *_a: Any, **_k: Any) -> None:
+                pass
+
+            async def __aenter__(self) -> Any:
+                return self
+
+            async def __aexit__(self, *_a: Any) -> bool:
+                return False
+
+            async def get(self, *_a: Any, **_k: Any) -> _Resp:
+                calls.append(1)
+                return _Resp(payload)
+
+        monkeypatch.setattr(finnhub_feed.httpx, "AsyncClient", _Client)
+        return calls
+
+    return _use
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{}, {"error": "API limit reached"}, {"data": None}, {"symbol": "EMPTYX"}, {"data": "oops"}],
+)
+async def test_a_200_without_a_data_list_is_not_an_empty_answer(
+    http_vendor: Any, payload: Any,
+) -> None:
+    """It used to come back as [] and be cached for 24h; since #824 [] deletes
+    data. Mutation: `data.get("data") or []`."""
+    calls = http_vendor(payload)
+    with pytest.raises(FinnhubUnavailableError):
+        await finnhub_feed.fetch_insider_transactions("EMPTYX", raise_failures=True)
+    assert await finnhub_feed.fetch_insider_transactions("EMPTYX") is None
+    assert await finnhub_feed.fetch_insider_transactions("EMPTYX") is None
+    assert len(calls) == 3, "a body that is not an answer must never be cached"
+
+
+async def test_an_explicit_empty_list_is_still_an_answer(http_vendor: Any) -> None:
+    calls = http_vendor({"data": [], "symbol": "EMPTYX"})
+    assert await finnhub_feed.fetch_insider_transactions("EMPTYX", raise_failures=True) == []
+    assert await finnhub_feed.fetch_insider_transactions("EMPTYX", raise_failures=True) == []
+    assert len(calls) == 1, "a real answer is cached as before"
+
+
+# ===========================================================================
+# 8. The clear is compare-and-set.
+# ===========================================================================
+
+
+def _interleave(monkeypatch: pytest.MonkeyPatch, writes: list[float]) -> None:
+    """Before each of the clear's UPDATEs of `tickers`, apply a competing write
+    of sub_trend in the same transaction - what a sheet upsert or tick chunk
+    committing between the clear's read and its write looks like to the
+    UPDATE's WHERE clause."""
+    from contextlib import asynccontextmanager
+
+    from sqlalchemy import update
+    from sqlalchemy.sql.dml import Update
+
+    real_scope = sp.session_scope
+
+    @asynccontextmanager
+    async def _scope() -> Any:
+        async with real_scope() as session:
+            real_execute = session.execute
+
+            async def _execute(stmt: Any, *a: Any, **k: Any) -> Any:
+                if isinstance(stmt, Update) and stmt.table.name == "tickers" and writes:
+                    await real_execute(
+                        update(Ticker).where(Ticker.symbol == SYM)
+                        .values(sub_trend=writes.pop(0), updated_at=Ticker.updated_at),
+                    )
+                return await real_execute(stmt, *a, **k)
+
+            session.execute = _execute  # type: ignore[method-assign]
+            yield session
+
+    monkeypatch.setattr(sp, "session_scope", _scope)
+
+
+async def test_the_clear_does_not_put_back_a_factor_another_writer_changed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mutations: no factor guard on the UPDATE (the composite ignores the new
+    trend); writing all six factors (trend 80 put back)."""
+    await _seed()
+    _interleave(monkeypatch, [20.0])
+
+    assert await sp._clear_smart_money_reading(SYM) == (True, False)
+
+    t = await _row()
+    assert t.sub_trend == 20.0, "the clear put back a factor another writer had changed"
+    assert t.sub_smart_money is None
+    assert t.score == _composite({c: getattr(t, c) for c in sp.FACTOR_COLUMNS})
+
+
+async def test_a_clear_that_keeps_losing_the_race_leaves_it_to_the_mark(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Mutation: returning before the mark when every attempt misses - the tick
+    would then keep the retired value."""
+    await _seed()
+    await _seed_form4()
+    _interleave(monkeypatch, [20.0, 30.0, 40.0])
+
+    with caplog.at_level("WARNING", logger=sp.logger.name):
+        assert await sp._clear_smart_money_reading(SYM) == (True, True)
+
+    assert "insider.clear_contended symbol=AGED" in caplog.text
+    t = await _row()
+    assert (t.sub_trend, t.sub_smart_money) == (40.0, 90.0)
+    assert await _form4_count() == 0
+    assert SYM in finnhub_feed.smart_money_cleared_symbols()
+    assert finnhub_feed.get_cached_smart_money_score(SYM) is None
+
+
+# ===========================================================================
+# 9. A pass that clears far more filings-backed readings than it scores alerts.
+# ===========================================================================
+
+
+def test_the_surge_threshold() -> None:
+    """Mutations: `>=` for `>`; dropping the minimum sample."""
+    assert sp._insider_clear_surge(100, 10, 31)
+    assert not sp._insider_clear_surge(100, 10, 30)
+    assert not sp._insider_clear_surge(99, 0, 50)
+    assert not sp._insider_clear_surge(100, 0, 0)
+
+
+@pytest.mark.parametrize(("with_filings", "alerts"), [(True, True), (False, False)])
+async def test_only_clears_of_readings_with_filings_raise_the_alarm(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    with_filings: bool, alerts: bool,
+) -> None:
+    """Mutations: no alert (True red); counting every clear (the unbacked
+    clean-up would page on its first run: False red)."""
+    symbols = [f"S{i:03d}" for i in range(100)]
+    for sym in symbols:
+        await _seed(sym)
+    if with_filings:
+        for sym in symbols:
+            await _seed_form4(sym, lines=1)
+    _vendor(monkeypatch, "empty")
+
+    with caplog.at_level("ERROR", logger=sp.logger.name):
+        await sp._refresh_insider_cache(limit=100)
+
+    assert ("insider.cleared_surge" in caplog.text) is alerts

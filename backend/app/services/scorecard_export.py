@@ -366,6 +366,30 @@ KNOWN_LIMITATIONS: list[dict[str, str]] = [
         ),
         "status": "Unresolved.",
     },
+    {
+        "date": "2026-09-14",
+        "period": (
+            "sessions 2026-08-24 to 2026-09-11 (16 rows); sessions before "
+            "2026-08-24 cannot be checked"
+        ),
+        "limitation": (
+            "16 rows were ranked while the ticker held a Smart Money value with "
+            "no SEC Form 4 filing on file: BBH on 2026-08-24, 2026-08-25, "
+            "2026-08-26, 2026-08-28, 2026-09-01, 2026-09-03 and 2026-09-08; BBP "
+            "on 2026-08-25, 2026-08-26, 2026-08-28 and 2026-09-01; BIB on "
+            "2026-08-26 and 2026-09-01; PLX on 2026-09-08, 2026-09-10 and "
+            "2026-09-11. At 13:30 UTC on 2026-09-14, 856 tickers held such a "
+            "value (629 ETFs, 222 stocks, 5 futures funds), 42 of them below 10 "
+            "or above 90, which the Form 4 calculation cannot produce. Where the "
+            "values came from has not been established."
+        ),
+        "status": (
+            "From 2026-09-14 (PR #824) an empty Form 4 answer removes the value "
+            "and the ticker's stored filings; a ticker holding a value with no "
+            "filing on file is re-checked at the next daily run (PR #FOLLOWUP). "
+            "Lists not changed."
+        ),
+    },
 ]
 
 

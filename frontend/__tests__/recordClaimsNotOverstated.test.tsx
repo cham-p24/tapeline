@@ -218,6 +218,12 @@ describe("rendered static pages", () => {
       "The corrected scores took effect on 7 September 2026",
       "Three of the six factors were not refreshed from 6 to 10 September",
       "That was wrong",
+      // #824: Smart Money values with no Form 4 filing on file.
+      "856 tickers held a Smart Money value although no SEC Form 4 filing for them was on file",
+      "16 of the 100 entries recorded from 24 August to 11 September 2026",
+      "BBH on 24, 25, 26 and 28 August and 1, 3 and 8 September",
+      "PLX on 8, 10 and 11 September",
+      "Where the values came from has not been established",
     ]) {
       expect(text).toContain(needle);
     }
