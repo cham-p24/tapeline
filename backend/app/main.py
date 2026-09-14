@@ -144,11 +144,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from app.services.pubsub import broker as _broker
 
     live_bridge = LiveBridge(publish=_broker.publish)
-    live_bridge.start()
+    if settings.live_bridge_enabled:
+        live_bridge.start()
+    else:
+        logger.info("live_bridge.disabled")
     try:
         yield
     finally:
-        await live_bridge.stop()
+        await live_bridge.stop()  # a no-op when it never started
         logger.info("app.shutdown")
 
 
