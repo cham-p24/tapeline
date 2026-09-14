@@ -149,7 +149,7 @@ def _vendor(monkeypatch: pytest.MonkeyPatch, outcome: str) -> list[str]:
             raise RuntimeError("scoring blew up")
         raise AssertionError(outcome)
 
-    monkeypatch.setattr("app.services.finnhub_feed.fetch_insider_transactions", _fetch)
+    monkeypatch.setattr("app.services.edgar_form4.fetch_insider_transactions", _fetch)
     return calls
 
 
