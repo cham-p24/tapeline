@@ -84,9 +84,11 @@ export default function SqueezePage() {
     }
   }, [hasFullFeed, userLoading]);
   // No auto-refresh on the free preview: every GET /api/squeeze/preview by a
-  // free user while more setups exist records a squeeze_preview cap hit and
-  // emails the founder, and the API's live bridge announces a new pass about
-  // every 70-80 seconds during the US session.
+  // free user while more setups exist records a squeeze_preview cap hit (the
+  // founder email is throttled to one per user per day, the row is not), and
+  // the API's live bridge announces a new pass about every 70-80 seconds
+  // during the US session. `enabled: false` also stops the refetch on a
+  // reconnect hello.
   // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
   // only ever moves for data that actually arrived.
   const { status, lastUpdate, markLoaded } = useLiveStream(load, { enabled: hasFullFeed });

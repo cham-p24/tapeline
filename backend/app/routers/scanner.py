@@ -384,12 +384,17 @@ async def list_scanner(
     # request with src=stream each time the API's live bridge announces a
     # worker pass (services/live_bridge.py), about every 70-80s while the page
     # is open. Counting those as scan_run would mark an idle open tab as an
-    # active user on every day it stays open.
+    # active user on every day it stays open, and logging them would add a
+    # scan_logs row per open tab per pass (~750 a day each) that describes a
+    # screen nobody asked for. So a refetch records nothing: no scan_run, no
+    # scan_logs row, no cap hit. Honouring the marker unconditionally is safe
+    # because it only silences bookkeeping; the tier clamps above (row cap,
+    # offset pin) apply to every request, so src=stream reads nothing a normal
+    # request by the same user could not.
     background_refetch = src == "stream"
 
-    if user is not None:
-        if not background_refetch:
-            await record_funnel_event(user, "scan_run")
+    if user is not None and not background_refetch:
+        await record_funnel_event(user, "scan_run")
 
         # ── WHAT THIS SCAN ACTUALLY WAS ─────────────────────────────────────
         # record_funnel_event above answers "did they scan today". It cannot

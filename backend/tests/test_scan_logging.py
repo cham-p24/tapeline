@@ -383,7 +383,7 @@ async def test_account_erasure_removes_the_scan_logs(client, monkeypatch):
 # ═════════════════════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
-async def test_a_human_scan_and_a_stream_refetch_are_distinguishable(client, monkeypatch):
+async def test_a_stream_refetch_is_not_logged_as_a_scan(client, monkeypatch):
     """Without this the table answers the motivating question WRONGLY.
 
     The scanner page calls the same `load` from a user's filter change and from
@@ -391,6 +391,11 @@ async def test_a_human_scan_and_a_stream_refetch_are_distinguishable(client, mon
     "The last scan before they cancelled" would then most likely be a
     background refresh of a tab nobody was reading — a confidently wrong answer
     dressed as evidence.
+
+    Since #840 made those refetches real (one per worker pass per open tab), a
+    refetch writes no row at all rather than a row labelled `stream`: it is
+    not a scan, and ~750 rows a day per idle tab would bury the ones that are.
+    `src` still separates the human sources that remain.
     """
     _patch_signup_gates(monkeypatch)
     await _insert()
@@ -402,7 +407,7 @@ async def test_a_human_scan_and_a_stream_refetch_are_distinguishable(client, mon
             assert (await client.get(f"/api/scanner?sector={_SECTOR}&src=stream")).status_code == 200
 
         got = [r.src for r in await _logs(uid)]
-        assert got == ["app", "stream"], f"src did not survive the request: {got}"
+        assert got == ["app"], f"a stream refetch was logged as a scan: {got}"
     finally:
         await _cleanup(uid)
 

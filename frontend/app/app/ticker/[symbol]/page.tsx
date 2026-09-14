@@ -173,24 +173,53 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
     }
   }, [symbol]);
 
-  // Auto-refresh only for callers who are never metered. Every GET
-  // /api/ticker/{symbol} by a metered free user spends one of their daily
-  // look-ups, and at the cap it is a 402, a daily_lookups cap hit and a
-  // founder email, so refetching once per worker pass would use up the day's
-  // budget in minutes and then swap the page for the look-up wall.
+  // Background refetch after a live-bridge update. It is NOT a look-up: it
+  // sends src=stream plus the receipt the API returned with this page's own
+  // look-up, and the API serves it without spending one, without a 402, a
+  // cap hit or a founder email (backend/app/services/usage.py, "Stream
+  // refetches"). A refused refetch (409: no valid receipt, e.g. after UTC
+  // midnight) or any other failure keeps the page as it is: it never swaps
+  // in the wall or the error card, and never reports a cap hit.
+  const receipt =
+    (data as (TickerDetail & { lookup_receipt?: string | null }) | null)?.lookup_receipt ?? null;
+  const refetch = useCallback(async () => {
+    const q = `src=stream${receipt ? `&receipt=${encodeURIComponent(receipt)}` : ""}`;
+    try {
+      // lib/api.ts is outside this change's file lane, so the query rides on
+      // the symbol segment: api.ticker builds `/api/ticker/${symbol}`.
+      setData(await api.ticker(`${symbol}?${q}`));
+      setError(null);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [symbol, receipt]);
+
+  // Auto-refresh for signed-in callers who are unmetered, or metered and
+  // holding a receipt. A metered payload WITHOUT a receipt comes from an API
+  // build older than the receipt, where a refetch would still spend a
+  // look-up, so the page does not refresh itself there. With no payload yet
+  // (the first load failed) only a paid tier refetches, as before.
   const lookupMeter =
     (data as (TickerDetail & { lookups?: LookupMeter | null }) | null)?.lookups ?? null;
   const autoRefresh =
-    !!user && user.tier !== "free" && (lookupMeter === null || lookupMeter.limit === null);
+    !!user &&
+    (data === null || lookupMeter === null
+      ? user.tier !== "free"
+      : lookupMeter.limit === null || receipt !== null);
   // Track this visit so it appears in the "Recent" pill row across the app.
   useEffect(() => { recordTickerVisit(symbol); }, [symbol]);
   // GA4 engagement event — declared in lib/gtag.ts but never fired until now,
   // so ticker-detail depth was invisible in the funnel. Re-fires per symbol
   // (each is a distinct view), fire-and-forget.
   useEffect(() => { trackEvent("view_ticker", { symbol }); }, [symbol]);
-  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
-  // only ever moves for data that actually arrived.
-  const { status, lastUpdate, markLoaded } = useLiveStream(load, { enabled: autoRefresh });
+  // `refetch` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived. No stream at all while
+  // the look-up wall is shown: nothing there refreshes.
+  const { status, lastUpdate, markLoaded } = useLiveStream(refetch, {
+    enabled: autoRefresh,
+    subscribe: lookupLimit === null,
+  });
   useEffect(() => {
     void load().then((ok) => { if (ok) markLoaded(); });
   }, [load, markLoaded]);

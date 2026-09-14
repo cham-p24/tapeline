@@ -17,34 +17,43 @@ pulsing "Live" badge and never refetched.
 What it does
 ------------
 Each API process runs one :class:`LiveBridge`. Every ``POLL_INTERVAL_SECONDS``
-it reads two watermarks in one query:
+it reads two stamps over scored ``tickers`` rows in one query:
 
-* ``max(tickers.updated_at)`` over scored rows. ``updated_at`` means "live
-  data was written to this row" (see the comment on ``Ticker.updated_at``;
-  metadata writers hold it still), so it advances once per worker pass, on
-  the sheet refresh and on the daily crypto refresh.
-* ``max(regime_state.updated_at)`` (a single row).
+* ``pass_at``: the ``updated_at`` of the row at the lower quartile of the
+  scored universe, oldest first (``n // PASS_QUANTILE_DIVISOR + 1``). This is
+  the pass marker.
+* ``latest_at``: ``max(updated_at)``, used only to tell when writing stopped.
 
-When a watermark advances and has *settled*, it publishes ONE event to the
-local broker, with the event names the worker already uses. The browser treats
-every event the same way (it refetches), so one event per advance is what
-keeps a page to one refetch per pass.
+Why a quartile and not the max. ``updated_at`` means "live data was written to
+this row" (see the comment on ``Ticker.updated_at``), but three writers move
+it. A worker pass rewrites every scored non-crypto row (11,569 of 11,679
+scored rows in one pass, read on production 14 Sep 2026 18:01 UTC). The SIGNAL
+sheet refresh (``sheet_feed.upsert_tickers``, up to every 30s) rewrites only
+sheet-governed rows whose values changed. The daily crypto refresh rewrites
+~110 ``X:`` rows. ``max(updated_at)`` advances for all three, so it fired
+extra events between passes, and each one could push a page's next refetch
+back by the browser's 40s refetch gap. The lower quartile moves only once
+three quarters of the universe has been rewritten, which only a pass does; a
+partial writer cannot move it however often it runs.
 
-Settling. A pass rewrites ~11,500 rows over ~5 seconds, stamping each row as
-it goes, so a poll can land mid-pass and see a max that is still climbing.
-Publishing that would refetch a half-written pass and then refetch again 15s
-later. An advance is therefore published only once the new max is at least
-``SETTLE_SECONDS`` old, or has been observed unchanged on two consecutive
-polls (which covers clock skew between machines). Latency from the end of a
-pass to the event is roughly 10-30 seconds.
+An advance of ``pass_at`` is published as ONE ``scores_updated`` event, and
+only once writing has *settled*: ``latest_at`` is at least ``SETTLE_SECONDS``
+old, or unchanged since the previous poll (which covers clock skew between
+machines). A pass commits in 500-row chunks, so a poll can land after three
+quarters of it and before its end; waiting for the writes to stop keeps that
+pass to one event. There is no separate regime event: the pass writes the
+regime row too, and a regime-only advance (the sheet's MARKET tab) is picked up
+by the next pass's refetch. Latency from the end of a pass to the event is
+roughly 10-30 seconds.
 
-Cost. One statement, two scalar sub-selects. There is no index on
-``tickers.updated_at`` and this deliberately does not add one: every pass
-rewrites that column on every scored row, so an index on it would turn every
-row update of every pass into an index write. Measured on production on
-14 Sep 2026 (11,925 rows, 11,657 scored): a sequential scan, 2,343 shared
-buffer hits, 4.0 ms execution, ~6 ms round trip. At one query per 15s per API
-process that is well under 0.1% of one core.
+Cost. One statement: a sequential scan of ``tickers`` and a sort of the
+~11,700 scored stamps. There is no index on ``tickers.updated_at`` and this
+deliberately does not add one: every pass rewrites that column on every scored
+row, so an index on it would turn every row update of every pass into an index
+write. ``EXPLAIN (ANALYZE, BUFFERS)`` on production (14 Sep 2026, 11,680 scored
+rows): 13.2 ms execution, 3,340 shared buffer hits, a 385 kB in-memory
+quicksort. At one query per 15s per API process that is under 0.1% of one
+core.
 
 Not LISTEN/NOTIFY. The production DATABASE_URL is a transaction-pooled Neon
 endpoint (``db.is_transaction_pooled`` is True, checked 14 Sep 2026), and
@@ -91,8 +100,13 @@ logger = logging.getLogger(__name__)
 
 #: How often each API process reads the watermarks.
 POLL_INTERVAL_SECONDS = 15.0
-#: A new watermark this old (or seen unchanged on two polls) is a finished pass.
+#: Writes whose latest stamp is this old (or unchanged since the previous poll)
+#: have stopped, so the pass that moved the marker is finished.
 SETTLE_SECONDS = 10.0
+#: The pass marker is the stamp of row n // 4 + 1 of the scored rows, oldest
+#: first. A pass rewrites ~99% of them; any other writer would have to rewrite
+#: more than three quarters of the universe to move it.
+PASS_QUANTILE_DIVISOR = 4
 #: Ceiling for the retry delay after consecutive poll failures.
 MAX_BACKOFF_SECONDS = 300.0
 #: A watermark read slower than this is abandoned and counted as a failure.
@@ -101,15 +115,20 @@ READ_TIMEOUT_SECONDS = 10.0
 SESSION_OPEN_ET = time(4, 0)
 SESSION_CLOSE_ET = time(20, 0)
 
-#: Event names, shared with the worker's in-process publishes
+#: Event name, shared with the worker's in-process publish
 #: (workers/signal_publisher.py) so the browser handles both identically.
 SCORES_EVENT = "scores_updated"
-REGIME_EVENT = "regime_updated"
 
+# Window functions run on Postgres (prod) and SQLite >= 3.25 (tests); `n / 4`
+# is integer division on both. An empty table returns no row.
 WATERMARK_SQL = text(
-    "select "
-    "(select max(updated_at) from tickers where score is not null) as tickers_at, "
-    "(select max(updated_at) from regime_state) as regime_at"
+    "select updated_at as pass_at, latest_at from ("
+    " select updated_at,"
+    " row_number() over (order by updated_at) as rn,"
+    " count(*) over () as n,"
+    " max(updated_at) over () as latest_at"
+    " from tickers where score is not null"
+    f") q where rn = n / {PASS_QUANTILE_DIVISOR} + 1"
 )
 
 
@@ -146,8 +165,10 @@ def in_us_extended_session(now: datetime) -> bool:
 
 @dataclass(frozen=True)
 class Watermarks:
-    tickers_at: datetime | None
-    regime_at: datetime | None
+    #: updated_at at the lower quartile of scored rows: moves once per pass.
+    pass_at: datetime | None
+    #: max(updated_at) over scored rows: moves on every write.
+    latest_at: datetime | None
 
 
 def _as_utc(value: Any) -> datetime | None:
@@ -168,7 +189,7 @@ def _as_utc(value: Any) -> datetime | None:
 
 
 async def read_watermarks() -> Watermarks:
-    """Read both watermarks in one statement.
+    """Read the pass marker and the latest write in one statement.
 
     ``SessionLocal`` is looked up at call time, not import time, so the test
     suite's per-test re-binding of the session factory applies here too.
@@ -176,10 +197,12 @@ async def read_watermarks() -> Watermarks:
     from app import db
 
     async with db.SessionLocal() as session:
-        row = (await session.execute(WATERMARK_SQL)).mappings().one()
+        row = (await session.execute(WATERMARK_SQL)).mappings().one_or_none()
+    if row is None:
+        return Watermarks(pass_at=None, latest_at=None)
     return Watermarks(
-        tickers_at=_as_utc(row["tickers_at"]),
-        regime_at=_as_utc(row["regime_at"]),
+        pass_at=_as_utc(row["pass_at"]),
+        latest_at=_as_utc(row["latest_at"]),
     )
 
 
@@ -187,7 +210,7 @@ Publish = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 
 class LiveBridge:
-    """Poll the watermarks and publish one event per settled advance."""
+    """Poll the pass marker and publish one event per settled pass."""
 
     def __init__(
         self,
@@ -212,24 +235,12 @@ class LiveBridge:
         self._read_timeout = read_timeout
         self._in_session = in_session
         self._baselined = False
-        # Last value we published (or baselined on), per watermark.
-        self._published: dict[str, datetime | None] = {}
-        # Value observed on the previous successful poll, per watermark.
-        self._seen: dict[str, datetime | None] = {}
+        # Pass marker we last published (or baselined on).
+        self._published_pass: datetime | None = None
+        # latest_at observed on the previous successful poll.
+        self._seen_latest: datetime | None = None
         self.failures = 0
         self._task: asyncio.Task[None] | None = None
-
-    def _ready(self, name: str, value: datetime | None, now: datetime) -> bool:
-        """Whether ``value`` is a settled advance past what was published."""
-        previous_seen = self._seen.get(name)
-        self._seen[name] = value
-        if value is None:
-            return False
-        published = self._published.get(name)
-        if published is not None and value <= published:
-            return False
-        aged = (now - value).total_seconds() >= self._settle
-        return aged or value == previous_seen
 
     async def poll_once(self) -> str | None:
         """One read. Returns the event name published, or None.
@@ -240,50 +251,34 @@ class LiveBridge:
         """
         marks = await asyncio.wait_for(self._read(), timeout=self._read_timeout)
         now = self._clock()
+        previous_latest, self._seen_latest = self._seen_latest, marks.latest_at
 
         if not self._baselined:
             # First successful read: a browser that connects now loads the
             # current data on mount, so there is nothing to announce yet.
-            self._published = {"tickers": marks.tickers_at, "regime": marks.regime_at}
-            self._seen = dict(self._published)
+            self._published_pass = marks.pass_at
             self._baselined = True
             return None
 
-        tickers_ready = self._ready("tickers", marks.tickers_at, now)
-        regime_ready = self._ready("regime", marks.regime_at, now)
-
-        published_tickers = self._published.get("tickers")
-        tickers_pending = marks.tickers_at is not None and (
-            published_tickers is None or marks.tickers_at > published_tickers
-        )
-
-        event: str | None = None
-        if regime_ready and tickers_pending and not tickers_ready:
-            # The regime row landed but the same pass's ticker rows are still
-            # settling. Wait: the scores event on a later poll covers both, so
-            # the browser refetches once for the pass, not twice.
+        if marks.pass_at is None:
             return None
-        if tickers_ready and marks.tickers_at is not None:
-            event = SCORES_EVENT
-            payload = {"ts": marks.tickers_at.isoformat()}
-        elif regime_ready and marks.regime_at is not None:
-            event = REGIME_EVENT
-            payload = {"ts": marks.regime_at.isoformat()}
-
-        if event is None:
+        if self._published_pass is not None and marks.pass_at <= self._published_pass:
+            # No new pass. Sheet and crypto writes move latest_at only.
+            return None
+        latest = marks.latest_at or marks.pass_at
+        aged = (now - latest).total_seconds() >= self._settle
+        if not (aged or latest == previous_latest):
+            # Most of a pass is in, but rows are still being written. Publishing
+            # now would announce the same pass again on the next poll.
             return None
 
-        # The worker writes the regime row in the same pass as the tickers, so
-        # a scores event already covers a regime advance seen in this poll.
-        # Mark both published BEFORE publishing so a publish error cannot make
-        # the next poll replay the same advance.
-        if tickers_ready:
-            self._published["tickers"] = marks.tickers_at
-        if regime_ready:
-            self._published["regime"] = marks.regime_at
-        await self._publish(event, payload)
-        logger.info("live_bridge.published event=%s ts=%s", event, payload["ts"])
-        return event
+        # Mark published BEFORE publishing so a publish error cannot make the
+        # next poll replay the same pass.
+        self._published_pass = marks.pass_at
+        payload = {"ts": latest.isoformat()}
+        await self._publish(SCORES_EVENT, payload)
+        logger.info("live_bridge.published event=%s ts=%s", SCORES_EVENT, payload["ts"])
+        return SCORES_EVENT
 
     def next_delay(self) -> float:
         """Delay before the next poll given the current failure count."""

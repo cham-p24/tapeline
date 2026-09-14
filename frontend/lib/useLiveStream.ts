@@ -41,11 +41,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *     "Connected" rather than a time for data that never arrived.
  *
  * `enabled` (default true). Pass `enabled: false` where a refetch costs the
- * user something: a metered endpoint (the free daily ticker look-ups) or one
- * that records a free-tier cap hit and emails the founder on every call (the
- * squeeze preview). While disabled the hook never schedules a refetch, never
+ * user something or records something: the squeeze preview (a free-tier cap
+ * hit per call), or the ticker page when the API gave it no receipt to prove
+ * the refetch is not a new look-up. While disabled the hook never schedules a
+ * refetch (on an update or on a reconnect hello), never
  * reports "auto", and drops any refetch already pending. The stream stays
  * open so the badge can still show "Offline".
+ *
+ * `subscribe` (default true). Pass `subscribe: false` while the page shows a
+ * cap wall instead of data (the ticker page's LookupWall): no EventSource is
+ * opened, and one already open is closed with its timers. Nothing on a wall
+ * refreshes and no badge is shown, so an open connection there would only be
+ * a way for a later change to start spending the user's limits again. When it
+ * turns true the stream connects fresh; the page loads its own data, so that
+ * first hello does not refetch.
+ *
+ * Reconnects refetch. A `hello` after the first one on this subscription means
+ * the connection dropped and came back (EventSource's own retry, or the
+ * backoff below). Any update sent while it was down was missed, so that hello
+ * schedules one refetch, paced like an update. It does not move the badge into
+ * "auto": no update arrived.
  *
  * Refetch pacing: a normal worker pass produces one event, but events are still
  * coalesced so a page never refetches more than once per MIN_REFETCH_GAP_MS.
@@ -88,6 +103,8 @@ export function deriveLiveStatus(
 export type LiveStreamOptions = {
   /** False turns auto-refresh off for this page. Default true. */
   enabled?: boolean;
+  /** False opens no stream at all (a cap wall is shown). Default true. */
+  subscribe?: boolean;
 };
 
 /** A refetch that returns `false` (or a promise resolving to it) failed. */
@@ -102,6 +119,7 @@ export function useLiveStream(
   markLoaded: () => void;
 } {
   const enabled = options.enabled ?? true;
+  const subscribe = options.subscribe ?? true;
   const [connection, setConnection] = useState<Connection>("connecting");
   const [lastEventAt, setLastEventAt] = useState<Date | null>(null);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
@@ -135,6 +153,12 @@ export function useLiveStream(
   }, []);
 
   useEffect(() => {
+    if (!subscribe) {
+      // A wall is shown: no connection, no timers. The previous run's cleanup
+      // (if any) already closed its stream and cleared its pending refetch.
+      cancelPendingRefetch.current = () => {};
+      return;
+    }
     const base = process.env.NEXT_PUBLIC_API_URL || "";
     const url = `${base}/api/stream/live`;
 
@@ -143,6 +167,8 @@ export function useLiveStream(
     let refetchTimer: ReturnType<typeof setTimeout> | null = null;
     let lastRefetchAt: number | null = null;
     let cancelled = false;
+    // hellos seen on this subscription; any after the first is a reconnect.
+    let hellos = 0;
     let backoffMs = 1000;
     const MAX_BACKOFF_MS = 30_000;
 
@@ -195,6 +221,9 @@ export function useLiveStream(
       es.addEventListener("hello", () => {
         backoffMs = 1000;
         setConnection("open");
+        hellos += 1;
+        // Back after a drop: updates sent while offline were missed.
+        if (hellos > 1 && enabledRef.current) scheduleRefetch();
       });
       es.addEventListener("update", () => {
         backoffMs = 1000;
@@ -245,7 +274,7 @@ export function useLiveStream(
       }
       es = null;
     };
-  }, []);
+  }, [subscribe]);
 
   const status = deriveLiveStatus(connection, enabled ? lastEventAt : null, now);
   const lastUpdate = status === "auto" ? lastEventAt : loadedAt;

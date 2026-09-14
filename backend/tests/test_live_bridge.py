@@ -58,11 +58,13 @@ def make_bridge(marks: list, clock: FakeClock, publish, **kw) -> LiveBridge:
     return LiveBridge(publish=publish, read=read, clock=clock, **kw)
 
 
-def wm(tickers_s: float | None, regime_s: float | None = None) -> Watermarks:
-    """Watermarks as offsets in seconds from T0."""
+def wm(pass_s: float | None, latest_s: float | None = None) -> Watermarks:
+    """Watermarks as offsets in seconds from T0. latest defaults to the pass."""
+    if latest_s is None:
+        latest_s = pass_s
     return Watermarks(
-        tickers_at=None if tickers_s is None else T0 + timedelta(seconds=tickers_s),
-        regime_at=None if regime_s is None else T0 + timedelta(seconds=regime_s),
+        pass_at=None if pass_s is None else T0 + timedelta(seconds=pass_s),
+        latest_at=None if latest_s is None else T0 + timedelta(seconds=latest_s),
     )
 
 
@@ -136,22 +138,24 @@ async def test_one_event_per_pass_across_several_passes():
     ]
 
 
-async def test_regime_only_advance_publishes_regime_updated_once():
+async def test_writes_that_do_not_move_the_pass_marker_publish_nothing():
+    """A sheet or crypto write moves latest_at, never the quartile marker."""
     clock, pub = FakeClock(T0 + timedelta(seconds=60)), Recorder()
-    bridge = make_bridge([wm(0, 0), wm(0, 30), wm(0, 30)], clock, pub)
+    bridge = make_bridge([wm(0, 0), wm(0, 30), wm(0, 45), wm(0, 45)], clock, pub)
     await bridge.poll_once()
-    assert await bridge.poll_once() == lb.REGIME_EVENT
-    assert await bridge.poll_once() is None
-    assert [e for e, _ in pub.events] == [lb.REGIME_EVENT]
+    for _ in range(3):
+        assert await bridge.poll_once() is None
+        clock.advance(15)
+    assert pub.events == []
 
 
-async def test_regime_landing_before_its_pass_settles_waits_for_one_scores_event():
+async def test_marker_moved_but_rows_still_being_written_waits_for_one_event():
     clock, pub = FakeClock(T0), Recorder()
-    # Regime row stamped at 1s and already 12s old; tickers still climbing.
-    bridge = make_bridge([wm(-70, -70), wm(4, 1), wm(6, 1), wm(6, 1)], clock, pub)
+    # Three quarters of a pass stamped from 1s; its last chunks still landing.
+    bridge = make_bridge([wm(-70), wm(1, 4), wm(1.2, 6), wm(1.2, 6)], clock, pub)
     await bridge.poll_once()
     clock.now = T0 + timedelta(seconds=13)
-    assert await bridge.poll_once() is None     # would have been regime_updated
+    assert await bridge.poll_once() is None     # latest write 9s old, still moving
     clock.now = T0 + timedelta(seconds=28)
     assert await bridge.poll_once() == lb.SCORES_EVENT
     clock.advance(15)
@@ -269,7 +273,7 @@ async def test_first_poll_after_the_open_publishes_the_overnight_advance_once():
     async def read() -> Watermarks:
         nonlocal reads
         reads += 1
-        return Watermarks(tickers_at=overnight, regime_at=overnight)
+        return Watermarks(pass_at=overnight, latest_at=overnight)
 
     sleeps = 0
 
@@ -283,8 +287,7 @@ async def test_first_poll_after_the_open_publishes_the_overnight_advance_once():
     bridge = LiveBridge(publish=pub, read=read, clock=clock, sleep=fake_sleep, interval=15)
     # Pretend a previous session published an older write.
     bridge._baselined = True
-    bridge._published = {"tickers": overnight - timedelta(hours=10),
-                         "regime": overnight - timedelta(hours=10)}
+    bridge._published_pass = overnight - timedelta(hours=10)
     with pytest.raises(asyncio.CancelledError):
         await bridge.run()
     assert reads == 4  # 03:59:30 and 03:59:45 skipped; 04:00:00 onwards read
@@ -367,7 +370,7 @@ async def test_read_watermarks_runs_against_the_real_schema():
     from app.models.ticker import Ticker
 
     empty = await lb.read_watermarks()
-    assert empty == Watermarks(tickers_at=None, regime_at=None)
+    assert empty == Watermarks(pass_at=None, latest_at=None)
 
     async with db.SessionLocal() as s:
         s.add(Ticker(symbol="AAA", name="Scored", score=50.0))
@@ -375,8 +378,8 @@ async def test_read_watermarks_runs_against_the_real_schema():
         await s.commit()
 
     marks = await lb.read_watermarks()
-    assert marks.tickers_at is not None and marks.tickers_at.tzinfo is not None
-    assert marks.regime_at is None
+    assert marks.pass_at is not None and marks.pass_at.tzinfo is not None
+    assert marks.latest_at is not None and marks.latest_at.tzinfo is not None
 
 
 def test_as_utc_normalises_naive_and_string_stamps():
@@ -430,3 +433,111 @@ def test_frontend_timing_constants_fit_the_bridge_cadence():
     worst_normal_gap = 80 + lb.POLL_INTERVAL_SECONDS + lb.SETTLE_SECONDS
     assert ms("AUTO_REFRESH_WINDOW_MS") > worst_normal_gap
     assert ms("MIN_REFETCH_GAP_MS") <= 60 - lb.POLL_INTERVAL_SECONDS
+
+
+# ── One event per worker pass, not per write ────────────────────────────────
+#
+# tickers.updated_at also advances outside a pass: the SIGNAL sheet refresh
+# (sheet_feed.upsert_tickers, up to every 30s, sheet-governed rows only) and
+# the daily crypto refresh (~110 X: rows). A watermark on max(updated_at) fired
+# for those too, adding refetches between passes and resetting the browser's
+# 40s refetch gap. A pass rewrites every scored non-crypto row (11,569 of
+# 11,679 scored rows in one pass, read on production 14 Sep 2026 18:01 UTC).
+
+
+async def _seed_universe(n: int, stamp: datetime, crypto: int = 0) -> list[str]:
+    from app import db
+    from app.models.ticker import Ticker
+
+    symbols = [f"PASS{i:04d}" for i in range(n)]
+    async with db.SessionLocal() as s:
+        for sym in symbols:
+            s.add(Ticker(symbol=sym, name=sym, score=50.0, updated_at=stamp))
+        for i in range(crypto):
+            s.add(Ticker(symbol=f"X:C{i}USD", name="coin", score=50.0,
+                         asset_class="crypto", updated_at=stamp))
+        await s.commit()
+    return symbols
+
+
+async def _stamp(symbols: list[str], stamp: datetime) -> None:
+    from sqlalchemy import update
+
+    from app import db
+    from app.models.ticker import Ticker
+
+    async with db.SessionLocal() as s:
+        await s.execute(
+            update(Ticker).where(Ticker.symbol.in_(symbols)).values(updated_at=stamp)
+        )
+        await s.commit()
+
+
+async def test_sheet_and_crypto_writes_between_passes_publish_nothing():
+    """Real SQL, real schema: only a worker pass produces an event."""
+    clock, pub = FakeClock(T0), Recorder()
+    symbols = await _seed_universe(200, T0, crypto=10)
+    bridge = LiveBridge(publish=pub, clock=clock)
+
+    clock.now = T0 + timedelta(seconds=20)
+    assert await bridge.poll_once() is None                    # baseline
+
+    # The sheet refresh rewrites 70 sheet-governed rows at +30s.
+    await _stamp(symbols[:70], T0 + timedelta(seconds=30))
+    clock.now = T0 + timedelta(seconds=45)
+    assert await bridge.poll_once() is None
+    clock.now = T0 + timedelta(seconds=60)
+    assert await bridge.poll_once() is None
+
+    # The daily crypto refresh at +62s.
+    from sqlalchemy import update
+
+    from app import db
+    from app.models.ticker import Ticker
+
+    async with db.SessionLocal() as s:
+        await s.execute(update(Ticker).where(Ticker.asset_class == "crypto")
+                        .values(updated_at=T0 + timedelta(seconds=62)))
+        await s.commit()
+    clock.now = T0 + timedelta(seconds=75)
+    assert await bridge.poll_once() is None
+    assert pub.events == []
+
+    # A worker pass rewrites every row at +72s: exactly one event.
+    await _stamp(symbols, T0 + timedelta(seconds=72))
+    clock.now = T0 + timedelta(seconds=90)
+    assert await bridge.poll_once() == lb.SCORES_EVENT
+    for _ in range(3):
+        clock.advance(15)
+        assert await bridge.poll_once() is None
+
+    # Another sheet write after the pass: still nothing.
+    await _stamp(symbols[100:170], T0 + timedelta(seconds=100))
+    clock.now = T0 + timedelta(seconds=150)
+    assert await bridge.poll_once() is None
+    assert [e for e, _ in pub.events] == [lb.SCORES_EVENT]
+
+
+async def test_a_poll_inside_a_pass_waits_for_the_pass_to_finish():
+    """Real SQL: a pass commits 500-row chunks. A poll that lands when most of
+    the universe is rewritten but the pass is still writing must not publish,
+    or the next poll would publish the same pass again."""
+    clock, pub = FakeClock(T0), Recorder()
+    symbols = await _seed_universe(200, T0)
+    bridge = LiveBridge(publish=pub, clock=clock)
+    clock.now = T0 + timedelta(seconds=20)
+    await bridge.poll_once()
+
+    # A slow pass started at +60s; 90% of rows are written, the last at +71s.
+    for i, chunk_start in enumerate(range(0, 180, 20)):
+        await _stamp(symbols[chunk_start:chunk_start + 20], T0 + timedelta(seconds=60 + i * 1.4))
+    await _stamp(symbols[178:180], T0 + timedelta(seconds=71))
+    clock.now = T0 + timedelta(seconds=72)
+    assert await bridge.poll_once() is None
+    # The last chunk lands at +73s.
+    await _stamp(symbols[180:], T0 + timedelta(seconds=73))
+    clock.now = T0 + timedelta(seconds=87)
+    assert await bridge.poll_once() == lb.SCORES_EVENT
+    clock.advance(15)
+    assert await bridge.poll_once() is None
+    assert len(pub.events) == 1

@@ -59,14 +59,16 @@ const START = new Date("2026-09-14T14:00:00Z");
 function Harness({
   onUpdate,
   enabled,
+  subscribe,
   markOnMount = true,
 }: {
   onUpdate: () => void | boolean | Promise<unknown>;
   enabled?: boolean;
+  subscribe?: boolean;
   /** Stands in for the page's own mount load succeeding. */
   markOnMount?: boolean;
 }) {
-  const { status, lastUpdate, markLoaded } = useLiveStream(onUpdate, { enabled });
+  const { status, lastUpdate, markLoaded } = useLiveStream(onUpdate, { enabled, subscribe });
   useEffect(() => {
     if (markOnMount) markLoaded();
   }, [markLoaded, markOnMount]);
@@ -288,6 +290,94 @@ describe("LiveBadge driven by useLiveStream", () => {
     });
     expect(onUpdate).not.toHaveBeenCalled();
     expect(badgeText()).toBe(`Updated ${formatBadgeTime(START)}`);
+  });
+
+  it("subscribe: false (a cap wall is shown): no stream is opened at all", async () => {
+    const onUpdate = vi.fn(() => Promise.resolve(true));
+    const { rerender } = render(<Harness onUpdate={onUpdate} subscribe={false} />);
+    expect(MockEventSource.instances).toHaveLength(0);
+    await act(async () => {
+      vi.advanceTimersByTime(10 * 60_000);
+    });
+    expect(MockEventSource.instances).toHaveLength(0);
+    expect(onUpdate).not.toHaveBeenCalled();
+
+    // The wall goes away: connect, and the first hello does not refetch
+    // (the page has just loaded its own data).
+    rerender(<Harness onUpdate={onUpdate} subscribe />);
+    expect(MockEventSource.instances).toHaveLength(1);
+    const es = MockEventSource.latest();
+    act(() => es.emit("hello"));
+    await act(async () => {
+      vi.advanceTimersByTime(MIN_REFETCH_GAP_MS * 2);
+    });
+    expect(onUpdate).not.toHaveBeenCalled();
+
+    // The wall comes back: the open stream is closed and a pending refetch dropped.
+    act(() => es.emit("update"));
+    rerender(<Harness onUpdate={onUpdate} subscribe={false} />);
+    expect(es.readyState).toBe(MockEventSource.CLOSED);
+    await act(async () => {
+      vi.advanceTimersByTime(MIN_REFETCH_GAP_MS * 2);
+    });
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(MockEventSource.instances).toHaveLength(1);
+  });
+
+  it("refetches once on the hello that follows a reconnect", async () => {
+    const onUpdate = vi.fn(() => Promise.resolve(true));
+    render(<Harness onUpdate={onUpdate} />);
+    const first = MockEventSource.latest();
+    act(() => first.emit("hello"));
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(onUpdate).not.toHaveBeenCalled();
+
+    // A permanent close: the hook reconnects after its backoff. Updates sent
+    // while the page was offline were missed, so the reconnect hello refetches.
+    act(() => first.fail(true));
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+    });
+    const second = MockEventSource.latest();
+    expect(second).not.toBe(first);
+    act(() => second.emit("hello"));
+    await act(async () => {
+      vi.advanceTimersByTime(COALESCE_MS);
+    });
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+
+    // A transient drop that EventSource reopens by itself also re-sends hello.
+    await act(async () => {
+      vi.advanceTimersByTime(MIN_REFETCH_GAP_MS);
+    });
+    act(() => second.fail(false));
+    act(() => second.emit("hello"));
+    await act(async () => {
+      vi.advanceTimersByTime(COALESCE_MS);
+    });
+    expect(onUpdate).toHaveBeenCalledTimes(2);
+
+    // Pings never refetch.
+    act(() => second.emit("ping"));
+    await act(async () => {
+      vi.advanceTimersByTime(MIN_REFETCH_GAP_MS * 2);
+    });
+    expect(onUpdate).toHaveBeenCalledTimes(2);
+  });
+
+  it("a reconnect hello does not refetch while auto-refresh is off", async () => {
+    const onUpdate = vi.fn(() => Promise.resolve(true));
+    render(<Harness onUpdate={onUpdate} enabled={false} />);
+    const es = MockEventSource.latest();
+    act(() => es.emit("hello"));
+    act(() => es.fail(false));
+    act(() => es.emit("hello"));
+    await act(async () => {
+      vi.advanceTimersByTime(MIN_REFETCH_GAP_MS * 2);
+    });
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 
   it("closes the stream and pending timers on unmount", () => {
