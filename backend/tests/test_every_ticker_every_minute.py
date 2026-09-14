@@ -122,16 +122,34 @@ async def test_an_overrun_starts_the_next_cycle_promptly_and_says_so(one_cycle) 
     assert any("tick.overrun" in w for w in warnings), warnings
 
 
-async def test_a_killed_cycle_does_not_add_a_whole_interval(one_cycle) -> None:
-    """The watchdog kills a hung tick at TICK_TIMEOUT_SECONDS. Waiting another
-    full minute after that only widened the gap."""
+async def test_a_killed_cycle_gets_a_recovery_pause_not_a_whole_interval(one_cycle) -> None:
+    """The watchdog kills a hung tick at TICK_TIMEOUT_SECONDS. A kill usually
+    means something the tick waits on is slow, so the next cycle waits a
+    recovery step - not the old full minute, and not a one-second breath that
+    piles straight back onto a struggling database. Mutations: passing no
+    timeout count to the pause; the one-second floor after a kill."""
     _clock, slept, _warnings, set_tick = one_cycle
     set_tick(float(sp.TICK_TIMEOUT_SECONDS), raises=TimeoutError())
 
     with pytest.raises(_StopLoop):
         await sp.main()
 
-    assert slept == [sp._MIN_CYCLE_PAUSE_SECONDS]
+    assert slept == [sp._TIMEOUT_RECOVERY_STEP_SECONDS]
+    assert sp._MIN_CYCLE_PAUSE_SECONDS < sp._TIMEOUT_RECOVERY_STEP_SECONDS < 60
+
+
+def test_the_recovery_pause_grows_with_consecutive_kills_and_stops_at_the_interval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mutations: a recovery pause that ignores the count; no cap."""
+    monkeypatch.setattr(sp.settings, "score_refresh_seconds", 60, raising=False)
+    step = sp._TIMEOUT_RECOVERY_STEP_SECONDS
+    killed = float(sp.TICK_TIMEOUT_SECONDS)
+    assert sp._seconds_until_next_cycle(killed, consecutive_timeouts=1) == step
+    assert sp._seconds_until_next_cycle(killed, consecutive_timeouts=3) == 3 * step
+    assert sp._seconds_until_next_cycle(killed, consecutive_timeouts=50) == 60.0
+    # An ordinary overrun, with no kill behind it, keeps the short breath.
+    assert sp._seconds_until_next_cycle(75.0) == sp._MIN_CYCLE_PAUSE_SECONDS
 
 
 async def test_a_quiet_tick_logs_no_overrun(one_cycle) -> None:
@@ -353,3 +371,108 @@ async def test_a_failed_boot_warm_leaves_the_rebuild_due(one_cycle, monkeypatch:
         )
     finally:
         sp._last_active_universe_refresh = None
+
+
+async def test_concurrent_rebuilds_run_one_at_a_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The tick's rebuild and sheet_feed's rebuild share the worker's event loop,
+    the rotating cursor and the list. A rebuild awaits the database between
+    reading the cursor and advancing it; interleaved, both read one cursor and
+    advance it once, so a backlog window is never offered, and whichever ends
+    last overwrites the list.
+
+    Measured as overlap rather than through the cursor: the SQLite test pool
+    hands out one connection at a time, which serialises the two rebuilds by
+    accident and hides the race that Postgres's pool of ten allows. Mutation: no
+    rebuild lock."""
+    inside = 0
+    most = 0
+
+    async def _slow_rebuild(target_size: int | None = None) -> int:
+        nonlocal inside, most
+        inside += 1
+        most = max(most, inside)
+        await asyncio.sleep(0.05)
+        inside -= 1
+        return 0
+
+    monkeypatch.setattr(universe_mod, "_refresh_active_universe", _slow_rebuild)
+
+    await asyncio.gather(
+        universe_mod.refresh_active_universe(),
+        universe_mod.refresh_active_universe(),
+        universe_mod.refresh_active_universe(),
+    )
+
+    assert most == 1, f"{most} rebuilds ran at once; they share the cursor and the list"
+
+
+async def test_a_run_of_kills_stops_stretching_cycles_once_a_tick_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The recovery pause grows with CONSECUTIVE kills, so a successful tick must
+    reset the count. Otherwise ten kills leave a 50-second floor on every later
+    cycle, and a 13-second tick waits 50 instead of 47 - the ~73-second cycles
+    again. Ten, because below that the floor never exceeds 47 and a missing reset
+    would be invisible. Mutation: not resetting consecutive_timeouts."""
+    clock = [1_000.0]
+    slept: list[float] = []
+    kills = 10
+    outcomes = [("kill", float(sp.TICK_TIMEOUT_SECONDS))] * kills + [("ok", 13.0)]
+
+    async def _noop() -> None:
+        return None
+
+    async def _refresh(*_a, **_k) -> int:
+        return 11_812
+
+    async def _tick() -> None:
+        kind, seconds = outcomes[len(slept)]
+        clock[0] += seconds
+        if kind == "kill":
+            raise TimeoutError
+
+    async def _sleep(seconds: float, *_a, **_k) -> None:
+        slept.append(seconds)
+        if len(slept) == len(outcomes):
+            raise _StopLoop
+
+    monkeypatch.setattr(sp.settings, "score_refresh_seconds", 60, raising=False)
+    monkeypatch.setattr(sp, "_init_sentry", lambda: None)
+    monkeypatch.setattr(sp, "seed_universe", _noop)
+    monkeypatch.setattr(sp, "warm_factor_caches_from_db", _noop)
+    monkeypatch.setattr(sp, "refresh_active_universe", _refresh)
+    monkeypatch.setattr(sp, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(sp, "tick", _tick)
+    for level in ("warning", "error", "critical"):
+        monkeypatch.setattr(sp.logger, level, lambda *a, **k: None)
+    monkeypatch.setattr(asyncio, "sleep", _sleep)
+    # sentry_sdk's capture at 3 consecutive kills is guarded in main(); nothing to patch.
+
+    with pytest.raises(_StopLoop):
+        await sp.main()
+
+    step = sp._TIMEOUT_RECOVERY_STEP_SECONDS
+    assert slept[:kills] == [min(60.0, step * n) for n in range(1, kills + 1)]
+    assert slept[-1] == 47.0, (
+        f"after {kills} kills a 13s tick slept {slept[-1]}: the kill count was not "
+        "reset by the successful tick, so every later cycle stays stretched"
+    )
+
+
+async def test_the_tick_does_not_queue_behind_a_rebuild_in_flight() -> None:
+    """A detached rebuild (sheet_feed's) can hold the lock with no watchdog of
+    its own. The tick must skip rather than wait. Mutation: ignoring wait=False."""
+    lock = universe_mod._rebuild_lock()
+    await lock.acquire()
+    try:
+        before = len(universe_mod._active_universe)
+        n = await asyncio.wait_for(universe_mod.refresh_active_universe(wait=False), timeout=2)
+        assert n == before
+    finally:
+        lock.release()
+
+
+def test_the_tick_asks_not_to_wait() -> None:
+    """The flag is only worth having if the tick passes it. Mutation: the tick
+    calling refresh_active_universe() without wait=False."""
+    assert "refresh_active_universe(wait=False)" in _code(sp.tick)

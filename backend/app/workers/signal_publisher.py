@@ -324,20 +324,6 @@ _last_universe_refresh: datetime | None = None
 _last_sheet_refresh: datetime | None = None
 _last_crypto_refresh: datetime | None = None
 _last_active_universe_refresh: datetime | None = None
-
-#: How often the snapshot list is rebuilt from the table.
-#:
-#: It was hourly, so a row added or first scored mid-session waited up to an
-#: hour for its first minute-by-minute price. The rebuild is one indexed read of
-#: the tickers table (no vendor call), so five minutes costs nothing measurable.
-ACTIVE_UNIVERSE_REFRESH_SECONDS = 300
-
-
-def _active_universe_refresh_due(now: datetime) -> bool:
-    """True when the snapshot list should be rebuilt on this tick."""
-    return _last_active_universe_refresh is None or (
-        now - _last_active_universe_refresh
-    ).total_seconds() >= ACTIVE_UNIVERSE_REFRESH_SECONDS
 _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run (UTC)
 _last_weekly_newsletter_token: str | None = None  # "weekly_YYYYWww" of last newsletter run
 _last_daily_newsletter_date: str | None = None  # "YYYY-MM-DD" of last Daily Top 10 digest run (UTC)
@@ -363,6 +349,21 @@ _last_score_snapshot_date: str | None = None
 # consumed by the per-tick snapshot upsert so the market feed can't clobber the
 # authoritative Tapeline composite. Empty when no sheet is configured.
 _sheet_governed_symbols: frozenset[str] = frozenset()
+
+
+#: How often the snapshot list is rebuilt from the table.
+#:
+#: It was hourly, so a row added or first scored mid-session waited up to an
+#: hour for its first minute-by-minute price. The rebuild is one indexed read of
+#: the tickers table (no vendor call), so five minutes costs nothing measurable.
+ACTIVE_UNIVERSE_REFRESH_SECONDS = 300
+
+
+def _active_universe_refresh_due(now: datetime) -> bool:
+    """True when the snapshot list should be rebuilt on this tick."""
+    return _last_active_universe_refresh is None or (
+        now - _last_active_universe_refresh
+    ).total_seconds() >= ACTIVE_UNIVERSE_REFRESH_SECONDS
 
 
 def _mock_writes_enabled() -> bool:
@@ -1185,7 +1186,9 @@ async def tick() -> None:
         # Stamped before the work — see the news refresh.
         _last_active_universe_refresh = started
         try:
-            n = await refresh_active_universe()
+            # wait=False: never queue inside the tick behind a rebuild that a
+            # detached task started - see refresh_active_universe.
+            n = await refresh_active_universe(wait=False)
             logger.info("active_universe.refreshed count=%d", n)
         except Exception:
             logger.exception("active_universe.refresh_failed")
@@ -4897,15 +4900,23 @@ async def main() -> None:
                     logger.exception("tick.timeout_streak.sentry_capture_failed")
         except Exception:
             logger.exception("tick.failure")
-        await asyncio.sleep(_seconds_until_next_cycle(monotonic() - cycle_clock))
+        await asyncio.sleep(_seconds_until_next_cycle(
+            monotonic() - cycle_clock, consecutive_timeouts=consecutive_timeouts,
+        ))
 
 
 #: The shortest pause between two cycles, even after one that overran.
 #: A breath for the background jobs sharing this event loop, not a pacing knob.
 _MIN_CYCLE_PAUSE_SECONDS = 1.0
 
+#: After the watchdog KILLS a tick, the pause before the next cycle grows by
+#: this much per consecutive kill, capped at the interval. A kill usually means
+#: something the tick waits on is slow - the database, the vendor - and starting
+#: again after one second only adds load to it.
+_TIMEOUT_RECOVERY_STEP_SECONDS = 5.0
 
-def _seconds_until_next_cycle(elapsed: float) -> float:
+
+def _seconds_until_next_cycle(elapsed: float, *, consecutive_timeouts: int = 0) -> float:
     """How long to sleep so cycles START every `score_refresh_seconds`.
 
     The loop used to sleep the whole interval AFTER each tick, so the real
@@ -4917,14 +4928,21 @@ def _seconds_until_next_cycle(elapsed: float) -> float:
     A cycle that took the whole interval or longer starts the next one after
     `_MIN_CYCLE_PAUSE_SECONDS`, and says so: an overrun means a minute was
     missed, and that should be visible in the logs rather than absorbed.
+
+    A cycle the watchdog killed is different: it waits
+    `_TIMEOUT_RECOVERY_STEP_SECONDS` per consecutive kill, up to the interval,
+    so whatever made the tick hang gets time to recover.
     """
     interval = float(settings.score_refresh_seconds)
+    floor = _MIN_CYCLE_PAUSE_SECONDS
+    if consecutive_timeouts > 0:
+        floor = max(floor, min(interval, _TIMEOUT_RECOVERY_STEP_SECONDS * consecutive_timeouts))
     if elapsed >= interval:
         logger.warning(
-            "tick.overrun elapsed=%.1fs interval=%.0fs — the next cycle starts now",
-            elapsed, interval,
+            "tick.overrun elapsed=%.1fs interval=%.0fs pause=%.0fs",
+            elapsed, interval, floor,
         )
-    return max(_MIN_CYCLE_PAUSE_SECONDS, interval - elapsed)
+    return max(floor, interval - elapsed)
 
 
 if __name__ == "__main__":

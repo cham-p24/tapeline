@@ -130,7 +130,8 @@ def test_the_bootstrap_query_only_offers_never_scored_rows():
     import inspect
     import textwrap
 
-    tree = ast.parse(textwrap.dedent(inspect.getsource(universe_svc.refresh_active_universe)))
+    # The public function only takes the rebuild lock; the query lives here.
+    tree = ast.parse(textwrap.dedent(inspect.getsource(universe_svc._refresh_active_universe)))
     for node in ast.walk(tree):
         body = getattr(node, "body", None)
         if (
