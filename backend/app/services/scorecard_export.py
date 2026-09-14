@@ -390,9 +390,10 @@ KNOWN_LIMITATIONS: list[dict[str, str]] = [
         "status": (
             "From 2026-09-14 (PR #824) an empty Form 4 answer removes the value "
             "and the ticker's stored filings, unless a stored filing from the "
-            "same source is dated inside the window; a ticker holding a value "
-            "with no filing on file becomes due for a re-check at the next daily "
-            "run, ahead of other re-checks (PR #833). Lists not changed."
+            "same source records a transaction in the last 80 days; a ticker "
+            "holding a value with no filing on file becomes due for a re-check "
+            "at the next daily run, ahead of other Smart Money re-checks (PR "
+            "#833). Lists not changed."
         ),
     },
 ]

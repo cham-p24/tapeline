@@ -227,12 +227,18 @@ describe("rendered static pages", () => {
       "5 commodity futures contracts",
       "the Form 4 calculation only produces values from 10 to 90",
       "BIB on 7, 12, 13 and 20 August 2026",
-      "unless a filing we already hold from that source is dated inside the window",
-      "becomes due for a re-check at the next daily run",
+      // The guard is 80 days on the transaction date, not the 90-day window.
+      "unless a filing we already hold from that source records a transaction in the last 80 days",
+      "becomes due for a re-check at the next daily run, ahead of other Smart Money re-checks",
     ]) {
       expect(text).toContain(needle);
     }
-    for (const stale of ["futures funds", "is re-checked at the next daily run"]) {
+    for (const stale of [
+      "futures funds",
+      "is re-checked at the next daily run",
+      "is dated inside the window",
+      "ahead of other re-checks",
+    ]) {
       expect(text).not.toContain(stale);
     }
   });

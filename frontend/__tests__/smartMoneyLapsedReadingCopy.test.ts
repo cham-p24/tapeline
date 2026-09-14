@@ -29,5 +29,10 @@ describe("/how-it-works/smart-money", () => {
     // some readings. What did not happen was removal when filings left the window.
     expect(text).toMatch(/Until 14 September 2026 such a reading was not removed when its filings left the window/);
     expect(text).not.toMatch(/never removed/);
+    // Not "until 14 September ... some tickers held a value": on that date they
+    // still did, and values are removed as each ticker is next re-checked.
+    expect(text).toMatch(
+      /On 14 September 2026 some tickers held a value with no filing on file at all; from that date such a value is removed when the ticker is next re-checked/,
+    );
   });
 });

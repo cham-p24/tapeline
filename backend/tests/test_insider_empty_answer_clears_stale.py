@@ -837,14 +837,20 @@ async def test_unbacked_values_are_selected_ahead_of_due_equities() -> None:
     """#835 made ~11,800 rows due at once, equities first; the 629 unbacked ETFs
     would not have been reached inside a day's phase. Mutations: the plain
     equities-first order (EQDUE first); ranking unbacked rows first for the
-    fundamentals pass too (its order changes)."""
+    fundamentals pass too (its order changes); counting only EDGAR rows as
+    backing - EQFH, backed by a Finnhub-era row, jumps ahead (and so would the
+    3,465 such equities in production)."""
     await _seed("EQDUE", last_smart_money_at=NOW - 72 * H, last_fundamentals_at=NOW - 30 * 24 * H)
     await _seed_form4("EQDUE")
+    await _seed("EQFH", last_smart_money_at=NOW - 96 * H, last_fundamentals_at=NOW)
+    await _seed_form4("EQFH", source=None)
     await _seed("ETFUNB", asset_class="etf", last_smart_money_at=NOW - 48 * H,
                 last_fundamentals_at=NOW - 60 * 24 * H)
 
     assert await sp._select_factor_symbols(Ticker.last_smart_money_at, 1) == ["ETFUNB"]
-    assert await sp._select_factor_symbols(Ticker.last_smart_money_at, 2) == ["ETFUNB", "EQDUE"]
+    assert await sp._select_factor_symbols(Ticker.last_smart_money_at, 3) == [
+        "ETFUNB", "EQFH", "EQDUE",
+    ]
     assert await sp._select_factor_symbols(Ticker.last_fundamentals_at, 2) == ["EQDUE", "ETFUNB"]
 
 
@@ -861,3 +867,92 @@ async def test_an_outage_that_is_not_contradicted_answers_is_only_a_warning(
 
     assert "insider.failing_stop" in caplog.text
     assert "insider.empty_contradicted_stop" not in caplog.text
+
+
+# ===========================================================================
+# 11. The contradiction alarm and the filings count, at their edges.
+# ===========================================================================
+
+
+def _vendor_by_prefix(monkeypatch: pytest.MonkeyPatch, outcomes: dict[str, str]) -> list[str]:
+    """fetch_insider_transactions answering per symbol prefix: "empty" or "down"."""
+    calls: list[str] = []
+
+    async def _fetch(
+        sym: str, days_back: int = 90, *, raise_failures: bool = False,
+    ) -> list[dict[str, Any]] | None:
+        calls.append(sym)
+        if len(calls) > 300:
+            raise _RunawayError(f"{len(calls)} calls")
+        if outcomes[sym[0]] == "down":
+            raise EdgarUnavailableError("submissions", "status=503")
+        return []
+
+    monkeypatch.setattr("app.services.edgar_form4.fetch_insider_transactions", _fetch)
+    return calls
+
+
+async def _seed_recent_edgar_filing(symbol: str) -> None:
+    async with session_scope() as s:
+        s.add(InsiderTransaction(
+            symbol=symbol, insider_name="Jane Q Insider",
+            transaction_date=(date.today() - timedelta(days=5)).isoformat(),
+            share_change=2_000, transaction_price=25.0, transaction_value=50_000.0,
+            code="P", fetched_at=OLD, source="edgar",
+        ))
+
+
+async def test_old_contradictions_do_not_turn_a_later_outage_into_the_alarm(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Five contradicted answers, then forty clean attempts, then an ordinary
+    5xx outage. By the stop the contradictions have left the 40-attempt window.
+    Mutation: appending to the contradiction window only on failures - it then
+    spans far more than 40 attempts and the outage raises the ERROR."""
+    for i in range(5):
+        await _seed(f"A{i}")
+        await _seed_recent_edgar_filing(f"A{i}")
+    for i in range(40):
+        await _seed(f"B{i:02d}", **{"sub_smart_money": None, "score": AFTER})
+    for i in range(10):
+        await _seed(f"C{i}")
+    calls = _vendor_by_prefix(monkeypatch, {"A": "empty", "B": "empty", "C": "down"})
+
+    with caplog.at_level("WARNING", logger=sp.logger.name):
+        assert await sp._refresh_insider_cache(limit=55) is True
+
+    assert len(calls) == 55
+    assert "insider.failing_stop" in caplog.text
+    assert "insider.empty_contradicted_stop" not in caplog.text
+
+
+async def test_half_contradicted_failures_raise_the_alarm(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Exactly 5 of the 10 failures are contradictions. Mutation: `>` for `>=`."""
+    for i in range(5):
+        await _seed(f"A{i}")
+        await _seed_recent_edgar_filing(f"A{i}")
+        await _seed(f"C{i}")
+    _vendor_by_prefix(monkeypatch, {"A": "empty", "C": "down"})
+
+    with caplog.at_level("WARNING", logger=sp.logger.name):
+        assert await sp._refresh_insider_cache(limit=10) is True
+
+    assert "insider.empty_contradicted_stop contradicted=5 failed=10" in caplog.text
+
+
+async def test_filings_deleted_from_a_row_holding_no_value_are_not_cleared_readings(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Mutation: `cleared_with_filings += had_filings`, ignoring whether a
+    reading was cleared - the surge alarm would count rows that held nothing."""
+    await _seed(**{"sub_smart_money": None, "score": AFTER})
+    await _seed_form4()
+    _vendor(monkeypatch, "empty")
+
+    with caplog.at_level("INFO", logger=sp.logger.name):
+        await sp._refresh_insider_cache(limit=1)
+
+    assert "insider.refreshed scored=0 cleared=0 cleared_with_filings=0 attempted=1" in caplog.text
+    assert await _form4_count() == 0

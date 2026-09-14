@@ -251,7 +251,7 @@ export const FACTORS: Factor[] = [
       "Every disclosed transaction in the window is converted to a signed dollar value, and the net is taken against the gross. The result is a ratio running from all-selling to all-buying.",
       "That ratio is mapped onto a 0–100 scale around a midpoint, so the reading reflects the balance of disclosed activity rather than its raw size. One large disclosed purchase can outweigh several small disclosed sales, but only on a net basis.",
       "A ticker with no disclosed filings in the window has no reading at all, and the composite substitutes a mid-range value. An absence of filings is treated as an absence of information, not as a negative signal.",
-      "When a ticker's filings have all left the window, its reading is removed at the ticker's next re-check, not at once: within about two days for a stock, and up to about a month for an ETF or futures contract. Until 14 September 2026 such a reading was not removed when its filings left the window, and some tickers held a value with no filing on file at all; the changelog entry for that date has the details.",
+      "When a ticker's filings have all left the window, its reading is removed at the ticker's next re-check, not at once: within about two days for a stock, and up to about a month for an ETF or futures contract. Until 14 September 2026 such a reading was not removed when its filings left the window. On 14 September 2026 some tickers held a value with no filing on file at all; from that date such a value is removed when the ticker is next re-checked. The changelog entry for that date has the details.",
     ],
     feeds: [
       {

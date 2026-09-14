@@ -142,6 +142,8 @@ describe("KnownLimitations", () => {
     expect(text).toMatch(/BBH on 24, 25, 26 and 28 August and 1, 3 and 8 September/);
     expect(text).toMatch(/5 commodity futures contracts/);
     expect(text).toMatch(/Where the values came from has not been established/);
+    expect(text).toMatch(/unless a filing we already hold from that source records a transaction in the last 80 days/);
+    expect(text).toMatch(/ahead of other Smart Money re-checks/);
     // No completeness claim.
     expect(text).not.toMatch(/everything else we know/i);
     expect(text).toMatch(/gaps and problems we have verified/);
