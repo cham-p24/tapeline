@@ -31,7 +31,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -142,7 +145,7 @@ Subject: Public scorecard for a US-equity scoring SaaS — would value
 Hi [first name],
 
 I run Tapeline (tapeline.io) — a solo-built quantitative scanner
-that scores every US ticker with a single 0-100 composite from a
+that scores about 11,500 US stocks and ETFs with a 0-100 composite from a
 published 6-factor methodology (the factors and their weight
 ordering). The piece I'm proud of is the public
 back-checked scorecard at tapeline.io/scorecard: every top-10
@@ -244,7 +247,7 @@ I've enjoyed your write-ups on [specific recent thesis they posted —
 quote one sentence]. Wanted to share something you might find useful
 to read against.
 
-Tapeline (tapeline.io) scores every US ticker via a 6-factor composite
+Tapeline (tapeline.io) scores about 11,500 US stocks and ETFs via a 6-factor composite
 — published factor set and weight ordering, free-tier scores.
 Where it might be useful for your style: the Smart Money sub-score nets
 disclosed SEC Form 4 transactions over a recent window — including the

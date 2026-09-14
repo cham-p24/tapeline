@@ -31,7 +31,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -165,7 +168,8 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 
 > **12.**
 > The Tapeline Free tier shows the top 10 rows, plus 12 ticker
-> look-ups a day and the full scorecard. That's the entire free product.
+> look-ups a day and the public scorecard (per-day entries on a 7-day delay).
+> That's the entire free product.
 > No "free for 30 days then $99/mo." The published record has no clock and
 > no card — no account needed at all. Signing up takes an email and a
 > password. A card starts the 30-day Premium trial: $0 that day, one click cancels.
@@ -314,16 +318,16 @@ That's ~15 signups over 30 days from outreach alone — at zero cost.
 ### Day-trader persona
 
 > Hey [name], saw your [post about a specific ticker last week]. Built a
-> scanner that scores every US stock on six named factors — would love 60
+> scanner that scores about 11,500 US stocks and ETFs on six named factors — would love 60
 > seconds of your honest take. No pitch. tapeline.io/scorecard for the
 > back-checks before you click anything.
 
 ### Swing-trader persona
 
 > [name] — I see you trade [setup type]. I built Tapeline (stock scanner
-> with a public scorecard, every pick back-checked vs SPY). 30-day hit
-> rate is at [X]%. Curious if you'd find the regime + smart-money factors
-> useful. The full record is free to read with no account at all — link in bio.
+> with a public scorecard, every recorded pick back-checked vs SPY, misses
+> included). Curious if you'd find the regime + smart-money factors
+> useful. The public scorecard is free to read with no account — link in bio.
 
 ### Quant-curious / engineer persona
 

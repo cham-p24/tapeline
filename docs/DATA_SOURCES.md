@@ -17,7 +17,7 @@ Every data source used in production must be documented here with license terms,
 - **Rate limit:** Starter 5 calls/min, Developer unlimited
 - **Renewal:** Monthly auto-renew via card
 
-### Finnhub — Fundamentals, insider Form 4, calendars, sector backfill
+### Finnhub — Fundamentals, calendars, sector backfill (insider Form 4 moved to SEC EDGAR in #835, 14 September 2026)
 - **Tier:** Free
 - **License:** ❌ **Personal use only.** Finnhub's ToS: personal plans cannot be used by a business, even internally, without written approval, and derived results may not be redistributed. Open launch blocker — see `docs/LICENSE_AUDIT.md`.
 - **URL:** https://finnhub.io/pricing
@@ -95,7 +95,7 @@ Every data source used in production must be documented here with license terms,
 | Regime inputs (VIX, DXY, 10Y) | FRED daily closes (the Starter plan has no indices entitlement) |
 | Crypto | Once a day, from daily bars |
 | Congress disclosures | ⚠️ n/a — no feed wired; the table does not accrue rows in production |
-| Fundamentals (P/E, margins, etc.) | See the public `/data-sources` page for the stated cadence; do not quote "weekly" (the line here was never measured) |
+| Fundamentals (P/E, margins, etc.) | Started at most once per 24 hours per worker process (`_last_fundamentals_refresh` latch in `workers/signal_publisher.py`; in memory, so a deploy resets it and restarts the chain). The chain is serial and paced at about 1.1 s per Finnhub request, so a full pass takes hours and may not finish on a deploy-heavy day. Not measured end to end; for public copy use the `/data-sources` wording, never "weekly" |
 
 ---
 

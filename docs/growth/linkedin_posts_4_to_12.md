@@ -54,7 +54,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -128,7 +131,7 @@ Char count: ~990. Add `tapeline.io/scorecard` in first comment.
 ## Post #5 — The six factors, and the order they're weighted in
 
 ```
-Tapeline scores every US stock on six factors, and the ordering is public:
+Tapeline scores about 11,500 US stocks and ETFs on six factors, and the ordering is public:
 
 Trend carries the most, then Relative Strength, then Fundamentals / Smart Money / Macro, with Momentum the lightest.
 
@@ -250,7 +253,7 @@ The Tapeline free surface doesn't show a feature-stripped demo. It shows the act
 
 Most SaaS free tiers cripple core functionality — fewer rows, no exports, no filters. The idea is to frustrate users into upgrading. That's the wrong incentive: it teaches users that the product is annoying.
 
-The published record needs no account at all: the daily Top 10, a page per scored ticker, the complete scorecard, and the raw CSV/JSON export. A free account adds the top 10 scanner rows, with 12 ticker look-ups a day — each with the full 6-factor breakdown and the full reason sentence. The gate is breadth and volume, not freshness: every plan sees the same prices, delayed about 15 minutes.
+The published record needs no account at all: the daily Top 10, a page per scored ticker, the public scorecard (per-day entries on a 7-day delay), and the raw CSV/JSON export. A free account adds the top 10 scanner rows, with 12 ticker look-ups a day — each with the full 6-factor breakdown and the full reason sentence. The gate is breadth and volume, not freshness: every plan sees the same prices, delayed about 15 minutes.
 
 If ten names a day is enough, that's the right tier. If you want every row of the scan (about 11,500 US stocks and ETFs), Pro ($8.25/month annual) opens it up.
 

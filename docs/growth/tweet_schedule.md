@@ -31,7 +31,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -321,9 +324,9 @@ Paste the numbers into the bracketed fields. If the command says "Not enough dat
 ```
 Every other stock scanner gives you 47 filters and a blank stare.
 
-Tapeline gives you one number, one plain-English why, and a public track record you can audit before you pay.
+Tapeline gives you one number, one plain-English why, and a public track record.
 
-The full record is free to read with no account. Pro is $9.99/mo for the full universe. Signing up takes an email and a password. A card starts the 30-day Premium trial — $0 today, one click cancels.
+The scorecard needs no account. A card starts the 30-day Premium trial, $0 today.
 
 https://tapeline.io
 ```
@@ -363,7 +366,7 @@ Defined as < 3 likes and < 200 impressions in the first 2 hours.
 ## What to do if a tweet pops (> 50 likes in first hour)
 
 - **Pin the tweet**. Replace the prior pinned tweet (currently the launch thread per LAUNCH_PLAYBOOK.md item 3).
-- **Reply with a follow-up tweet** within 4 hours: "Yesterday's $[AAA] back-check vs SPY: $[AAA] +X.X%, SPY +Y.Y%, alpha +Z.Z%. /scorecard has the full history." That turns one viral tweet into a thread, which Twitter's algorithm treats as continued engagement.
+- **Reply with a follow-up tweet** within 4 hours: "Yesterday's $[AAA] back-check vs SPY: $[AAA] +X.X%, SPY +Y.Y%, alpha +Z.Z%. /scorecard has the record." That turns one viral tweet into a thread, which Twitter's algorithm treats as continued engagement.
 - **DM new followers** who follow within 1 hour of the pop with a personal note. NOT a sales pitch — "hey, saw you followed during the $[AAA] tweet, thanks. If you want the breakdown for any ticker, drop one in DMs." Founder-personal voice always.
 
 ## Measurement (lightweight, no dashboards)

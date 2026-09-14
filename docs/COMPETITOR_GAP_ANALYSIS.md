@@ -4,6 +4,7 @@
 >
 > - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 70 to 80 seconds (gaps of 71 to 74 seconds measured on 14 September 2026), and most score inputs are daily, so a score usually changes about once a day. In-app pages do not update on their own, and public pages are cached snapshots that can be an hour or more old. Nothing is real-time, sub-60s or "every minute".
 > - **Congressional trades.** There is no real source of congressional trade disclosures. Tapeline shows none, none feeds the score, and they are not a Premium feature (#770, #820).
+> <!-- copy-compliance-allow record-never-edited -- this dated note names the false phrasings in order to retire them -->
 > - **The record.** Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026. "Never edited", "unedited", "append-only" and "immutable" are false.
 > - **Trial and card.** Signing up is free and needs no card (the card wall ran from 22 to 30 August 2026, #548 to #683). A card starts the 30-day Premium trial, and the pre-charge email goes about 7 days before the first charge.
 >

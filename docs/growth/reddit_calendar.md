@@ -31,7 +31,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -118,7 +121,7 @@ Two weeks ago I shared Tapeline (https://tapeline.io) here — a free stock scan
 - Best single call: [TICKER] at [+A.A]% alpha vs SPY.
 - Worst single call: [TICKER] at [-B.B]% alpha vs SPY.
 
-The full record — every pick, every back-check, including the misses — is at https://tapeline.io/scorecard. No survivor bias: the misses stay on the page, and the two corrections to recorded values and the days with no list are dated there.
+The public record — the recorded picks and their back-checks, including the misses — is at https://tapeline.io/scorecard (per-day entries on a 7-day delay without a paid plan). No survivor bias: the misses stay on the page, and the two corrections to recorded values and the days with no list are dated there.
 
 What surprised me from two weeks of running this:
 
@@ -128,7 +131,7 @@ What surprised me from two weeks of running this:
 
 3. Smart Money reads disclosed Form 4 transactions netted over a recent window — not 13F and not congressional disclosures. Whether that netting is the right construction is the thing I'd most like torn apart.
 
-The full record is readable with no account and no card. A free account is an email and a password — no card — and gets the top 10 rows plus 12 look-ups a day. Pro is $9.99/mo for every row (about 11,500 US stocks and ETFs). Prices are delayed about 15 minutes on every plan. A card is only for the 30-day Premium trial — $0 charged today, first charge on day 30, one click to cancel before then.
+The public scorecard is readable with no account and no card (per-day entries on a 7-day delay). A free account is an email and a password — no card — and gets the top 10 rows plus 12 look-ups a day. Pro is $9.99/mo for every row (about 11,500 US stocks and ETFs). Prices are delayed about 15 minutes on every plan. A card is only for the 30-day Premium trial — $0 charged today, first charge on day 30, one click to cancel before then.
 
 What signals or factors would you want me to add weight to? The weighting is versioned in the changelog so factor changes ship with a written rationale.
 ```
@@ -199,7 +202,7 @@ Three things I already know are weak about it, and where I actually want the roa
 
 Five reported metrics is a narrow view of a company, and I'd rather say that plainly than dress it up as analysis. The factor definitions are at https://tapeline.io/how-it-works — the six factors are named there, along with their weight ordering.
 
-Full scorecard with the Fundamentals factor on every name: https://tapeline.io/scorecard.
+Public scorecard with the Fundamentals factor on every name (per-day entries on a 7-day delay): https://tapeline.io/scorecard.
 ```
 
 ### Week 5 (2026-06-16) — r/stocks, market-event-tied post
@@ -307,7 +310,7 @@ If you've built anything on Form 4: what's the cleanest way you've seen anyone s
 ```
 Two months ago I launched Tapeline (https://tapeline.io) — a 6-factor stock scoring tool with a public scorecard back-checking every top-10 daily pick against SPY the next session.
 
-Two months in, the public scorecard has [X] daily top-10 cohorts logged with [Y]% hit rate beating SPY and [Z]% average alpha per pick. Full history at /scorecard.
+Two months in, the public scorecard has [X] daily top-10 cohorts logged. The current hit rate against SPY, with its sample size, is at /scorecard.
 
 One change I'd make if I were starting over today:
 
@@ -323,7 +326,7 @@ So I'm publishing the observation but not the weight change. /how-it-works has t
 
 If you want to track the next factor-weight decision: subscribe to the scorecard RSS at /scorecard/rss.xml, or follow @tapeline_io. The methodology updates land there first.
 
-Free accounts get the top 10 rows with 12 look-ups a day; the full record needs no account at all. Pro is $9.99/mo for the full universe.
+Free accounts get the top 10 rows with 12 look-ups a day; the public scorecard needs no account at all. Pro is $9.99/mo for the full universe.
 ```
 
 ---

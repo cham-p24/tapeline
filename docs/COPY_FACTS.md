@@ -83,7 +83,8 @@ deleted. We have corrected recorded values twice, and said so: prices on
   14 September 2026.
 - **Who sees what.** Reading the scorecard needs no account. Without Pro or
   Premium the per-day entries show on a 7-day delay (`_FREE_DELAY_DAYS` in
-  `backend/app/routers/scorecard.py`); the summary figures are not delayed.
+  `backend/app/routers/scorecard.py`); the summary figures are not delayed. The
+  CSV/JSON export stops 7 days back for every caller, paid or not (`_export_cutoff`).
   Say "the public scorecard needs no account", not "the full record, live, free".
 - **Four missing days.** No top 10 was recorded for 31 August, 2 September,
   4 September or 9 September 2026. None was filled in afterwards.
@@ -122,9 +123,9 @@ deleted. We have corrected recorded values twice, and said so: prices on
   the public scorecard (per-day entries on a 7-day delay).
 - **Anonymous visitors are not metered** on ticker look-ups. Do not state a
   number for use without an account.
-- **Pro:** $9.99 a month, or $99 a year ($8.25 a month billed annually). Up to
-  1,000 scanner rows, 50-ticker watchlist, email alerts (10 a day), browser push
-  alerts, CSV export.
+- **Pro:** $9.99 a month, or $99 a year ($8.25 a month billed annually). Every
+  matching scanner row (1,000 per request; paging reaches the rest), 50-ticker
+  watchlist, email alerts (10 a day), browser push alerts, CSV export.
 - **Premium:** $19.99 a month, or $199 a year ($16.58 a month billed annually).
   Everything in Pro plus per-ticker SEC Form 4 filings, a 200-ticker watchlist,
   100 saved screens, effectively unlimited alerts and API access (1,000 requests
@@ -143,5 +144,5 @@ deleted. We have corrected recorded values twice, and said so: prices on
 | Pre-charge notice | `backend/app/services/precharge_notice.py`, `frontend/lib/trial.ts` `PRECHARGE_NOTICE_DAYS` |
 | Prices, plan limits | `frontend/lib/pricing.ts`, `backend/app/services/tier.py` |
 | Universe counts | `frontend/lib/universe.ts` (with the measuring queries) |
-| Record corrections | `/changelog` entries dated 2026-08-25, 2026-06-15 and 2026-09-14; `/scorecard` "Gaps and known limitations" |
+| Record corrections | `/changelog` entries dated 2026-08-24, 2026-06-15 and 2026-09-14; `/scorecard` "Gaps and known limitations" |
 | Congress, squeeze | `backend/app/services/congress_integrity.py`, `backend/app/services/squeeze_integrity.py` |

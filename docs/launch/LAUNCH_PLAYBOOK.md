@@ -31,7 +31,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -91,7 +94,7 @@ Text field:
 ```
 Hey HN — I built Tapeline because I was tired of stock screeners that ask you to set up 47 filters and give you back a list with no opinion. The whole point of a scanner should be "here's what looks interesting and here's why."
 
-So Tapeline scores every US ticker with a single 0–100 composite from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — weighted most toward Trend and Relative Strength and least toward Momentum. The factor set and that ordering are public on /how-it-works and can't change without a changelog entry. Every score comes with one plain-English sentence explaining what's driving it.
+So Tapeline scores about 11,500 US stocks and ETFs with a 0–100 composite from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — weighted most toward Trend and Relative Strength and least toward Momentum. The factor set and that ordering are public on /how-it-works and can't change without a changelog entry. Every score comes with one plain-English sentence explaining what's driving it.
 
 The thing I care most about: a public scorecard. Each trading day I log the top 10 names. Next day I compute their actual return vs SPY and the result goes on a public page anyone can audit. Entries are not re-ranked or deleted; we have corrected recorded values twice and dated both (prices on 25 August 2026; scores from 18 May to 12 June capped on 15 June 2026), and the four days with no list (31 August, 2, 4 and 9 September 2026) are listed on the page. It's at https://tapeline.io/scorecard, and it does not beat SPY today.
 
@@ -99,7 +102,7 @@ Free tier: top-10 rows, 12 ticker look-ups a day, 5-name watchlist. No card.
 Pro $9.99/mo: every row of the scan (about 11,500 US stocks and ETFs) + watchlist alerts.
 Premium $19.99/mo: + per-ticker SEC Form 4 filings, API.
 Prices are delayed about 15 minutes and re-read about every 70 to 80 seconds during US market hours; most score inputs are daily readings.
-30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
+30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the public scorecard (per-day entries on a 7-day delay) are readable with no account.
 
 Stack: Next.js 16 + FastAPI + Massive (formerly Polygon) + Finnhub + FRED. Deployed on Fly.io.
 
@@ -145,7 +148,7 @@ Here's what I shipped:
 
 **The accountability layer**
 
-Each trading day I freeze the top 10 composite scores. The next day I log each name's actual return vs SPY. The full history lives at /scorecard with no survivor bias filtering — losers stay on the page, the two corrections to recorded values are dated, and the four days with no list are listed. Win-rate / avg alpha / beat-SPY rate columns fill in after each session resolves.
+Each trading day I freeze the top 10 composite scores. The next day I log each name's actual return vs SPY. The history lives at /scorecard (per-day entries on a 7-day delay without a paid plan) with no survivor bias filtering — losers stay on the page, the two corrections to recorded values are dated, and the four days with no list are listed. Win-rate / avg alpha / beat-SPY rate columns fill in after each session resolves.
 
 **What I'd like feedback on**
 
@@ -158,11 +161,11 @@ Roast it. The methodology is the part I want to harden.
 
 ### r/stocks (~3M subs, general retail)
 
-**Title**: `Built a free stock score tool — every call back-checked vs SPY next day, full history public`
+**Title**: `Built a free stock score tool — every call back-checked vs SPY next day, record public`
 
 **Body**:
 ```
-I got annoyed at every "AI stock recommendation" service refusing to show its track record. So I built Tapeline. The whole record is public — no account needed to read it.
+I got annoyed at every "AI stock recommendation" service refusing to show its track record. So I built Tapeline. The record is public — no account needed to read it.
 
 What's free:
 - One 0-100 score per stock with a plain-English why
@@ -178,7 +181,7 @@ What costs $19.99/mo (Premium):
 - + Per-ticker SEC Form 4 insider filings
 - + API access
 
-30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
+30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the public scorecard (per-day entries on a 7-day delay) are readable with no account.
 
 Try it on any ticker you like — `tapeline.io/t/AAPL`, `tapeline.io/t/NVDA`, whatever. Drop your favorite ticker in comments and I'll post its current score + the breakdown.
 
@@ -258,7 +261,7 @@ https://tapeline.io/how-it-works
 
 3/ Every market day, I freeze the top 10 composite scores. Next day I log each name's actual return vs SPY.
 
-The full history — winners and losers — lives at https://tapeline.io/scorecard
+The record — winners and losers — lives at https://tapeline.io/scorecard
 
 Entries are not re-ranked or deleted. Corrections to recorded values, and days with no list, are dated on the page.
 
@@ -270,7 +273,7 @@ Premium $19.99/mo: + per-ticker SEC Form 4 filings.
 
 Prices are delayed about 15 minutes.
 
-30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
+30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the public scorecard (per-day entries on a 7-day delay) are readable with no account.
 
 5/ Three things I care about most:
 

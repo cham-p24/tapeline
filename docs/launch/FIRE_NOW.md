@@ -31,7 +31,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -84,12 +87,12 @@ version of "go get customers."
 
 | Thing | Current truth |
 |---|---|
-| **Free** | $0, no card · 12 ticker look-ups/day (unmetered first 24h) · top-10 scanner rows · watchlist (5) · 1 saved screen · full public scorecard |
+| **Free** | $0, no card · 12 ticker look-ups/day (unmetered first 24h) · top-10 scanner rows · watchlist (5) · 1 saved screen · public scorecard (per-day entries on a 7-day delay) |
 | **Prices** | Delayed about 15 minutes on every plan; re-read about every 70 to 80 seconds during US market hours. Scores usually change about once a day. Never "live" or "no delay" |
 | **Pro** | **$9.99/mo** or **$8.25/mo billed annually** ($99/yr) · every row of the scan (about 11,500 US stocks and ETFs) · alerts · calendars · CSV |
 | **Premium** | **$19.99/mo** or **$16.58/mo billed annually** ($199/yr) · + per-ticker SEC Form 4 filings · + API 1,000/day |
-| **Trial** | 30 days of Premium, **card required** ($0 charged today, first charge on day 30, an email about 7 days before it, one-click cancel before then). Signing up takes an email and a password. Adding a card is what starts the trial. The published record — daily Top 10, full scorecard, per-ticker pages, CSV/JSON export — needs no account and no card. |
-| **Scorecard** | Pull `[DAYS]`, `[CALLS]` and `[PCT]` from `/api/scorecard` on the day you post (on 2026-07-26 it was 52 days, 478 calls, ~47% beating SPY the next day — below a coin flip; say so). Entries are not re-ranked or deleted; recorded values were corrected twice (prices on 25 August 2026; scores from 18 May to 12 June capped on 15 June 2026); no top 10 was recorded for 31 August, 2, 4 or 9 September 2026. |
+| **Trial** | 30 days of Premium, **card required** ($0 charged today, first charge on day 30, an email about 7 days before it, one-click cancel before then). Signing up takes an email and a password. Adding a card is what starts the trial. The published record — daily Top 10, the public scorecard (per-day entries on a 7-day delay), per-ticker pages, CSV/JSON export (to 7 days ago) — needs no account and no card. |
+| **Scorecard** | Pull `[DAYS]` and `[CALLS]` from `/api/scorecard` on the day you post. Do not put a hit rate in a post that stays up: link `/scorecard`, which carries the current figure and its sample size (`docs/COPY_FACTS.md` §3). For reference, on 2026-07-26 it was 52 days, 478 calls and ~47% beating SPY the next day. Entries are not re-ranked or deleted; recorded values were corrected twice (prices on 25 August 2026; scores from 18 May to 12 June capped on 15 June 2026); no top 10 was recorded for 31 August, 2, 4 or 9 September 2026. |
 | **Methodology** | 6-factor composite. `/how-it-works` names the six factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — and their weight **ordering** (heaviest Trend + Relative Strength, lightest Momentum). **The exact weights are not published — never put them in a post.** "Smart Money" = **SEC Form 4 insider buys**, not 13F lag. |
 
 **Compliance (non-negotiable — protects the AU publisher exemption):** descriptive
@@ -125,20 +128,20 @@ sell itself.
 
 **Title:**
 ```
-I built a stock scanner that logs every top-10 call vs SPY the next day — the whole record is public and free to read
+I built a stock scanner that logs each top-10 call vs SPY the next day — the record is public and free to read
 ```
 
 **Body:**
 ```
-I got tired of "AI stock pick" tools that never show you what happened after the call. So I built Tapeline. The published record is free to read with no account at all, and the entire track record is public — winners and losers, with any correction dated.
+I got tired of "AI stock pick" tools that never show you what happened after the call. So I built Tapeline. The published record is free to read with no account at all, and the track record is public — winners and losers, with any correction dated.
 
 Free, no account and no card:
 - The daily Top 10
 - One 0-100 score per stock with a plain-English "why" sentence
 - A page per scored ticker
-- The full public scorecard, plus the raw CSV/JSON export
+- The public scorecard (without a paid plan, the last 7 days of entries are held back), plus the raw CSV/JSON export
 
-The scorecard is the part I actually want you to attack. Each trading day I freeze the top 10 scores; the next day I log each name's real return vs SPY. [CALLS] calls logged over [DAYS] trading days — and right now [PCT]% of them beat SPY the next session. That's below a coin flip, and it's on the page anyway, along with the two corrections we made to recorded values and the four days with no list. The point is that it's auditable from day one, not that it's magic yet.
+The scorecard is the part I actually want you to attack. At the close I freeze the day's top 10 scores; the next day I log each name's real return vs SPY. [CALLS] calls logged over [DAYS] trading days. The share that beat SPY the next session is on the page with its sample size, whatever it says on the day you read this, along with the two corrections we made to recorded values and the four days with no list. The point is that it's auditable from day one, not that it's magic yet.
 
 The score is a 6-factor composite — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — with the six factors and their weight ordering published at tapeline.io/how-it-works. "Smart Money" is SEC Form 4 insider buying, not 13F lag.
 
@@ -171,7 +174,7 @@ The methodology (published, version-controlled, won't change without a changelog
 - Macro — a single market-wide regime classification; the same reading for every ticker on a tick
 - Momentum — a momentum-quality reading plus a short-horizon return, deliberately the lightest factor
 
-The accountability layer: each trading day I freeze the top 10 composite scores and log each name's next-day return vs SPY. No survivor-bias filtering — losers stay on the page, and corrections are dated. It's [DAYS] trading days deep now, [CALLS] calls, and honestly the top-10 is beating SPY only [PCT]% of the time so far. I'd rather publish a mediocre record than hide it.
+The accountability layer: at the close I freeze the day's top 10 composite scores and log each name's next-day return vs SPY. No survivor-bias filtering — losers stay on the page, and corrections are dated. It's [DAYS] trading days deep now, [CALLS] calls, and the share that beat SPY is on /scorecard with its sample size. I'd rather publish the record as it is than hide the misses.
 
 What I'd like torn apart:
 1. Smart Money via Form 4 — is net-90-day the right window, or should I weight by insider role (CEO > director)?
@@ -197,13 +200,13 @@ Show HN: A stock scanner that logs every top-10 pick vs SPY the next day
 ```
 I built Tapeline (https://tapeline.io) because every stock scanner I'd ever paid for had the same dishonest pattern: they show you a leaderboard of picks and never show you what happened next.
 
-So Tapeline does the opposite. Each trading day at close it freezes the top 10 ranked tickers. The next day at close it records each name's actual return vs SPY, and the result goes on /scorecard. Wins stay. Losses stay. Entries are not re-ranked or deleted; we have corrected recorded values twice and dated both, and the four days with no list are listed on the page.
+So Tapeline does the opposite. At the close it freezes the day's top 10 ranked tickers. The next day at close it records each name's actual return vs SPY, and the result goes on /scorecard. Wins stay. Losses stay. Entries are not re-ranked or deleted; we have corrected recorded values twice and dated both, and the four days with no list are listed on the page.
 
 The score is a 6-factor composite — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — weighted most toward Trend and Relative Strength and least toward Momentum. The factor set and that ordering are on /how-it-works and don't change without a changelog entry. Every score ships with one plain-English sentence explaining what's driving it.
 
-The scorecard is the part I want HN to tear apart. It's [DAYS] trading days and [CALLS] calls deep, and the top-10 is currently beating SPY [PCT]% of the time — i.e. slightly worse than a coin flip. I'm posting that number on purpose. The transparency is the product; the early hit rate is not the pitch, and I expect it to move both directions as the sample grows.
+The scorecard is the part I want HN to tear apart. It's [DAYS] trading days and [CALLS] calls deep, and the share of picks that beat SPY the next session is on /scorecard with its sample size. The transparency is the product; the hit rate is not the pitch, and I expect it to move both directions as the sample grows.
 
-The published record needs no account: the daily Top 10, a page per scored ticker, the full scorecard and the raw CSV/JSON export. Prices are delayed about 15 minutes, and most score inputs are daily readings. Pro is $8.25/mo billed annually for every row of the scan (about 11,500 US stocks and ETFs) + alerts. Premium is $16.58/mo annually for + per-ticker SEC Form 4 filings + API. Signing up takes an email and a password. A card starts the 30-day Premium trial — $0 today, first charge on day 30, one click to cancel.
+The published record needs no account: the daily Top 10, a page per scored ticker, the public scorecard (per-day entries on a 7-day delay) and the raw CSV/JSON export. Prices are delayed about 15 minutes, and most score inputs are daily readings. Pro is $8.25/mo billed annually for every row of the scan (about 11,500 US stocks and ETFs) + alerts. Premium is $16.58/mo annually for + per-ticker SEC Form 4 filings + API. Signing up takes an email and a password. A card starts the 30-day Premium trial — $0 today, first charge on day 30, one click to cancel.
 
 Built solo from Melbourne. Genuinely interested in what HN finds wrong with the methodology — and which factor I'm under-weighting.
 ```

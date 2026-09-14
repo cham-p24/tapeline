@@ -31,7 +31,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -69,15 +72,15 @@ stale and non-compliant (it claimed "+0.4% above SPY", described the old 20-tick
 free tier, and pitched the removed Quiver/13F feature) — all removed.
 
 ## Hard rules (do not undo)
-- **No performance claims.** The public scorecard currently trails SPY (~42% hit-rate).
+- **No performance claims.** The public scorecard trails SPY (read the current hit rate on `/scorecard`; do not quote it in copy).
   Any "beat the market / +X% vs SPY" line is false AND a Google/FTC/ASIC violation. The
   hook is the honesty: *"Most scanners show you the wins. We show the whole record —
   losses included."*
 - **Current facts (corrected 2026-09-15 — see `docs/COPY_FACTS.md`):** about 11,500 US stocks and ETFs scored on prices delayed about 15 minutes, re-read about every 70 to 80 seconds in US market hours (scores usually change about once a day) · six-factor score whose
   factor set and weight ordering are public (the exact weights are not) · one-sentence "why"
   per ticker · public scorecard freezes each daily top-10 and back-checks vs SPY, keeping the
-  losing days · **Free with no account at all:** the daily Top 10, the complete scorecard, a
-  page per scored ticker and the raw CSV/JSON export · signing up takes an email and a password
+  losing days · **Free with no account at all:** the daily Top 10, the public scorecard (per-day
+  entries on a 7-day delay), a page per scored ticker and the raw CSV/JSON export (to 7 days ago) · signing up takes an email and a password
   and opens Free (top-10 rows, 12 look-ups/day, 5-ticker watchlist) · a card starts the 30-day
   Premium trial ($0 today, first charge day 30, an email about 7 days before it, one-click cancel) · **Pro** $9.99/mo ($8.25/mo annual) · **Premium** $19.99/mo
   ($16.58/mo annual, founding pricing — locked in for early subscribers) adds per-ticker SEC Form 4 insider filings,
@@ -91,8 +94,8 @@ free tier, and pitched the removed Quiver/13F feature) — all removed.
 ```
 Most stock scanners show you a highlight reel.
 
-Tapeline publishes the whole tape: one 0–100 score on every US stock from six named
-factors, and a scorecard that freezes every daily top-10 and grades it against
+Tapeline publishes the whole tape: one 0–100 score on about 11,500 US stocks and ETFs from six named
+factors, and a scorecard that freezes the daily top-10 and grades it against
 the S&P — losing days kept on the page.
 
 The published record is free — no account, no card. The 30-day Premium trial takes one:
@@ -167,7 +170,7 @@ stay up. Honest status: it currently trails SPY. Small sample, and I'm leaving i
 regardless. Entries are not re-ranked or deleted, and the corrections I've made are dated.
 
 Not advice, no buy/sell calls — descriptive analytics you verify yourself. About 11,500 US stocks
-and ETFs, on prices delayed about 15 minutes. The daily Top 10 and the full record are public — no account, no card.
+and ETFs, on prices delayed about 15 minutes. The daily Top 10 and the scorecard are public (per-day entries on a 7-day delay) — no account, no card.
 
 Genuine question for the sub: would you trust a score more if you could read what goes into
 it, or is the obscurity doing useful work? (links in a comment)
@@ -215,7 +218,7 @@ that's the honest data, and it stays up), and a record anyone can read with no a
 
 Founding pricing while it earns a track record: Pro $8.25/mo annual, Premium $16.58/mo annual (adds per-ticker
 insider Form 4 filings, unlimited alerts, API). Stack: FastAPI + Postgres + Next.js;
-Massive for prices, Finnhub for fundamentals + Form 4, FRED for macro.
+Massive for prices, Finnhub for fundamentals, SEC EDGAR for Form 4, FRED for macro.
 
 It's descriptive research tooling, not advice — no buy/sell calls. Kick the tires and tell
 me what's broken.
@@ -228,7 +231,7 @@ me what's broken.
 Subject: Tapeline is live (please beat it up)
 
 Tapeline is live at tapeline.io. The short version:
-· 6-factor score on every US ticker, one-sentence why per row
+· 6-factor score on about 11,500 US stocks and ETFs, one-sentence why per row
 · A public scorecard that keeps its losing days (honest: it currently trails SPY)
 · The published record is free and needs no account; the 30-day Premium trial takes a card
   ($0 today, first charge day 30, one-click cancel)

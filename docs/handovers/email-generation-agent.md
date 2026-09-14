@@ -126,7 +126,7 @@ Editor's note: {one paragraph reflection from the founder on the
 week — what worked, what didn't, what changed in the methodology if
 anything}.
 
-Read the full scorecard at https://tapeline.io/scorecard.
+Read the public scorecard at https://tapeline.io/scorecard.
 ```
 
 - [ ] Sunday 18:00 user-local-time sending (use stored timezone or

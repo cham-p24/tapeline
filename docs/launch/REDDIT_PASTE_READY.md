@@ -42,7 +42,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -92,12 +95,12 @@ URL: https://www.reddit.com/r/stocks/submit
 
 **Title (~85 chars):**
 ```
-Built a free stock score tool — every call back-checked vs SPY next day, full history public
+Built a free stock score tool — every call back-checked vs SPY next day, record public
 ```
 
 **Body:**
 ```
-I got annoyed at every "AI stock recommendation" service refusing to show its track record. So I built Tapeline. The whole record is public — no account needed to read it.
+I got annoyed at every "AI stock recommendation" service refusing to show its track record. So I built Tapeline. The record is public — no account needed to read it.
 
 What's free:
 - One 0-100 score per stock with a plain-English why
@@ -113,7 +116,7 @@ What costs $19.99/mo (Premium):
 - + API access
 - + Recent insider buys (SEC Form 4) across the active universe
 
-30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the full public scorecard are readable with no account.
+30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the public scorecard (per-day entries on a 7-day delay) are readable with no account.
 
 Try it on any ticker you like — tapeline.io/t/AAPL, tapeline.io/t/NVDA, whatever. Drop your favorite ticker in comments and I'll post its current score + the breakdown.
 
@@ -148,7 +151,7 @@ Here's what I shipped:
 
 **The accountability layer**
 
-Each trading day I freeze the top 10 composite scores. The next day I log each name's actual return vs SPY. The full history lives at /scorecard with no survivor bias filtering — losers stay on the page, and corrections and days with no list are dated. Win-rate / avg alpha / beat-SPY rate columns fill in after each session resolves.
+Each trading day I freeze the top 10 composite scores. The next day I log each name's actual return vs SPY. The history lives at /scorecard (per-day entries on a 7-day delay without a paid plan) with no survivor bias filtering — losers stay on the page, and corrections and days with no list are dated. Win-rate / avg alpha / beat-SPY rate columns fill in after each session resolves.
 
 **What I'd like feedback on**
 

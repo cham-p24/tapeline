@@ -64,7 +64,7 @@ Replace the recommendation-flavored "picks" with score-flavored language everywh
 > # A scanner that shows its work.
 > Scan **about 11,500 US stocks and ETFs** on one transparent 0–100 score — six named factors, the weighting order in the open (most on Trend and Relative Strength, least on Momentum), no black box. Then check the receipts: **every daily top 10 is back-checked against SPY and stays on the record — the misses too. Corrections are dated.**
 
-CTAs stay: **"Start the 30-day Premium trial →"** / **"See the record"**. Subline becomes the honest one ("card required · $0 today · cancel in one click"), attached to the trial. The public record needs no account and no card, and since #683 (2026-08-30) signing up needs no card either; only the trial takes one.
+CTAs stay: **"Start the 30-day Premium trial →"** / **"See the record"**. Subline becomes the honest one ("card required · $0 today · cancel in one click"), attached to the trial. The public record needs no account and no card, and since #683 (2026-08-30) signing up needs no card either. The one step that takes a card is starting the Premium trial.
 
 *Why:* leads with the concrete time-saving (the benefit a burned audience actually buys), keeps the transparency wedge, drops "every call" (prescriptive) for "every score we publish" (descriptive), and pre-frames the negative record as honesty ("the misses too") instead of letting a visitor discover it as a gotcha.
 

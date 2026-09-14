@@ -42,7 +42,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -105,7 +108,7 @@ Free tier: top-10 rows, 12 ticker look-ups a day, 5-name watchlist.
 Pro $8.25/mo billed annually: every row of the scan (about 11,500 US stocks and ETFs) + alerts.
 Premium $19.99/mo: + per-ticker SEC Form 4 filings.
 Prices are delayed about 15 minutes.
-30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
+30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. The daily Top 10 and the public scorecard (per-day entries on a 7-day delay) are readable with no account.
 
 Built solo over the last few months from Melbourne. Genuinely interested in what HN finds wrong with the methodology — and what factors I'm under-weighting.
 ```

@@ -31,7 +31,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -119,20 +122,20 @@ I built Tapeline because every stock scanner I'd paid for had the same tell: the
 
 So Tapeline does the opposite three ways:
 
-1. One score, explained. Every US stock gets a 0–100 score from six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum) — with a plain-English sentence on every row saying what's driving it. The six factors and their weight ordering are public at /how-it-works.
+1. One score, explained. About 11,500 US stocks and ETFs get a 0–100 score from six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum) — with a plain-English sentence on every row saying what's driving it. The six factors and their weight ordering are public at /how-it-works.
 
-2. A record that keeps its losses. Each trading day it freezes the top 10 and logs each name's next-day return vs SPY. Wins stay, losses stay; entries are not re-ranked or deleted, the two corrections we made to recorded values are dated, and so are the four days with no list. It's [DAYS] trading days deep and — honestly — the top-10 is beating SPY only about [PCT]% of the time so far (pull both from /api/scorecard on launch day). I'm posting that on purpose. The point is that it's auditable, not that it's magic.
+2. A record that keeps its losses. At the close it freezes the day's top 10 and logs each name's next-day return vs SPY. Wins stay, losses stay; entries are not re-ranked or deleted, the two corrections we made to recorded values are dated, and so are the four days with no list. It's [DAYS] trading days deep (pull it from /api/scorecard on launch day), and the share of picks that beat SPY the next session is on /scorecard with its sample size. The point is that it's auditable, not that it's magic.
 
-3. You can download the whole record and check my math (/verify).
+3. You can download the record (up to 7 days ago) and check my math (/verify).
 
-The published record is genuinely usable on its own (scores, the daily Top 10, a page per ticker, the full scorecard). Prices are delayed about 15 minutes. Pro is $9.99/mo, Premium $19.99/mo (per-ticker SEC Form 4 filings + API). The published record never asks for an account or a card. Signing up takes an email and a password. A card starts the 30-day Premium trial — $0 charged today, first charge on day 30, one click to cancel.
+The published record is genuinely usable on its own (scores, the daily Top 10, a page per ticker, the public scorecard with per-day entries on a 7-day delay). Prices are delayed about 15 minutes. Pro is $9.99/mo, Premium $19.99/mo (per-ticker SEC Form 4 filings + API). The published record never asks for an account or a card. Signing up takes an email and a password. A card starts the 30-day Premium trial — $0 charged today, first charge on day 30, one click to cancel.
 
 Built solo from Melbourne. I'd genuinely love for this crowd to tear apart the methodology — which factor am I under-weighting? What would make the back-check defensible over a 1-year horizon instead of 1-day?
 ```
 
 **Voice rules for replies:** describe, never prescribe. Never "buy/sell/should/
-recommend/beat the market." If someone challenges the record, agree it's
-below a coin flip and link /scorecard — that candor is what earns upvotes here.
+recommend/beat the market." If someone challenges the record, don't argue
+the number: agree with what /scorecard shows and link it — that candor is what earns upvotes here.
 
 ---
 

@@ -80,9 +80,12 @@ with per-account overrides for larger seat counts or API caps.
 ### Public record — free, no account
 **$0**
 - The daily Top 10 at `/daily-picks` (a cached page; can be an hour or more old)
-- The complete scorecard at `/scorecard` — every pick, back-checked vs SPY
+- The public scorecard at `/scorecard` — every recorded pick, back-checked vs SPY.
+  Summary figures are current; per-day entries are on a 7-day delay without Pro
+  or Premium (`_FREE_DELAY_DAYS` in `routers/scorecard.py`)
 - A page per scored ticker at `/t/{TICKER}`, all six factor sub-scores
-- The raw record as CSV and JSON
+- The raw record as CSV and JSON, up to 7 days before today for every caller
+  (`_export_cutoff` applies the same delay)
 - Anonymous ticker look-ups: **not metered.** `ANON_DAILY_LOOKUPS` is dormant
   (`routers/ticker.py`); no copy may state a number for use without an account
   (#820, 2026-09-14)
@@ -133,8 +136,9 @@ quote the steady-state Free caps, never the promo numbers — see
 
 ### Pro — "Scanner"
 **$9.99/mo** or **$8.25/mo · billed annually ($99/yr · save $20)**
-- Scanner: the full scan (about 11,500 US stocks and ETFs), row cap 1,000
-  (`TIER_LIMITS[PRO]["scanner_rows"]`), on prices delayed about 15 minutes.
+- Scanner: the full scan (about 11,500 US stocks and ETFs): 1,000 rows per
+  request (`TIER_LIMITS[PRO]["scanner_rows"]`) and paging reaches every matching
+  row, on prices delayed about 15 minutes.
   In-app pages load the latest data when opened or when a filter changes; they
   do not update on their own today (`docs/COPY_FACTS.md`)
 - Market regime: full view with VIX/DXY/10Y/sector leaders · heatmap

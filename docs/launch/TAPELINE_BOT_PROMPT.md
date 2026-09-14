@@ -134,7 +134,7 @@ TEMPLATES = {
     # "live scanner" / "live, no card" as of 2026-09-15; that wording belongs to
     # the backend lane to fix. The text below is what it should say.
     "pricing": lambda: (
-        "The published record is free with no account at all: the daily top 10, the full scorecard back-checked vs SPY, a page per scored ticker, and the raw CSV/JSON. "
+        "The published record is free with no account at all: the daily top 10, the public scorecard back-checked vs SPY (per-day entries on a 7-day delay without Pro or Premium), a page per scored ticker, and the raw CSV/JSON. "
         "For the scanner: Pro is $8.25/mo annual ($9.99 monthly) for every row of the scan (about 11,500 US stocks and ETFs) + watchlist alerts. "
         "Premium is $16.58/mo annual ($19.99 monthly) for everything in Pro + SEC Form 4 insider filings. "
         "Prices are delayed about 15 minutes on every plan. "

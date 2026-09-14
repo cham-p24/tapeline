@@ -31,7 +31,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -197,7 +200,7 @@ For those narrow cases the original DM template (preserved in git history if nee
 | "Have you back-tested this?"            | "Walk-forward back-test on 2024-2025 in progress. /scorecard is the forward-test — misses stay on the page, and corrections are dated."                                                                |
 | "What about $[other ticker]?"           | Run the curl, paste the breakdown in the thread. Be willing to spend 2-3 replies going deep on their actual ticker of interest before any soft CTA.                                   |
 | "Are you the founder?"                  | "Yes — Christian Piyatilaka, solo founder. Built Tapeline because I was tired of stock scanners that hide their formula."                                                             |
-| "How do I try it?"                      | "The full record — daily Top 10, the whole scorecard, a page per ticker, the CSV/JSON export — is readable with no account and no card. If you want the logged-in scanner, an account is just an email and a password. A card is only for the 30-day Premium trial: $0 that day, first charge on day 30, one click cancels. tapeline.io if you want to give it a shot."                                      |
+| "How do I try it?"                      | "The public record — daily Top 10, the scorecard (per-day entries on a 7-day delay), a page per ticker, the CSV/JSON export — is readable with no account and no card. If you want the logged-in scanner, an account is just an email and a password. A card is only for the 30-day Premium trial: $0 that day, first charge on day 30, one click cancels. tapeline.io if you want to give it a shot."                                      |
 | Pushback / methodological critique      | Don't defend — engage with the substance. "That's a real critique — I think the answer is X but the version-controlled changelog lets the next operator argue differently."           |
 | Silence after the OP reads it           | Move on. The followers who saw the exchange got the value either way.                                                                                                                 |
 

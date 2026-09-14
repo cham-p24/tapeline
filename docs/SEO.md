@@ -73,7 +73,7 @@ We win by being the **only** stock-scanner brand that publishes (a) its full met
 | best healthcare stocks {YEAR}           | Browse       | `/sector/healthcare`            | Same                                               |
 | high conviction stocks                  | Specialised browse | `/signal/high-conviction` | Brand-defined term; we own it                    |
 | congressional trades stock scanner      | Niche commercial | None — not a feature (#820, 2026-09-14) | No feed wired — `polygon_feed.fetch_congress_trades()` returns `[]` and there is no ingestor. Source the data before writing a landing page |
-| insider buying tracker                  | Niche commercial | `/insider-buying`               | Live surface (SEC Form 4 via Finnhub)           |
+| insider buying tracker                  | Niche commercial | `/insider-buying`               | Live surface (SEC Form 4 from SEC EDGAR since #835) |
 
 ### 3.3 Tier-C targets (top-20 within 12 months — broad informational, supports topical authority)
 
@@ -339,7 +339,7 @@ Anchor text rule: use the **target page's keyword** as the anchor, not "click he
 - **JSON-LD structured data:** added FAQPage on /pricing, /how-it-works, /compare/*, /t/{symbol}, /best-*, /sector/*, /signal/*; Article on blog posts; Review/FinancialProduct + BreadcrumbList on ticker pages; ItemList on listicles
 - **New compare pages:** /compare/tradingview, /compare/trade-ideas, /compare/koyfin (using new shared CompareLayout component)
 - **New listicle pages:** /best-finviz-alternatives (8 tools), /best-stock-scanners (10 tools)
-- **New programmatic routes:** /sector/{slug} × 11 sectors, /signal/{slug} × 6 signal levels — fetches live snapshots from /api/scanner cached 5 min
+- **New programmatic routes:** /sector/{slug} × 11 sectors, /signal/{slug} × 6 signal levels — fetches snapshots from /api/scanner (15 September 2026: this said "cached 5 min"; measured on 14 September 2026 the pages are served with `s-maxage=3600` plus stale-while-revalidate, so a visitor can get a copy an hour or more old)
 - **Ticker page enrichment:** added on-page FAQ block (5 Qs per ticker), related-pages nav with anchor-text-optimised internal links, fixed title to remove duplicate brand suffix
 - **Sitemap:** added all new routes (3 new compare URLs, 2 listicles, 11 sectors, 6 signals)
 

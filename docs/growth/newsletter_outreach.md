@@ -31,7 +31,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -99,7 +102,7 @@ Hi Daily Upside team,
 Pitching Tapeline (tapeline.io) for a secondary placement. We're a 6-factor stock-scoring tool for US retail traders, with one positioning choice that matches Daily Upside's editorial voice: a published methodology (six named factors and their weight ordering) and a public scorecard that back-checks every top-10 daily pick against SPY the next session. No survivor bias, no opaque "AI" branding.
 
 Why your audience fits:
-— The published record is complete and needs no account; a free account adds the top 10 scanner rows and 12 look-ups a day. Genuine product, not a feature-stripped preview. Reads naturally as "try this useful thing."
+— The public scorecard (per-day entries on a 7-day delay) needs no account; a free account adds the top 10 scanner rows and 12 look-ups a day. Genuine product, not a feature-stripped preview. Reads naturally as "try this useful thing."
 — Pro tier is $8.25/mo (annual) — accessible price point for retail traders considering a paid tool.
 — The published record requires no account and no card. An account takes an email and a password and opens the free plan; a card is what starts the 30-day Premium trial — $0 today, cancels in one click.
 
@@ -178,7 +181,7 @@ Christian Piyatilaka, founder. Solo project; trading-system development backgrou
 ```
 Edwin — long-time Bear Cave reader.
 
-Pitching Tapeline (tapeline.io) for a single-issue sponsored block. The angle that's right for Bear Cave specifically: I built a stock-scanning tool with a public scorecard that records every top-10 daily pick and its next-day return vs SPY — including misses. Entries are not re-ranked or deleted; the two corrections to recorded values and the four days with no list are dated on the page. Every list since May 2026 is on /scorecard.
+Pitching Tapeline (tapeline.io) for a single-issue sponsored block. The angle that's right for Bear Cave specifically: I built a stock-scanning tool with a public scorecard that records every top-10 daily pick and its next-day return vs SPY — including misses. Entries are not re-ranked or deleted; the two corrections to recorded values and the four days with no list are dated on the page. The lists recorded since May 2026 are on /scorecard; without Pro or Premium, the last 7 days of entries are held back.
 
 Your audience is the cohort that most cares about this. Most retail scoring tools (Tipranks, Zacks, WallStreetZen) won't tell you what's in the score and don't publish a per-pick track record. Tapeline names its six factors and publishes the record. The framing matches Bear Cave's quantitative-accountability ethos.
 

@@ -31,7 +31,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -99,7 +102,7 @@ Self-skeptical tone matches the rest of the thread.
 ## Tweet 5 (~275 chars)
 
 ```
-The full record is free to read, no account. Pro $8.25/mo billed annually = the full ~11,500 stocks & ETFs + alerts. Premium $19.99 adds SEC Form 4 filings. Sign-up is email + password; a card starts the 30-day trial, $0 today. Built solo from Melbourne.
+The public scorecard is free to read, no account. Pro $8.25/mo billed annually = the full ~11,500 stocks & ETFs + alerts. Premium $19.99 adds SEC Form 4 filings. Sign-up is email + password; a card starts the 30-day trial, $0 today. Built solo from Melbourne.
 ```
 
 **Why this works:** transparent pricing with the genuinely card-free surface as
@@ -145,7 +148,7 @@ Heaviest Trend and RS, lightest Momentum. The ordering is fixed and public, and 
 
 **Tweet 5:**
 ```
-The published record is complete and needs no account. Free accounts get top-10 rows and 12 look-ups a day, no card. Pro $8.25/mo annual = all ~11,500 stocks & ETFs + alerts. Premium $19.99/mo adds SEC Form 4 filings. Prices delayed ~15 min.
+The public scorecard needs no account (per-day entries on a 7-day delay). Free accounts get top-10 rows and 12 look-ups a day, no card. Pro $8.25/mo annual = all ~11,500 stocks & ETFs + alerts. Premium $19.99/mo adds SEC Form 4 filings. Prices delayed ~15 min.
 ```
 
 **URL reply:** `https://tapeline.io`

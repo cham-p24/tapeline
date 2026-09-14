@@ -54,7 +54,10 @@
 > filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -275,7 +278,7 @@ The Free tier on Tapeline:
 – Top 10 rows
 – 12 ticker look-ups a day
 – Full 6-factor breakdown and "Why" sentence on every row
-– Full scorecard
+– Public scorecard
 – Watchlist of 5 names
 
 Pro adds all ~11,500 stocks and ETFs, unlimited look-ups, email alerts, CSV export and saved scans.
@@ -290,7 +293,7 @@ If you want every row of the scan, Pro is $8.25/mo billed annually. Same scoring
 
 **Tweet 4** (~270 chars):
 ```
-The 30-day Premium trial gives the full universe + per-ticker SEC Form 4 filings + API. It takes a card, charges $0 today, and cancels in one click.
+The 30-day Premium trial adds every row, SEC Form 4 filings and the API. A card starts it, $0 today, one-click cancel.
 
 I'd rather you understand what Tapeline does, decide it doesn't fit, and not pay than have you upgrade because the free tier was deliberately broken.
 ```
@@ -346,7 +349,7 @@ Everything else in the SaaS scanner space is back-tests (gameable) or testimonia
 
 **URL reply**:
 ```
-The full record so far: https://tapeline.io/scorecard
+The public record so far: https://tapeline.io/scorecard
 ```
 
 ---

@@ -415,7 +415,7 @@ These don't block launch but should land within the first month:
 - **Public scorecard** — never gate it. It's the trust mechanism. Free users see it; paying users see the full scanner (prices delayed about 15 minutes on every plan).
 - **Owner login** — only created via `seed_owner.py`. Never expose admin promotion via the signup form.
 - **Three-tier price points** — Pro $9.99/mo ($99/yr) / Premium $19.99/mo ($199/yr), founding pricing, locked in for early subscribers. Only revisit with conversion data.
-- **The public record shows real product** — the daily Top 10, the full scorecard and every per-ticker page are real data, readable with no account and no card (cached pages, so they can be an hour or more old). Not a feature-stripped mock. (Signing up needs no card; a card starts the 30-day trial. The 22–30 August 2026 card wall was removed by #683 — see docs/PRICING.md.)
+- **The public record shows real product** — the daily Top 10, the public scorecard (per-day entries on a 7-day delay without Pro or Premium) and every per-ticker page are real data, readable with no account and no card (cached pages, so they can be an hour or more old). Not a feature-stripped mock. (Signing up needs no card; a card starts the 30-day trial. The 22–30 August 2026 card wall was removed by #683 — see docs/PRICING.md.)
 - **Trial tier is Premium** — gives users the best, takes it away on expiry. Don't drop to Pro-trial without an A/B.
 
 ---
