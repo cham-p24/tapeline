@@ -6119,11 +6119,14 @@ _PRODUCT_UPDATE_OPENER = (
 #: asked for a rewording; it did not approve this text. What each withdrawn
 #: sentence said and why is in test_update_send.py, which fails if any returns.
 #:
-#: FOUNDER APPROVAL OF THIS EXACT TEXT — PENDING.
-#: >>> FOUNDER-APPROVAL-QUOTE-PLACEHOLDER: replace this line with the founder's
-#: >>> "yes, send this" reply on the rendered text, verbatim, with its UTC time.
-#: >>> Keep it identical to the quote above APPROVED_COPY in
-#: >>> backend/tests/test_update_send.py. <<<
+#: FOUNDER APPROVAL OF THIS EXACT TEXT — APPROVED.
+#: The founder was shown the complete rendered text for both audiences (account
+#: holder and newsletter: subject, body and footer, rendered from commit 53ca5df
+#: with the send replaced by a capture) and asked to reply "yes, send this" or
+#: "hold". At about 21:53 UTC on 14 September 2026 he replied, verbatim: "YES".
+#: That reply was to that rendered text. Any change to this copy after 53ca5df
+#: is not covered by it. Keep this record identical to the one above
+#: APPROVED_COPY in backend/tests/test_update_send.py.
 PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
     (
         "Scores were not kept up to date for most of 6 to 11 September.",

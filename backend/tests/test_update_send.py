@@ -64,10 +64,14 @@ SURVEY_REMINDER_DAY = date(2026, 9, 16)
 #: (13:24 UTC), which asked for a rewording and did not approve this text: see
 #: test_the_update_repeats_none_of_the_sentences_withdrawn_on_14_september.
 #:
-#: FOUNDER APPROVAL OF THIS EXACT TEXT — PENDING.
-#: >>> FOUNDER-APPROVAL-QUOTE-PLACEHOLDER: replace this line with the founder's
-#: >>> "yes, send this" reply on the rendered text, verbatim, with its UTC time.
-#: >>> Keep it identical to the quote in services/email.py. <<<
+#: FOUNDER APPROVAL OF THIS EXACT TEXT — APPROVED.
+#: The founder was shown the complete rendered text for both audiences (account
+#: holder and newsletter: subject, body and footer, rendered from commit 53ca5df
+#: with the send replaced by a capture) and asked to reply "yes, send this" or
+#: "hold". At about 21:53 UTC on 14 September 2026 he replied, verbatim: "YES".
+#: That reply was to that rendered text. Any change to this copy after 53ca5df
+#: is not covered by it. Keep this record identical to the one above
+#: PRODUCT_UPDATE_SECTIONS in backend/app/services/email.py.
 APPROVED_COPY = """\
 Hi Sam,
 
