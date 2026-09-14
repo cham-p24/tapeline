@@ -37,6 +37,7 @@ import csv
 import io
 import logging
 import re
+from collections import Counter
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -53,8 +54,21 @@ from app.services.score import compute_tapeline_composite
 # so the canonical implementation lives in app.services.symbols. Re-exported
 # under the original private name for the four tab parsers below + the tests.
 from app.services.symbols import clean_symbol as _clean_symbol
+from app.services.symbols import vendor_share_class_symbol
 
 logger = logging.getLogger(__name__)
+
+
+def _sheet_symbol(raw_ticker: Any) -> str | None:
+    """A workbook Ticker cell as the symbol our rows are keyed by, or None.
+
+    Validated by `_clean_symbol` first (strip, uppercase), then class shares are
+    spelled the vendor's way (BRK-B -> BRK.B). The order matters: mapping first
+    would miss a hand-typed ' brk-b '. A guard only; the workbook spells class
+    shares with a dot today. See symbols.vendor_share_class_symbol.
+    """
+    symbol = _clean_symbol(raw_ticker)
+    return vendor_share_class_symbol(symbol) if symbol is not None else None
 
 
 # Tapeline's descriptive signal labels, mapped from the composite 0-100
@@ -581,7 +595,7 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
     # full of blanks.
     _log_header_drift(reader.fieldnames)
     for raw in reader:
-        symbol = _clean_symbol(_cell(raw, "Ticker"))
+        symbol = _sheet_symbol(_cell(raw, "Ticker"))
         # _clean_symbol drops the header, blanks, dividers, summary rows, and
         # emoji/space-decorated cells like "🏆 IVV". None → skip the row.
         if symbol is None:
@@ -775,6 +789,18 @@ def _approx_sub_rs(row: dict[str, Any]) -> float | None:
     return max(0.0, min(100.0, avg))
 
 
+def _warn_collapsed_duplicates(rows: list[dict[str, Any]], event: str) -> None:
+    """Say out loud when one parse carried a symbol more than once.
+
+    Before the upserts kept one row per symbol, a duplicate new symbol failed
+    the whole commit. It now resolves silently to the later sheet row, so this
+    is the only trace that the workbook disagreed with itself.
+    """
+    dupes = sorted(s for s, n in Counter(r["symbol"] for r in rows).items() if n > 1)
+    if dupes:
+        logger.warning("%s symbols=%s (later sheet row kept)", event, dupes)
+
+
 async def upsert_tickers(
     session: AsyncSession, rows: list[dict[str, Any]]
 ) -> dict[str, int]:
@@ -802,11 +828,20 @@ async def upsert_tickers(
     NEUTRAL fallback in both slots.
     """
     inserted = updated = 0
+    # The rows added by this call, by symbol. The session does not autoflush,
+    # so the SELECT below cannot see a row added earlier in the same loop. A
+    # symbol that appears twice in one parse (the workbook carrying BRK-B and
+    # BRK.B, which both key BRK.B) would otherwise add two rows with one key,
+    # fail the commit, and leave the whole sheet un-ingested on every retry.
+    # The later sheet row wins, as it already does for a symbol that exists.
+    added: dict[str, Ticker] = {}
     for r in rows:
-        existing_q = await session.execute(
-            select(Ticker).where(Ticker.symbol == r["symbol"])
-        )
-        t = existing_q.scalar_one_or_none()
+        t = added.get(r["symbol"])
+        if t is None:
+            existing_q = await session.execute(
+                select(Ticker).where(Ticker.symbol == r["symbol"])
+            )
+            t = existing_q.scalar_one_or_none()
         is_new = t is None
         if is_new:
             t = Ticker(
@@ -819,6 +854,7 @@ async def upsert_tickers(
                 asset_class=r["asset_class"] or "equity",
             )
             session.add(t)
+            added[t.symbol] = t
             inserted += 1
         else:
             updated += 1
@@ -877,6 +913,7 @@ async def upsert_tickers(
                     "sub_smart_money", "sub_macro", "sub_momentum"):
             setattr(t, key, r.get(key))
 
+    _warn_collapsed_duplicates(rows, "sheet_feed.duplicate_symbols_collapsed")
     await session.commit()
     return {"inserted": inserted, "updated": updated, "total": inserted + updated}
 
@@ -988,7 +1025,7 @@ def parse_spike_intelligence_csv(text: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     reader = csv.DictReader(io.StringIO(text))
     for raw in reader:
-        symbol = _clean_symbol(raw.get("Ticker"))
+        symbol = _sheet_symbol(raw.get("Ticker"))
         # None → header, blank, category divider, or emoji/space-decorated cell.
         if symbol is None:
             continue
@@ -1147,7 +1184,7 @@ def parse_etf_benchmarks_csv(text: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     reader = csv.DictReader(io.StringIO(text))
     for raw in reader:
-        symbol = _clean_symbol(raw.get("Ticker"))
+        symbol = _sheet_symbol(raw.get("Ticker"))
         # None → header, blank, section divider, or emoji/space-decorated cell.
         if symbol is None:
             continue
@@ -1194,11 +1231,15 @@ async def upsert_etfs(
     filter once asset_class is exposed to clients.
     """
     inserted = updated = 0
+    # One row per symbol per call; see the same map in upsert_tickers.
+    added: dict[str, Ticker] = {}
     for r in rows:
-        existing_q = await session.execute(
-            select(Ticker).where(Ticker.symbol == r["symbol"])
-        )
-        t = existing_q.scalar_one_or_none()
+        t = added.get(r["symbol"])
+        if t is None:
+            existing_q = await session.execute(
+                select(Ticker).where(Ticker.symbol == r["symbol"])
+            )
+            t = existing_q.scalar_one_or_none()
         if t is None:
             t = Ticker(
                 symbol=r["symbol"],
@@ -1207,6 +1248,7 @@ async def upsert_etfs(
                 sector=r["sector"],
             )
             session.add(t)
+            added[t.symbol] = t
             inserted += 1
         else:
             # Don't downgrade asset_class — if a symbol exists as 'equity'
@@ -1230,6 +1272,7 @@ async def upsert_etfs(
         if r["change_pct_3m"] is not None:
             t.change_pct_1m = r["change_pct_3m"] / 3.0
 
+    _warn_collapsed_duplicates(rows, "sheet_feed.etf_duplicate_symbols_collapsed")
     await session.commit()
     return {"inserted": inserted, "updated": updated, "total": inserted + updated}
 
@@ -1491,7 +1534,7 @@ def parse_smart_money_csv(text: str) -> list[dict[str, Any]]:
     appearances: dict[str, int] = {}
     reader = csv.DictReader(io.StringIO(text))
     for raw in reader:
-        symbol = _clean_symbol(raw.get("Ticker"))
+        symbol = _sheet_symbol(raw.get("Ticker"))
         category = (raw.get("Category") or "").strip()
         # None → header, blank, em-dash, divider, or emoji/space-decorated cell.
         if symbol is None:
