@@ -329,6 +329,7 @@ _last_weekly_newsletter_token: str | None = None  # "weekly_YYYYWww" of last new
 _last_daily_newsletter_date: str | None = None  # "YYYY-MM-DD" of last Daily Top 10 digest run (UTC)
 _last_indexnow_date: str | None = None  # "YYYY-MM-DD" of last IndexNow batch submit (UTC)
 _last_seo_digest_token: str | None = None  # "seo_YYYYWww" of last weekly SEO digest run
+_seo_digest_retry_after: datetime | None = None  # 1h backoff after a caught digest failure
 _last_growth_tick_date: str | None = None  # "YYYY-MM-DD" of last growth-bot tick (UTC)
 _last_fundamentals_refresh: datetime | None = None
 _last_insider_refresh: datetime | None = None
@@ -364,6 +365,67 @@ def _active_universe_refresh_due(now: datetime) -> bool:
     return _last_active_universe_refresh is None or (
         now - _last_active_universe_refresh
     ).total_seconds() >= ACTIVE_UNIVERSE_REFRESH_SECONDS
+
+
+#: The durable claim key for the weekly SEO digest (see job_claims).
+SEO_DIGEST_JOB = "seo_weekly_digest"
+
+#: After a caught digest failure, how long before the tick dispatches it again.
+SEO_DIGEST_RETRY_AFTER = timedelta(hours=1)
+
+
+async def _run_weekly_seo_digest(token: str, previous_token: str | None) -> None:
+    """Send the weekly SEO digest at most once per ISO week, detached from the tick.
+
+    The claim is written before the work and completed after it. A restart after
+    the send finds the week DONE and sends nothing. A run still in flight
+    elsewhere (another process, or the standby) is BUSY: this process backs off
+    and asks again later, and takes the claim over if the other run was
+    abandoned (job_claims.STALE_CLAIM_AFTER). A caught failure releases the
+    claim and backs off an hour, so it retries without a storm.
+    """
+    global _last_seo_digest_token, _seo_digest_retry_after
+    from app.services.job_claims import (
+        STALE_CLAIM_AFTER,
+        ClaimStatus,
+        claim_period,
+        complete_period,
+        release_period,
+    )
+
+    try:
+        status = await claim_period(SEO_DIGEST_JOB, token)
+    except Exception:
+        _last_seo_digest_token = previous_token
+        _seo_digest_retry_after = datetime.now(UTC) + SEO_DIGEST_RETRY_AFTER
+        logger.exception("seo_digest.claim_failed token=%s", token)
+        return
+
+    if status is ClaimStatus.DONE:
+        logger.info("seo_digest.already_sent token=%s", token)
+        return
+    if status is ClaimStatus.BUSY:
+        _last_seo_digest_token = previous_token
+        _seo_digest_retry_after = datetime.now(UTC) + STALE_CLAIM_AFTER
+        logger.info("seo_digest.in_flight_elsewhere token=%s", token)
+        return
+
+    try:
+        from app.services.seo_health import run_weekly_digest
+
+        async with session_scope() as seo_session:
+            sent = await run_weekly_digest(seo_session)
+        await complete_period(SEO_DIGEST_JOB, token)
+        _seo_digest_retry_after = None
+        logger.info("seo_digest.weekly.ran sent=%s token=%s", sent, token)
+    except Exception:
+        _last_seo_digest_token = previous_token
+        _seo_digest_retry_after = datetime.now(UTC) + SEO_DIGEST_RETRY_AFTER
+        logger.exception("seo_digest.weekly.failed token=%s", token)
+        try:
+            await release_period(SEO_DIGEST_JOB, token)
+        except Exception:
+            logger.exception("seo_digest.release_failed token=%s", token)
 
 
 def _mock_writes_enabled() -> bool:
@@ -1470,8 +1532,16 @@ async def tick() -> None:
     # Weekly SEO digest — Monday at/after 09:00 UTC (~7pm Sydney
     # post-Monday-close, ~5am ET pre-market). Sends a Markdown summary
     # to the founder's Telegram: sitemap size, broken-URL count,
-    # ticker-universe stats, and suggested next steps. Process-level
-    # token + Telegram-side dedupe make double-fires harmless.
+    # ticker-universe stats, and suggested next steps.
+    #
+    # DETACHED, and latched in the DATABASE. It used to run inline here behind
+    # this process-memory token alone. Every restart forgets the token, so on a
+    # Monday the first tick after each deploy ran the digest again, inside the
+    # tick, and its link audit outlasted the watchdog: measured 2026-09-14
+    # 18:45Z, `tick.timeout elapsed=240.1s stage=seo_digest_token` and four
+    # minutes with no price pass. The durable claim (services/job_claims.py)
+    # is what makes it once a week across restarts and machines; the token
+    # below only saves this process a database read per tick.
     _set_stage("seo_digest_token")
     global _last_seo_digest_token
     seo_digest_token = f"seo_{iso_year}W{iso_week:02d}"
@@ -1479,25 +1549,13 @@ async def tick() -> None:
         iso_dow == 1                                    # Monday
         and started.hour >= 9                           # 09:00 UTC onward
         and _last_seo_digest_token != seo_digest_token
+        and (_seo_digest_retry_after is None or started >= _seo_digest_retry_after)
     ):
-        # Slot claimed BEFORE the work and rolled back only on a CAUGHT
-        # failure — the pattern already applied to the calendar seed and
-        # the trial check in #797. Latch-on-success protects against a
-        # transient error; it does NOT protect against a hang, because a
-        # cycle killed by the tick watchdog never reaches the except
-        # clause either. The stale value then survives, the next tick
-        # restarts the same job, and the worker wedges until something
-        # restarts it.
+        # Token claimed BEFORE dispatch; the job rolls it back on a caught
+        # failure or when another run is still in flight.
         _seo_prev = _last_seo_digest_token
         _last_seo_digest_token = seo_digest_token
-        try:
-            from app.services.seo_health import run_weekly_digest
-            async with session_scope() as seo_session:
-                sent = await run_weekly_digest(seo_session)
-            logger.info("seo_digest.weekly.ran sent=%s token=%s", sent, seo_digest_token)
-        except Exception:
-            _last_seo_digest_token = _seo_prev
-            logger.exception("seo_digest.weekly.failed")
+        _spawn(_run_weekly_seo_digest(seo_digest_token, _seo_prev), key="seo_digest")
 
     # Daily growth-bot tick. Fires once per UTC day at/after 22:00 UTC
     # — ~8am Melbourne the next morning AEST, ~6pm ET the prior evening.

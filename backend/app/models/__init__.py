@@ -10,6 +10,7 @@ from app.models.funnel_events import FUNNEL_EVENTS, FunnelEvent
 from app.models.inbox import InboundMessage
 from app.models.inbox_classification_log import InboxClassificationLog
 from app.models.insider_transaction import InsiderTransaction
+from app.models.job_period_claim import JobPeriodClaim
 from app.models.mcp_usage import McpToolCall
 from app.models.news import NewsItem
 from app.models.newsletter import NewsletterSubscriber
@@ -49,6 +50,7 @@ __all__ = [
     "InboundMessage",
     "InboxClassificationLog",
     "InsiderTransaction",
+    "JobPeriodClaim",
     "McpToolCall",
     "MfaRecoveryCode",
     "NewsItem",
