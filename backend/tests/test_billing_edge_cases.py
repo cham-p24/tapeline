@@ -239,24 +239,52 @@ class TestProductionActuallyUsesTheLatch:
                 f"{name} is called outside _welcome_on_first_paid_invoice"
             )
 
-        # The helper is awaited exactly once, inside the payment_succeeded branch.
-        handler = funcs["stripe_webhook"]
-        callers = []
-        for branch in ast.walk(handler):
-            if not isinstance(branch, ast.If):
-                continue
-            test = branch.test
-            if not (
-                isinstance(test, ast.Compare)
-                and isinstance(test.comparators[0], ast.Constant)
-            ):
-                continue
-            label = test.comparators[0].value
-            for stmt in branch.body:
-                for n in ast.walk(stmt):
-                    if isinstance(n, ast.Call) and _callee(n) == "_welcome_on_first_paid_invoice":
-                        callers.append(label)
-        assert callers == ["invoice.payment_succeeded"], callers
+        # The helper is called exactly once in the whole module, and that call
+        # sits in the BODY of the `evt_type == "invoice.payment_succeeded"`
+        # branch. Decided from each call's own ancestors: the nearest enclosing
+        # `evt_type` test must be that one, with the call in its body. (The
+        # earlier version only looked inside branches compared against a
+        # string constant, so a call dropped into the subscription branch —
+        # `evt_type in (<tuple>)` — was never seen and the check still passed.)
+        parents: dict[ast.AST, ast.AST] = {}
+        for node in ast.walk(tree):
+            for child in ast.iter_child_nodes(node):
+                parents[child] = node
+
+        def _is_evt_type_test(node: ast.AST) -> bool:
+            return (
+                isinstance(node, ast.If)
+                and isinstance(node.test, ast.Compare)
+                and isinstance(node.test.left, ast.Name)
+                and node.test.left.id == "evt_type"
+            )
+
+        def _enclosing_branch(call: ast.Call) -> str:
+            child: ast.AST = call
+            node = parents.get(call)
+            while node is not None:
+                if _is_evt_type_test(node):
+                    test = node.test
+                    assert isinstance(test, ast.Compare)
+                    in_body = any(child is stmt for stmt in node.body)
+                    if (
+                        in_body
+                        and len(test.ops) == 1
+                        and isinstance(test.ops[0], ast.Eq)
+                        and isinstance(test.comparators[0], ast.Constant)
+                    ):
+                        return str(test.comparators[0].value)
+                    return f"not in the body of a single-event branch ({ast.unparse(test)})"
+                child, node = node, parents.get(node)
+            return "outside any evt_type branch"
+
+        calls = [
+            n for n in ast.walk(tree)
+            if isinstance(n, ast.Call) and _callee(n) == "_welcome_on_first_paid_invoice"
+        ]
+        assert [_enclosing_branch(c) for c in calls] == ["invoice.payment_succeeded"], [
+            _enclosing_branch(c) for c in calls
+        ]
 
     def test_the_failed_payment_email_is_told_which_kind_of_charge(self):
         """Matched on the AST keyword argument, not on the text "first_charge=".

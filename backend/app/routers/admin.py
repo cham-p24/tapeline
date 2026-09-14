@@ -1067,7 +1067,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
             "Subscription started · Pro monthly",
             lambda: render_subscription_started_email(
                 "Alex", tier="pro", billing_period="monthly",
-                amount_cents=2999, currency="usd",
+                plan_price_cents=999, charged_today_cents=999, currency="usd",
                 next_charge_iso="2026-06-19T00:00:00+00:00",
             ),
         ),
@@ -1075,7 +1075,7 @@ def _email_samples() -> dict[str, tuple[str, Callable[[], str]]]:
             "Subscription started · Premium annual",
             lambda: render_subscription_started_email(
                 "Alex", tier="premium", billing_period="annual",
-                amount_cents=47999, currency="usd",
+                plan_price_cents=19900, charged_today_cents=19900, currency="usd",
                 next_charge_iso="2027-05-19T00:00:00+00:00",
             ),
         ),

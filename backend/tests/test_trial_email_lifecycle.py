@@ -135,6 +135,6 @@ def test_paid_receipt_still_reads_as_a_real_purchase():
     """The receipt itself is unchanged — it just fires later now."""
     html = render_subscription_started_email(
         user_name="Sam", tier="premium", billing_period="monthly",
-        amount_cents=1999, currency="usd",
+        plan_price_cents=1999, charged_today_cents=1999, currency="usd",
     )
     assert "19.99" in html

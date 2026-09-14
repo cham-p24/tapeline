@@ -1393,16 +1393,31 @@ def render_subscription_started_email(
     user_name: str,
     tier: str,
     billing_period: str = "monthly",
-    amount_cents: int | None = None,
+    plan_price_cents: int | None = None,
     currency: str = "usd",
     next_charge_iso: str | None = None,
+    *,
+    charged_today_cents: int | None = None,
 ) -> str:
     """Welcome-to-paid. Fires once per subscription, when its FIRST invoice
     with `amount_paid > 0` succeeds (`invoice.payment_succeeded`, latched on
     `paid_start:{subscription}` in stripe_webhook_events — see
     routers/webhooks.py:_welcome_on_first_paid_invoice). Never on a status
     change: a trial's subscription goes active before its first charge.
-    `amount_cents` is the invoice's amount_paid, not the list price.
+
+    TWO AMOUNTS, AND THEY ARE NOT THE SAME THING.
+      - `charged_today_cents` is what the invoice actually took (amount_paid).
+        It is rendered as "Charged today", never with "per month/year": a
+        discounted, credited or prorated first charge is a one-off figure.
+      - `plan_price_cents` is the plan's price per billing period (the paid
+        line's unit amount), rendered "per month/year". When the two differ
+        it is labelled "before any discount or credit".
+    Rendering the invoice amount as the recurring price told a customer on a
+    50%-off coupon "$10.00 USD per month · Next charge: …" when month four
+    would be $19.99 — a price promise the next invoice breaks. Either amount
+    may be None; an unknown amount is left out rather than guessed. There is
+    deliberately no sticker-price fallback: a hand-sold or grandfathered plan
+    is not on the public price table, so a fallback would state a wrong price.
 
     Tone:
       - Receipt-clean (acknowledge what they just paid for)
@@ -1416,27 +1431,38 @@ def render_subscription_started_email(
     """
     tier_label = tier.capitalize()
     period_label = "year" if billing_period == "annual" else "month"
-    if amount_cents is not None and amount_cents > 0:
-        dollars = amount_cents / 100
-        price_line = f"${dollars:.2f} {currency.upper()} per {period_label}"
-    else:
-        # Fallback to the canonical sticker prices if the webhook didn't carry
-        # an amount (shouldn't happen but better than printing nothing).
-        sticker = {
-            ("pro", "monthly"): "$9.99/mo",
-            ("pro", "annual"): "$99/yr",
-            ("premium", "monthly"): "$19.99/mo",
-            ("premium", "annual"): "$199/yr",
-        }.get((tier.lower(), billing_period), "")
-        price_line = sticker
-    next_charge_line = ""
+    cur = currency.upper()
+    plan = (
+        plan_price_cents
+        if isinstance(plan_price_cents, int) and plan_price_cents > 0
+        else None
+    )
+    charged = (
+        charged_today_cents
+        if isinstance(charged_today_cents, int) and charged_today_cents > 0
+        else None
+    )
+    discounted = plan is not None and charged is not None and charged != plan
+
+    headline = f"Tapeline {tier_label}"
+    if plan is not None and not discounted:
+        headline += f" · ${plan / 100:.2f} {cur} per {period_label}"
+    detail_lines: list[str] = []
+    if charged is not None:
+        detail_lines.append(f"Charged today: ${charged / 100:.2f} {cur}.")
+    if discounted and plan is not None:
+        detail_lines.append(
+            f"Plan price: ${plan / 100:.2f} {cur} per {period_label}, before "
+            f"any discount or credit."
+        )
     if next_charge_iso:
         try:
             from datetime import datetime
             dt = datetime.fromisoformat(next_charge_iso.replace("Z", "+00:00"))
-            next_charge_line = f"Next charge: {dt.strftime('%b %d, %Y')}."
+            detail_lines.append(f"Next charge: {dt.strftime('%b %d, %Y')}.")
         except Exception:
-            next_charge_line = ""
+            pass
+    next_charge_line = "<br>".join(detail_lines)
     # The guarantee is not the same on both plans and this renderer fires for
     # both: monthly refunds in full inside the window, annual refunds the
     # remainder prorated with one month at the monthly rate retained. Canonical
@@ -1450,14 +1476,18 @@ def render_subscription_started_email(
         refund_clause = "just reply to this email and we'll refund in full."
     return shell(
         h1(f"You're in, {user_name}.")
+        # No freshness or coverage claims here. "Every score live-updating,
+        # every alert channel on, the full universe scanner unlocked" was not
+        # true (prices are delayed, push is opt-in, paid plans list up to
+        # 1,000 scanner rows), and this email now goes out at the moment of a
+        # real charge. State what the charge did and stop.
         + lead(
-            f"Welcome to Tapeline <strong>{tier_label}</strong>. Your full data "
-            f"feed is live — every score live-updating, every alert channel on, "
-            f"the full universe scanner unlocked."
+            f"Welcome to Tapeline <strong>{tier_label}</strong>. Your first "
+            f"payment went through and your {tier_label} plan is active."
         )
         + card(
             f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Your subscription</div>'
-            f'<div class="tl-fg" style="margin-top:6px;font-size:18px;font-weight:700;color:{LIGHT_FG};font-family:{FONT_SANS};">Tapeline {tier_label} · {price_line}</div>'
+            f'<div class="tl-fg" style="margin-top:6px;font-size:18px;font-weight:700;color:{LIGHT_FG};font-family:{FONT_SANS};">{headline}</div>'
             f'<div class="tl-muted" style="margin-top:4px;font-size:13px;color:{LIGHT_MUTED};font-family:{FONT_SANS};">{next_charge_line}</div>',
             accent=True,
         )
@@ -1468,7 +1498,7 @@ def render_subscription_started_email(
             f"""
             <ol style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
               <li><strong>Build your watchlist</strong> — add the names you actually
-                  trade. Alerts fire the moment any score crosses your threshold.</li>
+                  trade. Alerts go out when a score crosses the threshold you set.</li>
               <li><strong>Pick a notification channel</strong> — email's on by default,
                   but {tier_label} can also fire browser push and
                   the daily briefing. <a href="https://tapeline.io/app/settings/email"
@@ -1485,7 +1515,7 @@ def render_subscription_started_email(
             f"style=\"color:{LIGHT_MUTED};text-decoration:underline;\">30-day money "
             f"back</a> — {refund_clause}"
         ),
-        preheader=f"Welcome to Tapeline {tier_label} — your full data feed is live.",
+        preheader=f"Welcome to Tapeline {tier_label} — your first payment went through.",
     )
 
 

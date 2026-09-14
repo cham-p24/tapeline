@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import delete, select
@@ -21,6 +23,7 @@ from app.services.billing import (
     subscription_payload,
     tier_from_price,
 )
+from app.services.stripe_compat import stripe_field
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -251,11 +254,15 @@ def _invoice_subscription_details(inv: dict) -> dict:
     """The invoice's `subscription_details` block, wherever this API version
     puts it.
 
-    On the version this account sends (2026-04-22.dahlia, read off live
-    invoice events on 2026-09-14) an invoice has NO top-level `subscription`:
-    the id and the checkout metadata live at
-    `parent.subscription_details.{subscription, metadata}`. Pre-basil payloads
-    carried a top-level `subscription` id and `subscription_details.metadata`.
+    A webhook event arrives on the ENDPOINT's API version, which is not the
+    version the SDK pins for the calls this app makes. The live endpoint's
+    invoice events carry `api_version` 2026-04-22.dahlia (read 2026-09-14 and
+    again 2026-09-15); production's stripe-python 15.6.1 makes its own API
+    calls on 2026-08-26.dahlia. Both are dahlia and agree on every field read
+    here: an invoice has NO top-level `subscription`; the id and the checkout
+    metadata live at `parent.subscription_details.{subscription, metadata}`.
+    Pre-basil payloads carried a top-level `subscription` id and
+    `subscription_details.metadata`.
     """
     parent = inv.get("parent")
     if isinstance(parent, dict):
@@ -281,7 +288,11 @@ def _invoice_lines(inv: dict) -> list[dict]:
 def _invoice_subscription_metadata(inv: dict) -> dict:
     """The metadata stamped on the subscription at checkout-session create
     (`user_id`, `tier`, `billing_period`). Falls back to the first line's copy,
-    which Stripe also carries."""
+    which Stripe also carries.
+
+    Stamped ONCE, at checkout. A plan changed after that (Premium -> Pro in the
+    portal, monthly -> annual) leaves it stale, so it is a fallback for the
+    plan name and period, never the first source."""
     meta = _invoice_subscription_details(inv).get("metadata")
     if isinstance(meta, dict) and meta:
         return meta
@@ -292,9 +303,157 @@ def _invoice_subscription_metadata(inv: dict) -> dict:
     return {}
 
 
-async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> None:
+def _line_period(line: Any) -> tuple[int, int] | None:
+    per = stripe_field(line, "period")
+    start_ts, end_ts = stripe_field(per, "start"), stripe_field(per, "end")
+    if (
+        isinstance(start_ts, int)
+        and isinstance(end_ts, int)
+        and not isinstance(start_ts, bool)
+        and not isinstance(end_ts, bool)
+        and end_ts > start_ts
+    ):
+        return start_ts, end_ts
+    return None
+
+
+def _line_price_id(line: Any) -> str | None:
+    """The price id an invoice line bills, in either payload shape.
+
+    dahlia lines have NO `price` key: the id is `pricing.price_details.price`.
+    Pre-basil lines carried an expanded `price` object (or a bare id)."""
+    pid = stripe_field(
+        stripe_field(stripe_field(line, "pricing"), "price_details"), "price"
+    )
+    if not pid:
+        legacy = stripe_field(line, "price")
+        pid = legacy if isinstance(legacy, str) else stripe_field(legacy, "id")
+    return pid if isinstance(pid, str) and pid else None
+
+
+def _line_plan_price_cents(line: Any) -> int | None:
+    """The plan's price for one billing period on this line, in minor units:
+    unit amount times quantity, BEFORE any discount. None when unknown.
+
+    dahlia lines carry the unit amount as `pricing.unit_amount_decimal` — a
+    decimal string of minor units in the webhook JSON ("1999"), a Decimal on an
+    SDK object. Pre-basil lines carried `price.unit_amount_decimal` or
+    `price.unit_amount`. A trial line reads "0" (live events, 2026-09-15), so
+    zero means "not a price we can quote", never "free"."""
+    raw = stripe_field(stripe_field(line, "pricing"), "unit_amount_decimal")
+    if raw is None:
+        legacy = stripe_field(line, "price")
+        if legacy is not None and not isinstance(legacy, str):
+            raw = stripe_field(legacy, "unit_amount_decimal")
+            if raw is None:
+                raw = stripe_field(legacy, "unit_amount")
+    if raw is None or isinstance(raw, bool):
+        return None
+    try:
+        unit = Decimal(str(raw))
+    except (InvalidOperation, ValueError):
+        return None
+    if not unit.is_finite():
+        return None
+    qty = stripe_field(line, "quantity", 1)
+    if not isinstance(qty, int) or isinstance(qty, bool) or qty < 1:
+        qty = 1
+    cents = int((unit * qty).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    return cents if cents > 0 else None
+
+
+def _plan_line(lines: list[dict]) -> dict | None:
+    """The line that bills the plan itself: one with a quotable unit price,
+    over the longest period. Proration lines ride along as shorter extras."""
+    best: dict | None = None
+    best_key: tuple[bool, int] | None = None
+    for line in lines:
+        per = _line_period(line)
+        key = (_line_plan_price_cents(line) is not None, (per[1] - per[0]) if per else 0)
+        if best_key is None or key > best_key:
+            best, best_key = line, key
+    return best
+
+
+def _billing_period_from_price(price_id: str | None) -> str | None:
+    """"annual" / "monthly" for one of the four configured plan prices, else
+    None (a hand-sold or rotated price). Falsy ids never match, so an unset
+    STRIPE_PRICE_* env var (the empty string) can't claim one."""
+    if not price_id:
+        return None
+    if price_id in (settings.stripe_price_pro_annual, settings.stripe_price_premium_annual):
+        return "annual"
+    if price_id in (settings.stripe_price_pro_monthly, settings.stripe_price_premium_monthly):
+        return "monthly"
+    return None
+
+
+async def _resolve_invoice_account(
+    session: AsyncSession, inv: dict, sub_id: str,
+) -> tuple[User | None, Subscription | None]:
+    """The account and Subscription row a paid invoice belongs to.
+
+    `invoice.payment_succeeded` can land before `checkout.session.completed`
+    has linked the customer, so this resolves the way the subscription branch
+    does — customer id, then the `user_id` stamped into subscription metadata
+    — plus the Subscription row."""
+    meta = _invoice_subscription_metadata(inv)
+    customer_id = inv.get("customer")
+    user = None
+    if customer_id:
+        user = (
+            await session.execute(
+                select(User).where(User.stripe_customer_id == customer_id)
+            )
+        ).scalar_one_or_none()
+    sub_row = (
+        await session.execute(select(Subscription).where(Subscription.id == sub_id))
+    ).scalar_one_or_none()
+    if user is None and meta.get("user_id"):
+        user = (
+            await session.execute(select(User).where(User.id == meta["user_id"]))
+        ).scalar_one_or_none()
+    if user is None and sub_row is not None:
+        user = (
+            await session.execute(select(User).where(User.id == sub_row.user_id))
+        ).scalar_one_or_none()
+    return user, sub_row
+
+
+async def _tell_founder_paid_invoice_unannounced(
+    *,
+    reason: str,
+    inv: dict,
+    amount_paid: int,
+    currency: str,
+    sub_id: str,
+    user: User | None,
+) -> None:
+    """Founder-only: money arrived and nothing announced it. Never raises."""
+    try:
+        from app.services.telegram import notify_founder_paid_invoice_unannounced
+
+        await notify_founder_paid_invoice_unannounced(
+            reason=reason,
+            amount=amount_paid / 100,
+            currency=currency,
+            email=user.email if user is not None else None,
+            customer=inv.get("customer"),
+            subscription=sub_id,
+        )
+    except Exception:
+        logger.exception("stripe.founder_unannounced_alert_failed sub=%s", sub_id)
+
+
+async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> bool:
     """Welcome-to-paid email + founder revenue alert, once per subscription,
     when the subscription's FIRST invoice with money on it succeeds.
+
+    Returns True when THIS invoice was taken as the subscription's first
+    payment (the latch was claimed here for it), whether or not the email was
+    then delivered. The caller uses that to hold back the dunning all-clear
+    ("Payment received … your subscription is fully current again … Nothing
+    lapsed"), which is false for someone paying for the first time.
 
     WHY HERE AND NOT ON `status == "active"`. At the end of a card-required
     trial Stripe flips the subscription to active roughly an hour before it
@@ -323,18 +482,28 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> No
       `subscription_create` invoice is by definition the first; for any other
       billing_reason Stripe's paid-invoice history decides, and an
       already-paid subscription has the latch claimed silently. If Stripe
-      cannot be asked, nothing is sent and nothing is claimed — a missing
-      welcome is recoverable, a false one is not.
-    * Direct paid checkouts need no event order. `invoice.payment_succeeded`
-      can land before `checkout.session.completed` has linked the customer, so
-      the user is resolved the way the subscription branch does it — customer
-      id, then the `user_id` stamped into subscription metadata — plus the
-      Subscription row.
-    * The amount and currency are the invoice's `amount_paid`, not the price:
-      a discounted or prorated first charge is what the customer actually paid.
+      cannot be asked, nothing is sent to the customer and nothing is claimed
+      — a missing welcome is recoverable, a false one is not.
+    * Refusing to send is not the same as staying silent. When the history is
+      unavailable, or no account matches the invoice, no latch is claimed —
+      and at the next renewal the history shows a paid invoice, so the latch
+      is then claimed with no alert and the first sale is never announced.
+      So the founder is told at once, with the amount charged, that a paid
+      invoice went unannounced and why.
+    * TWO AMOUNTS. The welcome states `amount_paid` as "Charged today" and the
+      plan's price per period (the paid line's unit amount) separately. A
+      discounted first charge (a win-back or trial-save coupon, a founder
+      promo code, a referral credit) is a one-off figure: rendering it "per
+      month" promised a price the next undiscounted invoice would break. The
+      founder alert labels the two the same way.
+    * The plan name and period come from the price the invoice actually
+      bills, then the Subscription row, then the checkout metadata, then the
+      account. Metadata is stamped once at checkout, so after a plan change it
+      names the plan the customer left.
 
     Never raises: this runs inside the webhook that has to acknowledge Stripe.
     """
+    first_charge = False
     try:
         amount_paid = inv.get("amount_paid")
         if (
@@ -342,28 +511,38 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> No
             or isinstance(amount_paid, bool)
             or amount_paid <= 0
         ):
-            return
+            return False
         sub_id = _invoice_subscription_id(inv)
         if not sub_id:
             # A one-off invoice is not a subscription starting.
-            return
+            return False
 
         latch_id = f"paid_start:{sub_id}"[:80]
         claimed = await session.execute(
             select(StripeWebhookEvent).where(StripeWebhookEvent.id == latch_id)
         )
         if claimed.scalar_one_or_none() is not None:
-            return
+            return False
+        currency = str(inv.get("currency") or "usd").lower()
 
         if (inv.get("billing_reason") or "") != "subscription_create":
             prior_paid = await subscription_has_other_paid_invoice(sub_id, inv.get("id"))
             if prior_paid is None:
                 logger.error(
                     "stripe.paid_welcome_undecided sub=%s invoice=%s — Stripe's "
-                    "invoice history was unavailable; welcome NOT sent",
+                    "invoice history was unavailable; welcome NOT sent, founder told",
                     sub_id, inv.get("id"),
                 )
-                return
+                user, _ = await _resolve_invoice_account(session, inv, sub_id)
+                await _tell_founder_paid_invoice_unannounced(
+                    reason=(
+                        "Stripe's invoice history could not be read, so this "
+                        "was not confirmed as the subscription's first payment"
+                    ),
+                    inv=inv, amount_paid=amount_paid, currency=currency,
+                    sub_id=sub_id, user=user,
+                )
+                return False
             if prior_paid:
                 # Already a paying subscription: this is a renewal (or an
                 # upgrade), not a first charge. Claim the latch so the history
@@ -374,34 +553,23 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> No
                 except Exception:
                     await session.rollback()
                 logger.info("stripe.paid_welcome_skipped_established sub=%s", sub_id)
-                return
+                return False
 
-        meta = _invoice_subscription_metadata(inv)
-        customer_id = inv.get("customer")
-        user = None
-        if customer_id:
-            user = (
-                await session.execute(
-                    select(User).where(User.stripe_customer_id == customer_id)
-                )
-            ).scalar_one_or_none()
-        sub_row = (
-            await session.execute(select(Subscription).where(Subscription.id == sub_id))
-        ).scalar_one_or_none()
-        if user is None and meta.get("user_id"):
-            user = (
-                await session.execute(select(User).where(User.id == meta["user_id"]))
-            ).scalar_one_or_none()
-        if user is None and sub_row is not None:
-            user = (
-                await session.execute(select(User).where(User.id == sub_row.user_id))
-            ).scalar_one_or_none()
+        user, sub_row = await _resolve_invoice_account(session, inv, sub_id)
         if user is None:
             logger.warning(
-                "stripe.paid_welcome_without_user customer=%s sub=%s",
-                customer_id, sub_id,
+                "stripe.paid_welcome_without_user customer=%s sub=%s — founder told",
+                inv.get("customer"), sub_id,
             )
-            return
+            await _tell_founder_paid_invoice_unannounced(
+                reason=(
+                    "no Tapeline account matches this Stripe customer or the "
+                    "subscription's metadata"
+                ),
+                inv=inv, amount_paid=amount_paid, currency=currency,
+                sub_id=sub_id, user=None,
+            )
+            return False
 
         # Claim before sending: at most once, never twice.
         try:
@@ -410,21 +578,19 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> No
         except Exception:
             await session.rollback()
             logger.info("stripe.paid_start_claim_lost sub=%s", sub_id)
-            return
+            return False
+        first_charge = True
 
+        meta = _invoice_subscription_metadata(inv)
         lines = _invoice_lines(inv)
-        tier = meta.get("tier") if meta.get("tier") in _PAID_TIERS else None
-        if tier is None:
-            for line in lines:
-                pricing = line.get("pricing") or {}
-                price_id = (pricing.get("price_details") or {}).get("price") or (
-                    (line.get("price") or {}).get("id")
-                )
-                if isinstance(price_id, str) and tier_from_price(price_id):
-                    tier = tier_from_price(price_id)
-                    break
+        plan_line = _plan_line(lines)
+        price_id = _line_price_id(plan_line) if plan_line is not None else None
+
+        tier = tier_from_price(price_id) if price_id else None
         if tier is None and sub_row is not None and sub_row.tier in _PAID_TIERS:
             tier = sub_row.tier
+        if tier is None and meta.get("tier") in _PAID_TIERS:
+            tier = meta["tier"]
         if tier is None and user.tier in _PAID_TIERS:
             # A hand-sold price: the admin grant set the account's tier.
             tier = user.tier
@@ -435,22 +601,18 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> No
 
         period_start = period_end = None
         for line in lines:
-            per = line.get("period") or {}
-            start_ts, end_ts = per.get("start"), per.get("end")
-            if (
-                isinstance(start_ts, int)
-                and isinstance(end_ts, int)
-                and end_ts > start_ts
-                and (period_end is None or end_ts > period_end)
-            ):
-                period_start, period_end = start_ts, end_ts
-        billing_period = meta.get("billing_period")
-        if billing_period not in _BILLING_PERIODS:
-            billing_period = (
-                sub_row.billing_period
-                if sub_row is not None and sub_row.billing_period in _BILLING_PERIODS
-                else None
-            )
+            per = _line_period(line)
+            if per is not None and (period_end is None or per[1] > period_end):
+                period_start, period_end = per
+        billing_period = _billing_period_from_price(price_id)
+        if (
+            billing_period is None
+            and sub_row is not None
+            and sub_row.billing_period in _BILLING_PERIODS
+        ):
+            billing_period = sub_row.billing_period
+        if billing_period is None and meta.get("billing_period") in _BILLING_PERIODS:
+            billing_period = meta["billing_period"]
         if billing_period is None:
             long_period = (
                 period_start is not None
@@ -465,7 +627,9 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> No
             next_charge_iso = sub_row.current_period_end.isoformat()
         else:
             next_charge_iso = None
-        currency = str(inv.get("currency") or "usd").lower()
+        plan_price_cents = (
+            _line_plan_price_cents(plan_line) if plan_line is not None else None
+        )
 
         if tier is None:
             logger.error(
@@ -484,15 +648,17 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> No
                     user_name=(user.name or "trader"),
                     tier=tier_label,
                     billing_period=billing_period,
-                    amount_cents=amount_paid,
+                    plan_price_cents=plan_price_cents,
                     currency=currency,
                     next_charge_iso=next_charge_iso,
+                    charged_today_cents=amount_paid,
                 )
                 subject = f"You're in — welcome to Tapeline {tier_label.capitalize()}"
                 await send_email(user.email, subject, html, persona="billing")
                 logger.info(
-                    "stripe.welcome_to_paid_sent user=%s tier=%s billing=%s amount=%d",
-                    user.id, tier_label, billing_period, amount_paid,
+                    "stripe.welcome_to_paid_sent user=%s tier=%s billing=%s "
+                    "charged=%d plan_price=%s",
+                    user.id, tier_label, billing_period, amount_paid, plan_price_cents,
                 )
             except Exception:
                 logger.exception("stripe.welcome_to_paid_send_failed user=%s", user.id)
@@ -509,11 +675,16 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> No
                 billing_period=billing_period,
                 amount=amount_paid / 100,
                 currency=currency,
+                plan_price=(
+                    plan_price_cents / 100 if plan_price_cents is not None else None
+                ),
             )
         except Exception:
             logger.exception("stripe.founder_alert_failed user=%s", user.id)
+        return True
     except Exception:
         logger.exception("stripe.paid_welcome_failed invoice=%s", inv.get("id"))
+        return first_charge
 
 
 @router.post("/stripe")
@@ -707,8 +878,10 @@ async def stripe_webhook(
         # No prior-status snapshot here any more. It used to exist so the paid
         # receipt could fire on a trialing -> active transition, but that misses
         # a trial whose first charge is declined (trialing -> past_due ->
-        # active) and misfires on ordinary dunning recovery. `is_paid_start`
-        # below latches "has this subscription ever been active" instead.
+        # active) and misfires on ordinary dunning recovery. The receipt and
+        # the founder's revenue alert are not sent from this branch at all:
+        # they wait for money, in `_welcome_on_first_paid_invoice`
+        # (invoice.payment_succeeded).
         if existing:
             existing.status = p["status"]
             # Skip the tier write on an unknown price — keep what we last knew.
@@ -1498,14 +1671,24 @@ async def stripe_webhook(
             )
 
     elif evt_type == "invoice.payment_succeeded":
-        # A renewal charge cleared. Most of these are routine — every monthly
-        # renewal lands here — so we act ONLY when the customer was mid-dunning
-        # (carries one or more `dun{n}` tokens from prior failed attempts). In
-        # that case the declined charge just recovered: send the all-clear and
-        # wipe the dunning tokens so the next episode starts clean. No token =
-        # ordinary renewal = stay silent (we don't email every successful
-        # charge — Stripe's own receipt covers that). The exception is the
-        # subscription's FIRST paid invoice, handled after this block.
+        # A charge cleared. Most of these are routine — every monthly renewal
+        # lands here — and stay silent (we don't email every successful charge;
+        # Stripe's own receipt covers that). Two exceptions:
+        #
+        # 1. The subscription's FIRST invoice with money on it: welcome-to-paid
+        #    + the founder revenue alert (`_welcome_on_first_paid_invoice`).
+        # 2. A customer mid-dunning (one or more `dun{n}` tokens from failed
+        #    attempts): the declined charge just recovered, so wipe the tokens
+        #    and send the all-clear.
+        #
+        # Both can be true of one invoice — a trial whose first charge was
+        # declined and then clears on a retry. The welcome is decided FIRST so
+        # that case gets one email, not two: the all-clear says the
+        # subscription is "fully current again" and "Nothing lapsed", which is
+        # false for someone paying for the first time. The dunning tokens are
+        # still cleared either way.
+        welcomed = await _welcome_on_first_paid_invoice(session, obj)
+
         customer_id = obj.get("customer")
         result = await session.execute(select(User).where(User.stripe_customer_id == customer_id))
         user = result.scalar_one_or_none()
@@ -1518,7 +1701,13 @@ async def stripe_webhook(
                 # not be able to strand the tokens if Resend hiccups.
                 user.drip_state = ",".join(t for t in tokens if not t.startswith("dun"))
                 await session.commit()
-                if user.email:
+                if welcomed:
+                    logger.info(
+                        "stripe.payment_recovered_email_skipped_first_charge "
+                        "user=%s cleared=%d",
+                        user.id, len(dun_tokens),
+                    )
+                elif user.email:
                     try:
                         from app.services.email import (
                             render_payment_recovered_email,
@@ -1541,10 +1730,6 @@ async def stripe_webhook(
                         logger.exception(
                             "stripe.payment_recovered_email_error user=%s", user.id,
                         )
-
-        # The one successful charge that IS emailed: a subscription's first
-        # invoice with money on it. Welcome-to-paid + the founder revenue alert.
-        await _welcome_on_first_paid_invoice(session, obj)
 
     # Mark event as processed so the next delivery is treated as a replay
     if event_id:
