@@ -1,23 +1,19 @@
-"""A class share from the workbook must land on the row the vendor prices.
+"""A guard: a class share from the workbook lands on the row the vendor prices.
 
-MEASURED IN PRODUCTION, 2026-09-14 (read-only SQL and page fetches)
-------------------------------------------------------------------
-* BRK.A and BRK.B - the vendor's spelling, created by discovery - were scored
-  and priced live (BRK.B $514.83).
-* BRK-A and BRK-B - the workbook's Yahoo-style spelling - were SEPARATE rows:
-  scored (61.4 / 61.3), no price, no daily move. The vendor never answers for
-  the hyphen form, so each minute's snapshot wrote price NULL. The sheet
-  upsert writes the sheet's price on every sheet change, so the two writers
-  flipped the price back and forth.
-* /t/BRK-B rendered "BRK-B Stock Score" with a dash for a price. The sitemap
-  lists only BRK.A and BRK.B.
-* Non-crypto symbol shapes: 11,774 plain, 26 dotted, 10 dot-PR, and exactly
-  two hyphenated - both Berkshire.
+WHAT PRODUCTION LOOKS LIKE (read-only, 2026-09-14)
+--------------------------------------------------
+* The workbook has spelled class shares Yahoo-style in the past. The BRK-A and
+  BRK-B rows exist, and the sheet last wrote them before 2026-08-24: their
+  trend, RS and momentum are identical in every daily snapshot since. Their
+  price is NULL, because the vendor does not answer for the hyphen spelling.
+* As of 2026-09-14 the workbook writes BRK.A and BRK.B. ALL SIGNALS has no
+  hyphenated tickers, and BRK.B and BRK.A are already sheet-governed.
+* So on today's data this mapping changes nothing. It keeps a return to
+  hyphens from recreating a second, never-priced row.
 
-The workbook's class shares are now spelled the vendor's way at the parse, on
-all four tabs that read a Ticker cell. The two existing hyphen rows are left
-exactly as they are; retiring or merging them is a production data change for
-the founder to decide.
+The two existing hyphen rows are left exactly as they are. Retiring them, and
+redirecting /t/BRK-A and /t/BRK-B, is a production data change for the founder
+to decide.
 """
 from __future__ import annotations
 
@@ -32,6 +28,7 @@ from app.services.sheet_feed import (
     parse_etf_benchmarks_csv,
     parse_smart_money_csv,
     parse_spike_intelligence_csv,
+    upsert_etfs,
     upsert_tickers,
 )
 
@@ -45,12 +42,15 @@ _ALL_SIGNALS_HEADER = (
 )
 
 
-def _all_signals(ticker: str) -> str:
+def _all_signals_row(ticker: str, price: str = "514.83") -> str:
     return (
-        _ALL_SIGNALS_HEADER + "\n"
         f"{ticker},STOCK,Stock,QUALITY,A,72,90,ACCUMULATE,Buy,Accumulate,6-12 months,"
-        "514.83,TRUE,BULL,Yes (+3.1%),All 3 positive,4.2,9.8,18.1,1.2,3.1,2.4,1.0,96.5\n"
+        f"{price},TRUE,BULL,Yes (+3.1%),All 3 positive,4.2,9.8,18.1,1.2,3.1,2.4,1.0,96.5\n"
     )
+
+
+def _all_signals(*tickers: str) -> str:
+    return _ALL_SIGNALS_HEADER + "\n" + "".join(_all_signals_row(t) for t in tickers)
 
 
 @pytest.mark.parametrize(("sheet", "vendor"), [
@@ -66,11 +66,14 @@ def test_a_hyphenated_class_share_is_spelled_the_vendors_way(sheet: str, vendor:
 
 @pytest.mark.parametrize("unchanged", [
     "BRK.B", "SPY", "BAC.PRL", "FFH.TO", "CL=F", "ZC=F", "ABCD-WS", "ABC-RT", "ABCDEF-B",
+    "RCI-B.TO", "XYZ-WT", "BAC-PL",
 ])
 def test_everything_else_is_left_alone(unchanged: str) -> None:
     """Only a one-letter class after one to five letters is a class share.
-    Mutations: widening the suffix (ABCD-WS, a warrant-style suffix, would be
-    rewritten into a symbol that does not exist); widening the root."""
+    Mutations: widening the suffix (XYZ-WT, a warrant, or BAC-PL, a preferred,
+    would be rewritten into a symbol that does not exist); widening the root;
+    dropping the end anchor (RCI-B.TO is a foreign listing, not a US class
+    share)."""
     assert symbols.vendor_share_class_symbol(unchanged) == unchanged
 
 
@@ -81,8 +84,17 @@ def test_the_serving_path_still_resolves_the_existing_row() -> None:
 
 
 def test_the_all_signals_tab_keys_berkshire_by_the_vendor_symbol() -> None:
-    """The regression. Mutation: the parser calling _clean_symbol directly."""
+    """Mutation: the parser calling _clean_symbol directly."""
     rows = parse_all_signals_csv(_all_signals("BRK-B"))
+    assert [r["symbol"] for r in rows] == ["BRK.B"]
+
+
+@pytest.mark.parametrize("typed", [" brk-b ", "brk-b"])
+def test_a_hand_typed_cell_is_cleaned_before_it_is_mapped(typed: str) -> None:
+    """The cell is stripped and uppercased first, then mapped. Mutation:
+    mapping before cleaning, which misses the lowercase or padded form and
+    ingests a new BRK-B twin."""
+    rows = parse_all_signals_csv(_all_signals(typed))
     assert [r["symbol"] for r in rows] == ["BRK.B"]
 
 
@@ -137,3 +149,46 @@ async def test_the_sheet_upsert_lands_on_the_vendor_row_and_creates_no_twin() ->
             )).scalars().all()
         }
     assert set(found) == {"BRK.B"}, f"the sheet created a second Berkshire: {sorted(found)}"
+
+
+async def test_a_workbook_carrying_both_spellings_updates_one_row() -> None:
+    """If the workbook ever carries BRK-B and BRK.B together, both parse to
+    BRK.B and one row is written, the later sheet row winning. Mutation: the
+    parser left on _clean_symbol, which writes a BRK-B twin."""
+    csv_text = (
+        _ALL_SIGNALS_HEADER + "\n"
+        + _all_signals_row("BRK-B", price="500.00")
+        + _all_signals_row("BRK.B", price="514.83")
+    )
+    rows = parse_all_signals_csv(csv_text)
+    assert [r["symbol"] for r in rows] == ["BRK.B", "BRK.B"]
+
+    async with session_scope() as s:
+        await upsert_tickers(s, rows)
+
+    async with session_scope() as s:
+        found = (await s.execute(
+            select(Ticker.symbol, Ticker.price).where(Ticker.symbol.in_(["BRK.B", "BRK-B"]))
+        )).all()
+    assert [(sym, price) for sym, price in found] == [("BRK.B", 514.83)]
+
+
+async def test_the_etf_tab_carrying_both_spellings_updates_one_row() -> None:
+    """The ETF BENCHMARKS upsert is the other path that inserts rows. Mutation:
+    dropping its per-call symbol map, which adds the same new key twice."""
+    rows = parse_etf_benchmarks_csv(
+        "Ticker,Name,unused,Note,Score,Signal,3M Return %,6M Return %,1Y Return %,Above 200DMA,"
+        "Beats SPY (6M),vs SPY 6M %,Action\n"
+        "BRK-B,Berkshire (hyphen),,Holding company,75,BUY NOW,5.2,11.4,18.3,TRUE,Yes,0.0,Hold\n"
+        "BRK.B,Berkshire (dot),,Holding company,75,BUY NOW,5.2,11.4,18.3,TRUE,Yes,0.0,Hold\n"
+    )
+    assert [r["symbol"] for r in rows] == ["BRK.B", "BRK.B"]
+
+    async with session_scope() as s:
+        await upsert_etfs(s, rows)
+
+    async with session_scope() as s:
+        found = (await s.execute(
+            select(Ticker.symbol, Ticker.name).where(Ticker.symbol.in_(["BRK.B", "BRK-B"]))
+        )).all()
+    assert [(sym, name) for sym, name in found] == [("BRK.B", "Berkshire (dot)")]

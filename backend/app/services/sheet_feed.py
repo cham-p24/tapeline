@@ -61,10 +61,10 @@ logger = logging.getLogger(__name__)
 def _sheet_symbol(raw_ticker: Any) -> str | None:
     """A workbook Ticker cell as the symbol our rows are keyed by, or None.
 
-    Validated by `_clean_symbol`, then class shares are spelled the vendor's way
-    (BRK-B -> BRK.B), so the sheet's composite lands on the row the vendor
-    prices instead of on a second, never-priced Berkshire. See
-    symbols.vendor_share_class_symbol.
+    Validated by `_clean_symbol` first (strip, uppercase), then class shares are
+    spelled the vendor's way (BRK-B -> BRK.B). The order matters: mapping first
+    would miss a hand-typed ' brk-b '. A guard only; the workbook spells class
+    shares with a dot today. See symbols.vendor_share_class_symbol.
     """
     symbol = _clean_symbol(raw_ticker)
     return vendor_share_class_symbol(symbol) if symbol is not None else None
@@ -815,11 +815,20 @@ async def upsert_tickers(
     NEUTRAL fallback in both slots.
     """
     inserted = updated = 0
+    # The rows added by this call, by symbol. The session does not autoflush,
+    # so the SELECT below cannot see a row added earlier in the same loop. A
+    # symbol that appears twice in one parse (the workbook carrying BRK-B and
+    # BRK.B, which both key BRK.B) would otherwise add two rows with one key,
+    # fail the commit, and leave the whole sheet un-ingested on every retry.
+    # The later sheet row wins, as it already does for a symbol that exists.
+    added: dict[str, Ticker] = {}
     for r in rows:
-        existing_q = await session.execute(
-            select(Ticker).where(Ticker.symbol == r["symbol"])
-        )
-        t = existing_q.scalar_one_or_none()
+        t = added.get(r["symbol"])
+        if t is None:
+            existing_q = await session.execute(
+                select(Ticker).where(Ticker.symbol == r["symbol"])
+            )
+            t = existing_q.scalar_one_or_none()
         is_new = t is None
         if is_new:
             t = Ticker(
@@ -832,6 +841,7 @@ async def upsert_tickers(
                 asset_class=r["asset_class"] or "equity",
             )
             session.add(t)
+            added[t.symbol] = t
             inserted += 1
         else:
             updated += 1
@@ -1207,11 +1217,15 @@ async def upsert_etfs(
     filter once asset_class is exposed to clients.
     """
     inserted = updated = 0
+    # One row per symbol per call; see the same map in upsert_tickers.
+    added: dict[str, Ticker] = {}
     for r in rows:
-        existing_q = await session.execute(
-            select(Ticker).where(Ticker.symbol == r["symbol"])
-        )
-        t = existing_q.scalar_one_or_none()
+        t = added.get(r["symbol"])
+        if t is None:
+            existing_q = await session.execute(
+                select(Ticker).where(Ticker.symbol == r["symbol"])
+            )
+            t = existing_q.scalar_one_or_none()
         if t is None:
             t = Ticker(
                 symbol=r["symbol"],
@@ -1220,6 +1234,7 @@ async def upsert_etfs(
                 sector=r["sector"],
             )
             session.add(t)
+            added[t.symbol] = t
             inserted += 1
         else:
             # Don't downgrade asset_class — if a symbol exists as 'equity'

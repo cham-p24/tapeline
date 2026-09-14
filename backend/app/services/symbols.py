@@ -108,19 +108,19 @@ def vendor_share_class_symbol(symbol: str) -> str:
     """Spell a class share the vendor's way: "BRK-B" -> "BRK.B". Anything else is
     returned unchanged.
 
-    For symbols read from the signal-system workbook, which writes class shares
-    Yahoo-style. Measured 2026-09-14 (read-only): the sheet's BRK-A and BRK-B
-    sat beside the vendor rows BRK.A and BRK.B as separate Berkshire tickers.
-    The vendor never prices the hyphen form, so each minute's snapshot wrote
-    their price NULL. Every sheet change wrote the sheet's price back, so the
-    price flipped between the two. /t/BRK-B rendered Berkshire with a dash for
-    a price. The hyphen form was the only one in the table: 11,774 plain, 26
-    dotted and 10 dot-PR symbols, and exactly two hyphenated, both Berkshire.
-    So this cannot collide with a symbol the vendor spells with a hyphen.
+    A guard for symbols read from the signal-system workbook. The workbook has
+    spelled class shares Yahoo-style in the past: the BRK-A and BRK-B rows
+    exist, and the sheet last wrote them before 2026-08-24. As of 2026-09-14 it
+    writes BRK.A and BRK.B, and ALL SIGNALS has no hyphenated tickers, so today
+    this changes nothing. It keeps a return to hyphens from recreating a
+    second, never-priced row beside the one the vendor prices. The only
+    hyphenated non-crypto symbols in the table are BRK-A and BRK-B, so the
+    mapping cannot land on a symbol the vendor spells with a hyphen.
 
     Deliberately narrow: a one-letter class after one to five letters. A longer
-    suffix is not a class share and is left alone, and so are preferred shares
-    (BAC.PRL), foreign listings (FFH.TO) and futures (CL=F).
+    suffix is not a class share and is left alone (XYZ-WT, BAC-PL), and so are
+    preferred shares (BAC.PRL), foreign listings (FFH.TO, RCI-B.TO) and futures
+    (CL=F).
 
     NOT applied to the serving path. `clean_symbol` still returns "BRK-B", so
     /t/BRK-B keeps resolving the row that exists until someone decides what to
