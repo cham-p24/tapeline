@@ -734,7 +734,9 @@ describe("SignUpPage", () => {
     // require is the claim that needs no account at all: the published record.
     render(<SignUpPage />);
     const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
-    expect(text).toMatch(/the daily Top 10, the whole back-checked scorecard/i);
+    // "the whole back-checked scorecard" until 2026-09-14: per-day entries reach
+    // anonymous and free readers after a delay, so "whole" overclaimed.
+    expect(text).toMatch(/the daily Top 10, the back-checked scorecard/i);
     expect(text).toMatch(/raw CSV\/JSON export are open to everyone/i);
   });
 
