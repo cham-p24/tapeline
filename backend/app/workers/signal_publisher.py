@@ -2759,6 +2759,28 @@ _EQUITY_FACTOR_DUE_AFTER: dict[str, timedelta] = {
 #: symbol that does gain coverage is still picked up within a month.
 _NON_EQUITY_FACTOR_DUE_AFTER = timedelta(days=30)
 
+#: Equity fundamentals stamped before this instant, with no reading on the row,
+#: are due NOW instead of when their 8-day horizon passes.
+#:
+#: Until #825 (worker restarted on it at 22:58 UTC on 2026-09-13) a stamp could
+#: land without its reading: the pass cached the value and a deploy took it
+#: before the row's owner saved it. See `_save_factor_readings`. Those rows
+#: cannot be told apart from rows Finnhub does not cover, and they were hidden
+#: until their stamp aged out: 1,548 sheet-owned equities with Finnhub key
+#: statistics sat at NEUTRAL 50 (ADBE, JPM, COST, V, CAT among them), plus 457
+#: owned by the tick from the 09-06..09-11 outage. Stamps ran 09-07..09-13, so
+#: the horizon alone would have taken until 09-21.
+#:
+#: So every such equity is asked once more: about 3,400 calls, roughly 40% of
+#: them to symbols Finnhub genuinely does not cover. A re-read stamps the row
+#: after this instant, so the rule retires row by row and needs no clean-up; by
+#: 2026-09-22 every row it could match is past its horizon anyway.
+#:
+#: Equities only. Sheet-owned ETFs lost readings too, but only about 1 ETF in 7
+#: has fundamentals at all, so re-asking ~5,000 of them would recover ~150;
+#: those come due on the 30-day horizon by 2026-10-13.
+_FUNDAMENTALS_UNSAVED_BEFORE = datetime(2026, 9, 13, 23, 0, tzinfo=UTC)
+
 #: What a factor pass does when Finnhub throttles the KEY (429, or 401).
 #:
 #: Pause, then ask for the SAME symbol again. After this many consecutive
@@ -2815,11 +2837,18 @@ def _factor_due_clause(stamp_col: Any, now: datetime) -> Any:
     """
     equity_cutoff = now - _EQUITY_FACTOR_DUE_AFTER[stamp_col.key]
     other_cutoff = now - _NON_EQUITY_FACTOR_DUE_AFTER
-    return (
+    due = (
         stamp_col.is_(None)
         | ((Ticker.asset_class == "equity") & (stamp_col < equity_cutoff))
         | ((Ticker.asset_class != "equity") & (stamp_col < other_cutoff))
     )
+    if stamp_col.key == "last_fundamentals_at":
+        due = due | (
+            (Ticker.asset_class == "equity")
+            & Ticker.sub_fundamentals.is_(None)
+            & (stamp_col < _FUNDAMENTALS_UNSAVED_BEFORE)
+        )
+    return due
 
 
 async def _factor_due_counts(now: datetime | None = None) -> tuple[int, int]:
@@ -3082,7 +3111,7 @@ async def _save_factor_readings(
     ---------------------------------------------------------------------
     The pass used to put a reading only into this process's cache and stamp the
     row, and leave the row to a later writer. For the rows the tick owns that
-    writer comes within one tick (~130s). For the rows the ALL SIGNALS sheet
+    writer comes within one tick. For the rows the ALL SIGNALS sheet
     owns - about 3,700 - it is `sheet_feed.upsert_tickers`, which runs only
     when the sheet CHANGES, and the sheet can sit unchanged for a whole weekend.
     A deploy in between took the reading with it, and the stamp hid the row for
