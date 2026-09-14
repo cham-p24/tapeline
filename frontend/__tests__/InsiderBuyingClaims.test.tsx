@@ -181,7 +181,8 @@ describe("/how-it-works — insider freshness and the daily record", () => {
     expect(html).not.toMatch(/every daily top-10/i);
     // The qualification is stated where the record claim is made.
     expect(html).toMatch(/four trading days have no list: 31 August, 2 September, 4 September and 9 September 2026/);
-    expect(html).toMatch(/vendor can run behind SEC EDGAR/);
+    // Measured 14-67 days on 2026-09-14; see insiderRefreshCadenceCopy.test.tsx.
+    expect(html).toMatch(/filings can run weeks behind SEC EDGAR/);
 
     const meta = JSON.stringify(howMeta);
     expect(meta).not.toMatch(/every pick logged/i);
@@ -194,6 +195,9 @@ describe("/how-it-works — insider freshness and the daily record", () => {
     expect(copy).not.toMatch(/published as its own feed/i);
     expect(copy).not.toMatch(/within hours/i);
     expect(copy).not.toMatch(/not by Tapeline/i);
-    expect(copy).toMatch(/not every stock is re-checked every day/i);
+    // #822 made the cadence specific; pinned against the backend in
+    // insiderRefreshCadenceCopy.test.tsx.
+    expect(copy).toMatch(/about every two days/i);
+    expect(copy).toMatch(/weeks behind SEC EDGAR/);
   });
 });
