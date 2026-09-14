@@ -1,8 +1,17 @@
 """
 In-process pub/sub for SSE fan-out.
 
-Keeps the MVP simple — later this swaps to Redis pub/sub when we scale past
-one API container. The interface stays identical so only the internals change.
+IN-PROCESS ONLY. A publish reaches subscribers in the same Python process and
+nowhere else. In production the worker (workers/signal_publisher.py) and the
+API (routers/stream.py) are separate Fly processes on separate machines, so
+the worker's own publishes never reach a browser. Measured 14 Sep 2026: 300s
+of /api/stream/live during the US session delivered 0 update events across 4
+worker passes.
+
+What actually feeds API subscribers is services/live_bridge.py, which runs in
+each API process, watches the database for new writes and publishes here.
+Anything that needs to reach a browser must be published from the API process
+(or detected by that bridge), not from the worker.
 """
 from __future__ import annotations
 
