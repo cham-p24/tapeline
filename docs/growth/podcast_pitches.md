@@ -28,9 +28,9 @@ What I'd bring to a CWT episode:
 
 — The five-month forward-test data — how often the top-10 daily picks beat SPY, where the biggest factor surprises came from, and one weight change I'd argue for (and the reason I haven't made it yet, because two months isn't a long enough sample).
 
-— A specific worked example: pull a ticker live during the episode, decompose its score, show what the factor breakdown is saying that the composite hides.
+— A specific worked example: pull a ticker during the episode, decompose its score, show what the factor breakdown is saying that the composite hides.
 
-— Tooling: how the live worker scores ~2,500 US tickers per minute on Fly.io + Neon Postgres + Massive (formerly Polygon) data, the cost structure, where the engineering bottlenecks are.
+— Tooling: how a single worker re-scores about 11,500 US stocks and ETFs every 70 to 80 seconds on 15-minute-delayed prices, on Fly.io + Neon Postgres + Massive (formerly Polygon) data, the cost structure, where the engineering bottlenecks are.
 
 I built this solo over the last six months. Background in trading-system development before this. The whole thing is a single-founder project with a public methodology and a public scorecard.
 
@@ -59,11 +59,11 @@ Pitching myself as a guest. Tapeline (tapeline.io) is a 6-factor composite stock
 
 — A public scorecard that freezes the top-10 daily picks at each market close and back-checks each name against SPY the next session. No survivor bias; misses stay on the page.
 
-— A live forward-test that's currently in month 5. The dataset is small but the methodology is the point — the publisher's commitment to record every miss is what most retail scoring tools refuse to do.
+— A forward-test running since May 2026. The dataset is small but the methodology is the point — recording every miss, and dating every correction, is what most retail scoring tools refuse to do.
 
 What I'd bring to a TTU episode:
 
-— A walkthrough of how the composite handles the Smart Money factor: it reads disclosed SEC Form 4 insider transactions and nets them by direction and size over a recent rolling window. Congressional disclosure is ingested and published as its own feed in the product, but it is not an input to that sub-score. This isn't a topic most retail tools think rigorously about; your audience does.
+— A walkthrough of how the composite handles the Smart Money factor: it reads disclosed SEC Form 4 insider transactions and nets them by direction and size over a recent rolling window. It does not read congressional disclosures; Tapeline has no source for them. This isn't a topic most retail tools think rigorously about; your audience does.
 
 — The Macro factor: it reads a single market-wide regime classification, so on any given tick it is the same reading for every ticker on the board. What that does and does not add to a composite is a genuinely open question. The argument is that confluence beats single-signal, but only if the regime overlay is honest about being market-wide.
 
@@ -97,7 +97,7 @@ The model — six factors, heaviest-weighted first — Trend and Relative Streng
 — Trend: the ticker's multi-month price change, and where the latest price sits inside its own 52-week range.
 — Relative Strength: the ticker's price change minus a broad-market benchmark's, over three horizons; not sector-adjusted.
 — Fundamentals: reported margin, return on equity, EPS and revenue growth, and an earnings multiple.
-— Smart Money: disclosed SEC Form 4 insider transactions, netted over a recent window. Not 13F; Congressional disclosure is a separate published feed, not an input to this factor.
+— Smart Money: disclosed SEC Form 4 insider transactions, netted over a recent window. Not 13F and not congressional disclosures.
 — Macro: a single market-wide regime classification; the same reading for every ticker on a tick.
 — Momentum: a momentum-quality reading plus a short-horizon return, deliberately the lightest factor.
 
@@ -138,9 +138,9 @@ Episode angle suggestions:
 
 — **"Why publish the methodology?"** Your published-tactical-strategies argument applied to retail-facing scoring tools. Same logic, different audience. The moat isn't the factor list; the moat is the data spine and the accountability layer.
 
-— **"How a solo founder ships a quant tool in 2026."** Stack: FastAPI + Neon Postgres + Fly.io + Vercel + Massive (Polygon) data, ~$200/mo all-in to score ~2,500 tickers per minute. Engineering bottlenecks, where I'm Stuck, what I'd build next.
+— **"How a solo founder ships a quant tool in 2026."** Stack: FastAPI + Neon Postgres + Fly.io + Vercel + Massive (Polygon) data, ~$200/mo all-in to score about 11,500 stocks and ETFs through the trading day. Engineering bottlenecks, where I'm Stuck, what I'd build next.
 
-Background: trading-system developer before this. Six-month solo project. /scorecard is live; /how-it-works has the methodology; /pricing is the business model.
+Background: trading-system developer before this. Solo project, public since May 2026. /scorecard is up; /how-it-works has the methodology; /pricing is the business model.
 
 Happy to record.
 
@@ -161,7 +161,7 @@ Trey / Stig / Clay — long-time listener (We Study Billionaires + Millennial In
 
 Pitching a TIP episode. Tapeline (tapeline.io) is a 6-factor composite stock score; the angle I think your audience cares about most is the Smart Money factor.
 
-Most retail scoring tools hide where the smart-money signal comes from. Tapeline names it on /how-it-works: the Smart Money factor reads disclosed SEC Form 4 insider transactions and nets them by direction and size over a recent rolling window. Congressional disclosure is ingested and published as its own feed in the product, but it is not an input to that sub-score, and the page says so.
+Most retail scoring tools hide where the smart-money signal comes from. Tapeline names it on /how-it-works: the Smart Money factor reads disclosed SEC Form 4 insider transactions and nets them by direction and size over a recent rolling window. It does not read congressional disclosures: Tapeline has no source for them.
 
 The bit worth an episode is the statutory lag. Form 4 is due within a couple of business days of the transaction; a 13F is a quarterly snapshot filed up to 45 days after the quarter ends. Same phrase, "smart money", two very different vintages of information — and the filing records that a transaction happened, never why. Sales scheduled months ahead under a 10b5-1 plan, option exercises and tax-withholding sales all arrive as Form 4s and get netted like anything else.
 
@@ -171,9 +171,9 @@ Possible episode arcs:
 
 — **"What disclosed insider buying actually looks like."** We could walk through recent Form 4 filings and what the six-factor breakdown on each of those names says alongside them.
 
-— **"The Berkshire AAPL question."** When a famous manager buys a stock everyone watches, the position is already crowded by the time the quarterly filing publishes. That lag is exactly why Tapeline scores Form 4 and Congressional flow and doesn't score 13F at all. Stig's audience would appreciate the argument about survivorship in the source data.
+— **"The Berkshire AAPL question."** When a famous manager buys a stock everyone watches, the position is already crowded by the time the quarterly filing publishes. That lag is exactly why Tapeline scores Form 4 and doesn't score 13F at all. Stig's audience would appreciate the argument about survivorship in the source data.
 
-Background: solo founder, trading-system development before this. Tapeline has been live in public for six months. /scorecard back-checks every call.
+Background: solo founder, trading-system development before this. Tapeline has been public since May 2026. /scorecard back-checks every logged call.
 
 Happy to record.
 
@@ -194,7 +194,7 @@ Michael + Ben — long-time Animal Spirits listener; have referenced your "thing
 
 Pitching a Tapeline (tapeline.io) episode. The hook for the show: I built a retail stock-scanning tool with one mandate that everyone in the category refuses to do — publish every miss.
 
-The /scorecard page records every top-10 daily pick and its next-day return vs SPY. Wins are recorded, misses are recorded, nothing gets quietly removed. Five months in, the hit rate is real but humbling. The misses are visible. The model gets things wrong on a real percentage of calls. That's the whole point of publishing.
+The /scorecard page records every top-10 daily pick and its next-day return vs SPY. Wins are recorded, misses are recorded; entries are not re-ranked or deleted, and the two corrections to recorded values are dated. Since May 2026 the record trails SPY. The misses are visible. The model gets things wrong on a real percentage of calls. That's the whole point of publishing.
 
 Animal Spirits often covers "this tool says X" without auditing what the tool's track record actually is. I think your listeners would benefit from one episode that walks through:
 
@@ -217,7 +217,7 @@ Christian Piyatilaka
 
 **Hosts**: Justin Carbonneau + Matt Zeigler.
 **Audience**: Quant practitioners + sophisticated retail. Smaller (~5-10K per episode) but every listener is a methodology-buyer.
-**Why a fit**: Excess Returns is explicitly about quant model design + walk-forward testing. Tapeline's published-methodology + live-forward-test format is exactly their show.
+**Why a fit**: Excess Returns is explicitly about quant model design + walk-forward testing. Tapeline's published-methodology + forward-test format is exactly their show.
 **Contact**: excessreturnspod.com → contact form.
 
 **Pitch** (subject: "Guest idea: walk-forward forward-testing a 6-factor model in public"):
@@ -264,11 +264,11 @@ What I'd bring to a Compounders episode:
 
 — **The Smart Money factor and filing lag for long-horizon holders.** Form 4 is due within a couple of business days of the transaction; a 13F is a quarterly snapshot filed up to 45 days after the quarter ends, slow enough that Tapeline doesn't score it at all. For compounders, though, a slow signal still confirms what the long-term holder was already thinking. How much should a score value confirmation vs freshness?
 
-— **A specific worked example on a Compounders-coverage name** ($CMG, $COST, your pick). Pull the live 6-factor breakdown, decompose what the composite is saying, debate whether the weighting is appropriate for the compounder-investor lens.
+— **A specific worked example on a Compounders-coverage name** ($CMG, $COST, your pick). Pull the current 6-factor breakdown, decompose what the composite is saying, debate whether the weighting is appropriate for the compounder-investor lens.
 
 — **Why I publish the methodology and not just the score.** The Compounders listener-base is the most likely audience to argue with the six factors and their ordering, which is exactly what naming them enables. Every methodology revision goes in the public /changelog, so a re-weighting is a change on the record rather than a silent one.
 
-Background: solo founder, six months in. Trading-system development before this. /scorecard for the live record.
+Background: solo founder, six months in. Trading-system development before this. /scorecard for the record.
 
 Happy to record.
 
@@ -296,9 +296,9 @@ The angle that's right for RR:
 
 — Factor decomposition done in retail-accessible language. The 6 factors map to academic literature your audience already knows — Asness defensive-quality, Fama-French momentum, regime-aware risk scaling — expressed as a single 0-100 number with a plain-English "why" sentence per row. The transparency of a factor product, without the factor-product framing.
 
-— Why the live forward-test is more honest than any back-test. The /scorecard freezes the top-10 daily picks at close and back-checks each against SPY the next session. Five months in. Misses stay on the page. The sample is small but the methodology stays.
+— Why a forward-test is more honest than any back-test. The /scorecard freezes the top-10 daily picks at close and back-checks each against SPY the next session. Running since May 2026. Misses stay on the page, corrections are dated. The sample is small but the methodology stays.
 
-— A specific worked example: take a name live, decompose the score, show where the composite agrees and disagrees with the underlying factor signals. The disagreements are usually more interesting than the agreements.
+— A specific worked example: take a name, decompose the score, show where the composite agrees and disagrees with the underlying factor signals. The disagreements are usually more interesting than the agreements.
 
 — The evidence-based-software conversation, retail edition. Tapeline is $9.99/mo Pro, $19.99/mo Premium — competing against $500-$5,000/yr scoring tools that don't publish their methodology. What "evidence-based" means for retail-facing software, not just for portfolio construction.
 
@@ -326,13 +326,13 @@ Pitching myself for an Acquirers Podcast spot. Tapeline (tapeline.io) is a 6-fac
 
 The angle that's right for Acquirers:
 
-— A breakdown of how the Smart Money factor is wired: disclosed SEC Form 4 insider transactions, netted by direction and size over a recent window. Congressional disclosure is a separate published feed, not an input to this factor. Smart Money is deliberately a corroborating factor, not a standalone one. Worth discussing what the published research says about the lag on statutory disclosure.
+— A breakdown of how the Smart Money factor is wired: disclosed SEC Form 4 insider transactions, netted by direction and size over a recent window. Not congressional disclosures. Smart Money is deliberately a corroborating factor, not a standalone one. Worth discussing what the published research says about the lag on statutory disclosure.
 
-— The Fundamentals factor: reported margin, return on equity, EPS and revenue growth, and an earnings multiple — five reported numbers on fixed bands, not sector-adjusted. Why it carries less weight than a deep-value playbook would suggest, and the live forward-test result that's making me reconsider.
+— The Fundamentals factor: reported margin, return on equity, EPS and revenue growth, and an earnings multiple — five reported numbers on fixed bands, not sector-adjusted. Why it carries less weight than a deep-value playbook would suggest, and the forward-test result that's making me reconsider.
 
-— A specific worked example: take a deep-value name (Acquirer's Funds holding or otherwise) and decompose the Tapeline score live. Where the 6-factor view agrees with the deep-value framing and where it diverges. The disagreements are usually more interesting than the agreements.
+— A specific worked example: take a deep-value name (Acquirer's Funds holding or otherwise) and decompose the Tapeline score. Where the 6-factor view agrees with the deep-value framing and where it diverges. The disagreements are usually more interesting than the agreements.
 
-— Operating economics. Live worker scoring ~2,500 US tickers per minute on Fly.io + Neon Postgres + Massive (formerly Polygon). The cost-per-paid-user math and where the operational moat actually is (transparent forward-test, not the factor list).
+— Operating economics. One worker re-scoring about 11,500 US stocks and ETFs every 70 to 80 seconds on Fly.io + Neon Postgres + Massive (formerly Polygon). The cost-per-paid-user math and where the operational moat actually is (transparent forward-test, not the factor list).
 
 Background: trading-system developer for ~10 years; built Tapeline solo over six months. Melbourne-based.
 
@@ -364,7 +364,7 @@ The angle that's right for The Long View:
 
 — The retail-price conversation. Tapeline is $9.99/mo Pro, $19.99/mo Premium. The competitive set is $500-$5,000/yr scoring tools that don't publish their methodology. Why "evidence-based" software at retail price points is a structurally different conversation than evidence-based portfolio management.
 
-— A specific worked example: take a name your audience knows, decompose the Tapeline score live, show what the 6-factor breakdown is communicating that the composite hides.
+— A specific worked example: take a name your audience knows, decompose the Tapeline score, show what the 6-factor breakdown is communicating that the composite hides.
 
 Background: built Tapeline solo over the last six months. Trading-system developer for ~10 years before this. Melbourne-based, time-zone-flexible.
 

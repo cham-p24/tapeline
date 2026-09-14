@@ -91,7 +91,7 @@ Tier 1 = high-value, NEEDS FOUNDER VOICE. Examples:
 - Long thoughtful (200+ char) methodology critique
 
 Tier 2 = templatable, AUTO-REPLY SAFE. Examples:
-- "What's the score for $TICKER?"  → reply with live API curl + breakdown
+- "What's the score for $TICKER?"  → reply with current API curl + breakdown
 - "Is there a free version?" / pricing questions → canonical pricing reply
 - "Can I get a free trial?" → trial signup reply
 - Generic "cool product" / "interesting tool" → short thanks + invite
@@ -127,19 +127,23 @@ TEMPLATES = {
     # NOTE: the live implementations are in
     # backend/app/services/inbox_templates.py — that module is what actually
     # ships, and it is the copy to change first. These are kept in sync as
-    # documentation. Both were corrected on 2026-08-22 for the card gate: they
-    # used to end "Signup is email + password and lands on the free tier — no
-    # card", which is false for every stranger these replies go to.
+    # documentation. History: corrected 2026-08-22 for the card wall, changed
+    # back 2026-08-30 when #683 removed it, and re-synced here 2026-09-15 after
+    # the 14 September integrity wave (no congressional trades, ~11,500 not
+    # ~2,500, prices delayed about 15 minutes). The live module still says
+    # "live scanner" / "live, no card" as of 2026-09-15; that wording belongs to
+    # the backend lane to fix. The text below is what it should say.
     "pricing": lambda: (
         "The published record is free with no account at all: the daily top 10, the full scorecard back-checked vs SPY, a page per scored ticker, and the raw CSV/JSON. "
-        "For the live scanner: Pro is $8.25/mo annual ($9.99 monthly) for the full ~2,500-ticker live scan + smart watchlist alerts. "
-        "Premium is $16.58/mo annual ($19.99 monthly) for everything in Pro + congressional trades + insider Form 4 buys. "
-        "A new account puts a card on file at first sign-in, which starts the 30-day Premium trial: $0 charged that day, first charge on day 30, one click to cancel before then. tapeline.io/pricing has the full comparison."
+        "For the scanner: Pro is $8.25/mo annual ($9.99 monthly) for every row of the scan (about 11,500 US stocks and ETFs) + watchlist alerts. "
+        "Premium is $16.58/mo annual ($19.99 monthly) for everything in Pro + SEC Form 4 insider filings. "
+        "Prices are delayed about 15 minutes on every plan. "
+        "Signing up is email and password and lands on the free tier: the top ten scored rows of any scan. A card adds the 30-day Premium trial: $0 charged that day, first charge on day 30, one click to cancel before then. tapeline.io/pricing has the full comparison."
     ),
     "trial": lambda: (
-        "There's a 30-day Premium trial — a new account adds a card at first sign-in, but nothing is charged that day. "
-        "The first charge is on day 30 and one click cancels before then. tapeline.io/signup. "
-        "The full ~2,500-ticker universe, scorecard, watchlist alerts, congressional/insider feeds, all included for the trial window. "
+        "There's a 30-day Premium trial. Signing up takes an email and a password and lands on the free tier; adding a card starts the trial and nothing is charged that day. "
+        "The first charge is on day 30, we email you about 7 days before it, and one click cancels before then. tapeline.io/signup. "
+        "The full scored universe, scorecard, watchlist alerts and SEC Form 4 insider filings are all included for the trial window. "
         "If you'd rather not put a card down, the daily top 10 and the whole public record are readable with no account at tapeline.io/scorecard."
     ),
     "thanks": lambda: (
@@ -148,7 +152,7 @@ TEMPLATES = {
 }
 ```
 
-For "ticker_score", call `GET https://api.tapeline.io/api/ticker/{symbol}` to get live data. Reply with the formatted string.
+For "ticker_score", call `GET https://api.tapeline.io/api/ticker/{symbol}` to get the current data (prices delayed about 15 minutes). Reply with the formatted string.
 
 ### Tier 1 Telegram approval flow
 

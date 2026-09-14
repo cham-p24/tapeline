@@ -1,5 +1,12 @@
 # Meta ads — go-live runbook
 
+> **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
+>
+> - **Coverage.** About 11,500 US stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs updated once a day. 2,500 was a snapshot setting, fixed by #763/#765 and corrected in copy by #826.
+> - **Trial and card.** Signing up is free and needs no card (the card wall ran from 22 to 30 August 2026, #548 to #683). A card starts the 30-day Premium trial, and the pre-charge email goes about 7 days before the first charge.
+>
+> Measurements, times and approved wording: `docs/COPY_FACTS.md`.
+
 *Operational companion to `META_ADS_DECISION.md`. That document is the **analysis** and it recommends **not** running Meta. The founder has decided to run it anyway (2026-08-21, after three explicit requests). This document does not re-argue that; it is the how, written so the test is measurable, compliant, and cheap to stop.*
 
 *Nothing here is legal or financial advice. The items marked 🔴 are hard gates, not suggestions.*

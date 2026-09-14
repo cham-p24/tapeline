@@ -178,7 +178,7 @@ founder posts. Agent's job is to:
   3. Help them copy from the chosen draft. URL field gets
      https://tapeline.io. Text field gets the body.
   4. Title format (≤ 80 chars):
-     "Show HN: Tapeline — one score per stock, with a public, unedited
+     "Show HN: Tapeline — one score per stock, with a public, dated
      track record" (or variant title).
   5. After posting: hang around for 90 MINUTES answering every comment
      in real time. HN front-page algorithm rewards reply velocity in

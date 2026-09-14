@@ -1,5 +1,14 @@
 # Tapeline — Growth Strategy (the path to a real revenue base, then 10x)
 
+> **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
+>
+> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 70 to 80 seconds (gaps of 71 to 74 seconds measured on 14 September 2026), and most score inputs are daily, so a score usually changes about once a day. In-app pages do not update on their own, and public pages are cached snapshots that can be an hour or more old. Nothing is real-time, sub-60s or "every minute".
+> - **Coverage.** About 11,500 US stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs updated once a day. 2,500 was a snapshot setting, fixed by #763/#765 and corrected in copy by #826.
+> - **Congressional trades.** There is no real source of congressional trade disclosures. Tapeline shows none, none feeds the score, and they are not a Premium feature (#770, #820).
+> - **Trial and card.** Signing up is free and needs no card (the card wall ran from 22 to 30 August 2026, #548 to #683). A card starts the 30-day Premium trial, and the pre-charge email goes about 7 days before the first charge.
+>
+> Measurements, times and approved wording: `docs/COPY_FACTS.md`.
+
 *Produced 2026-06-26 by a multi-agent audit of the actual repo (product/tech, GTM state, SEO, distribution, monetization) + fresh web research on the competitive landscape, finance-channel economics, and compliance — then an adversarial review. Supersedes the generic playbook; this one is grounded in what Tapeline actually is today.*
 
 *Not legal advice. The compliance section flags consults to book, not opinions to rely on.*
@@ -25,7 +34,7 @@ Your wedge is *"the only retail scanner that publishes its methodology — six n
 You cannot hide it (hiding it destroys the wedge and the compliance posture). So you must **pivot the value proposition — a decision only you can make:**
 
 - ❌ *Old, fragile pitch:* "Our scores beat the market." (The record doesn't support it, and claiming it is both false and a Google Ads / FTC violation.)
-- ✅ *Honest, durable pitch:* **"Most gurus show you the wins. We show you the record — the whole thing. We save you hours of screening across 2,500 tickers on six transparent factors, and we never pretend we're psychic."** You sell **process + time-savings + honesty**, not alpha.
+- ✅ *Honest, durable pitch:* **"Most gurus show you the wins. We show you the record — the whole thing. We save you hours of screening across about 11,500 US stocks and ETFs on six named factors, and we never pretend we're psychic."** You sell **process + time-savings + honesty**, not alpha.
 
 This reframe is simultaneously: the only *true* claim, the only *compliant* claim (US adviser line, AU, Google Ads, FTC — §7), and the message that actually converts a previously-burned audience. **Adopt it everywhere — ad copy, landing pages, FinTwit.**
 
@@ -39,9 +48,9 @@ This reframe is simultaneously: the only *true* claim, the only *compliant* clai
 
 **Built, and it's a lot** (the briefs are unanimous):
 - Fully-wired multi-tenant SaaS — 37 backend routers, cookie auth + MFA, deployed + monitored on Fly.io, CI/CD, uptime checks. Live at tapeline.io / api.tapeline.io.
-- The 6-factor composite is **real running code** (`score.py:compute_tapeline_composite`), weights sum to 1.0, ~2,500-ticker universe, sub-60s refresh. (Resolves the May scoring-audit complaint.)
+- The 6-factor composite is **real running code** (`score.py:compute_tapeline_composite`), weights sum to 1.0, ~2,500-ticker universe, sub-60s refresh. (Resolves the May scoring-audit complaint.) *[Corrected 15 September 2026: the universe is about 11,500 US stocks and ETFs, prices are delayed about 15 minutes, and a pass takes about 70 to 80 seconds — "sub-60s" was never measured and does not hold. See `docs/COPY_FACTS.md`.]*
 - **Stripe billing is the most mature subsystem** — Pro/Premium × monthly/annual checkout, customer portal, webhooks, *plus* retention machinery most launches lack: pause-collection, 50%-off-3mo save offer, 40%-off win-back, referral 100%-off coupons, exit survey, dunning. `FOUNDERFRIENDS` founding-beta coupon live on /pricing.
-- 30-day Premium trial, **card required at first sign-in** since #548 (2026-08-22) — $0 today, first charge on day 30, T-3 reminder email, one-click cancel — on top of the same layered abuse defence (email-normalize, IP cap, 30-day device fingerprint, honeypot, Turnstile, disposable-email block). Accounts created before 2026-08-22 are grandfathered and never asked for a card.
+- 30-day Premium trial, card required — $0 today, first charge on day 30, a reminder email about 7 days before it, one-click cancel *(15 September 2026: this line said "card required at first sign-in since #548" and "T-3 reminder"; #683 removed the sign-in card wall on 2026-08-30 and #820 moved the notice to about 7 days)* — on top of the same layered abuse defence (email-normalize, IP cap, 30-day device fingerprint, honeypot, Turnstile, disposable-email block). Accounts created before 2026-08-22 are grandfathered and never asked for a card.
 - **~4,750 indexable SEO URLs** — 22 `/compare/*`, 13 `/best-stocks-for/*`, 11 sectors, 6 signals, ~4,600 per-ticker pages, 14 blog posts, the public scorecard. Schema smoke test 20/20.
 - **Live Google Ads** with sign-up *and* subscribe (revenue) conversion tracking.
 - 200+ pages of **launch-grade distribution copy** across ten channels — almost all of it *un-fired*.
@@ -113,7 +122,7 @@ Everything else is downstream of getting real volume into the funnel.
 ### Retention & LTV
 - Habit loops are built but never fired (drip emails: synthetic only). Activate **daily briefing + alerts (email + browser push — the only two live channels)** the moment real users exist — the daily-return hook. **Regime** is the "check before I trade" reflex. The **weekly scorecard update** is a retention + content twofer.
 - Churn defense is already in code (pause, save-offer, win-back, exit survey). **Add:** an "annual at your current monthly rate" cancel-flow save offer (stickier than a discount); auto-trigger win-back on involuntary churn (dunning is wired, never fired).
-- **Expansion (Pro→Premium):** the Premium fences (Congressional trades, Recent insider buys (SEC Form 4), unlimited email alerts, the public API) are the right ones. Drive upgrades with blog posts that feed the *paid* feature pages (a Form 4 explainer, a congressional-trades explainer) + a teaser of congress/insider data to Pro users. ("Elite 13F" is not a fence — Quiver was cancelled and the surface is retired.)
+- **Expansion (Pro→Premium):** the Premium fences (Recent insider buys (SEC Form 4), unlimited email alerts, the public API) are the right ones. *(15 September 2026: congressional trades removed from this list — there is no real source for them, #820.)* Drive upgrades with blog posts that feed the *paid* feature pages (a Form 4 explainer, a congressional-trades explainer) + a teaser of congress/insider data to Pro users. ("Elite 13F" is not a fence — Quiver was cancelled and the surface is retired.)
 - **Quality caveat that caps LTV:** Fundamentals & Smart-money factors lean on Finnhub caches the audit found empty for many tickers → composites fall back to NEUTRAL-50 on 2 of 6 factors, diluting differentiation *and* scorecard accuracy. Backfill these caches.
 
 ### Monetization leverage (sequenced — `outputs/` is empty; nothing built yet)

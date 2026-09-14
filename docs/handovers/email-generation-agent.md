@@ -87,8 +87,10 @@ watchlist last week. Here's where they landed today:
   {ticker_b}  68.0 → 71.2   CONSTRUCTIVE → STRONG SETUP     (+3.2)
   {ticker_c}  82.0 → 79.4   STRONG SETUP — held             (-2.6)
 
-The Tapeline Score updates every 60 seconds. The full breakdown for
-each is one click away on your watchlist page.
+Scores are recalculated through the trading day on prices delayed
+about 15 minutes, and most inputs are daily, so a score usually moves
+about once a day. The full breakdown for each is one click away on
+your watchlist page.
 
 Reminder: 4 days left in your trial. If the scanner has earned its
 keep, the Pro plan is $9.99/mo ($8.25/mo billed annually) and Premium
@@ -140,7 +142,7 @@ Currently `render_trial_ended_email` fires once on day 30. Extend to
 3 emails:
 
 **Day 14 (existing, polish):** *"Your trial just ended"* — calm tone,
-recap what they kept: the public record, the live top-10 scanner,
+recap what they kept: the public record, the top-10 scanner,
 12 look-ups per UTC day, a 5-ticker watchlist. One CTA: upgrade.
 
 > **Scope note (post-#548, 2026-08-22):** a card-required trial converts

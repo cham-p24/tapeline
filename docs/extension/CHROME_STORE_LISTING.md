@@ -48,7 +48,7 @@ Tapeline's six-factor score and track record for the stock you're viewing. Tapel
 
 *(124 chars. This is the manifest `description` verbatim, deliberately — the store field and the manifest disagreeing is the kind of small inconsistency reviewers notice. Two non-negotiables are preserved: the account requirement, because a reviewer who installs it and hits a connect screen the listing never mentioned files a functionality-mismatch rejection; and "sends only the ticker", the strongest fact in the submission.)*
 
-**Note the wording is "Tapeline account", not "free account".** See the card gate below — "free" is no longer true for new accounts and must not reappear here.
+**Note the wording is "Tapeline account", not "free account".** The account is what the extension needs; the plan is separate. (Updated 15 September 2026: this note used to say "free" was no longer true for new accounts. That was true only while the card wall was in place, 22 to 30 August 2026; #683 removed it and signing up is free with no card again. "Tapeline account" is still the right wording for this field.)
 
 ## Category
 
@@ -64,7 +64,7 @@ English (United States)
 ## Detailed description
 
 ```
-Tapeline scores about 11,500 US stocks and ETFs on six published factors, and logs each day's top-10 picks to a public record that keeps the picks that lose. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026.
+Tapeline scores about 11,500 US stocks and ETFs on six named factors, and logs its daily top-10 picks to a public record that keeps the picks that lose. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026.
 
 This extension puts that on the pages you already read.
 
@@ -97,7 +97,7 @@ WHAT YOU NEED
 
 A Tapeline account. After installing, the welcome page takes you to tapeline.io to sign in or create one.
 
-Signing up takes an email and a password and opens the free plan. A card is what starts the 30-day Premium trial — $0 that day, the first charge lands at the end of the trial, and one click cancels before then.
+Signing up takes an email and a password and opens the free plan, with no card. A card is what starts the 30-day Premium trial — $0 that day, the first charge lands on day 30, we email you about 7 days before it, and one click cancels before then.
 
 HONEST ABOUT THE RECORD
 
@@ -105,7 +105,7 @@ Tapeline's published picks do not currently beat SPY. Just under half beat it th
 
 At the current sample size these numbers do not distinguish the ranking from chance. We publish them anyway, losses included and corrections dated — the whole point is a record you can check rather than a claim you have to trust.
 
-Scores are descriptive readings of published data. Not investment advice, price targets or forecasts.
+Scores are descriptive readings of published data. The prices behind them are delayed about 15 minutes, and most inputs are daily readings, so a score usually changes about once a day. Not investment advice, price targets or forecasts.
 ```
 
 **Why the record paragraph carries no percentage.** Store copy is static; the scorecard is not. As of this writing the live figures are 47.2% beating SPY next session and median alpha −0.137% over 678 entries across 72 sessions. Bake either number into the listing and it is quietly false within a week, which is precisely the failure mode PR #612 spent four rounds cleaning up. "Just under half" stays true across the plausible range and the link carries the exact figure.
@@ -174,7 +174,7 @@ How: load the unpacked extension, open the page, and use Windows `Win + Shift + 
 - [ ] Verify the privacy URL loads: https://tapeline.io/legal/extension-privacy
 - [ ] Support email is `@tapeline.io`
 - [ ] Confirm the uploaded zip reports **1.2.3** in the dashboard
-- [ ] Walk the connect flow yourself once on a clean profile: install → welcome page → sign in on tapeline.io → a score appears. That is exactly the path a reviewer takes, and it is the only way to catch a break in it. **Use a brand-new account** so you see the card gate the reviewer will see.
+- [ ] Walk the connect flow yourself once on a clean profile: install → welcome page → sign in on tapeline.io → a score appears. That is exactly the path a reviewer takes, and it is the only way to catch a break in it. **Use a brand-new account** so you see the sign-up path the reviewer will see (no card is asked for at sign-up since #683).
 
 ## Fixed before submission
 

@@ -1,5 +1,14 @@
 # Paid acquisition — deep dive, September 2026
 
+> **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
+>
+> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 70 to 80 seconds (gaps of 71 to 74 seconds measured on 14 September 2026), and most score inputs are daily, so a score usually changes about once a day. In-app pages do not update on their own, and public pages are cached snapshots that can be an hour or more old. Nothing is real-time, sub-60s or "every minute".
+> - **Coverage.** About 11,500 US stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs updated once a day. 2,500 was a snapshot setting, fixed by #763/#765 and corrected in copy by #826.
+> - **The record.** Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026. "Never edited", "unedited", "append-only" and "immutable" are false.
+> - **Trial and card.** Signing up is free and needs no card (the card wall ran from 22 to 30 August 2026, #548 to #683). A card starts the 30-day Premium trial, and the pre-charge email goes about 7 days before the first charge.
+>
+> Measurements, times and approved wording: `docs/COPY_FACTS.md`.
+
 **Method.** 10 parallel research streams (Google Ads for low-ACV SaaS, Google finance
 policy, Meta Special Ad Category, Meta learning-phase/low-budget delivery, delayed-conversion
 attribution, trial→paid benchmarks, low-ACV paid viability, creative/message, landing/signup,
@@ -504,6 +513,8 @@ Never let the two facts appear in separate paragraphs.
 
 **Do the free citation-gatekeeper fix: put a price as literal text on the homepage.** `frontend/app/page.tsx` currently shows "$0 today" and a "Free · no card" chip but **no subscription figure**. A controlled 252,000-trial study (Vishwakarma, Kumar & Jamidar, arXiv 2605.25517, SIGIR 2026) finds price-present a citation gatekeeper — though read the real numbers before believing the headline: odds ratios span **6.26 to >>10,000**, and four of six models sit well under 100. Treat it as a cheap, low-risk change on general merit, not a 10,000× lift.
 
+> **Superseded 14 September 2026 (#826):** the universe count was corrected to about 11,500 US stocks and ETFs, measured by an unfiltered scan (11,501 on 13 September 2026). The paragraph below is kept as written; do not act on it.
+
 **Do NOT "correct" llms.txt from ~2,500 tickers to 11,814.** This recommendation appears in the research and it is **actively dangerous**. 2,500 is the live scoring cap — `ACTIVE_UNIVERSE_SIZE` in `backend/app/services/universe.py:37`, mirrored by `EXPORT_ROW_CAP` — and the public text already qualifies it as "top by daily dollar-volume." 11,814 is the count of *discovered* tickers, a different quantity. Publishing it would overstate product capability on a legal-critical descriptive-only publication. *(The one genuinely stale artefact is an internal docstring in `universe.py` claiming the DB tracks 5,757 tickers.)*
 
 **Cap the programmatic footprint.** Google's spam policies (updated 2026-08-28) define scaled content abuse to include "using generative AI tools... to generate many pages without adding value," and August 2026 spam-update case studies document an ultra-YMYL site losing 200,000+ queries for templated content padded with AI paragraphs. 800 ticker pages backed by proprietary scores is defensible. 11,814 templated pages in a YMYL vertical is the exact pattern being penalised. **Grow only as fast as genuinely distinct per-page data allows.**
@@ -564,7 +575,7 @@ will write it.**
 
 The gate is not met, so no paid runs. Founder hours go where the evidence points:
 
-1. **Third-party listicle placement** (§7.3). Pitch StockBrokers.com, Liberated Stock Trader, Koyfin's blog and NerdWallet on the immutable back-checked record. Lead with editorial novelty; hold the ~$60 first-year annual commission in reserve. **~12 hours.**
+1. **Third-party listicle placement** (§7.3). Pitch StockBrokers.com, Liberated Stock Trader, Koyfin's blog and NerdWallet on the back-checked record, with its corrections dated (15 September 2026: this said "immutable", which is false — see `docs/COPY_FACTS.md`). Lead with editorial novelty; hold the ~$60 first-year annual commission in reserve. **~12 hours.**
 2. **Four educational pieces** on the 67–91% AIO-triggering query shapes, each opening with a 120–150 character answer capsule. **~12 hours.**
 3. **Ship the three code fixes** so the next flight is not blind: `event_source_url` at all four call sites; contracted-subscription value instead of `amount_total` in `_send_purchase_conversion`; `GRAPH_API_VERSION` bump. **~4 hours.**
 4. **Ask Meta support in writing** whether a descriptive analytics publication with no transaction capability requires the Financial Products & Services category. Keep the answer. **~1 hour + wait.**

@@ -1,8 +1,12 @@
 # Tapeline
 
-**A live quantitative market scanner for retail traders.**
+**A quantitative market scanner for retail traders.**
 
-Tapeline surfaces high-conviction technical and fundamental signals across US stocks and ETFs. It scores ~2,500 tickers every minute during market hours, detects Bollinger Band squeezes and volume expansions, surfaces recent insider buys (SEC Form 4), and classifies the overall market regime. (A Congressional-trades surface is built and Premium-gated, but no disclosure feed is wired yet.)
+Tapeline scores about 11,500 US stocks and ETFs on six named factors, shows SEC Form 4 insider filings per ticker, and classifies the overall market regime. About 100 crypto pairs are scored separately, once a day.
+
+Prices are delayed about 15 minutes (the data plan is Massive Stocks Starter). During US market hours the scoring worker re-reads them for every covered stock and ETF about every 70 to 80 seconds. Scores are recalculated on each pass, but most of their inputs are daily readings, so a score usually changes about once a day. See `docs/COPY_FACTS.md` for the measurements (14 September 2026) and for what copy may say.
+
+Not available today: congressional trade data (no real source; the pages say so) and squeeze detection (no real data source is configured, so the squeeze pages are empty and squeeze alerts cannot fire).
 
 Built on the same engine that powers a production personal trading bot.
 
@@ -10,22 +14,22 @@ Built on the same engine that powers a production personal trading bot.
 
 ## Status
 
-**Live.** `tapeline.io` is served by the Fly.io app `tapeline-web`; the API runs at `api.tapeline.io` (Fly app `tapeline-backend`). Real market data comes from Massive, with Finnhub for fundamentals, calendars and SEC Form 4 insider transactions, and FRED for macro. Three live tiers, Stripe billing, and a public scorecard. This repo stays separate from the personal `C:\signal-system\` engine — no shared files.
+**Live.** `tapeline.io` is served by the Fly.io app `tapeline-web`; the API runs at `api.tapeline.io` (Fly app `tapeline-backend`). Market data comes from Massive (prices delayed about 15 minutes), with Finnhub for fundamentals and calendars, SEC EDGAR for Form 4 insider filings (#835), and FRED for macro. Three live tiers, Stripe billing, and a public scorecard. This repo stays separate from the personal `C:\signal-system\` engine — no shared files.
 
 ## Architecture (see `docs/ARCHITECTURE.md`)
 
 ```
 ┌──────────────────────┐      ┌──────────────────┐      ┌─────────────────┐
-│  Massive SIP feed    │─────▶│  Scoring worker  │─────▶│  Postgres       │
-│  (Polygon, rebranded │      │  (adapted from   │      │  (scores,       │
-│   2025-10-30)        │      │   signal-system) │      │   snapshots)    │
+│  Massive snapshots   │─────▶│  Scoring worker  │─────▶│  Postgres       │
+│  (Polygon rebrand;   │      │  (adapted from   │      │  (scores,       │
+│   ~15 min delayed)   │      │   signal-system) │      │   snapshots)    │
 └──────────────────────┘      └──────────────────┘      └────────┬────────┘
                                                                  │
                                                                  ▼
 ┌──────────────────────┐      ┌──────────────────┐      ┌─────────────────┐
 │  Next.js dashboard   │◀─SSE─│  FastAPI         │◀─────│  Read API       │
-│  (scanner, squeeze,  │      │  (auth, billing, │      │                 │
-│   regime, congress)  │      │   live stream)   │      │                 │
+│  (scanner, regime,   │      │  (auth, billing, │      │                 │
+│   ticker pages)      │      │   event stream)  │      │                 │
 └──────────────────────┘      └──────────────────┘      └─────────────────┘
           │                            │
           ▼                            ▼
@@ -41,25 +45,27 @@ Built on the same engine that powers a production personal trading bot.
 - **Frontend:** Next.js 16 + TypeScript + Tailwind + shadcn/ui
 - **Auth:** native cookie-JWT sessions (`services/session.py`), with emailed sign-in codes as a new-device second factor; Clerk and Google/Microsoft OAuth are env-gated add-ons
 - **Billing:** Stripe
-- **Data feed:** Massive Stocks Starter ($29/mo) — formerly Polygon.io, rebranded 2025-10-30. Licence scope is under review; see `docs/LICENSE_AUDIT.md`
-- **Macro / fundamentals / smart money:** FRED · Finnhub (fundamentals, SEC Form 4 insider transactions, earnings + IPO calendars)
+- **Data feed:** Massive Stocks Starter ($29/mo), a 15-minute delayed plan — formerly Polygon.io, rebranded 2025-10-30. Licence scope is under review; see `docs/LICENSE_AUDIT.md`
+- **Macro / fundamentals / smart money:** FRED · Finnhub (fundamentals, earnings + IPO calendars) · SEC EDGAR (Form 4 insider filings, since #835)
 - **Deployment:** Fly.io — `tapeline-backend` (API + scoring worker) and `tapeline-web` (Next.js frontend, serves tapeline.io). Vercel builds PR previews only
 - **Email:** Resend
 
 ## Product tabs (v1)
 
-1. **📡 Scanner** — ~2,500 tickers, composite score, filters, sort
-2. **🔥 Squeeze Watch** — BB squeeze days, volume expansion, OBV trend, suggested window
+1. **📡 Scanner** — about 11,500 US stocks and ETFs, composite score, filters, sort. Prices delayed about 15 minutes.
+2. **🔥 Squeeze Watch** — *not working today.* No real squeeze data source is configured, so the page shows an empty state and squeeze alerts cannot fire (#818, 14 September 2026).
 3. **🌊 Market Regime** — current regime, VIX, DXY, 10Y, rate direction, sector leaders
-4. **🏛️ Congress Trades** — recent politician buys/sells aggregated by ticker. *Surface and Premium gate are built, but no disclosure feed is wired: the table does not accrue rows in production (see `docs/DATA_SOURCES.md`).*
+4. **🏛️ Congress Trades** — *not available.* There is no real source of congressional trade disclosures, so none are shown and none feed the score (#820, 14 September 2026). The page says so.
 
 ## Pricing
 
-- **Free** $0 — top-10 scanner rows, live (no delay), 12 ticker look-ups per UTC day, watchlist of 5, 2 browser-push alert rules. *(Open-access promo, ends 2026-09-08: scanner rows only are lifted 10 → 1,000 for signed-in Free accounts — `tier.py:PROMO_OPEN_ACCESS_UNTIL`. Look-ups, watchlist and push caps are unchanged, no Pro feature unlocks, and anonymous visitors still see the top 10.)*
-- **Pro** $9.99/mo or $8.25/mo billed annually ($99/yr) — full universe live, squeeze + regime + heatmap, watchlist 50, email alerts (10/day), CSV export, browser push.
-- **Premium** $19.99/mo or $16.58/mo billed annually ($199/yr) — everything in Pro plus Congressional trades, Recent insider buys (SEC Form 4), unlimited email alerts, watchlist 200, saved scans 100, public API (1,000 req/day).
+Prices and limits mirror `frontend/lib/pricing.ts` and `backend/app/services/tier.py`; check those before quoting.
 
-Accounts created from 2026-08-22 add a card at first sign-in, which starts a 14-day Premium trial: $0 that day, first charge on day 14, one click to cancel. Accounts created before that date are grandfathered and are never asked for a card. The public record — scorecard, daily picks, per-ticker pages, the CSV/JSON exports and the public API — needs no account and no card.
+- **Free** $0, no card — top-10 scanner rows, 12 ticker look-ups per UTC day, watchlist of 5, 1 saved screen, no alert rules. Anonymous look-ups are not metered.
+- **Pro** $9.99/mo or $8.25/mo billed annually ($99/yr) — up to 1,000 scanner rows, regime + heatmap, watchlist 50, email alerts (10/day), browser push alerts, CSV export.
+- **Premium** $19.99/mo or $16.58/mo billed annually ($199/yr) — everything in Pro plus per-ticker SEC Form 4 insider filings, unlimited email alerts, watchlist 200, saved scans 100, public API (1,000 req/day).
+
+Signing up is free and needs no card. Adding a card starts a 30-day Premium trial: $0 that day, first charge on day 30, one click to cancel, and an email about 7 days before the first charge. (A card wall on new accounts ran from 22 to 30 August 2026; #683 removed it.) The public record — scorecard, daily picks, per-ticker pages, the CSV/JSON exports and the public API — needs no account and no card.
 
 ## Repo layout
 

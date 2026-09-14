@@ -72,7 +72,7 @@ We win by being the **only** stock-scanner brand that publishes (a) its full met
 | best technology stocks {YEAR}           | Browse       | `/sector/technology`            | Programmatic; one URL per sector                   |
 | best healthcare stocks {YEAR}           | Browse       | `/sector/healthcare`            | Same                                               |
 | high conviction stocks                  | Specialised browse | `/signal/high-conviction` | Brand-defined term; we own it                    |
-| congressional trades stock scanner      | Niche commercial | Premium-tier feature page (BLOCKED) | No feed wired — `polygon_feed.fetch_congress_trades()` returns `[]` and there is no ingestor. Source the data before writing a landing page |
+| congressional trades stock scanner      | Niche commercial | None — not a feature (#820, 2026-09-14) | No feed wired — `polygon_feed.fetch_congress_trades()` returns `[]` and there is no ingestor. Source the data before writing a landing page |
 | insider buying tracker                  | Niche commercial | `/insider-buying`               | Live surface (SEC Form 4 via Finnhub)           |
 
 ### 3.3 Tier-C targets (top-20 within 12 months — broad informational, supports topical authority)
@@ -142,7 +142,7 @@ Posts are ordered by ROI: each one targets a Tier-B/C keyword, internally links 
 
 - **Target:** "congressional stock trades", "Pelosi tracker", "house senate stock trades"
 - **Angle:** STOCK Act disclosure rules + ethical caveats. **Blocked on data** — `polygon_feed.fetch_congress_trades()` returns `[]` and no ingestor exists, so do not write "the data feed we use" until a source is actually wired.
-- **Internal links:** Premium pricing page (Congress feed), `/how-it-works` (smart money)
+- **Internal links:** `/congressional-trades` (which says the data is not available), `/how-it-works` (smart money). Not a Premium pricing link — congressional trades are not sold (#820).
 - **Length:** 2,000 words
 
 ### Post 7: The case against AI-powered stock scanners (from someone who built one)
