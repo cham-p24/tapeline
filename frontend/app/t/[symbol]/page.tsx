@@ -603,7 +603,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `How often does the ${sym} score update?`,
-      a: `${sym}'s score is recalculated ${PASS_CADENCE_PHRASE} during US market hours and persists between sessions, but it usually changes about once a day: trend, relative strength and momentum come from daily price bars, and prices themselves are ${PRICE_DELAY_PHRASE}; fundamentals refresh on company filing cadence; insider Form 4 filings are re-checked about every two days for stocks (about monthly for ETFs), through a data vendor whose filings can run weeks behind SEC EDGAR.`,
+      a: `${sym}'s score is recalculated ${PASS_CADENCE_PHRASE} during US market hours and persists between sessions, but it usually changes about once a day: trend, relative strength and momentum come from daily price bars, and prices themselves are ${PRICE_DELAY_PHRASE}; fundamentals refresh on company filing cadence; insider Form 4 filings are read from SEC EDGAR and re-checked about every two days for stocks (about monthly for ETFs).`,
     },
     {
       q: `Where can I see the historical track record for Tapeline scores?`,

@@ -24,9 +24,12 @@
  * equity, the newest open-market buy in production was still 31 August 2026.
  * The vendor, not the pipeline: on 14 September 2026 Finnhub's newest Form 4
  * filing for AAPL, NVDA and META was 27 Aug, 6 Jul and 12 Aug, against 10, 11
- * and 11 Sep on SEC EDGAR — 14, 67 and 30 days behind. "A vendor that CAN run
- * behind EDGAR" understated that, so every surface that states the cadence
- * must also say the vendor's filings can run WEEKS behind.
+ * and 11 Sep on SEC EDGAR - 14, 67 and 30 days behind. For a day the copy said
+ * so (#827). Then #835/#837 moved the source to SEC EDGAR itself, and by 21:48
+ * UTC that day 53,317 Form 4 rows came from EDGAR against 95 vendor-era rows on
+ * 6 tickers. So every surface that states the cadence now names SEC EDGAR as
+ * the source, and any PRESENT-tense "data vendor ... behind EDGAR" is false: the
+ * vendor lag may only appear as dated history ("Until 14 September 2026 ...").
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -71,13 +74,22 @@ const STALE_CLAIMS = [
   // True once, and vaguer than the code now is (#817's pre-#822 wording).
   /once-a-day refresh/i,
   /not every stock is re-checked every day/i,
-  // Understates a measured 14-67 day vendor lag.
+  // Understated a measured 14-67 day vendor lag (#827 replaced it).
   /vendor (that |itself )?can run behind SEC EDGAR/i,
+  // #827's own wording, false in the present tense since #835/#837.
+  /can run weeks behind/i,
+  /runs behind SEC EDGAR/i,
+  /through a data vendor whose filings/i,
+  /with (a|our) data vendor/i,
+  /from its data vendor/i,
+  /via our data vendor/i,
+  /our data vendor's filings/i,
 ];
 
 const TWO_DAYS = /about every two days/i;
 const MONTHLY = /about monthly/i;
-const WEEKS_BEHIND = /filings can run weeks behind SEC EDGAR/;
+/** The source every cadence statement must name since #835/#837. */
+const FROM_EDGAR = /(read from|read directly from|straight from|on) SEC EDGAR/;
 
 // ── The numbers the copy quotes, read from the backend ──────────────────────
 
@@ -166,7 +178,7 @@ describe("/app/holdings", () => {
 
     const header = screen.getByText(/officers, directors and 10%\+ owners/);
     expect(header.textContent).toMatch(TWO_DAYS);
-    expect(header.textContent).toMatch(WEEKS_BEHIND);
+    expect(header.textContent).toMatch(FROM_EDGAR);
     expect(header.textContent).not.toMatch(/live data/i);
 
     const filterBar = screen.getByText(/tracked · /);
@@ -175,7 +187,7 @@ describe("/app/holdings", () => {
     const note = screen.getByText(/Source: SEC Form 4 filings/);
     expect(note.textContent).toMatch(TWO_DAYS);
     expect(note.textContent).toMatch(MONTHLY);
-    expect(note.textContent).toMatch(WEEKS_BEHIND);
+    expect(note.textContent).toMatch(FROM_EDGAR);
 
     expectNoStaleClaim(container.textContent ?? "");
   });
@@ -188,7 +200,7 @@ describe("/roadmap shipped item", () => {
     const { container } = render(<RoadmapPage />);
     const item = screen.getByText(/SEC Form 4 transactions \(officers/);
     expect(item.textContent).toMatch(TWO_DAYS);
-    expect(item.textContent).toMatch(WEEKS_BEHIND);
+    expect(item.textContent).toMatch(FROM_EDGAR);
     expectNoStaleClaim(container.textContent ?? "");
   });
 });
@@ -196,10 +208,10 @@ describe("/roadmap shipped item", () => {
 describe("/data-sources SEC filings cadence", () => {
   it("states the Form 4 cadence, not 'Form 4 daily'", () => {
     const { container } = render(<DataSourcesPage />);
-    const cadence = screen.getByText(/^Form 4 re-checked/);
+    const cadence = screen.getByText(/^Form 4 read from SEC EDGAR, re-checked/);
     expect(cadence.textContent).toMatch(TWO_DAYS);
     expect(cadence.textContent).toMatch(MONTHLY);
-    expect(cadence.textContent).toMatch(WEEKS_BEHIND);
+    expect(cadence.textContent).toMatch(FROM_EDGAR);
     // The 8-K half of the same sentence is untouched.
     expect(cadence.textContent).toContain("8-Ks every 5 minutes.");
     expectNoStaleClaim(container.textContent ?? "");
@@ -262,7 +274,7 @@ describe("/t/[symbol] FAQ", () => {
     expect(answer).toBeDefined();
     expect(answer!.acceptedAnswer.text).toMatch(TWO_DAYS);
     expect(answer!.acceptedAnswer.text).toMatch(MONTHLY);
-    expect(answer!.acceptedAnswer.text).toMatch(WEEKS_BEHIND);
+    expect(answer!.acceptedAnswer.text).toMatch(FROM_EDGAR);
 
     // The visible FAQ mirrors the schema.
     expect(container.textContent).toContain(answer!.acceptedAnswer.text);
@@ -276,7 +288,7 @@ describe("/insider-buying, /how-it-works and the Smart Money factor", () => {
     (useUser as ReturnType<typeof vi.fn>).mockReturnValue({ user: null, loading: false });
   });
 
-  it("/insider-buying states the cadence, the lag, and the measurement behind it", async () => {
+  it("/insider-buying states the cadence, the source, and the dated vendor history", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -296,28 +308,33 @@ describe("/insider-buying, /how-it-works and the Smart Money factor", () => {
 
     const methodology = screen.getByText(/re-checking each stock about/);
     expect(methodology.textContent).toMatch(TWO_DAYS);
-    expect(methodology.textContent).toMatch(WEEKS_BEHIND);
-    expect(methodology.textContent).toMatch(/not a real-time or complete record/);
+    expect(methodology.textContent).toMatch(FROM_EDGAR);
+    expect(methodology.textContent).toMatch(/a filing can take two to three days\s+to reach this list/);
+    expect(methodology.textContent).toMatch(/non-derivative/);
 
-    // The freshness FAQ carries the dated measurement, visibly and in JSON-LD.
-    const measured = /14 September 2026, its newest Form 4 filing for Apple, NVIDIA and Meta was 14, 67 and 30 days older than the newest one on EDGAR/;
+    // The freshness FAQ keeps the vendor measurement as DATED history, visibly
+    // and in JSON-LD, and states how long EDGAR filings take to arrive now.
+    const measured = /Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR: that day its newest Form 4 filing for Apple, NVIDIA and Meta was 14, 67 and 30 days older than the newest one on EDGAR/;
     expect(text).toMatch(TWO_DAYS);
+    expect(text).toMatch(/usually reaches this list within two to three days of appearing on EDGAR/);
     expect(text).toMatch(measured);
     expect(container.innerHTML.match(new RegExp(measured.source, "g"))?.length).toBeGreaterThanOrEqual(2);
     expectNoStaleClaim(container.innerHTML);
   });
 
-  it("/how-it-works FAQ states the cadence and the lag", () => {
+  it("/how-it-works FAQ states the cadence and the source", () => {
     const { container } = render(<HowItWorksPage />);
-    expect(container.innerHTML).toMatch(/re-checked with a data vendor about every two days per stock/);
-    expect(container.innerHTML).toMatch(WEEKS_BEHIND);
+    expect(container.innerHTML).toMatch(/read from SEC EDGAR and re-checked about every two days per stock/);
+    expect(container.innerHTML).toMatch(FROM_EDGAR);
     expectNoStaleClaim(container.innerHTML);
   });
 
-  it("the Smart Money factor copy states the cadence and the lag", () => {
+  it("the Smart Money factor copy states the cadence, the source and what is read", () => {
     const copy = JSON.stringify(FACTORS.find((f) => f.slug === "smart-money"));
     expect(copy).toMatch(TWO_DAYS);
-    expect(copy).toMatch(WEEKS_BEHIND);
+    expect(copy).toMatch(FROM_EDGAR);
+    expect(copy).toMatch(/non-derivative/);
+    expect(copy).toMatch(/Until 14 September 2026 these filings came through a data vendor/);
     expectNoStaleClaim(copy);
   });
 });

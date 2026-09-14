@@ -115,7 +115,7 @@ describe("/insider-buying — labels and claims", () => {
     const source = screen.getByTestId("insider-source-line");
     expect(source.textContent).toContain("Source: SEC Form 4");
     expect(source.textContent).toContain(
-      "Source: SEC Form 4 filings via our data vendor. Insiders must file within 2 business days of a trade.",
+      "Source: SEC Form 4 filings, read from SEC EDGAR. Insiders must file within 2 business days of a trade.",
     );
     expect(source.textContent).toContain("Newest trade shown: Aug 31, 2026.");
     expect(text).toContain("Trade date");
@@ -181,8 +181,8 @@ describe("/how-it-works — insider freshness and the daily record", () => {
     expect(html).not.toMatch(/every daily top-10/i);
     // The qualification is stated where the record claim is made.
     expect(html).toMatch(/four trading days have no list: 31 August, 2 September, 4 September and 9 September 2026/);
-    // Measured 14-67 days on 2026-09-14; see insiderRefreshCadenceCopy.test.tsx.
-    expect(html).toMatch(/filings can run weeks behind SEC EDGAR/);
+    // Read from SEC EDGAR since #835/#837; see insiderRefreshCadenceCopy.test.tsx.
+    expect(html).toMatch(/read from SEC EDGAR/);
 
     const meta = JSON.stringify(howMeta);
     expect(meta).not.toMatch(/every pick logged/i);
@@ -198,6 +198,6 @@ describe("/how-it-works — insider freshness and the daily record", () => {
     // #822 made the cadence specific; pinned against the backend in
     // insiderRefreshCadenceCopy.test.tsx.
     expect(copy).toMatch(/about every two days/i);
-    expect(copy).toMatch(/weeks behind SEC EDGAR/);
+    expect(copy).toMatch(/read directly from SEC EDGAR/);
   });
 });
