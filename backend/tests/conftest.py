@@ -35,6 +35,12 @@ for _live_key in (
 ):
     os.environ.pop(_live_key, None)
 
+# The app lifespan starts services/live_bridge.py, which polls the database
+# every 15s during the US session. Every `with TestClient(app)` would otherwise
+# run a real poller against that test's database, making the suite's behaviour
+# depend on the time of day. test_live_bridge.py enables it where it is tested.
+os.environ["LIVE_BRIDGE_ENABLED"] = "false"
+
 # Hard-pin the test database to local SQLite. The suite signs users up, mints
 # verification tokens and deletes rows — pointed at the production Neon URL it
 # would do all of that to real customer data. That very nearly happened: a run

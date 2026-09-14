@@ -348,6 +348,69 @@ async def test_start_and_stop_cancel_cleanly():
     await bridge.stop()  # idempotent
 
 
+async def test_stop_while_a_read_closes_its_session_leaves_nothing_running(monkeypatch):
+    """stop() must not cancel a real read while its session is closing.
+
+    AsyncSession.__aexit__ closes the session in a shielded child task.
+    Cancelling the bridge at that moment cancels only the waiter: the close
+    outlives stop(), and when the loop is then closed under it aiosqlite's
+    worker thread raises "RuntimeError: Event loop is closed" (on Postgres the
+    pooled connection is dropped instead). Nothing may still be running once
+    stop() returns.
+    """
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    closing = asyncio.Event()
+    real_close = AsyncSession.close
+
+    async def close(self: AsyncSession) -> None:
+        closing.set()
+        await real_close(self)
+
+    monkeypatch.setattr(AsyncSession, "close", close)
+    bridge = LiveBridge(
+        publish=Recorder(), read=lb.read_watermarks, in_session=lambda _now: True,
+    )
+    bridge.start()
+    await asyncio.wait_for(closing.wait(), 5)
+    await bridge.stop()
+
+    me = asyncio.current_task()
+    still_running = [
+        t.get_coro().__qualname__
+        for t in asyncio.all_tasks()
+        if t is not me and not t.done()
+    ]
+    assert still_running == []
+
+
+async def test_stop_cancels_a_read_that_outlasts_the_grace(monkeypatch):
+    """A hung read cannot hold shutdown past STOP_GRACE_SECONDS."""
+    monkeypatch.setattr(lb, "STOP_GRACE_SECONDS", 0.05)
+    reading = asyncio.Event()
+
+    async def read() -> Watermarks:
+        reading.set()
+        await asyncio.Event().wait()  # never returns
+        raise AssertionError("unreachable")
+
+    bridge = LiveBridge(
+        publish=Recorder(), read=read, read_timeout=60, in_session=lambda _now: True,
+    )
+    task = bridge.start()
+    await asyncio.wait_for(reading.wait(), 5)
+    loop = asyncio.get_running_loop()
+    began = loop.time()
+    await bridge.stop()
+    assert task.cancelled()
+    assert loop.time() - began < 1.0
+
+
+def test_stop_grace_fits_inside_the_platform_kill_timeout():
+    """Fly sends SIGKILL 5s after SIGINT by default; shutdown must finish first."""
+    assert 0 < lb.STOP_GRACE_SECONDS <= 2.0
+
+
 async def test_published_event_reaches_a_stream_subscriber():
     from app.services.pubsub import InMemoryBroker
 
@@ -390,25 +453,48 @@ def test_as_utc_normalises_naive_and_string_stamps():
     assert lb._as_utc(T0.astimezone()) == T0
 
 
-def test_app_lifespan_starts_and_stops_the_bridge(monkeypatch):
+def test_app_lifespan_starts_and_stops_the_real_bridge(monkeypatch):
+    """The one test that runs the real startup path (conftest disables it)."""
     from fastapi.testclient import TestClient
 
-    from app.main import app
+    from app import main
 
+    tasks: list[asyncio.Task[None]] = []
     calls: list[str] = []
+    real_start, real_stop = LiveBridge.start, LiveBridge.stop
 
-    def fake_start(self):
+    def spy_start(self: LiveBridge) -> asyncio.Task[None]:
         calls.append("start")
+        task = real_start(self)
+        tasks.append(task)
+        return task
 
-    async def fake_stop(self):
+    async def spy_stop(self: LiveBridge) -> None:
         calls.append("stop")
+        await real_stop(self)
 
-    monkeypatch.setattr(LiveBridge, "start", fake_start)
-    monkeypatch.setattr(LiveBridge, "stop", fake_stop)
-    with TestClient(app) as client:
+    monkeypatch.setattr(main.settings, "live_bridge_enabled", True)
+    monkeypatch.setattr(LiveBridge, "start", spy_start)
+    monkeypatch.setattr(LiveBridge, "stop", spy_stop)
+    with TestClient(main.app) as client:
         assert client.get("/api/health").status_code in (200, 503)
         assert calls == ["start"]
+        assert len(tasks) == 1 and not tasks[0].done()
     assert calls == ["start", "stop"]
+    assert tasks[0].done()
+
+
+def test_the_suite_runs_the_app_without_the_bridge(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app import main
+
+    assert main.settings.live_bridge_enabled is False  # tests/conftest.py
+    started: list[LiveBridge] = []
+    monkeypatch.setattr(LiveBridge, "start", lambda self: started.append(self))
+    with TestClient(main.app) as client:
+        assert client.get("/api/health").status_code in (200, 503)
+    assert started == []
 
 
 def test_frontend_timing_constants_fit_the_bridge_cadence():

@@ -88,6 +88,7 @@ subscribers and its own bridge. They do not coordinate and do not need to.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -111,6 +112,9 @@ PASS_QUANTILE_DIVISOR = 4
 MAX_BACKOFF_SECONDS = 300.0
 #: A watermark read slower than this is abandoned and counted as a failure.
 READ_TIMEOUT_SECONDS = 10.0
+#: On shutdown, how long stop() lets an in-flight read finish (session closed,
+#: connection returned) before cancelling it. Well under Fly's 5s kill timeout.
+STOP_GRACE_SECONDS = 2.0
 #: US extended session, Eastern time: pre-market open to after-hours close.
 SESSION_OPEN_ET = time(4, 0)
 SESSION_CLOSE_ET = time(20, 0)
@@ -241,6 +245,10 @@ class LiveBridge:
         self._seen_latest: datetime | None = None
         self.failures = 0
         self._task: asyncio.Task[None] | None = None
+        # Set whenever no read is in flight, so stop() never cancels a read
+        # while its session is closing (see stop()).
+        self._idle = asyncio.Event()
+        self._idle.set()
 
     async def poll_once(self) -> str | None:
         """One read. Returns the event name published, or None.
@@ -298,6 +306,7 @@ class LiveBridge:
                 self.failures = 0
                 await self._sleep(self._interval)
                 continue
+            self._idle.clear()
             try:
                 await self.poll_once()
                 self.failures = 0
@@ -309,6 +318,8 @@ class LiveBridge:
                     "live_bridge.poll_failed failures=%d retry_in=%.0fs",
                     self.failures, self.next_delay(), exc_info=True,
                 )
+            finally:
+                self._idle.set()
             await self._sleep(self.next_delay())
 
     def start(self) -> asyncio.Task[None]:
@@ -320,6 +331,13 @@ class LiveBridge:
         task, self._task = self._task, None
         if task is None:
             return
+        # AsyncSession.__aexit__ closes the session in a SHIELDED child task.
+        # Cancelling mid-read cancels only the waiter: the close keeps running
+        # after stop() returns, and the loop is closed under it (aiosqlite:
+        # "RuntimeError: Event loop is closed" in its worker thread). Let the
+        # read finish first; cancel only the sleep, or a read past the grace.
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(self._idle.wait(), STOP_GRACE_SECONDS)
         task.cancel()
         try:
             await task

@@ -308,6 +308,14 @@ class Settings(BaseSettings):
         "SuperMugatu,Citrini7,iancassel,FoolAllTheTime"
     )
 
+    # ---- Live updates (API process) ----
+    # services/live_bridge.py polls the tickers table from each API process
+    # during the US session and publishes an SSE event per settled worker
+    # pass. Set LIVE_BRIDGE_ENABLED=false to stop the API from polling (the
+    # browser then only sees new data on its own refetch). The test suite
+    # turns it off in tests/conftest.py; one test enables the real path.
+    live_bridge_enabled: bool = True
+
 
 @lru_cache
 def get_settings() -> Settings:
