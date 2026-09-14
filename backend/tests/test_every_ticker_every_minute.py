@@ -404,3 +404,75 @@ async def test_concurrent_rebuilds_run_one_at_a_time(monkeypatch: pytest.MonkeyP
     )
 
     assert most == 1, f"{most} rebuilds ran at once; they share the cursor and the list"
+
+
+async def test_a_run_of_kills_stops_stretching_cycles_once_a_tick_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The recovery pause grows with CONSECUTIVE kills, so a successful tick must
+    reset the count. Otherwise ten kills leave a 50-second floor on every later
+    cycle, and a 13-second tick waits 50 instead of 47 - the ~73-second cycles
+    again. Ten, because below that the floor never exceeds 47 and a missing reset
+    would be invisible. Mutation: not resetting consecutive_timeouts."""
+    clock = [1_000.0]
+    slept: list[float] = []
+    kills = 10
+    outcomes = [("kill", float(sp.TICK_TIMEOUT_SECONDS))] * kills + [("ok", 13.0)]
+
+    async def _noop() -> None:
+        return None
+
+    async def _refresh(*_a, **_k) -> int:
+        return 11_812
+
+    async def _tick() -> None:
+        kind, seconds = outcomes[len(slept)]
+        clock[0] += seconds
+        if kind == "kill":
+            raise TimeoutError
+
+    async def _sleep(seconds: float, *_a, **_k) -> None:
+        slept.append(seconds)
+        if len(slept) == len(outcomes):
+            raise _StopLoop
+
+    monkeypatch.setattr(sp.settings, "score_refresh_seconds", 60, raising=False)
+    monkeypatch.setattr(sp, "_init_sentry", lambda: None)
+    monkeypatch.setattr(sp, "seed_universe", _noop)
+    monkeypatch.setattr(sp, "warm_factor_caches_from_db", _noop)
+    monkeypatch.setattr(sp, "refresh_active_universe", _refresh)
+    monkeypatch.setattr(sp, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(sp, "tick", _tick)
+    for level in ("warning", "error", "critical"):
+        monkeypatch.setattr(sp.logger, level, lambda *a, **k: None)
+    monkeypatch.setattr(asyncio, "sleep", _sleep)
+    # sentry_sdk's capture at 3 consecutive kills is guarded in main(); nothing to patch.
+
+    with pytest.raises(_StopLoop):
+        await sp.main()
+
+    step = sp._TIMEOUT_RECOVERY_STEP_SECONDS
+    assert slept[:kills] == [min(60.0, step * n) for n in range(1, kills + 1)]
+    assert slept[-1] == 47.0, (
+        f"after {kills} kills a 13s tick slept {slept[-1]}: the kill count was not "
+        "reset by the successful tick, so every later cycle stays stretched"
+    )
+
+
+async def test_the_tick_does_not_queue_behind_a_rebuild_in_flight() -> None:
+    """A detached rebuild (sheet_feed's) can hold the lock with no watchdog of
+    its own. The tick must skip rather than wait. Mutation: ignoring wait=False."""
+    lock = universe_mod._rebuild_lock()
+    await lock.acquire()
+    try:
+        before = len(universe_mod._active_universe)
+        n = await asyncio.wait_for(universe_mod.refresh_active_universe(wait=False), timeout=2)
+        assert n == before
+    finally:
+        lock.release()
+
+
+def test_the_tick_asks_not_to_wait() -> None:
+    """The flag is only worth having if the tick passes it. Mutation: the tick
+    calling refresh_active_universe() without wait=False."""
+    assert "refresh_active_universe(wait=False)" in _code(sp.tick)

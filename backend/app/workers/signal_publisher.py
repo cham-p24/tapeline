@@ -1186,7 +1186,9 @@ async def tick() -> None:
         # Stamped before the work — see the news refresh.
         _last_active_universe_refresh = started
         try:
-            n = await refresh_active_universe()
+            # wait=False: never queue inside the tick behind a rebuild that a
+            # detached task started - see refresh_active_universe.
+            n = await refresh_active_universe(wait=False)
             logger.info("active_universe.refreshed count=%d", n)
         except Exception:
             logger.exception("active_universe.refresh_failed")

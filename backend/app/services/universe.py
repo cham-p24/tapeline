@@ -147,12 +147,27 @@ def _rebuild_lock() -> asyncio.Lock:
     return _refresh_lock
 
 
-async def refresh_active_universe(target_size: int | None = None) -> int:
+async def refresh_active_universe(target_size: int | None = None, *, wait: bool = True) -> int:
     """Refresh the cached active universe from the DB, one rebuild at a time.
 
     See `_rebuild_lock` for why concurrent rebuilds are serialised.
+
+    `wait=False` is for the tick. If another rebuild holds the lock, it returns
+    at once with the current list size instead of queueing. The holder can be a
+    detached task with no watchdog of its own (sheet_feed's rebuild after a
+    sheet insert), and there is no statement timeout on the engine. If its query
+    hangs, a waiting tick would sit at the lock until the 240s watchdog killed
+    it, every rebuild, until a restart. The rebuild in flight refreshes the list
+    anyway.
     """
-    async with _rebuild_lock():
+    lock = _rebuild_lock()
+    if not wait and lock.locked():
+        logger.info(
+            "universe.refresh_skipped_in_flight count=%d - another rebuild holds the lock",
+            len(_active_universe),
+        )
+        return len(_active_universe)
+    async with lock:
         return await _refresh_active_universe(target_size)
 
 
