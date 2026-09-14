@@ -214,7 +214,7 @@ async def test_limit_bounds_the_insider_pass(
         return []
 
     monkeypatch.setattr(
-        "app.services.finnhub_feed.fetch_insider_transactions", _fake,
+        "app.services.edgar_form4.fetch_insider_transactions", _fake,
     )
 
     await signal_publisher._refresh_insider_cache(limit=3)

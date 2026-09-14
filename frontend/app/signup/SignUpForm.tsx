@@ -9,7 +9,8 @@ import { authApi } from "@/lib/auth";
 import { PRECHARGE_NOTICE_DAYS, PRECHARGE_NOTICE_PHRASE, TRIAL_DAYS, TRIAL_LENGTH_LABEL } from "@/lib/trial";
 import { userLocale } from "@/lib/datetime";
 import { trackMetaCompleteRegistration } from "@/lib/metaConversions";
-import { PRICING, REFUND, usd, usdCompact } from "@/lib/pricing";
+import { FREE_LIMITS, PRICING, REFUND, usd, usdCompact } from "@/lib/pricing";
+import { activeScoredLabel } from "@/lib/universe";
 import { safeNext } from "@/lib/safeNext";
 import {
   getStoredFbclid,
@@ -111,7 +112,17 @@ if (typeof window !== "undefined") {
 // — the trial takes a card, $0 that day, first charge on day 30. Keep the two
 // facts in separate sentences; a reader who merges them has been misled, and
 // the copy linter's Rule 10 fails the build on the merged phrasing.
-const FROM_COPY: Record<string, { h1: string; sub: string }> = {
+//
+// RECORD AND UNIVERSE CLAIMS (2026-09-14). `screener` said "every pick logged
+// public vs SPY" and `scorecard` said "The full live universe, every name
+// scored". Neither was true of what a visitor gets: no top 10 was recorded for
+// four sessions, recorded values were corrected twice, and the free plan this
+// form creates shows the top rows of a scan, not the whole universe. Describe
+// the scorecard as what it is and take the universe size from lib/universe.ts.
+//
+// Exported so __tests__/signupCopyTruth.test.tsx can walk every key, including
+// any added later.
+export const FROM_COPY: Record<string, { h1: string; sub: string }> = {
   _default: {
     h1: "Create your Tapeline account",
     sub: `Email and password to start — no card. You land on the free plan and can run scans straight away. Adding a card starts the ${TRIAL_LENGTH_LABEL} Premium trial: $0 that day, cancel in one click.`,
@@ -122,11 +133,11 @@ const FROM_COPY: Record<string, { h1: string; sub: string }> = {
   },
   screener: {
     h1: "The scanner that shows its receipts.",
-    sub: `One score, one sentence, and every pick logged public vs SPY. Sign up with no card. A card starts the ${TRIAL_LENGTH_LABEL} Premium trial: $0 charged that day.`,
+    sub: `One score, one sentence, and a public scorecard: each day's top-ten scores with the next session's move against SPY, misses included, gaps and corrections dated. Sign up with no card. A card starts the ${TRIAL_LENGTH_LABEL} Premium trial: $0 charged that day.`,
   },
   scorecard: {
     h1: "You've seen the record. Now run the scanner.",
-    sub: `The full live universe, every name scored. Sign up with no card. A card starts the ${TRIAL_LENGTH_LABEL} Premium trial: $0 charged that day, cancel in one click.`,
+    sub: `The scanner scores ${activeScoredLabel} US stocks and ETFs. Sign up with no card and the free plan shows the top ${FREE_LIMITS.scannerRows} rows of any scan, live. A card starts the ${TRIAL_LENGTH_LABEL} Premium trial: $0 charged that day, cancel in one click.`,
   },
   compare: {
     h1: "Switching to Tapeline?",
@@ -151,9 +162,13 @@ const FROM_COPY: Record<string, { h1: string; sub: string }> = {
   //                                         pages, CSV/JSON exports
   // Nothing here may drift into "no credit card" — the trial takes one. See
   // the CARD HONESTY block above.
+  //
+  // The opening sentence was added 2026-09-14. Without it this subhead, sitting
+  // over a sign-up form, read as if the form itself started the trial. It does
+  // not: creating the account starts nothing, and the trial is chosen later.
   trial: {
     h1: "$0 today. The charge date is on the page.",
-    sub: `The ${TRIAL_LENGTH_LABEL} Premium trial takes a card and charges $0 today — the exact date of the first charge is shown before you confirm, we email you about ${PRECHARGE_NOTICE_DAYS} days ahead of it, and one click ends the trial before then. Reading the public record needs no account either way.`,
+    sub: `Creating an account takes an email and a password and starts no trial. The ${TRIAL_LENGTH_LABEL} Premium trial is a separate step: it takes a card and charges $0 that day — the exact date of the first charge is shown before you confirm, we email you about ${PRECHARGE_NOTICE_DAYS} days ahead of it, and one click ends the trial before then. Reading the public record needs no account either way.`,
   },
 };
 
@@ -616,7 +631,7 @@ function SignUpForm() {
 
           {/* Public-record proof — leads with the SIZE + DISCIPLINE of the
               track record (true, on-brand, decision-safe) rather than the
-              short-sample hit-rate/alpha headline. The "winners and losers"
+              short-sample hit-rate/alpha headline. The "misses included"
               link sends anyone who wants the full performance breakdown to
               /scorecard, so nothing is hidden — we just don't anchor the buy
               on our weakest metric. Renders nothing until a day is logged. */}
@@ -639,8 +654,11 @@ function SignUpForm() {
                   <span className="ml-1 text-xs text-muted">logged same-day; corrections dated</span>
                 </span>
               </div>
+              {/* Was "See each recorded pick and how it did vs SPY". Anonymous
+                  and free readers see per-day entries after a delay, so the
+                  link promises the recorded top tens, not every pick. */}
               <div className="mt-2 text-xs text-muted">
-                See each recorded pick and how it did vs SPY — winners and losers &rarr;
+                See the recorded top tens and the next session&apos;s move against SPY, misses included &rarr;
               </div>
             </Link>
           )}
@@ -902,9 +920,8 @@ function SignUpForm() {
             </p>
             <p className="mt-2">
               You do not need an account &mdash; or a card &mdash; to read the record: the daily
-              Top 10, the whole back-checked scorecard, a page per scored ticker and the raw
-              CSV/JSON export are open to everyone. Accounts created before 22 August 2026 keep
-              the free access they signed up for and are never asked for a card.
+              Top 10, the back-checked scorecard, a page per scored ticker and the raw
+              CSV/JSON export are open to everyone.
             </p>
             <p className="mt-2 text-[11px] text-subtle">
               <span className="text-muted">{REFUND.short}</span> if you change your mind ·

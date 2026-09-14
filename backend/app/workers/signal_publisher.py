@@ -2781,6 +2781,20 @@ _NON_EQUITY_FACTOR_DUE_AFTER = timedelta(days=30)
 #: those come due on the 30-day horizon by 2026-10-13.
 _FUNDAMENTALS_UNSAVED_BEFORE = datetime(2026, 9, 13, 23, 0, tzinfo=UTC)
 
+#: Smart money stamped before this instant came from Finnhub, and is due NOW.
+#:
+#: The insider pass switched to SEC EDGAR here (`services/edgar_form4.py`),
+#: because Finnhub's Form 4 data ran 14-67 days behind EDGAR for the large
+#: companies checked on 2026-09-14. Without this rule the Finnhub readings would
+#: sit out their 36h (equities) or 30-day (everything else) horizon first. All
+#: asset classes: an ETF's Finnhub reading was usually its underlying's insiders
+#: (2x single-stock funds), and EDGAR answers such tickers from the ticker map
+#: alone, with no request. Gaps still go first, then equities, oldest stamp
+#: first. A re-read stamps after this instant, so the rule retires itself row by
+#: row; rows the old worker stamped between this instant and the deploy are
+#: re-read on their horizon.
+_SMART_MONEY_EDGAR_SINCE = datetime(2026, 9, 14, 14, 10, tzinfo=UTC)
+
 #: What a factor pass does when Finnhub throttles the KEY (429, or 401).
 #:
 #: Pause, then ask for the SAME symbol again. After this many consecutive
@@ -2848,6 +2862,8 @@ def _factor_due_clause(stamp_col: Any, now: datetime) -> Any:
             & Ticker.sub_fundamentals.is_(None)
             & (stamp_col < _FUNDAMENTALS_UNSAVED_BEFORE)
         )
+    if stamp_col.key == "last_smart_money_at":
+        due = due | (stamp_col < _SMART_MONEY_EDGAR_SINCE)
     return due
 
 
@@ -3660,8 +3676,17 @@ async def _refresh_aggregates_cache() -> bool:
     return refreshed > 0
 
 
-#: The insider window the pass asks Finnhub about, in days.
+#: The insider window the pass reads from SEC EDGAR, in days.
 _INSIDER_WINDOW_DAYS = 90
+
+#: Pause between symbols in the insider pass.
+#:
+#: 1.1s while the pass shared Finnhub's 60-calls-a-minute key with the
+#: fundamentals pass. EDGAR is paced per REQUEST inside
+#: `edgar_form4._pace()` (8/s, under SEC's 10), and a symbol costs one request
+#: plus one per Form 4 not yet cached, so a per-symbol sleep on top would only
+#: add ~1.8 hours a day across ~6,000 equities for nothing.
+_INSIDER_PACE_SECONDS = 0.0
 
 #: An empty answer is not believed while we hold a filing dated this recently.
 #:
@@ -3676,7 +3701,8 @@ _INSIDER_EMPTY_CONTRADICTED_WITHIN = timedelta(days=_INSIDER_WINDOW_DAYS - 10)
 
 
 async def _clear_smart_money_reading(symbol: str) -> bool:
-    """Retire a symbol's smart-money reading: Finnhub found no Form 4 filings.
+    """Retire a symbol's smart-money reading: SEC EDGAR holds no Form 4 filings
+    for it in the window (or lists no filer for the ticker at all).
 
     An empty answer from the 90-day insider window is a MEASUREMENT - nothing to
     score, so the factor is None and the composite uses NEUTRAL for it, exactly
@@ -3701,16 +3727,18 @@ async def _clear_smart_money_reading(symbol: str) -> bool:
     so the tick cannot write the old value back (see `_SMART_MONEY_CLEARED`).
     If the write fails, nothing has changed and the caller counts a failure.
 
-    Raises FinnhubUnavailableError, changing nothing, when a stored filing
-    contradicts the empty answer; see `_INSIDER_EMPTY_CONTRADICTED_WITHIN`.
+    Raises EdgarUnavailableError, changing nothing, when a stored filing
+    contradicts the empty answer; see `_INSIDER_EMPTY_CONTRADICTED_WITHIN`. Only
+    rows EDGAR itself supplied count as a contradiction: a pre-switch Finnhub row
+    for a symbol EDGAR has no filings for is the old vendor's attribution (for
+    example a 2x single-stock ETF carrying its underlying's insiders), and the
+    switchover exists to replace exactly those.
 
     Returns whether the row held a reading.
     """
     from app.models import InsiderTransaction
-    from app.services.finnhub_feed import (
-        FinnhubUnavailableError,
-        clear_cached_smart_money_score,
-    )
+    from app.services.edgar_form4 import EdgarUnavailableError
+    from app.services.finnhub_feed import clear_cached_smart_money_score
 
     sym = symbol.upper()
     sheet_owned = _sheet_governed_symbols if _sheet_is_scoring_source() else frozenset()
@@ -3718,12 +3746,12 @@ async def _clear_smart_money_reading(symbol: str) -> bool:
     async with session_scope() as session:
         newest = await session.scalar(
             select(func.max(func.nullif(InsiderTransaction.transaction_date, "")))
-            .where(InsiderTransaction.symbol == sym)
+            .where(InsiderTransaction.symbol == sym, InsiderTransaction.source == "edgar")
         )
         recent = (date.today() - _INSIDER_EMPTY_CONTRADICTED_WITHIN).isoformat()
         if newest is not None and newest >= recent:
-            raise FinnhubUnavailableError(
-                "stock/insider-transactions",
+            raise EdgarUnavailableError(
+                "submissions",
                 f"empty answer contradicts a stored filing dated {newest}",
             )
         await session.execute(
@@ -3758,7 +3786,8 @@ async def _refresh_insider_cache(
     limit: int | None = None, *, deadline: float | None = None,
 ) -> bool:
     """
-    Pre-fetch of Finnhub insider Form 4 transactions. Populates
+    Read insider Form 4 transactions from SEC EDGAR (`services/edgar_form4.py`;
+    Finnhub until 2026-09-14, see `_SMART_MONEY_EDGAR_SINCE`). Populates
     _SMART_MONEY_SCORE_CACHE so polygon_feed reads a real sub_smart_money per
     tick, writes each reading onto its row with the composite recomputed beside
     it (`_save_factor_readings`), and stamps `last_smart_money_at` so the next
@@ -3776,16 +3805,15 @@ async def _refresh_insider_cache(
     from app.services.universe import ACTIVE_UNIVERSE_SIZE
     INSIDER_CAP = ACTIVE_UNIVERSE_SIZE if limit is None else limit
 
+    from app.services.edgar_form4 import fetch_insider_transactions
     from app.services.finnhub_feed import (
-        FinnhubThrottledError,
-        FinnhubUnavailableError,
         compute_smart_money_score,
-        fetch_insider_transactions,
         insider_feed_size_db,
         set_cached_smart_money_score,
         set_recent_insider_transactions_db,
         smart_money_cache_size,
     )
+    from app.services.vendor_errors import VendorThrottledError, VendorUnavailableError
 
     symbols = await _select_factor_symbols(
         Ticker.last_smart_money_at, INSIDER_CAP,
@@ -3821,13 +3849,13 @@ async def _refresh_insider_cache(
                     readings[sym] = score
                 # Persist to the DB-backed insider feed (cross-process, so
                 # the api machine can read what the worker writes).
-                await set_recent_insider_transactions_db(sym, txns)
+                await set_recent_insider_transactions_db(sym, txns, source="edgar")
                 refreshed += 1
             elif txns is not None and await _clear_smart_money_reading(sym):
-                # [] is Finnhub answering "no filings in 90 days". None is no
-                # answer at all (no key); failures raise above.
+                # [] is EDGAR answering "no Form 4 filings in 90 days" (or no
+                # filer for this ticker). Failures raise above.
                 cleared += 1
-        except FinnhubThrottledError as exc:
+        except VendorThrottledError as exc:
             # Same rule as the fundamentals pass: a throttle is not an answer.
             throttled_in_a_row += 1
             if throttled_in_a_row > _FACTOR_THROTTLE_MAX_PAUSES:
@@ -3850,7 +3878,7 @@ async def _refresh_insider_cache(
             await asyncio.sleep(_FACTOR_THROTTLE_PAUSE_SECONDS)
             continue
         except Exception as exc:
-            if isinstance(exc, FinnhubUnavailableError):
+            if isinstance(exc, VendorUnavailableError):
                 logger.warning("insider.fetch_unavailable symbol=%s %s", sym, exc)
             else:
                 logger.exception("insider.fetch_failed symbol=%s", sym)
@@ -3872,7 +3900,8 @@ async def _refresh_insider_cache(
             )
             stopped = True
             break
-        await asyncio.sleep(1.1)  # stay well under 60/min
+        if _INSIDER_PACE_SECONDS:
+            await asyncio.sleep(_INSIDER_PACE_SECONDS)
         if len(pending) >= _FACTOR_STAMP_BATCH:
             await _flush_insider_attempts(pending, readings)
             pending, readings = [], {}

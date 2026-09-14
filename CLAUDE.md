@@ -166,11 +166,20 @@ Password sign-in from an **unrecognised browser** does NOT mint a session: it em
 Without coverage the ratings widget renders a "No analyst coverage" empty state.
 
 ## Smart-money / Recent insider buys
-**Marketing pivot 2026-05-17 (PR #74).** Premium no longer promises "Elite 13F holdings" — that copy was stripped across 15 frontend files (PricingTable, ComparisonTable, JSON-LD, llms.txt, OG image, blog, how-it-works, roadmap, share pages, ScannerPreview, etc.). The driver was Quiver Trader-tier TOS: "No Commercial Use Rights" (see `docs/LICENSE_AUDIT.md`). Premium's smart-money surface is now **Recent insider buys** — SEC Form 4 transactions across the active universe via Finnhub, refreshed daily.
+**Marketing pivot 2026-05-17 (PR #74).** Premium no longer promises "Elite 13F holdings" — that copy was stripped across 15 frontend files (PricingTable, ComparisonTable, JSON-LD, llms.txt, OG image, blog, how-it-works, roadmap, share pages, ScannerPreview, etc.). The driver was Quiver Trader-tier TOS: "No Commercial Use Rights" (see `docs/LICENSE_AUDIT.md`). Premium's smart-money surface is now **Recent insider buys** — SEC Form 4 transactions across the active universe.
+
+**Source: SEC EDGAR directly, since 2026-09-14** (`services/edgar_form4.py`). Finnhub was dropped for Form 4 because it lagged EDGAR badly — measured 2026-09-14, its newest Form 4 for AAPL/NVDA/META was 14/67/30 days behind EDGAR, and it returned 12 JPM filings in 90 days where EDGAR lists 134 in a year. The worker's insider pass (`_refresh_insider_cache`) keeps all its stamp/clear/rebuild rules; only the fetch changed:
+- ticker → CIK via SEC `company_tickers.json` (share classes hyphenated: BRK.B = `BRK-B`); a ticker SEC doesn't list (ETFs, most funds, foreign private issuers) is an empty answer, not a failure.
+- `data.sec.gov/submissions` (its `recent` block always covers ≥1 year, so the 90-day window never needs the paged files) → Form 4/4A XML per filing, parsed once and cached by accession in `edgar_form4_filings` (pure cache; migration 0069).
+- **Only filings whose XML names this issuer** — a company's submission list also carries Form 4s it filed as a 10% owner of another company. A 4/A replaces the same owner's Form 4 of its original date. **Non-derivative lines only.**
+- Paced at 8 req/s (SEC allows 10), 4 concurrent document downloads under a shared pacing lock. SEC answers over-rate clients with **403**, treated as a throttle.
+- `insider_transactions.source` is `"edgar"` on new rows, NULL on pre-switch Finnhub rows; the empty-answer contradiction guard only trusts `"edgar"` rows. `signal_publisher._SMART_MONEY_EDGAR_SINCE` makes every Finnhub-era smart-money stamp due immediately.
+- `finnhub_feed.fetch_insider_transactions` still exists (tests pin its contract) but nothing in the worker calls it.
+- Observed, not a bug: TSMC (TSM) files many tiny officer purchases coded P, so it scores as heavy net buying.
 
 What's live now:
 - `/app/holdings` page renders Form 4 buys/sales with date / insider / shares / price / value columns. Same `holdings.elite` Premium feature gate (kept for migration simplicity — name is stale but the gate works).
-- `/api/holdings` returns Form 4 transactions from `get_recent_insider_transactions_db()` (Finnhub-backed). The legacy `/api/holdings/funds` endpoint exists for frontend compatibility but returns `{"items": []}` — the "elite funds" concept is off-roadmap.
+- `/api/holdings` returns Form 4 transactions from `get_recent_insider_transactions_db()` (the DB table the EDGAR pass writes). The legacy `/api/holdings/funds` endpoint exists for frontend compatibility but returns `{"items": []}` — the "elite funds" concept is off-roadmap.
 
 Quiver 13F removed (subscription cancelled — never wired in production, so the
 feature only ever served mock data):
@@ -179,7 +188,7 @@ feature only ever served mock data):
   `institutional_holdings` DB table is left as a harmless orphan (no migration —
   CI asserts a single migration head).
 - `holdings.elite` feature flag + `/app/holdings` + `/api/holdings` are KEPT —
-  they now gate/serve the Finnhub Form 4 "Recent insider buys" feed, not Quiver.
+  they now gate/serve the SEC EDGAR Form 4 "Recent insider buys" feed, not Quiver.
 - `Paywall.tsx` labels `holdings.elite` as "Recent insider activity".
 
 ## Known issues / partially-built
@@ -287,8 +296,8 @@ Each Ticker row carries a `confidence_pct` (0-100) that varies with which underl
 - `backend/app/services/auth.py` — native + Clerk JWT verification + dev-bypass
 - `backend/app/services/mock_feed.py` — fake data generator (112 tickers incl. 32 commodity ETFs)
 - `backend/app/services/polygon_feed.py` — real Polygon adapter (stubbed in places)
-- `backend/app/routers/holdings.py` — `/api/holdings` (Recent insider buys, Form 4 via Finnhub). `/api/holdings/funds` is a legacy empty-stub for frontend compatibility. (Quiver 13F `quiver_feed.py` was deleted when the Quiver subscription was cancelled — it only ever served mock data.)
-- `backend/app/services/finnhub_feed.py` — Finnhub fundamentals + earnings + IPO calendars + insider Form 4. Calendar replacement wired into `calendar_feed.upcoming_*`; fundamentals → score wiring still TODO.
+- `backend/app/routers/holdings.py` — `/api/holdings` (Recent insider buys, Form 4 from SEC EDGAR via `services/edgar_form4.py`). `/api/holdings/funds` is a legacy empty-stub for frontend compatibility. (Quiver 13F `quiver_feed.py` was deleted when the Quiver subscription was cancelled — it only ever served mock data.)
+- `backend/app/services/finnhub_feed.py` — Finnhub fundamentals + earnings + IPO calendars (insider Form 4 moved to `edgar_form4.py` on 2026-09-14; the shared insider DB helpers and smart-money cache still live here). Calendar replacement wired into `calendar_feed.upcoming_*`; fundamentals → score wiring still TODO.
 - `backend/app/services/bot_protection.py` — honeypot + disposable email + Turnstile
 - `backend/app/services/fred_feed.py` — FRED macro indicators (DXY, 10Y, VIX) with 1h cache
 - `backend/app/services/alerts.py` — per-rule alert evaluators (score / squeeze / regime / congress) with **two**-channel delivery (email / web push)
