@@ -23,7 +23,7 @@ against the mutation its docstring names.
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -327,3 +327,93 @@ async def test_a_crypto_pair_is_stamped_not_written(monkeypatch: pytest.MonkeyPa
     assert row.last_fundamentals_at is not None
     assert row.sub_fundamentals is None
     assert row.score == 44.0
+
+
+# ===========================================================================
+# The backlog #825 could not save: due again now, not in 8 days.
+# ===========================================================================
+#
+# Rows stamped before the fix may have lost their reading, and cannot be told
+# apart from rows Finnhub does not cover. On 2026-09-14 the rule matched 3,358
+# equities (2,006 with Finnhub key statistics), stamped 09-07..09-13.
+#
+# Every instant here is fixed relative to the cutoff, never the wall clock:
+# after 2026-09-21 those stamps are past their horizon anyway, and a test that
+# read the clock would silently stop testing the rule.
+
+CUT = sp._FUNDAMENTALS_UNSAVED_BEFORE
+AT = CUT + timedelta(days=1)
+H = timedelta(hours=1)
+
+
+@pytest.fixture
+def at_cut_plus_a_day(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The worker's clock reads AT, so selection and stamps use it."""
+
+    class _FakeDT(datetime):
+        @classmethod
+        def now(cls, tz: Any = None) -> datetime:  # type: ignore[override]
+            return AT
+
+    monkeypatch.setattr(sp, "datetime", _FakeDT)
+
+
+async def test_an_equity_that_lost_its_reading_before_the_fix_is_due_now(
+    monkeypatch: pytest.MonkeyPatch, at_cut_plus_a_day: None,
+) -> None:
+    """Stamped two hours before the cutoff, so a day later it is well inside its
+    8-day horizon - and still due, re-read, and written.
+
+    Mutation: drop the dated clause - nothing is due and the pass asks nobody."""
+    await _seed("ADBE", last_fundamentals_at=CUT - 2 * H)
+    _vendor(monkeypatch)
+
+    assert (await sp._factor_due_counts(now=AT))[0] == 1
+    assert await sp._select_factor_symbols(Ticker.last_fundamentals_at, 5, now=AT) == ["ADBE"]
+
+    await sp._refresh_fundamentals_cache(limit=5)
+
+    row = await _row("ADBE")
+    assert row.sub_fundamentals == READING
+    assert (await sp._factor_due_counts(now=AT))[0] == 0
+
+
+async def test_the_rule_retires_once_an_uncovered_equity_is_asked_again(
+    monkeypatch: pytest.MonkeyPatch, at_cut_plus_a_day: None,
+) -> None:
+    """Asked once, not forever. Mutation: drop the cutoff from the clause - an
+    equity Finnhub does not cover stays due on every run."""
+    await _seed("NOCOV", last_fundamentals_at=CUT - 2 * H)
+    _vendor(monkeypatch, {"NOCOV": ["none"]})
+
+    await sp._refresh_fundamentals_cache(limit=5)
+
+    row = await _row("NOCOV")
+    assert row.sub_fundamentals is None
+    assert (await sp._factor_due_counts(now=AT))[0] == 0
+
+
+async def test_a_row_holding_a_reading_waits_for_its_horizon() -> None:
+    """Mutation: drop `sub_fundamentals IS NULL` - every recent reading is re-asked."""
+    await _seed("JPM", last_fundamentals_at=CUT - 2 * H, sub_fundamentals=66.0)
+    assert (await sp._factor_due_counts(now=AT))[0] == 0
+
+
+async def test_a_stamp_from_the_fixed_code_waits_for_its_horizon() -> None:
+    """A stamp at the cutoff was written with its reading. Mutation: `<=`."""
+    await _seed("NEWER", last_fundamentals_at=CUT)
+    assert (await sp._factor_due_counts(now=AT))[0] == 0
+
+
+async def test_non_equities_keep_their_monthly_horizon() -> None:
+    """About 1 ETF in 7 has fundamentals. Mutation: drop the equity condition -
+    ~5,000 uncovered ETFs are re-asked."""
+    await _seed("ETFY", asset_class="etf", last_fundamentals_at=CUT - 2 * H)
+    assert (await sp._factor_due_counts(now=AT))[0] == 0
+
+
+async def test_the_smart_money_rotation_is_untouched() -> None:
+    """Mutation: apply the rule to both stamp columns - a smart-money stamp 26
+    hours old is served inside its 36-hour horizon."""
+    await _seed("META", last_fundamentals_at=AT, last_smart_money_at=CUT - 2 * H)
+    assert (await sp._factor_due_counts(now=AT))[1] == 0

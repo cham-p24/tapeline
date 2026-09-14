@@ -134,6 +134,18 @@ def _fresh_caches(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(finnhub_feed, "_SMART_MONEY_SCORE_CACHE", {})
 
 
+@pytest.fixture(autouse=True)
+def _no_dated_backlog_rule(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests pin the HORIZONS, seeding stamps relative to the wall clock.
+
+    `_FUNDAMENTALS_UNSAVED_BEFORE` is a fixed instant: until it has aged past
+    the 8-day horizon, a seeded equity stamped "a day ago" with no reading also
+    matches it, and a horizon test would be measuring the wrong rule. It is
+    tested on its own, at fixed instants, in
+    tests/test_fundamentals_reading_survives_restart.py."""
+    monkeypatch.setattr(sp, "_FUNDAMENTALS_UNSAVED_BEFORE", datetime(1970, 1, 1, tzinfo=UTC))
+
+
 def _fundamentals_vendor(
     monkeypatch: pytest.MonkeyPatch, script: dict[str, list[str]] | None = None,
 ) -> list[str]:
