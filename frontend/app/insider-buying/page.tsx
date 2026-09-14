@@ -135,7 +135,7 @@ function newestTradeDate(rows: InsiderRow[]): string | null {
 }
 
 const SOURCE_PREFIX =
-  "Source: SEC Form 4 filings via our data vendor. Insiders must file within 2 business days of a trade.";
+  "Source: SEC Form 4 filings, read from SEC EDGAR. Insiders must file within 2 business days of a trade.";
 
 export default async function InsiderBuyingPage() {
   const { items: rows, state } = await fetchInsiderBuys();
@@ -156,12 +156,12 @@ export default async function InsiderBuyingPage() {
               SEC Form 4 must generally be filed within two business days of a
               trade by a director, officer, or 10%+ shareholder. The form
               discloses the transaction code, share count, price, and resulting
-              ownership. Tapeline pulls Form 4 transactions from its data vendor
-              (Finnhub) for the stocks it scores, re-checking each stock about
-              every two days (ETFs about monthly). The vendor&rsquo;s filings
-              can run weeks behind SEC EDGAR, so recent filings on EDGAR may not
-              be in our data yet. This is not a real-time or complete record of
-              insider trading.
+              ownership. Tapeline reads Form 4 filings straight from SEC EDGAR
+              for the stocks it scores, re-checking each stock about every two
+              days (ETFs about monthly), so a filing can take two to three days
+              to reach this list after it appears on EDGAR. Only
+              non-derivative transactions (shares, not options) are read, and
+              an amended filing (4/A) replaces the one it amends.
             </p>
             <p>
               This page shows only transaction code <strong>P</strong> (a
@@ -205,7 +205,7 @@ export default async function InsiderBuyingPage() {
         },
         {
           q: "How often does the list update?",
-          a: "This page is rebuilt hourly from our database. We re-check each stock's Form 4 filings with our data vendor about every two days (ETFs about monthly). The vendor itself runs behind SEC EDGAR: when we checked on 14 September 2026, its newest Form 4 filing for Apple, NVIDIA and Meta was 14, 67 and 30 days older than the newest one on EDGAR, and the newest open-market buy in our data was dated 31 August 2026. The newest trade date is printed under the table so you can see how current the list is.",
+          a: "This page is rebuilt hourly from our database. We re-check each stock's Form 4 filings on SEC EDGAR about every two days (ETFs about monthly), so a new filing usually reaches this list within two to three days of appearing on EDGAR. Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR: that day its newest Form 4 filing for Apple, NVIDIA and Meta was 14, 67 and 30 days older than the newest one on EDGAR. The newest trade date is printed under the table so you can see how current the list is.",
         },
         {
           q: "What tier do I need?",

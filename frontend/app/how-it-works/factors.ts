@@ -256,11 +256,11 @@ export const FACTORS: Factor[] = [
     feeds: [
       {
         name: "SEC filings",
-        detail: "Form 4 insider transactions from a data vendor, re-checked about every two days per stock (about monthly for ETFs). The vendor's filings can run weeks behind SEC EDGAR.",
+        detail: "Form 4 insider transactions read directly from SEC EDGAR, re-checked about every two days per stock (about monthly for ETFs). Only non-derivative transactions (shares, not options) count, and an amended filing replaces the one it amends. Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR.",
       },
     ],
     caveat:
-      "Disclosure is lagged by statute: a Form 4 is generally filed up to two business days after the trade. Tapeline's copy can lag much further, because our data vendor's filings can run weeks behind SEC EDGAR and each stock is re-checked only about every two days. So this factor is always reading the past, and the filing records that a transaction happened, never why.",
+      "Disclosure is lagged by statute: a Form 4 is generally filed up to two business days after the trade, and Tapeline re-checks each stock on SEC EDGAR only about every two days, so a filing can take a few days more to reach this factor. This factor is therefore always reading the past, and the filing records that a transaction happened, never why.",
     limitations: [
       "Many disclosed transactions carry no view at all. Sales scheduled months in advance under a 10b5-1 plan, option exercises, vesting events and share sales made purely to cover tax withholding all arrive as Form 4 filings and are netted like any other.",
       "Smaller and less-covered companies file rarely, so the window is frequently empty and the factor is unavailable for long stretches.",
