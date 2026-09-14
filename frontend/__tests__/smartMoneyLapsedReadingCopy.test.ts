@@ -19,12 +19,15 @@ describe("/how-it-works/smart-money", () => {
   it("says a lapsed reading is removed at the next re-check, not at once", () => {
     const text = [...(factor?.computed ?? [])].join(" ");
     expect(text).toMatch(/removed at the ticker's next re-check, not at once/);
-    expect(text).toMatch(/about two days later for a stock/);
-    expect(text).toMatch(/up to about a month for an ETF/);
+    expect(text).toMatch(/within about two days for a stock/);
+    expect(text).toMatch(/up to about a month for an ETF or futures contract/);
   });
 
   it("points to the dated correction instead of implying it was always so", () => {
     const text = [...(factor?.computed ?? [])].join(" ");
-    expect(text).toMatch(/Until 14 September 2026 such a reading was never removed/);
+    // Not "never removed": cold-cache sheet writes and #812's repair did blank
+    // some readings. What did not happen was removal when filings left the window.
+    expect(text).toMatch(/Until 14 September 2026 such a reading was not removed when its filings left the window/);
+    expect(text).not.toMatch(/never removed/);
   });
 });

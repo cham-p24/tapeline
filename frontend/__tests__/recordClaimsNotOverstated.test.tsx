@@ -224,8 +224,16 @@ describe("rendered static pages", () => {
       "BBH on 24, 25, 26 and 28 August and 1, 3 and 8 September",
       "PLX on 8, 10 and 11 September",
       "Where the values came from has not been established",
+      "5 commodity futures contracts",
+      "the Form 4 calculation only produces values from 10 to 90",
+      "BIB on 7, 12, 13 and 20 August 2026",
+      "unless a filing we already hold from that source is dated inside the window",
+      "becomes due for a re-check at the next daily run",
     ]) {
       expect(text).toContain(needle);
+    }
+    for (const stale of ["futures funds", "is re-checked at the next daily run"]) {
+      expect(text).not.toContain(stale);
     }
   });
 });

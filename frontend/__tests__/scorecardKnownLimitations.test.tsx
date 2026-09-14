@@ -136,6 +136,12 @@ describe("KnownLimitations", () => {
     // Factor coverage is still open, not "fixed".
     expect(text).toMatch(/6,092 of 11,649 scored tickers had neither reading/);
     expect(text).toMatch(/All lists to date/);
+    // #824: the same facts as KNOWN_LIMITATIONS and /changelog (rule 4 of
+    // recordLimitationsData.ts).
+    expect(text).toMatch(/Entries from 24 August to 11 September 2026 \(16 entries\)/);
+    expect(text).toMatch(/BBH on 24, 25, 26 and 28 August and 1, 3 and 8 September/);
+    expect(text).toMatch(/5 commodity futures contracts/);
+    expect(text).toMatch(/Where the values came from has not been established/);
     // No completeness claim.
     expect(text).not.toMatch(/everything else we know/i);
     expect(text).toMatch(/gaps and problems we have verified/);

@@ -169,7 +169,9 @@ def test_known_limitations_are_dated_and_cover_the_verified_defects():
         "session 2026-08-24",   # list outside the 25 Aug restatement (P5)
         "#775", "6,092 of 11,649",  # factor coverage still incomplete
         # Smart Money values with no Form 4 filing on file (#824)
-        "#824", "16 rows", "856 tickers", "BBH", "BBP", "BIB", "PLX",
+        "#824", "#833", "16 rows", "856 tickers", "BBH", "BBP", "BIB", "PLX",
+        "5 commodity futures contracts", "7 earlier rows",
+        "only produces values from 10 to 90",
     ):
         assert must in blob, f"known_limitations does not mention {must!r}"
     smart = next(k for k in lims if "#824" in k["status"])
@@ -177,6 +179,7 @@ def test_known_limitations_are_dated_and_cover_the_verified_defects():
     assert "not been established" in smart["limitation"], (
         "where the values came from is unknown and must be stated as unknown"
     )
+    assert "futures funds" not in blob, "the 5 are commodity futures contracts, not funds"
     coverage = next(k for k in lims if "5,697 of 7,417" in k["limitation"])
     assert coverage["period"] == "all lists to date"
     assert "Fixed" not in coverage["status"], "factor coverage is still incomplete"

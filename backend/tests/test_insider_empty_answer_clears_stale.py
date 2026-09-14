@@ -41,7 +41,8 @@ from sqlalchemy import func, select
 from app.db import session_scope
 from app.models import InsiderTransaction, Ticker
 from app.services import finnhub_feed
-from app.services.finnhub_feed import FinnhubThrottledError, FinnhubUnavailableError
+from app.services.edgar_form4 import EdgarThrottledError, EdgarUnavailableError
+from app.services.finnhub_feed import FinnhubUnavailableError
 from app.services.score import composite_from_factors
 from app.workers import signal_publisher as sp
 
@@ -75,6 +76,9 @@ def _isolated(monkeypatch: pytest.MonkeyPatch) -> None:
     # against the code before the fix.
     monkeypatch.setattr(finnhub_feed, "_SMART_MONEY_CLEARED", set(), raising=False)
     monkeypatch.setattr(sp, "_sheet_is_scoring_source", lambda: False)
+    # #835's switchover rule makes every stamp before 2026-09-14 14:10 UTC due.
+    # Moved out of the way so these tests measure their own rules only.
+    monkeypatch.setattr(sp, "_SMART_MONEY_EDGAR_SINCE", datetime(1970, 1, 1, tzinfo=UTC))
 
     async def _no_sleep(seconds: float, *a: Any, **k: Any) -> None:
         return None
@@ -95,7 +99,13 @@ async def _seed(symbol: str = SYM, **overrides: Any) -> None:
         s.add(Ticker(**row))
 
 
-async def _seed_form4(symbol: str = SYM, lines: int = 3) -> None:
+async def _seed_form4(
+    symbol: str = SYM, lines: int = 3, source: str | None = "edgar",
+) -> None:
+    """`source=None` is a pre-#835 Finnhub-era row. The column's default fills
+    an explicit None on insert, so it is set afterwards, as production holds it."""
+    from sqlalchemy import update
+
     async with session_scope() as s:
         for i in range(lines):
             s.add(InsiderTransaction(
@@ -104,6 +114,13 @@ async def _seed_form4(symbol: str = SYM, lines: int = 3) -> None:
                 transaction_price=25.0, transaction_value=50_000.0, code="P",
                 fetched_at=OLD,
             ))
+    if source != "edgar":
+        async with session_scope() as s:
+            await s.execute(
+                update(InsiderTransaction)
+                .where(InsiderTransaction.symbol == symbol)
+                .values(source=source)
+            )
 
 
 async def _row(symbol: str = SYM) -> Ticker:
@@ -146,11 +163,11 @@ def _vendor(monkeypatch: pytest.MonkeyPatch, outcome: str) -> list[str]:
             return None
         if outcome == "throttle":
             if raise_failures:
-                raise FinnhubThrottledError("stock/insider-transactions", 429)
+                raise EdgarThrottledError("submissions", 429)
             return None
         if outcome == "down":
             if raise_failures:
-                raise FinnhubUnavailableError("stock/insider-transactions", "status=503")
+                raise EdgarUnavailableError("submissions", "status=503")
             return None
         if outcome == "boom":
             raise RuntimeError("scoring blew up")
@@ -328,12 +345,13 @@ async def test_an_empty_answer_is_not_believed_over_a_recent_stored_filing(
 
 
 async def test_an_outage_of_empty_answers_stops_the_pass_instead_of_wiping(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A vendor answering [] for everyone. Each contradicted answer is a failed
-    call, so the failure stop ends the pass after 10. Mutation: a contradiction
-    skipped quietly instead of failing - all 40 are asked and the pass reports
-    no stop."""
+    call, so the failure stop ends the pass after 10, and because the failures
+    were contradictions it is an ERROR. Mutations: a contradiction skipped
+    quietly instead of failing (all 40 asked, no stop); no
+    `insider.empty_contradicted_stop` (the surge alert cannot fire this early)."""
     recent = (date.today() - timedelta(days=5)).isoformat()
     symbols = [f"R{i:02d}" for i in range(40)]
     for sym in symbols:
@@ -347,10 +365,12 @@ async def test_an_outage_of_empty_answers_stops_the_pass_instead_of_wiping(
             ))
     calls = _vendor(monkeypatch, "empty")
 
-    stopped = await sp._refresh_insider_cache(limit=40)
+    with caplog.at_level("WARNING", logger=sp.logger.name):
+        stopped = await sp._refresh_insider_cache(limit=40)
 
     assert stopped is True
     assert len(calls) == sp._FACTOR_FAILURE_STOP
+    assert "insider.empty_contradicted_stop contradicted=10 failed=10" in caplog.text
     async with session_scope() as s:
         held = await s.scalar(
             select(func.count()).select_from(Ticker).where(Ticker.sub_smart_money.is_not(None))
@@ -679,8 +699,9 @@ def http_vendor(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> Any:
 async def test_a_200_without_a_data_list_is_not_an_empty_answer(
     http_vendor: Any, payload: Any,
 ) -> None:
-    """It used to come back as [] and be cached for 24h; since #824 [] deletes
-    data. Mutation: `data.get("data") or []`."""
+    """It used to come back as [] and be cached for 24h. Since #835 the worker
+    reads EDGAR, but the ticker page's insider endpoint still calls this, and a
+    body that says nothing is not "no filings". Mutation: `data.get("data") or []`."""
     calls = http_vendor(payload)
     with pytest.raises(FinnhubUnavailableError):
         await finnhub_feed.fetch_insider_transactions("EMPTYX", raise_failures=True)
@@ -751,14 +772,15 @@ async def test_the_clear_does_not_put_back_a_factor_another_writer_changed(
 async def test_a_clear_that_keeps_losing_the_race_leaves_it_to_the_mark(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Mutation: returning before the mark when every attempt misses - the tick
-    would then keep the retired value."""
+    """Mutations: returning before the mark when every attempt misses (the tick
+    would then keep the retired value); reporting it as cleared (the pass's
+    `cleared` count would include a value still in the database)."""
     await _seed()
     await _seed_form4()
     _interleave(monkeypatch, [20.0, 30.0, 40.0])
 
     with caplog.at_level("WARNING", logger=sp.logger.name):
-        assert await sp._clear_smart_money_reading(SYM) == (True, True)
+        assert await sp._clear_smart_money_reading(SYM) == (False, True)
 
     assert "insider.clear_contended symbol=AGED" in caplog.text
     t = await _row()
@@ -781,22 +803,61 @@ def test_the_surge_threshold() -> None:
     assert not sp._insider_clear_surge(100, 0, 0)
 
 
-@pytest.mark.parametrize(("with_filings", "alerts"), [(True, True), (False, False)])
-async def test_only_clears_of_readings_with_filings_raise_the_alarm(
+@pytest.mark.parametrize(
+    ("filings", "alerts"), [("edgar", True), ("none", False), ("finnhub_era", False)],
+)
+async def test_only_clears_of_readings_with_edgar_filings_raise_the_alarm(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
-    with_filings: bool, alerts: bool,
+    filings: str, alerts: bool,
 ) -> None:
-    """Mutations: no alert (True red); counting every clear (the unbacked
-    clean-up would page on its first run: False red)."""
+    """Mutations: no alert (edgar red); counting every clear (the unbacked
+    clean-up would page on its first run: none red); counting pre-switch
+    Finnhub rows (the switchover itself would page: finnhub_era red)."""
     symbols = [f"S{i:03d}" for i in range(100)]
     for sym in symbols:
         await _seed(sym)
-    if with_filings:
+    if filings != "none":
         for sym in symbols:
-            await _seed_form4(sym, lines=1)
+            await _seed_form4(sym, lines=1, source="edgar" if filings == "edgar" else None)
     _vendor(monkeypatch, "empty")
 
     with caplog.at_level("ERROR", logger=sp.logger.name):
         await sp._refresh_insider_cache(limit=100)
 
     assert ("insider.cleared_surge" in caplog.text) is alerts
+
+
+# ===========================================================================
+# 10. After #835: unbacked values are asked about first, and an ordinary
+#     outage is not reported as contradicted empty answers.
+# ===========================================================================
+
+
+async def test_unbacked_values_are_selected_ahead_of_due_equities() -> None:
+    """#835 made ~11,800 rows due at once, equities first; the 629 unbacked ETFs
+    would not have been reached inside a day's phase. Mutations: the plain
+    equities-first order (EQDUE first); ranking unbacked rows first for the
+    fundamentals pass too (its order changes)."""
+    await _seed("EQDUE", last_smart_money_at=NOW - 72 * H, last_fundamentals_at=NOW - 30 * 24 * H)
+    await _seed_form4("EQDUE")
+    await _seed("ETFUNB", asset_class="etf", last_smart_money_at=NOW - 48 * H,
+                last_fundamentals_at=NOW - 60 * 24 * H)
+
+    assert await sp._select_factor_symbols(Ticker.last_smart_money_at, 1) == ["ETFUNB"]
+    assert await sp._select_factor_symbols(Ticker.last_smart_money_at, 2) == ["ETFUNB", "EQDUE"]
+    assert await sp._select_factor_symbols(Ticker.last_fundamentals_at, 2) == ["EQDUE", "ETFUNB"]
+
+
+async def test_an_outage_that_is_not_contradicted_answers_is_only_a_warning(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Mutation: raising the contradiction ERROR on every failure stop."""
+    for i in range(40):
+        await _seed(f"D{i:02d}")
+    _vendor(monkeypatch, "down")
+
+    with caplog.at_level("WARNING", logger=sp.logger.name):
+        assert await sp._refresh_insider_cache(limit=40) is True
+
+    assert "insider.failing_stop" in caplog.text
+    assert "insider.empty_contradicted_stop" not in caplog.text

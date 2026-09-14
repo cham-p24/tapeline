@@ -2801,10 +2801,12 @@ _SMART_MONEY_EDGAR_SINCE = datetime(2026, 9, 14, 14, 10, tzinfo=UTC)
 #: once its stamp is this old, whatever its asset class's horizon says.
 #:
 #: Such a value is not a reading of any filing we hold. On 2026-09-14 (read-only)
-#: 856 non-crypto rows held one - 629 ETFs, 222 equities, 5 futures - and 16 of
-#: the 100 entries recorded from 24 Aug to 11 Sep were ranked with one. #824 only
-#: retires a value when the symbol is asked again, and non-equities are asked
-#: every 30 days, so the ETFs among them would have stayed until 7-13 Oct.
+#: 856 non-crypto rows held one - 629 ETFs, 222 equities, 5 commodity futures
+#: contracts - and 16 of the 100 entries recorded from 24 Aug to 11 Sep were
+#: ranked with one. #824 only retires a value when the symbol is asked again, and
+#: non-equities are asked every 30 days, so the ETFs among them would have
+#: stayed until 7-13 Oct. `_select_factor_symbols` also asks about these rows
+#: first, because #835 made ~11,800 rows due at once.
 #:
 #: The floor is the factor phase's budget, so a symbol whose call fails - and is
 #: stamped, still holding its value - is not handed back inside the same phase.
@@ -2882,13 +2884,20 @@ def _factor_due_clause(stamp_col: Any, now: datetime) -> Any:
     if stamp_col.key == "last_smart_money_at":
         due = due | (stamp_col < _SMART_MONEY_EDGAR_SINCE)
         due = due | (
-            Ticker.sub_smart_money.is_not(None)
-            & ~select(InsiderTransaction.id)
-            .where(InsiderTransaction.symbol == Ticker.symbol)
-            .exists()
+            _unbacked_smart_money()
             & (stamp_col < now - _UNBACKED_SMART_MONEY_RECHECK_AFTER)
         )
     return due & _factor_scope_clause(stamp_col)
+
+
+def _unbacked_smart_money() -> Any:
+    """SQL predicate: the row holds a smart-money value with no Form 4 row on file."""
+    return (
+        Ticker.sub_smart_money.is_not(None)
+        & ~select(InsiderTransaction.id)
+        .where(InsiderTransaction.symbol == Ticker.symbol)
+        .exists()
+    )
 
 
 def _factor_scope_clause(stamp_col: Any) -> Any:
@@ -3093,11 +3102,26 @@ async def _select_factor_symbols(
         # oldest stamp first within each group. A plain stamp order used to
         # serve a 30-day-old ETF stamp ahead of a 40-hour-old equity one.
         head = gaps[:fill_cap]
+        # Smart money puts unbacked values ahead of even the equities: a value
+        # with no filing behind it is not a reading at all, it is on published
+        # rankings until it is asked about, and it is cheap to ask about (EDGAR
+        # answers most non-equities from its ticker map with no request). After
+        # #835 made ~11,800 rows due at once, equities-first would not have
+        # reached the 629 unbacked ETFs inside a day's phase budget.
+        priority = (
+            case(
+                (_unbacked_smart_money(), 0),
+                (Ticker.asset_class == "equity", 1),
+                else_=2,
+            )
+            if stamp_col.key == "last_smart_money_at"
+            else case((Ticker.asset_class == "equity", 0), else_=1)
+        )
         refresh = list((await session.execute(
             select(Ticker.symbol)
             .where(stamp_col.is_not(None), _factor_due_clause(stamp_col, now))
             .order_by(
-                case((Ticker.asset_class == "equity", 0), else_=1),
+                priority,
                 stamp_col.asc(),
                 Ticker.symbol.asc(),
             )

@@ -1308,9 +1308,10 @@ async def fetch_insider_transactions(
             if not isinstance(data, dict):
                 raise ValueError(f"expected a JSON object, got {type(data).__name__}")
             # Only an explicit list is an answer. `data.get("data") or []` read
-            # {}, {"error": ...} and {"data": null} as "no filings", cached that
-            # for 24h, and since #824 an empty answer deletes the symbol's Form
-            # 4 rows and its reading. A body that says nothing is a failed call.
+            # {}, {"error": ...} and {"data": null} as "no filings" and cached
+            # that for 24h. The worker's insider pass reads SEC EDGAR since #835
+            # and no longer calls this, but the ticker page's insider endpoint
+            # still does, and a body that says nothing is not "no filings".
             if not isinstance(data.get("data"), list):
                 raise ValueError(
                     f"expected a data list, got {type(data.get('data')).__name__}",

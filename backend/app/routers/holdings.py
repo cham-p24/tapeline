@@ -78,9 +78,10 @@ async def insider_preview(
 async def list_insider_buys(
     user: User = Depends(current_user_required),
     symbol: str | None = Query(None, description="Filter to one ticker"),
-    # At most 90, the window the worker asks Finnhub for. Stored rows older than
-    # that are deleted when a symbol's next answer is empty (#824) and kept until
-    # then, so a longer lookback would return a different window per symbol.
+    # At most signal_publisher._INSIDER_WINDOW_DAYS (90), the window the worker
+    # reads from SEC EDGAR. Stored rows older than that are deleted when a
+    # symbol's next answer is empty (#824) and kept until then, so a longer
+    # lookback would return a different window per symbol.
     days: int = Query(30, ge=1, le=90, description="Lookback window in days"),
     buys_only: bool = Query(False, description="Only return net positive (buy) transactions"),
     limit: int = Query(100, ge=1, le=500),
