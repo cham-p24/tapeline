@@ -68,10 +68,10 @@ Hi Sam,
 A lot changed at Tapeline over the past week, and part of it went wrong in a way you should hear about from us rather than notice for yourself.
 
 Scores were not kept up to date for most of 6 to 11 September.
-From 6 September our scoring kept failing to finish its work. Three of the six factors — trend, relative strength and momentum — kept using price data from 6 September until a fix on 10 September, and nothing on the site said so. From 15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner showed numbers that were not being refreshed at all. Our monitoring restarted the machines that run scoring many times over those days, and the restarts did not fix it. The cause was our own code plus a server that could not keep up with the larger universe described below. We fixed the problems we had found in our code on 10 September, but scoring fell behind again, and on 11 September we moved it to a dedicated machine. Every automated check on it since then, up to 14 September, has passed.
+From 6 September our scoring kept failing to finish its work. Three of the six factors — trend, relative strength and momentum — kept using price data fetched on 6 September until fixes on 10 and 11 September, and nothing on the site said so. From 15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner showed numbers that were not being refreshed at all. Our monitoring restarted the machines that run scoring many times over those days. That did not fix it, and it made things worse: each restart threw away work in progress, and the restarts also started a second copy of scoring alongside the first. The cause was our own code plus a server that could not keep up with the larger universe described below. We fixed the problems we had found in our code on 10 September, but scoring fell behind again, and on 11 September we moved it to a dedicated machine. Since then, up to 14 September, when we wrote this, our monitoring has found scoring finishing on time at every check.
 
 Two other factors fell behind as well.
-Company fundamentals and insider buying are refreshed by a separate job. It was still stalled on 13 September, two days after scoring moved to its new machine, and some readings it did fetch were lost when we released updates to the site. We made fixes on 13 and 14 September and began fetching the lost readings again. Where a stock has no reading for one of these factors, that factor counts as neutral in its score.
+Company fundamentals and insider buying are refreshed by a separate job. It was still stalled on 13 September, two days after scoring moved to its new machine, and some readings it did fetch were lost when we released updates to the site. We made fixes on 13 and 14 September and began fetching the lost readings again. Insider filings had a second problem: they reached us through a data provider whose copies could run weeks behind the SEC's own. On 14 September we began reading them from the SEC directly, and as each stock is re-read, its insider-buying reading, and the score that uses it, can change. Where a stock has no reading for one of these factors, that factor counts as neutral in its score.
 
 The scanner now covers about 11,500 stocks and ETFs.
 Until 6 September, thousands of stocks and ETFs we had already scored could not appear in a scan. That is not new data we bought. It is data we already had and were not refreshing. Search for TSM, Sony or Toyota and they are there.
@@ -80,7 +80,7 @@ Crypto is in: more than 100 pairs, updated once a day.
 Coins sit in their own list and are never ranked against stocks, because two of our six factors — company fundamentals and insider buying — cannot exist for a coin. Prices update daily, not live. Our data plan does not include live crypto prices, and we would rather tell you that than label a day-old number "live".
 
 Scores moved on 7 September, mostly down.
-Three columns in one of our data sources were renamed, and we read them as missing. Missing inputs are scored as neutral, which made most of the affected scores too high. We recalculated 4,112 scores and 3,233 of them went down. Scores also moved that week as the stale price data and missing factor readings described above were refreshed, so a change in a score you watch may have more than one cause.
+Three columns in one of our data sources were renamed, and we read them as missing. Missing inputs are scored as neutral, which made most of the affected scores too high. When we fixed it, a test run against that source changed 4,088 of its 4,112 scores, and 3,233 of them went down. Scores moved again once the stale price data described above was replaced, and they can still move as the factor readings described above are fetched again, so a change in a score you watch may have more than one cause.
 
 And one thing that is not an improvement: the open-access month ended on 8 September, as scheduled. Free accounts are back to the top 10 rows per scan.
 
@@ -778,6 +778,36 @@ def test_the_universe_count_is_the_one_the_rest_of_the_copy_uses() -> None:
     assert int(counts[0].replace(",", "")) == SCORED_TICKERS_IN_COPY
 
 
+def test_the_sec_sentence_matches_where_the_insider_pass_reads_from() -> None:
+    """The email says insider filings have been read from the SEC directly
+    since a named day (#835). The day is checked against the worker's
+    switchover constant, and the insider pass is checked, by AST so neither a
+    comment nor a docstring can satisfy it, to still import its fetch from
+    services/edgar_form4. If the switch is reverted before the send, the build
+    fails instead of the email describing a source the worker no longer reads."""
+    from app.services.email import PRODUCT_UPDATE_SECTIONS
+    from app.workers import signal_publisher as sp
+
+    days = [
+        m.group(1)
+        for _heading, body in PRODUCT_UPDATE_SECTIONS
+        for m in [re.search(r"On (\d+) September we began reading them from the SEC directly", body)]
+        if m
+    ]
+    assert len(days) == 1, "the detector no longer finds the SEC sentence"
+    assert int(days[0]) == sp._SMART_MONEY_EDGAR_SINCE.day
+    assert sp._SMART_MONEY_EDGAR_SINCE.month == 9
+
+    tree = ast.parse(inspect.getsource(sp._refresh_insider_cache).lstrip())
+    fetches = {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and any(alias.name == "fetch_insider_transactions" for alias in node.names)
+    }
+    assert fetches == {"app.services.edgar_form4"}, fetches
+
+
 @pytest.mark.parametrize("audience", ["account", "newsletter"])
 def test_the_update_repeats_none_of_the_sentences_withdrawn_on_14_september(audience: str) -> None:
     """Checked against the pull requests and production on 2026-09-14 and
@@ -801,6 +831,23 @@ def test_the_update_repeats_none_of_the_sentences_withdrawn_on_14_september(audi
     - "Crypto is in: 100 pairs": 110 pairs were scored on 14 September.
     - "stopped updating for about a day": three factors ran on 6 September
       price data for four days.
+
+    Withdrawn again after adversarial review of the rewording, same day:
+
+    - "price data from 6 September until a fix on 10 September": the bars
+      were fetched on 6 September (a Sunday, so they end at the 4 September
+      close), and the pass was still being restarted until the 11 September
+      move (#807). The changelog says "fetched on 6 September".
+    - "Every automated check on it since then … has passed": the watchdog
+      tests only that the tick finished on time, and a run later on the 14th
+      could still fail. It now says what the check found, up to when it was
+      written.
+    - "We recalculated 4,112 scores and 3,233 of them went down": those are
+      #766's dry-run figures (4,088 of 4,112 changed), not a production
+      count. The changelog calls them a dry run; so does the email now.
+    - "Scores also moved that week as … were refreshed": the re-reads of
+      #828, #829 and #835 were still running on 14 September, so the refresh
+      was neither that week nor finished.
     """
     from app.services.email import render_product_update_email, render_product_update_text
 
@@ -821,6 +868,10 @@ def test_the_update_repeats_none_of_the_sentences_withdrawn_on_14_september(audi
             r"flattered most",
             r"crypto is in: 100 pairs",
             r"stopped updating for about a day",
+            r"price data from 6 September",
+            r"every automated check on it since",
+            r"we recalculated 4,112",
+            r"scores also moved that week",
         ):
             assert not re.search(withdrawn, content, re.I), (
                 f"{audience} {part} repeats a withdrawn claim: {withdrawn!r}"

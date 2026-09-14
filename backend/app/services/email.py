@@ -6122,16 +6122,19 @@ PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
         "Scores were not kept up to date for most of 6 to 11 September.",
         "From 6 September our scoring kept failing to finish its work. Three of "
         "the six factors — trend, relative strength and momentum — kept using "
-        "price data from 6 September until a fix on 10 September, and nothing on "
-        "the site said so. From 15:36 UTC on 9 September to 16:18 UTC on 10 "
-        "September, the scanner showed numbers that were not being refreshed at "
-        "all. Our monitoring restarted the machines that run scoring many times "
-        "over those days, and the restarts did not fix it. The cause was our own "
-        "code plus a server that could not keep up with the larger universe "
-        "described below. We fixed the problems we had found in our code on 10 "
-        "September, but scoring fell behind again, and on 11 September we moved "
-        "it to a dedicated machine. Every automated check on it since then, up "
-        "to 14 September, has passed.",
+        "price data fetched on 6 September until fixes on 10 and 11 September, "
+        "and nothing on the site said so. From 15:36 UTC on 9 September to 16:18 "
+        "UTC on 10 September, the scanner showed numbers that were not being "
+        "refreshed at all. Our monitoring restarted the machines that run "
+        "scoring many times over those days. That did not fix it, and it made "
+        "things worse: each restart threw away work in progress, and the "
+        "restarts also started a second copy of scoring alongside the first. The "
+        "cause was our own code plus a server that could not keep up with the "
+        "larger universe described below. We fixed the problems we had found in "
+        "our code on 10 September, but scoring fell behind again, and on 11 "
+        "September we moved it to a dedicated machine. Since then, up to 14 "
+        "September, when we wrote this, our monitoring has found scoring "
+        "finishing on time at every check.",
     ),
     (
         "Two other factors fell behind as well.",
@@ -6139,8 +6142,13 @@ PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
         "It was still stalled on 13 September, two days after scoring moved to "
         "its new machine, and some readings it did fetch were lost when we "
         "released updates to the site. We made fixes on 13 and 14 September and "
-        "began fetching the lost readings again. Where a stock has no reading "
-        "for one of these factors, that factor counts as neutral in its score.",
+        "began fetching the lost readings again. Insider filings had a second "
+        "problem: they reached us through a data provider whose copies could run "
+        "weeks behind the SEC's own. On 14 September we began reading them from "
+        "the SEC directly, and as each stock is re-read, its insider-buying "
+        "reading, and the score that uses it, can change. Where a stock has no "
+        "reading for one of these factors, that factor counts as neutral in its "
+        "score.",
     ),
     (
         "The scanner now covers about 11,500 stocks and ETFs.",
@@ -6161,10 +6169,12 @@ PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
         "Scores moved on 7 September, mostly down.",
         "Three columns in one of our data sources were renamed, and we read them "
         "as missing. Missing inputs are scored as neutral, which made most of the "
-        "affected scores too high. We recalculated 4,112 scores and 3,233 of them "
-        "went down. Scores also moved that week as the stale price data and "
-        "missing factor readings described above were refreshed, so a change in "
-        "a score you watch may have more than one cause.",
+        "affected scores too high. When we fixed it, a test run against that "
+        "source changed 4,088 of its 4,112 scores, and 3,233 of them went down. "
+        "Scores moved again once the stale price data described above was "
+        "replaced, and they can still move as the factor readings described "
+        "above are fetched again, so a change in a score you watch may have more "
+        "than one cause.",
     ),
 )
 
