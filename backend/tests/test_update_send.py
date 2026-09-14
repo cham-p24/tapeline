@@ -60,18 +60,24 @@ SURVEY_REMINDER_DAY = date(2026, 9, 16)
 #: text, everything above the footer. The newsletter variant is this minus the
 #: "And one thing that is not an improvement" paragraph. If the copy changes
 #: after approval, this is where the change has to be made on purpose.
-#: Reworded 2026-09-14 on the founder's "reword the email": see
+#: Reworded 2026-09-14 after the founder's "go on 1-5, reword the email"
+#: (13:24 UTC), which asked for a rewording and did not approve this text: see
 #: test_the_update_repeats_none_of_the_sentences_withdrawn_on_14_september.
+#:
+#: FOUNDER APPROVAL OF THIS EXACT TEXT — PENDING.
+#: >>> FOUNDER-APPROVAL-QUOTE-PLACEHOLDER: replace this line with the founder's
+#: >>> "yes, send this" reply on the rendered text, verbatim, with its UTC time.
+#: >>> Keep it identical to the quote in services/email.py. <<<
 APPROVED_COPY = """\
 Hi Sam,
 
 A lot changed at Tapeline over the past week, and part of it went wrong in a way you should hear about from us rather than notice for yourself.
 
 Scores were not kept up to date for most of 6 to 11 September.
-From 6 September our scoring kept failing to finish its work. Three of the six factors — trend, relative strength and momentum — kept using price data fetched on 6 September until fixes on 10 and 11 September, and nothing on the site said so. From 15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner showed numbers that were not being refreshed at all. Our monitoring restarted the machines that run scoring many times over those days. That did not fix it, and it made things worse: each restart threw away work in progress, and the restarts also started a second copy of scoring alongside the first. The cause was our own code plus a server that could not keep up with the larger universe described below. We fixed the problems we had found in our code on 10 September, but scoring fell behind again, and on 11 September we moved it to a dedicated machine. Since then, up to 14 September, when we wrote this, our monitoring has found scoring finishing on time at every check.
+From 6 September our scoring kept failing to finish its work. Three of the six factors — trend, relative strength and momentum — kept using price data fetched on 6 September until fixes on 10 and 11 September, and nothing on the site said those three factors were out of date. From 15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner showed numbers that were not being refreshed at all. Our monitoring restarted the machines that run scoring many times over those days. That did not fix it, and it made things worse: each restart threw away work in progress, and the restarts also started a second copy of scoring alongside the first. The cause was our own code plus a server that could not keep up with the larger universe described below. We fixed the problems we had found in our code on 10 September, but scoring fell behind again, and on 11 September we moved it to a dedicated machine. Since then, up to 14 September, when we wrote this, our monitoring has found scoring finishing on time at every check.
 
 Two other factors fell behind as well.
-Company fundamentals and insider buying are refreshed by a separate job. It was still stalled on 13 September, two days after scoring moved to its new machine, and some readings it did fetch were lost when we released updates to the site. We made fixes on 13 and 14 September and began fetching the lost readings again. Insider filings had a second problem: they reached us through a data provider whose copies could run weeks behind the SEC's own. On 14 September we began reading them from the SEC directly, and as each stock is re-read, its insider-buying reading, and the score that uses it, can change. Where a stock has no reading for one of these factors, that factor counts as neutral in its score.
+Company fundamentals and insider buying are refreshed by a separate job. It was still stalled on 13 September, two days after scoring moved to its new machine, and some readings it did fetch were lost when we released updates to the site. We made fixes on 13 and 14 September and began fetching the lost readings again. Insider filings had a second problem: they reached us through a data provider whose copies could run weeks behind the SEC's own. On 14 September we began reading them from the SEC directly, and as each stock is re-read, its insider-buying reading, and the score that uses it, can change.
 
 The scanner now covers about 11,500 stocks and ETFs.
 Until 6 September, thousands of stocks and ETFs we had already scored could not appear in a scan. That is not new data we bought. It is data we already had and were not refreshing. Search for TSM, Sony or Toyota and they are there.
@@ -80,7 +86,7 @@ Crypto is in: more than 100 pairs, updated once a day.
 Coins sit in their own list and are never ranked against stocks, because two of our six factors — company fundamentals and insider buying — cannot exist for a coin. Prices update daily, not live. Our data plan does not include live crypto prices, and we would rather tell you that than label a day-old number "live".
 
 Scores moved on 7 September, mostly down.
-Three columns in one of our data sources were renamed, and we read them as missing. Missing inputs are scored as neutral, which made most of the affected scores too high. When we fixed it, a test run against that source changed 4,088 of its 4,112 scores, and 3,233 of them went down. Scores moved again once the stale price data described above was replaced, and they can still move as the factor readings described above are fetched again, so a change in a score you watch may have more than one cause.
+Three columns in one of our data sources were renamed, and we read them as missing. We scored those missing values as neutral, which made most of the affected scores too high. When we fixed it, a test run against that source changed 4,088 of its 4,112 scores, and 3,233 of them went down. Scores moved again once the stale price data described above was replaced, and they can still move as the factor readings described above are fetched again, so a change in a score you watch may have more than one cause.
 
 And one thing that is not an improvement: the open-access month ended on 8 September, as scheduled. Free accounts are back to the top 10 rows per scan.
 
@@ -848,6 +854,24 @@ def test_the_update_repeats_none_of_the_sentences_withdrawn_on_14_september(audi
     - "Scores also moved that week as … were refreshed": the re-reads of
       #828, #829 and #835 were still running on 14 September, so the refresh
       was neither that week nor finished.
+
+    Withdrawn after the operator's review of the second rewording, same day:
+
+    - "Where a stock has no reading for one of these factors, that factor
+      counts as neutral in its score": read-only production at 14:32 UTC on
+      14 September held 839 scored non-crypto tickers (205 equities, 629
+      ETFs, 5 futures funds) with an insider-buying value and no Form 4 row
+      on file, 40 of them outside the 10-90 range the Form 4 calculation can
+      produce. Those values feed the score, not neutral; where they came from
+      is not established (#833, still open).
+    - "Missing inputs are scored as neutral": the same claim in general,
+      present-tense form. The rename paragraph now says what happened to
+      those columns, in the past tense, as the changelog does.
+    - "and nothing on the site said so": /status showed the scoring worker as
+      "Stale", and the /app banner said the scanner data was minutes old,
+      whenever the regime heartbeat lapsed (#807 sampled 691s and 814s). What
+      no page ever said was that trend, relative strength and momentum were
+      running on 6 September's bars.
     """
     from app.services.email import render_product_update_email, render_product_update_text
 
@@ -872,6 +896,9 @@ def test_the_update_repeats_none_of_the_sentences_withdrawn_on_14_september(audi
             r"every automated check on it since",
             r"we recalculated 4,112",
             r"scores also moved that week",
+            r"counts as neutral",
+            r"missing inputs are scored as neutral",
+            r"nothing on the site said so",
         ):
             assert not re.search(withdrawn, content, re.I), (
                 f"{audience} {part} repeats a withdrawn claim: {withdrawn!r}"

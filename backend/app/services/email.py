@@ -6113,19 +6113,27 @@ _PRODUCT_UPDATE_OPENER = (
 
 #: (heading, body). Bold in the HTML part; own line in the text part.
 #:
-#: REWORDED 2026-09-14, founder-approved ("reword the email"), after the stall,
-#: universe and score-change sentences were checked against the PRs and
-#: production and found false or misleading. What each said and why it was
-#: withdrawn is in test_update_send.py, which fails if any of them returns.
+#: REWORDED 2026-09-14 after the founder's "go on 1-5, reword the email" (13:24
+#: UTC), once the stall, universe and score-change sentences were checked
+#: against the PRs and production and found false or misleading. That reply
+#: asked for a rewording; it did not approve this text. What each withdrawn
+#: sentence said and why is in test_update_send.py, which fails if any returns.
+#:
+#: FOUNDER APPROVAL OF THIS EXACT TEXT — PENDING.
+#: >>> FOUNDER-APPROVAL-QUOTE-PLACEHOLDER: replace this line with the founder's
+#: >>> "yes, send this" reply on the rendered text, verbatim, with its UTC time.
+#: >>> Keep it identical to the quote above APPROVED_COPY in
+#: >>> backend/tests/test_update_send.py. <<<
 PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
     (
         "Scores were not kept up to date for most of 6 to 11 September.",
         "From 6 September our scoring kept failing to finish its work. Three of "
         "the six factors — trend, relative strength and momentum — kept using "
         "price data fetched on 6 September until fixes on 10 and 11 September, "
-        "and nothing on the site said so. From 15:36 UTC on 9 September to 16:18 "
-        "UTC on 10 September, the scanner showed numbers that were not being "
-        "refreshed at all. Our monitoring restarted the machines that run "
+        "and nothing on the site said those three factors were out of date. From "
+        "15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner "
+        "showed numbers that were not being refreshed at all. Our monitoring "
+        "restarted the machines that run "
         "scoring many times over those days. That did not fix it, and it made "
         "things worse: each restart threw away work in progress, and the "
         "restarts also started a second copy of scoring alongside the first. The "
@@ -6146,9 +6154,7 @@ PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
         "problem: they reached us through a data provider whose copies could run "
         "weeks behind the SEC's own. On 14 September we began reading them from "
         "the SEC directly, and as each stock is re-read, its insider-buying "
-        "reading, and the score that uses it, can change. Where a stock has no "
-        "reading for one of these factors, that factor counts as neutral in its "
-        "score.",
+        "reading, and the score that uses it, can change.",
     ),
     (
         "The scanner now covers about 11,500 stocks and ETFs.",
@@ -6168,9 +6174,9 @@ PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
     (
         "Scores moved on 7 September, mostly down.",
         "Three columns in one of our data sources were renamed, and we read them "
-        "as missing. Missing inputs are scored as neutral, which made most of the "
-        "affected scores too high. When we fixed it, a test run against that "
-        "source changed 4,088 of its 4,112 scores, and 3,233 of them went down. "
+        "as missing. We scored those missing values as neutral, which made most "
+        "of the affected scores too high. When we fixed it, a test run against "
+        "that source changed 4,088 of its 4,112 scores, and 3,233 of them went down. "
         "Scores moved again once the stale price data described above was "
         "replaced, and they can still move as the factor readings described "
         "above are fetched again, so a change in a score you watch may have more "
@@ -6229,8 +6235,8 @@ def render_product_update_email(
     one, because a broadcast with no working opt-out is the thing the Spam Act
     is about.
 
-    NO PREHEADER. Every other line of this email was approved word for word; a
-    preheader would be the one sentence nobody approved.
+    NO PREHEADER. Every other line of this email goes to the founder word for
+    word; a preheader would be the one sentence nobody approved.
     """
     from html import escape as _html_escape
 
