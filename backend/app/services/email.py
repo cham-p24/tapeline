@@ -6112,24 +6112,45 @@ _PRODUCT_UPDATE_OPENER = (
 )
 
 #: (heading, body). Bold in the HTML part; own line in the text part.
+#:
+#: REWORDED 2026-09-14, founder-approved ("reword the email"), after the stall,
+#: universe and score-change sentences were checked against the PRs and
+#: production and found false or misleading. What each said and why it was
+#: withdrawn is in test_update_send.py, which fails if any of them returns.
 PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
     (
-        "Scores and prices stopped updating for about a day.",
-        "From 15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner "
-        "kept showing numbers that were not being refreshed. Over the following "
-        "day it stalled several more times before recovering on its own. The "
-        "cause was our own code plus a server that could not keep up with the "
-        "larger universe described below. Both are fixed: scoring now runs on a "
-        "dedicated machine, and it has not stalled since 11 September.",
+        "Scores were not kept up to date for most of 6 to 11 September.",
+        "From 6 September our scoring kept failing to finish its work. Three of "
+        "the six factors — trend, relative strength and momentum — kept using "
+        "price data from 6 September until a fix on 10 September, and nothing on "
+        "the site said so. From 15:36 UTC on 9 September to 16:18 UTC on 10 "
+        "September, the scanner showed numbers that were not being refreshed at "
+        "all. Our monitoring restarted the machines that run scoring many times "
+        "over those days, and the restarts did not fix it. The cause was our own "
+        "code plus a server that could not keep up with the larger universe "
+        "described below. We fixed the problems we had found in our code on 10 "
+        "September, but scoring fell behind again, and on 11 September we moved "
+        "it to a dedicated machine. Every automated check on it since then, up "
+        "to 14 September, has passed.",
+    ),
+    (
+        "Two other factors fell behind as well.",
+        "Company fundamentals and insider buying are refreshed by a separate job. "
+        "It was still stalled on 13 September, two days after scoring moved to "
+        "its new machine, and some readings it did fetch were lost when we "
+        "released updates to the site. We made fixes on 13 and 14 September and "
+        "began fetching the lost readings again. Where a stock has no reading "
+        "for one of these factors, that factor counts as neutral in its score.",
     ),
     (
         "The scanner now covers about 11,500 stocks and ETFs.",
-        "At the start of the month it was about 2,000. That is not new data we "
-        "bought. It is data we already had and were not refreshing. Search for "
-        "TSM, Sony or Toyota and they are there.",
+        "Until 6 September, thousands of stocks and ETFs we had already scored "
+        "could not appear in a scan. That is not new data we bought. It is data "
+        "we already had and were not refreshing. Search for TSM, Sony or Toyota "
+        "and they are there.",
     ),
     (
-        "Crypto is in: 100 pairs, updated once a day.",
+        "Crypto is in: more than 100 pairs, updated once a day.",
         "Coins sit in their own list and are never ranked against stocks, because "
         "two of our six factors — company fundamentals and insider buying — "
         "cannot exist for a coin. Prices update daily, not live. Our data plan "
@@ -6138,11 +6159,12 @@ PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
     ),
     (
         "Scores moved on 7 September, mostly down.",
-        "A renamed column in one of our data sources meant some inputs went "
-        "missing, and a missing input was being scored as neutral, which "
-        "flattered most stocks. We recalculated 4,112 scores and 3,233 of them "
-        "went down. If a score you watch dropped that week, the lower number is "
-        "the accurate one.",
+        "Three columns in one of our data sources were renamed, and we read them "
+        "as missing. Missing inputs are scored as neutral, which made most of the "
+        "affected scores too high. We recalculated 4,112 scores and 3,233 of them "
+        "went down. Scores also moved that week as the stale price data and "
+        "missing factor readings described above were refreshed, so a change in "
+        "a score you watch may have more than one cause.",
     ),
 )
 

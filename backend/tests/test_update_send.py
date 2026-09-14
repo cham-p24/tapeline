@@ -60,22 +60,27 @@ SURVEY_REMINDER_DAY = date(2026, 9, 16)
 #: text, everything above the footer. The newsletter variant is this minus the
 #: "And one thing that is not an improvement" paragraph. If the copy changes
 #: after approval, this is where the change has to be made on purpose.
+#: Reworded 2026-09-14 on the founder's "reword the email": see
+#: test_the_update_repeats_none_of_the_sentences_withdrawn_on_14_september.
 APPROVED_COPY = """\
 Hi Sam,
 
 A lot changed at Tapeline over the past week, and part of it went wrong in a way you should hear about from us rather than notice for yourself.
 
-Scores and prices stopped updating for about a day.
-From 15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner kept showing numbers that were not being refreshed. Over the following day it stalled several more times before recovering on its own. The cause was our own code plus a server that could not keep up with the larger universe described below. Both are fixed: scoring now runs on a dedicated machine, and it has not stalled since 11 September.
+Scores were not kept up to date for most of 6 to 11 September.
+From 6 September our scoring kept failing to finish its work. Three of the six factors — trend, relative strength and momentum — kept using price data from 6 September until a fix on 10 September, and nothing on the site said so. From 15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner showed numbers that were not being refreshed at all. Our monitoring restarted the machines that run scoring many times over those days, and the restarts did not fix it. The cause was our own code plus a server that could not keep up with the larger universe described below. We fixed the problems we had found in our code on 10 September, but scoring fell behind again, and on 11 September we moved it to a dedicated machine. Every automated check on it since then, up to 14 September, has passed.
+
+Two other factors fell behind as well.
+Company fundamentals and insider buying are refreshed by a separate job. It was still stalled on 13 September, two days after scoring moved to its new machine, and some readings it did fetch were lost when we released updates to the site. We made fixes on 13 and 14 September and began fetching the lost readings again. Where a stock has no reading for one of these factors, that factor counts as neutral in its score.
 
 The scanner now covers about 11,500 stocks and ETFs.
-At the start of the month it was about 2,000. That is not new data we bought. It is data we already had and were not refreshing. Search for TSM, Sony or Toyota and they are there.
+Until 6 September, thousands of stocks and ETFs we had already scored could not appear in a scan. That is not new data we bought. It is data we already had and were not refreshing. Search for TSM, Sony or Toyota and they are there.
 
-Crypto is in: 100 pairs, updated once a day.
+Crypto is in: more than 100 pairs, updated once a day.
 Coins sit in their own list and are never ranked against stocks, because two of our six factors — company fundamentals and insider buying — cannot exist for a coin. Prices update daily, not live. Our data plan does not include live crypto prices, and we would rather tell you that than label a day-old number "live".
 
 Scores moved on 7 September, mostly down.
-A renamed column in one of our data sources meant some inputs went missing, and a missing input was being scored as neutral, which flattered most stocks. We recalculated 4,112 scores and 3,233 of them went down. If a score you watch dropped that week, the lower number is the accurate one.
+Three columns in one of our data sources were renamed, and we read them as missing. Missing inputs are scored as neutral, which made most of the affected scores too high. We recalculated 4,112 scores and 3,233 of them went down. Scores also moved that week as the stale price data and missing factor readings described above were refreshed, so a change in a score you watch may have more than one cause.
 
 And one thing that is not an improvement: the open-access month ended on 8 September, as scheduled. Free accounts are back to the top 10 rows per scan.
 
@@ -710,7 +715,7 @@ def test_the_section_headings_are_bold_in_html() -> None:
     from app.services.email import render_product_update_email
 
     headings = [b.split("\n")[0] for b in APPROVED_COPY.split("\n\n") if "\n" in b]
-    assert len(headings) == 4, headings  # self-test: the detector found the headings
+    assert len(headings) == 5, headings  # self-test: the detector found the headings
     html = render_product_update_email("Sam", scorecard_url=SCORECARD, audience="account")
     for h in headings:
         assert f"<strong>{h}</strong>" in html, f"not bold: {h!r}"
@@ -752,6 +757,74 @@ def test_the_open_access_sentence_is_still_true() -> None:
     assert int(day.group(1)) == PROMO_OPEN_ACCESS_UNTIL.day
     assert day.group(2) == f"{PROMO_OPEN_ACCESS_UNTIL:%B}"
     assert int(rows.group(1)) == FREE_SCANNER_ROWS
+
+
+def test_the_universe_count_is_the_one_the_rest_of_the_copy_uses() -> None:
+    """The heading's count is read from the copy and checked against
+    services/universe.py, the number every other email and the site's
+    frontend/lib/universe.ts print. #826 re-measured it the night this email
+    was merged; a re-measure before the send fails the build instead of this
+    email disagreeing with the site."""
+    from app.services.email import PRODUCT_UPDATE_SECTIONS
+    from app.services.universe import SCORED_TICKERS_IN_COPY
+
+    counts = [
+        m.group(1)
+        for heading, _body in PRODUCT_UPDATE_SECTIONS
+        for m in [re.search(r"covers about ([\d,]+) stocks and ETFs", heading)]
+        if m
+    ]
+    assert len(counts) == 1, "the detector no longer finds the universe heading"
+    assert int(counts[0].replace(",", "")) == SCORED_TICKERS_IN_COPY
+
+
+@pytest.mark.parametrize("audience", ["account", "newsletter"])
+def test_the_update_repeats_none_of_the_sentences_withdrawn_on_14_september(audience: str) -> None:
+    """Checked against the pull requests and production on 2026-09-14 and
+    reworded before the send:
+
+    - "stalled several more times before recovering on its own": the cloud
+      watchdog found the worker's tick stale on 30 of its 34 runs from 6 to
+      11 September and restarted the worker machines each time. It never
+      recovered on its own; #797, #798 and #800 (10 Sep) and the dedicated
+      machine in #807 (11 Sep) fixed it.
+    - "it has not stalled since 11 September": the fundamentals and insider
+      refresh stalled from 11 to 13 September and lost readings on deploys
+      (#822, #825, #828, #829).
+    - "At the start of the month it was about 2,000": on 1 September 6,757
+      tickers were scored and the refresh cap was 2,500; ~1,836 was only the
+      default view, measured just before #763.
+    - "the lower number is the accurate one": that week scores also moved on
+      stale price bars and on the factor fixes, so no single number was.
+    - "flattered most stocks": the renamed columns affected the ~4,100
+      spreadsheet-based scores, not most of ~11,500.
+    - "Crypto is in: 100 pairs": 110 pairs were scored on 14 September.
+    - "stopped updating for about a day": three factors ran on 6 September
+      price data for four days.
+    """
+    from app.services.email import render_product_update_email, render_product_update_text
+
+    text = render_product_update_text(
+        "Sam", scorecard_url=SCORECARD, audience=audience,
+        unsubscribe_url="https://tapeline.io/api/unsubscribe?token=t",
+    )
+    html_body, _slot = _split_rendered(render_product_update_email(
+        "Sam", scorecard_url=SCORECARD, audience=audience,
+        newsletter_unsubscribe_url="https://tapeline.io/api/newsletter/unsubscribe?token=t",
+    ))
+    for part, content in (("text", _squash(text)), ("html", _visible_text(html_body))):
+        for withdrawn in (
+            r"recover\w* on its own",
+            r"(?:has not|hasn't|not) stalled since",
+            r"about 2,000",
+            r"lower number is the accurate",
+            r"flattered most",
+            r"crypto is in: 100 pairs",
+            r"stopped updating for about a day",
+        ):
+            assert not re.search(withdrawn, content, re.I), (
+                f"{audience} {part} repeats a withdrawn claim: {withdrawn!r}"
+            )
 
 
 @pytest.mark.parametrize("audience", ["account", "newsletter"])
