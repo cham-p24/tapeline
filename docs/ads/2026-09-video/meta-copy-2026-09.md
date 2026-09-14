@@ -38,7 +38,7 @@ Videos:
 
 | Field | Characters | Text |
 |---|---|---|
-| Primary text | 415 total; price at character 53; card, $0, price, interval and cancel all within the first 115 | 30-day Premium trial: card required, $0 today, then $19.99/mo or $199/yr, the plan you choose. Cancel in one click. Anyone can show you their good weeks. Tapeline's public scorecard lists top-ten scores by date, each next to the following session's price move and SPY's, misses included. Gaps and corrections are dated on the page. Reading it needs no account. Without Pro or Premium, entries show on a 7-day delay. |
+| Primary text | 422 total; price at character 53; card, $0, price, interval and cancel all within the first 115 | 30-day Premium trial: card required, $0 today, then $19.99/mo or $199/yr, the plan you choose. Cancel in one click. Anyone can show you their good weeks. Tapeline's public scorecard lists top-ten scores by date, with the following session's price move and SPY's where recorded, misses included. Gaps and corrections are dated on the page. Reading it needs no account. Without Pro or Premium, entries show on a 7-day delay. |
 | Headline | 22 | Read the record first. |
 | Description | 22 | Not investment advice. |
 

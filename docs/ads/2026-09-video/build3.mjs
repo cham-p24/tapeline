@@ -6,6 +6,9 @@
 //               The money scene carries "card required", price and interval.
 //               Added <=15 s cuts, verbatim .en_US.srt captions, and the Meta
 //               text fields (generated here, so they read the same constants).
+//   2026-09-15  E's scorecard line said each score sits "next to" the following
+//               session's move and SPY's. Not every entry has one, so it now
+//               says "where recorded"; the record-claim gate rejects "each next to".
 //
 // THE TIMING RULE THAT MATTERS
 // ----------------------------
@@ -235,7 +238,7 @@ const LONG = {
       vo: "Anyone can show you their good weeks." },
     { id: "02-turn", base: 3.2,
       screen: () => "<h1>Our scorecard shows<br>the <em>misses</em> too.</h1>" +
-        '<p class="sub">Top-ten scores by date, each next to the following session&rsquo;s price move and SPY&rsquo;s.</p>',
+        '<p class="sub">Top-ten scores by date, with the following session&rsquo;s price move and SPY&rsquo;s where recorded.</p>',
       vo: "Our public scorecard shows the misses too." },
     PROOF,
     { id: "04-sentence", base: 3.4,
@@ -381,6 +384,10 @@ const RECORD_CLAIMS = [
   /\bnothing\s+(?:is\s+|gets\s+)?(?:deleted|removed|edited)\b/i,
   /\bwe\s+publish\s+every\b/i,
   /\bscore\s+in\s+the\s+archive\b/i,
+  // "each next to the following session's price move" says every entry has
+  // one. On 2026-09-14, 34 entries older than the publication delay had no
+  // move and no SPY figure on the page, so the line says "where recorded".
+  /\beach\s+(?:next\s+to|beside|alongside|with|paired)\b/i,
   // No figures from the record, in any concept.
   /\d\s*%/,
   /\bhit\s+rate\b/i,
@@ -426,7 +433,7 @@ const META = {
   e: {
     name: "E - The record (VO)",
     primary: OPENER + " Anyone can show you their good weeks. Tapeline's public scorecard lists top-ten scores by " +
-      "date, each next to the following session's price move and SPY's, misses included. Gaps and corrections " +
+      "date, with the following session's price move and SPY's where recorded, misses included. Gaps and corrections " +
       "are dated on the page. Reading it needs no account. Without Pro or Premium, entries show on a " + DELAY_DAYS +
       "-day delay.",
     headline: "Read the record first.",

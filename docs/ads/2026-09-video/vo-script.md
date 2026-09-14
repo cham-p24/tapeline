@@ -142,7 +142,7 @@ Trial length, prices and the scorecard delay are read from
 
 - Spoken: Our public scorecard shows the misses too.
 - Caption: Our public scorecard shows the misses too.
-- On screen: Our scorecard shows the misses too. | Top-ten scores by date, each next to the following session’s price move and SPY’s.
+- On screen: Our scorecard shows the misses too. | Top-ten scores by date, with the following session’s price move and SPY’s where recorded.
 
 **03-proof**
 

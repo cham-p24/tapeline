@@ -160,7 +160,9 @@ them needs a separate founder yes.
    has US trading days with no top ten, and recorded values were corrected after the fact; both
    are dated on `/scorecard`. E now says only what is true, with no figures:
    - the public scorecard shows the misses too;
-   - it lists top-ten scores by date, each next to the following session's price move and SPY's;
+   - it lists top-ten scores by date, with the following session's price move and SPY's where
+     recorded (corrected 2026-09-15: this said "each next to", but some entries past the delay
+     show no move and no SPY figure; the three E long cuts were re-rendered for that one line);
    - gaps and corrections are dated on the page;
    - reading it needs no account, and without Pro or Premium the entries show on a delay (read
      from `_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
@@ -195,7 +197,7 @@ against a deliberately broken copy of the script and seen to fail.
 | Gate | Seen failing on |
 |---|---|
 | `lint-copy-compliance.mjs --ads` over every spoken, on-screen and caption line (`vo-script.md`) and every Meta field (`meta-copy-2026-09.md`) | a stock-tip word swapped into the Meta opener; a card-free claim placed next to the trial in the CTA |
-| Record-claim check, for what the linter misses: "every day", "each session", "daily", "frozen", "logged", "never re-ranked", "when it prints", any `%`, "hit rate", "alpha", "beat" | "We publish every day. Including the bad ones."; "Frozen when it prints." |
+| Record-claim check, for what the linter misses: "every day", "each session", "daily", "frozen", "logged", "never re-ranked", "when it prints", "each next to", any `%`, "hit rate", "alpha", "beat" | "We publish every day. Including the bad ones."; "Frozen when it prints."; "each next to the following session's price move" (2026-09-15) |
 | No trial length typed into the script (it is read from `frontend/lib/trial.ts`) | a typed "30-day" in the money scene, and in the Meta opener |
 | Meta limits: card, $0, both prices, both intervals and one-click cancel inside 125 characters; headline ≤ 40; description ≤ 25; no "$0" headline without "card required" | the old 41-character B2 headline; the price pushed past character 125 |
 | Every 15 s cut is ≤ 15 s; captions are verbatim | not mutation-tested |
