@@ -17,7 +17,7 @@ TIER 1 — fully autonomous (live now, zero founder action)
   - Trial drip emails (day 3 / 7 / 13)  (Fly worker, daily)
   - End-of-day watchlist digest         (Fly worker, 21:00 UTC daily)
   - Weekly market digest                (Fly worker, Monday 13:00 UTC)
-  - Web push, alerts, scoring tick      (Fly worker, every 60s)
+  - Web push, alerts, scoring tick      (Fly worker, one tick then a 60s sleep: about every 70-80s)
   - SEO content + blog post crawl       (Vercel auto-deploys per PR)
 
 TIER 2 — cloud-scheduled Claude sessions (zero founder action,

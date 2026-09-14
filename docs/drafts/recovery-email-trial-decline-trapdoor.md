@@ -40,6 +40,7 @@ there for them, with no card.
   since #683/#686
 - No performance claim of any kind; the scorecard link speaks for itself
 - Australian publisher exemption from AFSL depends on this — descriptive only
+- No "live" or "real-time": prices are delayed about 15 minutes (body corrected 15 September 2026; see `docs/COPY_FACTS.md`)
 
 ---
 
@@ -55,7 +56,7 @@ that free plan I promised you actually works now
 Hi {first_name or "there"},
 
 You signed up a few days ago, said no to the trial, and were told you'd get
-the free plan — the live top-10 scanner and a handful of ticker look-ups a day.
+the free plan — the top-10 scanner and a handful of ticker look-ups a day.
 
 You didn't get it. The button that said "no thanks" sent you to a page that
 immediately asked you for a card anyway. That was my bug, not a bait and

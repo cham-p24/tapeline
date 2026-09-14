@@ -1,5 +1,14 @@
 # Meta (Facebook / Instagram) ads — decision
 
+> **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
+>
+> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 70 to 80 seconds, and most score inputs are daily, so a score usually changes about once a day. In-app pages do not update on their own. Variant 3's "Summary stats are public and live" should read "public and current", and "live for subscribers" should read "current for Pro and Premium".
+> - **Coverage.** About 11,500 US stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs updated once a day. 2,500 was a snapshot setting, fixed by #763/#765 and corrected in copy by #826.
+> - **Congressional trades.** There is no real source of congressional trade disclosures. Tapeline shows none, none feeds the score, and they are not a Premium feature (#770, #820).
+> - **Trial and card.** Signing up is free and needs no card (the card wall ran from 22 to 30 August 2026, #548 to #683). A card starts the 30-day Premium trial, and the pre-charge email goes about 7 days before the first charge.
+>
+> Measurements, times and approved wording: `docs/COPY_FACTS.md`.
+
 *Final, 2026-08-20. Answers one question: should Tapeline run Meta ads, and would that help conversion? Long-form companion to the single Meta line in `docs/PAID_MARKETING_PLAYBOOK.md` §7 ("Special Ad Category = no lookalikes, no demographic targeting; the niche on Meta is alert-room sellers with prescriptive copy. Retargeting-only if ever."). Built from six research sweeps, then an adversarial review and a ~70-claim fact-check against live Meta pages, primary papers and `origin/main` (2026-08-20); every correction from those passes is applied here. Nothing here is legal advice. Evidence grades: A controlled / replicated · B large independent dataset · V vendor telemetry · C practitioner consensus · D single case · E folklore. Older than 2020 flagged *(older)*. [unverified] = not confirmed at a primary source. USD unless marked A$.*
 
 ---
@@ -168,7 +177,7 @@ House rules: descriptive only — never buy / sell / recommend / beat / guarante
    Headline: "We publish the record, misses included." *(Whether summary statistics such as hit rate may appear in acquisition copy at all is lawyer-brief item 5(e); until answered, this line names the record's existence, not a number. The draft's "Judge the scanner by its scorecard" is dropped — it was Motley Fool's headline.)*
 4. "Swing trading around a day job means about twenty minutes a night. Tapeline is built for that window: a ranked list, a one-line read on each name, and a watchlist so you decide what to look at before you open the chart."
    Headline: "Built for the 20-minute trader." *(No alert promise — alerts are Pro+ and "alerts" reads as investment promotion in cold copy.)*
-5. "Tapeline reads SEC Form 4 insider purchases and Congressional disclosures into one smart-money factor, alongside trend, relative strength, fundamentals, macro and momentum. Descriptive labels, not instructions, and a methodology page that explains what each factor measures."
+5. *(Corrected 15 September 2026: congressional disclosures removed — Tapeline has no source for them.)* "Tapeline reads SEC Form 4 insider purchases into one smart-money factor, alongside trend, relative strength, fundamentals, macro and momentum. Descriptive labels, not instructions, and a methodology page that explains what each factor measures."
    Headline: "Six factors. Plain-English labels. Public methodology." *(Band names are deliberately not listed in cold copy — to a stranger the band name is the hook and reads as a strength-of-recommendation scale; a lawyer-brief line, not a house-rule breach.)*
 
 Optional footer on every asset: "Informational only. Descriptive scores, not recommendations." Re-run the linter over any edit.

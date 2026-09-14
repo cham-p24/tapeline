@@ -12,7 +12,11 @@ class of regression is impossible to miss in future.
 A scanner that shows 14-hour-old news is not a "live" scanner. The
 `/app/scanner` page renders a "● Live · updated just now" pill that the
 news bar undermines. Everything Tapeline sells (transparency, public
-scorecard, real-time edge) breaks visually if news is stale.
+scorecard, fresh data) breaks visually if news is stale.
+
+> *Note added 15 September 2026: Tapeline does not have a real-time edge. Prices are
+> delayed about 15 minutes, and the "Live" pill never receives an update event in
+> production (measured 14 September 2026). See `docs/COPY_FACTS.md`.*
 
 ## Confirmed symptom (2026-05-08)
 

@@ -151,9 +151,10 @@ high signal-to-noise.
 **Recommendation**: lowest-priority of the five. The geographic-niche fit
 is real but Ziet's reach is meaningfully smaller than the other four. Save
 for Week 6+ if there's bandwidth and the US-only-cap on Tapeline's
-free-tier (top-10 live rows, 12 look-ups/day) is loosened for
-non-US-resident sign-ups. Note there is no data delay left to loosen —
-the gating condition here is the look-up cap, not freshness.
+free-tier (top-10 rows, 12 look-ups/day) is loosened for
+non-US-resident sign-ups. Freshness is not a plan gate — every plan sees
+the same prices, delayed about 15 minutes by the data plan (see
+`docs/COPY_FACTS.md`) — so the gating condition here is the look-up cap.
 
 ---
 

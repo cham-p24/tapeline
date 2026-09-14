@@ -1,5 +1,15 @@
 # Tapeline — Messaging Reframe (paste-ready)
 
+> **Note added 15 September 2026.** This is a 26 June 2026 proposal. Lines marked
+> "Current:" quote the site as it was then and are kept as written. The proposed
+> copy was corrected in place on 15 September 2026 after the integrity wave the
+> founder approved on 14 September 2026: the universe is about 11,500 US stocks
+> and ETFs, not ~2,500; prices are delayed about 15 minutes and re-read about
+> every 70 to 80 seconds, so "in under 60 seconds" is not a claim to make; the
+> record has been corrected twice and has four days with no list, so "no edits"
+> and "never delete" are out; the trial is 30 days; signing up needs no card.
+> Check any line against `docs/COPY_FACTS.md` before using it.
+
 *Companion to [TAPELINE_GROWTH_STRATEGY_10X.md](./TAPELINE_GROWTH_STRATEGY_10X.md) §1. Turns the value-prop decision into surgical, copy-level edits. Grounded in the actual current copy (`frontend/app/page.tsx`, `docs/launch/google-ads/tapeline-rsa-improved.csv`) as of 2026-06-26.*
 
 ## The decision in one line
@@ -8,7 +18,7 @@ The public scorecard is currently **negative** (~42% hit, −0.58% median alpha 
 
 Good news: your copy is already ~70% there ("shows its work," "the losers stay on the page," "descriptive, not prescriptive"). This is a surgical edit, not a rewrite. Three jobs:
 1. **Kill prescriptive words** ("buy signals", "picks", "every call") — compliance + brand consistency.
-2. **Add the missing process/time-savings leg** ("scan 2,500 tickers in 60s against a published methodology").
+2. **Add the missing process/time-savings leg** ("scan about 11,500 US stocks and ETFs on one score against a published methodology").
 3. **Add the honesty hook** as a headline — your single strongest line, currently unused.
 
 ---
@@ -52,9 +62,9 @@ Replace the recommendation-flavored "picks" with score-flavored language everywh
 
 **Reframe (keep the H1, rewrite the subhead to add time-savings + soften "call"):**
 > # A scanner that shows its work.
-> Scan **~2,500 US tickers in under 60 seconds** on one transparent 0–100 score — six named factors, the weighting order in the open (most on Trend and Relative Strength, least on Momentum), no black box. Then check the receipts: **every score we publish is back-checked against SPY and stays on the record — the misses too.**
+> Scan **about 11,500 US stocks and ETFs** on one transparent 0–100 score — six named factors, the weighting order in the open (most on Trend and Relative Strength, least on Momentum), no black box. Then check the receipts: **every daily top 10 is back-checked against SPY and stays on the record — the misses too. Corrections are dated.**
 
-CTAs stay: **"Start the 30-day Premium trial →"** / **"See the record"**. Subline becomes the honest one ("card required · $0 today · cancel in one click") — the public record (no account, no card) is the only place the card-free line still belongs. Since the 2026-08-22 card gate there is no account tier a new user can reach without a card.
+CTAs stay: **"Start the 30-day Premium trial →"** / **"See the record"**. Subline becomes the honest one ("card required · $0 today · cancel in one click"), attached to the trial. The public record needs no account and no card, and since #683 (2026-08-30) signing up needs no card either. The one step that takes a card is starting the Premium trial.
 
 *Why:* leads with the concrete time-saving (the benefit a burned audience actually buys), keeps the transparency wedge, drops "every call" (prescriptive) for "every score we publish" (descriptive), and pre-frames the negative record as honesty ("the misses too") instead of letting a visitor discover it as a gotcha.
 
@@ -72,7 +82,7 @@ This is your strongest single line and it's nowhere on the site. It does double 
 **Current label:** "Back-checked vs SPY" / body "Top-10 picks logged at close... The losers stay on the page."
 **Reframe:**
 > **02 — The receipts, losers included**
-> Our 10 highest-scoring tickers are logged at the close. Next-day return and alpha vs SPY recorded automatically — **and the misses stay up, permanently.** We're not selling you a crystal ball; we're showing you exactly how a transparent score behaves. *Audit any day →*
+> Our 10 highest-scoring tickers are logged at the close. Next-day return and alpha vs SPY recorded automatically — **and the misses stay up.** Entries are not re-ranked or deleted, and corrections to recorded values are dated. We're not selling you a crystal ball; we're showing you exactly how a transparent score behaves. *Audit any day →*
 
 *Why:* never implies the record is a winning one; sells the honesty, not the alpha. Survives a skeptic clicking through to a negative scorecard.
 
@@ -80,11 +90,11 @@ This is your strongest single line and it's nowhere on the site. It does double 
 
 **Current:** "One score. One sentence. One public record." / "See your watchlist scored the same way..."
 **Add one line under the subhead:**
-> No hype, no hidden track record, no "trust me." Just the method and the receipts — the public record with no account at all, or 14 days of Premium for $0 today (card required, first charge on day 30, one click to cancel).
+> No hype, no hidden track record, no "trust me." Just the method and the receipts — the public record with no account at all, or 30 days of Premium for $0 today (card required, first charge on day 30, one click to cancel).
 
 ### B5. Scorecard page (`/scorecard`) — frame the number honestly *before* the visitor reads it
 Add a one-line framing at the top of the scorecard:
-> *This is the live record of our 10 highest-scoring tickers vs SPY — wins and losses, no edits. A transparent score is a starting point for your own research, not a promise of returns.*
+> *This is the record of our 10 highest-scoring tickers vs SPY — wins and losses, with corrections dated. A transparent score is a starting point for your own research, not a promise of returns.*
 This converts the negative number from a credibility hit into the proof-point of your entire pitch (and it's the compliant disclaimer too).
 
 ---
@@ -93,7 +103,7 @@ This converts the negative number from a credibility hit into the proof-point of
 
 When you fire Show HN / Reddit / FinTwit (Strategy §4), lead with the **honest** angle, not "beat the market":
 - **Show HN title:** *"Show HN: A stock scanner that back-checks every top-10 pick vs SPY — including the losers"* (the transparency IS the story; HN respects honesty and roasts hype).
-- **FinTwit pinned + weekly:** *"Here's how our 10 highest-scoring tickers did vs SPY this week — winners AND losers. We never delete a miss. [screenshot]"* The losses are the content that builds trust; lean in.
+- **FinTwit pinned + weekly:** *"Here's how our 10 highest-scoring tickers did vs SPY this week — winners AND losers. The misses stay on the page. [screenshot]"* The losses are the content that builds trust; lean in.
 - **Reddit:** open with the methodology + the public record (incl. the down weeks); never "buy these." The audience there punishes promotion and rewards receipts.
 
 ---

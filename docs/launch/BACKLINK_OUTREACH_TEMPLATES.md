@@ -23,7 +23,7 @@ Goal: earn ~10-20 high-DA editorial backlinks over the next 90 days. Each link p
 >
 > Read your [Finviz Elite Review / "Best Stock Scanners" / specific article title] piece — the section on [specific feature they covered well] was the cleanest breakdown I've seen.
 >
-> I built a Finviz alternative called Tapeline (launched 2026, ~2,500 actively-scored US tickers, public 6-factor methodology — the factors and their weight ordering are published). What might be useful for your readers: I published a hand-tested comparison of 8 Finviz alternatives at https://tapeline.io/best-finviz-alternatives with a feature matrix, migration checklist, and honest "stay on Finviz if" guidance for readers whose use case Finviz still wins. No paywall, no sign-up, no affiliate fees on the comparison.
+> I built a Finviz alternative called Tapeline (launched 2026, about 11,500 scored US stocks and ETFs, public 6-factor methodology — the factors and their weight ordering are published). What might be useful for your readers: I published a hand-tested comparison of 8 Finviz alternatives at https://tapeline.io/best-finviz-alternatives with a feature matrix, migration checklist, and honest "stay on Finviz if" guidance for readers whose use case Finviz still wins. No paywall, no sign-up, no affiliate fees on the comparison.
 >
 > If it fits, a link from your Finviz post would be welcome. If not — I'd love feedback either way. The article works for me as a marketing piece; I'd rather it work for your readers too.
 >
@@ -38,7 +38,7 @@ Goal: earn ~10-20 high-DA editorial backlinks over the next 90 days. Each link p
 
 **Direct message:**
 
-> Hey [First Name] — followed for [specific reason from their bio / recent post]. Built a free stock-score widget I think your audience would actually use — paste a 2-line iframe, get a live Tapeline Score for any ticker. Refreshes every 60s, free, no auth, link in attribution. https://tapeline.io/embed
+> Hey [First Name] — followed for [specific reason from their bio / recent post]. Built a free stock-score widget I think your audience would actually use — paste a 2-line iframe, get the current Tapeline Score for any ticker. Free, no auth, link in attribution. https://tapeline.io/embed
 >
 > Not asking for a tweet — embed it in your Substack or share with someone who'd use it. I'll keep it free for as long as you want to use it.
 
@@ -52,7 +52,7 @@ Goal: earn ~10-20 high-DA editorial backlinks over the next 90 days. Each link p
 
 > Maintainer of [repo name] — thanks for [specific contribution / feature].
 >
-> If you want to surface live stock scores alongside the tools listed in your README, the Tapeline Score Badge is iframe-able and free. Documented at https://tapeline.io/embed. I'd open a PR but didn't want to touch your README uninvited — wanted to ask first.
+> If you want to surface stock scores alongside the tools listed in your README, the Tapeline Score Badge is iframe-able and free. Documented at https://tapeline.io/embed. I'd open a PR but didn't want to touch your README uninvited — wanted to ask first.
 >
 > Compact variant is 320×80 and renders cleanly in markdown that allows iframes (most static-site README renderers do; raw GitHub README doesn't, an SVG variant is on the roadmap).
 >
@@ -72,7 +72,7 @@ Goal: earn ~10-20 high-DA editorial backlinks over the next 90 days. Each link p
 >
 > Long-time reader of [specific essay or series]. Wanted to share a free thing you might use:
 >
-> I built Tapeline (https://tapeline.io) — a quantitative stock scanner with a public 6-factor methodology and a per-pick record forward-checked vs SPY. The piece of it most useful for newsletter writers is the embeddable score badge (https://tapeline.io/embed) — paste a two-line iframe, get a live score for any US ticker. Updates every 60s, free, no auth.
+> I built Tapeline (https://tapeline.io) — a quantitative stock scanner with a public 6-factor methodology and a per-pick record forward-checked vs SPY. The piece of it most useful for newsletter writers is the embeddable score badge (https://tapeline.io/embed) — paste a two-line iframe, get the current score for any US ticker. Free, no auth.
 >
 > Not asking for an endorsement or affiliate deal. If you find it useful, embed it. If you don't, no worries.
 >
@@ -117,7 +117,7 @@ Goal: earn ~10-20 high-DA editorial backlinks over the next 90 days. Each link p
 > Three guest-post angles I could write for [site name], picking whichever fits your editorial calendar:
 >
 > 1. "What 'smart money' actually means — and why most retail definitions are wrong"
->    Drawn from the Smart Money factor in our composite. Covers SEC Form 4, 13F lag, Congressional disclosures, and the difference between retail folklore and actual institutional flow. ~1,800 words.
+>    Drawn from the Smart Money factor in our composite. Covers SEC Form 4, 13F lag, congressional disclosures (which Tapeline does not have or use), and the difference between retail folklore and actual institutional flow. ~1,800 words.
 >
 > 2. "How to evaluate a stock scanner before you pay for it"
 >    Five criteria (transparency, freshness, evidence, completeness, value-at-price). Reads as a buyer's-guide rather than a pitch — Tapeline is mentioned once at the end as one of seven examples. ~2,000 words.

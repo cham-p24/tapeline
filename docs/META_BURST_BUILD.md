@@ -1,5 +1,25 @@
 # Meta burst — the exact build
 
+> **WHAT CHANGED ON 14 SEPTEMBER 2026 — read before pasting anything below.**
+> The founder approved an integrity wave on 14 September 2026 that corrected the
+> product and the site. This build was written on 23 August 2026. On 15 September
+> 2026 Concept A's freshness line and Concept C's "public and live" were corrected
+> in place; check every other line against `docs/COPY_FACTS.md`:
+>
+> - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
+>   covered stock and ETF about every 70 to 80 seconds during US market hours,
+>   and most score inputs are daily readings, so a score usually changes about
+>   once a day. Do not call anything live, real-time, sub-60s or "every minute".
+> - **The scorecard:** summary figures are current; per-day entries are on a
+>   7-day delay without Pro or Premium. Entries are not re-ranked or deleted.
+>   Recorded values were corrected twice (prices on 25 August 2026; scores from
+>   18 May to 12 June capped on 15 June 2026), and no top 10 was recorded for
+>   31 August, 2 September, 4 September or 9 September 2026.
+> - **Congressional trades and squeeze detection do not exist today.**
+> - **The trial is 30 days** (since #737, 5 September 2026), and a card starts it.
+>   Signing up needs no card. The pre-charge email goes about 7 days before the
+>   first charge.
+
 *Founder decision 2026-08-23: **3 concepts · A$25/day · 14 days ≈ A$350**. This is the trimmed configuration from `PAID_ADS_METRICS_BIBLE.md` §7.2 — the concept count came down, the daily rate did not, because the daily rate is what decides whether the burst produces a readable answer at all (see §0). Every value below is copy-and-paste ready. Nothing here is legal advice.*
 
 ---
@@ -32,7 +52,7 @@ All three landing keys verified live on tapeline.io 2026-08-23.
 
 ### Concept A — "Retire the Sunday-night spreadsheet."
 **Primary text:**
-> If your process is fourteen browser tabs and a hand-built spreadsheet every Sunday night, Tapeline does the compression for you: one 0–100 composite score and one plain sentence per ticker — the scanner scores every name in its universe, refreshed through the session. You still make every decision — the scanner just shortens the reading.
+> If your process is fourteen browser tabs and a hand-built spreadsheet every Sunday night, Tapeline does the compression for you: one 0–100 composite score and one plain sentence per ticker; most inputs are daily readings, so a score usually changes about once a day. You still make every decision — the scanner just shortens the reading.
 
 **Headline:** Retire the Sunday-night spreadsheet.
 **Description:** Informational only. Descriptive scores, not recommendations.
@@ -48,7 +68,7 @@ All three landing keys verified live on tapeline.io 2026-08-23.
 
 ### Concept C — "We publish the record, misses included."
 **Primary text:**
-> We publish the scorecard because a scanner should be judged on what it said before, not after — including the misses. Summary stats are public and live; per-day entries are public on a 7-day delay, live for subscribers.
+> We publish the scorecard because a scanner should be judged on what it said before, not after — including the misses. Summary stats are public and current; per-day entries are public on a 7-day delay, current for Pro and Premium.
 
 **Headline:** We publish the record, misses included.
 **Description:** Informational only. Descriptive scores, not recommendations.
@@ -553,7 +573,7 @@ running experiment, to buy something the burst does not actually need:
 - What the token adds is the ad-blocked share of registrations, plus server-side `StartTrial` and
   `Purchase`.
 - `Purchase` cannot inform this test anyway — §8 already records that trial→paid is unmeasurable
-  here, and the first charge lands 14 days out, past Meta's 7-day click window by construction.
+  here, and the first charge lands 14 days out (the trial length on 23 August 2026; it has been 30 days since #737, 5 September 2026, which only widens the gap), past Meta's 7-day click window by construction.
 
 So the honest sequencing is: **finish the burst on the browser-side signal, set up the Business
 portfolio and the CAPI token afterwards**, before any second flight. Doing it sooner is defensible

@@ -1,17 +1,40 @@
 # LinkedIn outreach — finance journalists, fintech operators, fund managers
 
-> **WHERE THE CARD SITS — updated 2026-09-05. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-09-15. Check every claim below against `docs/COPY_FACTS.md` and `docs/PRICING.md` before posting.**
+>
+> **WHAT CHANGED ON 14 SEPTEMBER 2026 — read before posting anything below.**
+> The founder approved an integrity wave on 14 September 2026 that corrected the
+> product and the site. Drafts below were written before it. False lines found
+> on 15 September 2026 were corrected in place, but check each one against
+> `docs/COPY_FACTS.md`, which has the measurements and times:
+>
+> - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
+>   covered stock and ETF about every 70 to 80 seconds during US market hours,
+>   and a score usually changes about once a day. Do not call anything live,
+>   real-time, sub-60s or "every minute".
+> - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
+>   updated once a day. Not ~2,500.
+> - **Congressional trades and squeeze detection do not exist today.** Do not
+>   offer either as a feature, a Premium benefit or a score input.
+> - **The record:** entries are not re-ranked or deleted. We have corrected
+>   recorded values twice, and said so: prices on 25 August 2026, and scores from
+>   18 May to 12 June capped on 15 June 2026. No top 10 was recorded for
+>   31 August, 2 September, 4 September or 9 September 2026.
+> - **The pre-charge email** goes about 7 days before the first charge.
 >
 > **Signing up takes an email and a password.** The account it makes lands on
-> the Free plan and opens the live scanner — the top ten scored rows of any
+> the Free plan and opens the scanner — the top ten scored rows of any
 > scan, one saved screen. **A card is what starts the 30-day Premium trial**
 > (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
-> than the first ten, plus alerts, CSV export and the Congressional and insider
-> feeds.
+> than the first ten, plus alerts, CSV export and per-ticker SEC Form 4
+> filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -122,12 +145,12 @@ Subject: Public scorecard for a US-equity scoring SaaS — would value
 Hi [first name],
 
 I run Tapeline (tapeline.io) — a solo-built quantitative scanner
-that scores every US ticker with a single 0-100 composite from a
+that scores about 11,500 US stocks and ETFs with a 0-100 composite from a
 published 6-factor methodology (the factors and their weight
 ordering). The piece I'm proud of is the public
 back-checked scorecard at tapeline.io/scorecard: every top-10
-daily pick logged with next-day return vs SPY, append-only, every
-miss still on the page.
+daily pick logged with next-day return vs SPY, every miss still on
+the page, corrections dated.
 
 I noticed you covered [specific recent article they wrote] — the
 piece on [specific angle they took]. The angle that might be
@@ -177,7 +200,7 @@ Hi [first name],
 I run Tapeline (tapeline.io) — a US-equity scoring SaaS scoring every
 US ticker via a public 6-factor composite. The scorecard
 (tapeline.io/scorecard) is what I'd pitch you on: every top-10 pick
-back-checked vs SPY, append-only, public methodology.
+back-checked vs SPY, misses kept, corrections dated, public methodology.
 
 I noticed [their product] is building in [adjacent space]. Two angles
 that might be useful:
@@ -224,8 +247,8 @@ I've enjoyed your write-ups on [specific recent thesis they posted —
 quote one sentence]. Wanted to share something you might find useful
 to read against.
 
-Tapeline (tapeline.io) scores every US ticker via a 6-factor composite
-— published factor set and weight ordering, live free-tier scores.
+Tapeline (tapeline.io) scores about 11,500 US stocks and ETFs via a 6-factor composite
+— published factor set and weight ordering, free-tier scores.
 Where it might be useful for your style: the Smart Money sub-score nets
 disclosed SEC Form 4 transactions over a recent window — including the
 scheduled and comp-driven ones, which it makes no attempt to strip out.
@@ -239,8 +262,8 @@ For the names you've written up recently, the composite read is at:
 worked.)
 
 Not asking for anything — just a heads-up that the scorecard
-(tapeline.io/scorecard) is back-checked against SPY every day, every
-miss still on the page. Happy to send the methodology doc if you'd
+(tapeline.io/scorecard) is back-checked against SPY each session, every
+miss still on the page, corrections and missing days dated. Happy to send the methodology doc if you'd
 find it useful for a future write-up.
 
 Christian

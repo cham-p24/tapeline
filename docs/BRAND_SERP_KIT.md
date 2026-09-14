@@ -1,17 +1,40 @@
 # Brand SERP Kit — paste-ready off-site copy + launch pitch
 
-> **WHERE THE CARD SITS — updated 2026-08-30. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-09-15. Check every claim below against `docs/COPY_FACTS.md` and `docs/PRICING.md` before posting.**
+>
+> **WHAT CHANGED ON 14 SEPTEMBER 2026 — read before posting anything below.**
+> The founder approved an integrity wave on 14 September 2026 that corrected the
+> product and the site. Drafts below were written before it. False lines found
+> on 15 September 2026 were corrected in place, but check each one against
+> `docs/COPY_FACTS.md`, which has the measurements and times:
+>
+> - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
+>   covered stock and ETF about every 70 to 80 seconds during US market hours,
+>   and a score usually changes about once a day. Do not call anything live,
+>   real-time, sub-60s or "every minute".
+> - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
+>   updated once a day. Not ~2,500.
+> - **Congressional trades and squeeze detection do not exist today.** Do not
+>   offer either as a feature, a Premium benefit or a score input.
+> - **The record:** entries are not re-ranked or deleted. We have corrected
+>   recorded values twice, and said so: prices on 25 August 2026, and scores from
+>   18 May to 12 June capped on 15 June 2026. No top 10 was recorded for
+>   31 August, 2 September, 4 September or 9 September 2026.
+> - **The pre-charge email** goes about 7 days before the first charge.
 >
 > **Signing up takes an email and a password.** The account it makes lands on
-> the Free plan and opens the live scanner — the top ten scored rows of any
+> the Free plan and opens the scanner — the top ten scored rows of any
 > scan, one saved screen. **A card is what starts the 30-day Premium trial**
 > (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
-> than the first ten, plus alerts, CSV export and the Congressional and insider
-> feeds.
+> than the first ten, plus alerts, CSV export and per-ticker SEC Form 4
+> filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -43,7 +66,8 @@
 > re-check them against `tier.py` before posting them as today's product.
 >
 > Some drafts here are stale on product facts as well (a "top 20, 24-hour
-> delayed" free tier is long gone; the per-rule Telegram alert channel was
+> delayed" free tier is long gone, and today every plan sees prices delayed
+> about 15 minutes by the data plan; the per-rule Telegram alert channel was
 > retired and `AlertRuleCreate` now accepts only email|web_push). Treat unmarked
 > copy as a draft to re-check, not as approved copy.
 
@@ -91,7 +115,7 @@ company is not a competitor. Treat this kit as launch hygiene that compounds.
 - **Handle ladder (use first available):** `@tapeline_io` → `tapelineio` → `tapeline`
 - **One sentence — short (bios, ≤90 chars):**
   ```
-  Live quantitative stock scanner. Six named factors. Public scorecard. tapeline.io
+  Quantitative stock scanner. Six named factors. Public scorecard. tapeline.io
   ```
 - **One sentence — formal (press, taglines):**
   ```
@@ -99,7 +123,7 @@ company is not a competitor. Treat this kit as launch hygiene that compounds.
   ```
 - **One paragraph (the canonical description — verbatim from `/press`):**
   ```
-  Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every US ticker in the active universe gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — updated sub-60s during market hours. Every top-10 daily pick auto-publishes to a public scorecard with the realized next-day return vs SPY, immutable and back-checked. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin at the $10-20/mo price point (Pro $9.99/mo or $99/yr; Premium $19.99/mo or $199/yr).
+  Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every US ticker in the active universe gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — on prices delayed about 15 minutes, re-read about every 70 to 80 seconds during US market hours. Every top-10 daily pick is published to a public, back-checked scorecard with the realized next-day return vs SPY; entries are not re-ranked or deleted, and the two corrections to recorded values (prices on 25 August 2026; scores from 18 May to 12 June capped on 15 June 2026) are dated. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin at the $10-20/mo price point (Pro $9.99/mo or $99/yr; Premium $19.99/mo or $199/yr).
   ```
 - **Fact sheet (same facts as the `/press` table; the Pricing and Free-trial rows are spelled out at greater length here so the card gate can't be misread — quote `/press` itself if you need it byte-exact):**
   | Field | Value |
@@ -110,9 +134,9 @@ company is not a competitor. Treat this kit as launch hygiene that compounds.
   | Headquarters | Melbourne, Victoria, Australia |
   | Funding | Bootstrapped — no external investment |
   | Pricing | Public record free, no account required · Pro from $8.25/mo (annual) · Premium from $16.58/mo (annual) |
-  | Free trial | 14-day Premium — a card starts it, $0 charged that day, first charge on day 30, one-click cancel. Signing up itself takes only an email and a password and opens the free plan. The published record (daily Top 10, full scorecard, raw CSV/JSON) needs no account at all |
-  | Universe | ~2,500 active US tickers (top by daily $-volume) · 5,757 tracked |
-  | Update cadence | Sub-60 seconds during US market hours |
+  | Free trial | 30-day Premium — a card starts it, $0 charged that day, first charge on day 30, one-click cancel. Signing up itself takes only an email and a password and opens the free plan. The published record (daily Top 10, the public scorecard with per-day entries on a 7-day delay, raw CSV/JSON) needs no account at all |
+  | Universe | About 11,500 US stocks and ETFs (unfiltered scan, 13 September 2026) · about 100 crypto pairs, updated once a day |
+  | Prices | Delayed about 15 minutes; re-read about every 70 to 80 seconds during US market hours. Scores usually change about once a day |
   | Press contact | press@tapeline.io |
 - **Logo / social card:** `tapeline.io/favicon.svg` (export to PNG where SVG is
   rejected) and `tapeline.io/opengraph-image` (1200×630 PNG).
@@ -154,9 +178,9 @@ bottom of Part A.
 - **Description (paste — GBP allows ≤750 chars, NO URLs / NO pricing / NO promo
   language, so this is a policy-clean variant of the canonical paragraph):**
   ```
-  Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every active US ticker gets one 0-100 composite score from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength, least toward Momentum — updated in under 60 seconds during market hours, each with a plain-English explanation of the reading. Every top-10 daily pick is logged to a public, back-checked scorecard showing its realized next-day return versus the S&P 500. Tapeline provides descriptive market analytics, not financial advice. Bootstrapped and built in Melbourne, Australia; launched in 2026.
+  Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. About 11,500 US stocks and ETFs get one 0-100 composite score from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength, least toward Momentum — each with a plain-English explanation of the reading. Prices are delayed about 15 minutes. Every top-10 daily pick is logged to a public, back-checked scorecard showing its realized next-day return versus the S&P 500. Tapeline provides descriptive market analytics, not financial advice. Bootstrapped and built in Melbourne, Australia; launched in 2026.
   ```
-  *(748 chars — under GBP's 750 limit. Note: GBP descriptions forbid URLs, phone numbers, pricing, and
+  *(736 chars — under GBP's 750 limit. Note: GBP descriptions forbid URLs, phone numbers, pricing, and
   promotional/sales language — so this drops the tapeline.io / $-tiers / competitor
   list that the canonical paragraph carries. Everything else is voice-identical.)*
 - **Logo:** export `tapeline.io/favicon.svg` to PNG, **min 250×250** (720×720 ideal).
@@ -177,7 +201,7 @@ bottom of Part A.
   *(51 chars. Alt: `Stock scanner that shows its work` — 33 chars.)*
 - **Description (short — ~260 chars):**
   ```
-  A transparent quantitative stock scanner. Every US ticker gets one 0-100 score from six named factors, plus a plain-English "why." Every top-10 daily pick is logged to a public scorecard vs SPY. Bootstrapped. Record free to read, no account; trial takes a card.
+  A transparent quantitative stock scanner. About 11,500 US stocks and ETFs get a 0-100 score from six named factors, plus a plain-English "why." Every top-10 daily pick is logged to a public scorecard vs SPY. Record free to read, no account; trial takes a card.
   ```
 - **Topics:** `Fintech`, `Stock trading`, `Investing`, `SaaS`, `Analytics`
 - **Links:** Website `https://tapeline.io` · Pricing `https://tapeline.io/pricing`
@@ -234,7 +258,7 @@ bottom of Part A.
 - **Website:** `https://tapeline.io` · **Pricing:** `https://tapeline.io/pricing`
 - **Comparison set (G2 auto-builds vs-pages):** Finviz, Zacks, TradingView
 - **Logo / screenshots:** `favicon.svg` + the four screens in `/press` → Screenshot kit
-  (Live scanner `/`, Per-ticker `/t/AAPL`, Methodology `/how-it-works`, Scorecard `/scorecard`)
+  (Scanner `/`, Per-ticker `/t/AAPL`, Methodology `/how-it-works`, Scorecard `/scorecard`)
 - **Recurring:** email paying users for reviews after 30 days; target 10 in 90 days.
 
 ### A4 · Capterra — `capterra.com/vendors/sign-up`
@@ -310,8 +334,8 @@ HN culture: technical, humble, zero marketing words ("best", "revolutionary",
   filter fields with no opinion, or an "AI pick" you can't audit. So I built the
   opposite.
 
-  Tapeline gives every active US ticker one 0-100 score from a fixed, fully
-  published six-factor set (Trend, Relative Strength, Fundamentals, Smart Money,
+  Tapeline gives about 11,500 US stocks and ETFs one 0-100 score from a fixed set of
+  six named factors (Trend, Relative Strength, Fundamentals, Smart Money,
   Macro, Momentum) — weighted most toward Trend and Relative Strength, least
   toward Momentum. The ordering is published and never changes without a
   changelog entry, and there's no ML rerank between the factors and the number.
@@ -320,10 +344,11 @@ HN culture: technical, humble, zero marketing words ("best", "revolutionary",
   The accountability bit: every top-10 daily pick auto-logs to a public
   scorecard the next session with realized return vs SPY — including the losers.
 
-  Stack: FastAPI + SQLAlchemy + Postgres, Next.js front end, a 60s scoring
-  worker, SSE for live updates. Scores are descriptive, not advice (no buy/sell
-  language — publisher's-exemption posture). The public record is live and needs
-  no account; the full ~2,500-ticker scanner is paid.
+  Stack: FastAPI + SQLAlchemy + Postgres, Next.js front end, and a scoring
+  worker that re-reads 15-minute-delayed prices about every 70 to 80 seconds.
+  Scores are descriptive, not advice (no buy/sell language — publisher's-exemption
+  posture). The public record needs no account; the full scanner (about 11,500
+  US stocks and ETFs) is paid.
   Methodology: https://tapeline.io/how-it-works
 
   Happy to talk about the scoring design, the data spine, or the
@@ -358,7 +383,7 @@ time.
 
   I'm Christian Piyatilaka, solo founder of Tapeline (tapeline.io), a
   quantitative stock scanner with an unusual bet: both the methodology and the
-  track record are public. Every US ticker gets one 0-100 score from six named
+  track record are public. About 11,500 US stocks and ETFs get a 0-100 score from six named
   factors, and every top-10 daily pick auto-logs to a public scorecard
   the next day with its realized return vs SPY — winners and losers, corrections dated.
 

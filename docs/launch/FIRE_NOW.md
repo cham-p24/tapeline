@@ -1,18 +1,50 @@
-# FIRE NOW — the paste-ready launch pack (current as of 2026-07-26)
+# FIRE NOW — the paste-ready launch pack (written 2026-07-26; false lines corrected 2026-09-15)
 
-> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-09-15. Check every claim below against `docs/COPY_FACTS.md` and `docs/PRICING.md` before posting.**
 >
-> From 2026-08-22 a **new account must put a card on file at first sign-in**
-> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
-> 30-day Premium trial, first charge on day 30, one click to cancel before then).
-> Accounts created **before** that date are grandfathered: they keep the free
-> access they signed up for and are never asked for a card.
+> **WHAT CHANGED ON 14 SEPTEMBER 2026 — read before posting anything below.**
+> The founder approved an integrity wave on 14 September 2026 that corrected the
+> product and the site. Drafts below were written before it. False lines found
+> on 15 September 2026 were corrected in place, but check each one against
+> `docs/COPY_FACTS.md`, which has the measurements and times:
 >
-> So: **no line in this file may say an account is free, that there is a free
-> tier a new user can sign up for, or that signing up needs no card.** What is
-> still true and should be said instead — the **published record is free with no
-> account at all**: the daily Top 10, the complete scorecard, a page per scored
-> ticker, and the raw CSV/JSON export.
+> - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
+>   covered stock and ETF about every 70 to 80 seconds during US market hours,
+>   and a score usually changes about once a day. Do not call anything live,
+>   real-time, sub-60s or "every minute".
+> - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
+>   updated once a day. Not ~2,500.
+> - **Congressional trades and squeeze detection do not exist today.** Do not
+>   offer either as a feature, a Premium benefit or a score input.
+> - **The record:** entries are not re-ranked or deleted. We have corrected
+>   recorded values twice, and said so: prices on 25 August 2026, and scores from
+>   18 May to 12 June capped on 15 June 2026. No top 10 was recorded for
+>   31 August, 2 September, 4 September or 9 September 2026.
+> - **The pre-charge email** goes about 7 days before the first charge.
+>
+> **Signing up takes an email and a password.** The account it makes lands on
+> the Free plan and opens the scanner — the top ten scored rows of any
+> scan, one saved screen. **A card is what starts the 30-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
+> cancel before then), and the trial is what turns on every matching row rather
+> than the first ten, plus alerts, CSV export and per-ticker SEC Form 4
+> filings.
+>
+> The **published record is free with no account at all**: the daily Top 10, the
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
+>
+> So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
+> IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
+> this order: the record needs no account; signing up takes an email and a
+> password; a card starts the trial.
+>
+> _History: until 15 September 2026 this block was headed "CARD GATE —
+> 2026-08-22" and described the card wall on new accounts, and told writers
+> that no line may call an account free. That was true only while the wall
+> ran (#548, 2026-08-22, to #683, 2026-08-30)._
 >
 > **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
 > equation.** `/how-it-works` names the six factors and their weight *ordering*
@@ -36,9 +68,11 @@
 
 This supersedes `REDDIT_PASTE_READY.md` and `SHOW_HN_VARIANTS.md`. Those had two
 things wrong that would have burned a launch: the **Free tier** was described as
-"top 20, 24h delayed" (it is now **live, 12 look-ups/day**), and the **scorecard
-numbers** were first-week placeholders. Everything below is checked against the
-live site and API today.
+"top 20, 24h delayed" (it is now the top 10 rows and 12 look-ups/day, on the same
+15-minute-delayed prices as every plan), and the **scorecard numbers** were
+first-week placeholders. The posts below were checked against the site on
+2026-07-26 and corrected against `docs/COPY_FACTS.md` on 2026-09-15; the record
+figures are now placeholders you fill in from `/api/scorecard` on the day.
 
 **Why this matters:** the product is built and the funnel converts end to end.
 The only thing between zero signups and the first paying customer is **traffic**,
@@ -49,15 +83,16 @@ version of "go get customers."
 
 ---
 
-## The numbers everything below is locked to (verified 2026-07-26)
+## The numbers everything below is locked to (verified 2026-07-26, corrected 2026-09-15)
 
 | Thing | Current truth |
 |---|---|
-| **Free** | $0 · **live scores, no delay** · 12 ticker look-ups/day (unmetered first 24h) · top-10 scanner rows · watchlist (5) · full public scorecard |
-| **Pro** | **$9.99/mo** or **$8.25/mo billed annually** ($99/yr) · full ~2,500-ticker live scan · smart alerts · calendars · CSV |
-| **Premium** | **$19.99/mo** or **$16.58/mo billed annually** ($199/yr) · + Congress trades · + SEC Form 4 insider buys · + API 1,000/day |
-| **Trial** | 14 days of Premium, **card required** ($0 charged today, first charge on day 30, one-click cancel before then). A new account puts a card on file at first sign-in, which is what starts the trial. Accounts created before 2026-08-22 are grandfathered and never asked. The published record — daily Top 10, full scorecard, per-ticker pages, CSV/JSON export — needs no account and no card. |
-| **Scorecard** | **52 days on the record, 478 calls logged and never edited. ~47% have beaten SPY the next day** (below a coin flip — say so; the point is that it's auditable, not that it's magic). |
+| **Free** | $0, no card · 12 ticker look-ups/day (unmetered first 24h) · top-10 scanner rows · watchlist (5) · 1 saved screen · public scorecard (per-day entries on a 7-day delay) |
+| **Prices** | Delayed about 15 minutes on every plan; re-read about every 70 to 80 seconds during US market hours. Scores usually change about once a day. Never "live" or "no delay" |
+| **Pro** | **$9.99/mo** or **$8.25/mo billed annually** ($99/yr) · every row of the scan (about 11,500 US stocks and ETFs) · alerts · calendars · CSV |
+| **Premium** | **$19.99/mo** or **$16.58/mo billed annually** ($199/yr) · + per-ticker SEC Form 4 filings · + API 1,000/day |
+| **Trial** | 30 days of Premium, **card required** ($0 charged today, first charge on day 30, an email about 7 days before it, one-click cancel before then). Signing up takes an email and a password. Adding a card is what starts the trial. The published record — daily Top 10, the public scorecard (per-day entries on a 7-day delay), per-ticker pages, CSV/JSON export (to 7 days ago) — needs no account and no card. |
+| **Scorecard** | Pull `[DAYS]` and `[CALLS]` from `/api/scorecard` on the day you post. Do not put a hit rate in a post that stays up: link `/scorecard`, which carries the current figure and its sample size (`docs/COPY_FACTS.md` §3). For reference, on 2026-07-26 it was 52 days, 478 calls and ~47% beating SPY the next day. Entries are not re-ranked or deleted; recorded values were corrected twice (prices on 25 August 2026; scores from 18 May to 12 June capped on 15 June 2026); no top 10 was recorded for 31 August, 2, 4 or 9 September 2026. |
 | **Methodology** | 6-factor composite. `/how-it-works` names the six factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — and their weight **ordering** (heaviest Trend + Relative Strength, lightest Momentum). **The exact weights are not published — never put them in a post.** "Smart Money" = **SEC Form 4 insider buys**, not 13F lag. |
 
 **Compliance (non-negotiable — protects the AU publisher exemption):** descriptive
@@ -93,24 +128,24 @@ sell itself.
 
 **Title:**
 ```
-I built a stock scanner that logs every top-10 call vs SPY the next day — the whole record is public and free to read
+I built a stock scanner that logs each top-10 call vs SPY the next day — the record is public and free to read
 ```
 
 **Body:**
 ```
-I got tired of "AI stock pick" tools that never show you what happened after the call. So I built Tapeline. The published record is free to read with no account at all, and the entire track record is public — winners and losers, never edited.
+I got tired of "AI stock pick" tools that never show you what happened after the call. So I built Tapeline. The published record is free to read with no account at all, and the track record is public — winners and losers, with any correction dated.
 
 Free, no account and no card:
-- The daily Top 10, live (no delay)
+- The daily Top 10
 - One 0-100 score per stock with a plain-English "why" sentence
 - A page per scored ticker
-- The full public scorecard, plus the raw CSV/JSON export
+- The public scorecard (without a paid plan, the last 7 days of entries are held back), plus the raw CSV/JSON export
 
-The scorecard is the part I actually want you to attack. Every market day I freeze the top 10 scores; the next day I log each name's real return vs SPY. 52 days in, 478 calls logged — and right now they beat SPY about 47% of the time. That's below a coin flip, and it's on the page anyway. The point is that it's auditable from day one, not that it's magic yet.
+The scorecard is the part I actually want you to attack. At the close I freeze the day's top 10 scores; the next day I log each name's real return vs SPY. [CALLS] calls logged over [DAYS] trading days. The share that beat SPY the next session is on the page with its sample size, whatever it says on the day you read this, along with the two corrections we made to recorded values and the four days with no list. The point is that it's auditable from day one, not that it's magic yet.
 
 The score is a 6-factor composite — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — with the six factors and their weight ordering published at tapeline.io/how-it-works. "Smart Money" is SEC Form 4 insider buying, not 13F lag.
 
-Paid is $9.99/mo (full ~2,500-ticker live scan + alerts + calendars) and $19.99/mo (+ Congress trades + the Form 4 feed). The public record needs no account and no card. Creating an account puts a card on file at first sign-in and starts the 30-day Premium trial — $0 until day 30, one click cancels.
+Prices are delayed about 15 minutes. Paid is $9.99/mo (every row of the scan, about 11,500 US stocks and ETFs, + alerts + calendars) and $19.99/mo (+ per-ticker SEC Form 4 filings + API). The public record needs no account and no card. Signing up takes an email and a password. A card starts the 30-day Premium trial — $0 until day 30, one click cancels.
 
 Drop a ticker in the comments and I'll post its current score + the six-factor breakdown. And tell me what's wrong with the methodology — that's the part I want to harden.
 ```
@@ -123,7 +158,7 @@ Drop a ticker in the comments and I'll post its current score + the six-factor b
 
 **Title:**
 ```
-I built a 6-factor composite stock score with a public, unedited daily back-check vs SPY — roast the methodology
+I built a 6-factor composite stock score with a public daily back-check vs SPY — roast the methodology
 ```
 
 **Body:**
@@ -139,7 +174,7 @@ The methodology (published, version-controlled, won't change without a changelog
 - Macro — a single market-wide regime classification; the same reading for every ticker on a tick
 - Momentum — a momentum-quality reading plus a short-horizon return, deliberately the lightest factor
 
-The accountability layer: every market day I freeze the top 10 composite scores and log each name's next-day return vs SPY. No survivor-bias filtering — losers stay on the page. It's 52 days deep now, 478 calls, and honestly the top-10 is beating SPY only ~47% of the time so far. I'd rather publish a mediocre record than hide it.
+The accountability layer: at the close I freeze the day's top 10 composite scores and log each name's next-day return vs SPY. No survivor-bias filtering — losers stay on the page, and corrections are dated. It's [DAYS] trading days deep now, [CALLS] calls, and the share that beat SPY is on /scorecard with its sample size. I'd rather publish the record as it is than hide the misses.
 
 What I'd like torn apart:
 1. Smart Money via Form 4 — is net-90-day the right window, or should I weight by insider role (CEO > director)?
@@ -165,13 +200,13 @@ Show HN: A stock scanner that logs every top-10 pick vs SPY the next day
 ```
 I built Tapeline (https://tapeline.io) because every stock scanner I'd ever paid for had the same dishonest pattern: they show you a leaderboard of picks and never show you what happened next.
 
-So Tapeline does the opposite. Every market day at close it freezes the top 10 ranked tickers. The next day at close it records each name's actual return vs SPY, and the result goes on /scorecard. Wins stay. Losses stay. Nothing gets quietly removed when a pick ages badly.
+So Tapeline does the opposite. At the close it freezes the day's top 10 ranked tickers. The next day at close it records each name's actual return vs SPY, and the result goes on /scorecard. Wins stay. Losses stay. Entries are not re-ranked or deleted; we have corrected recorded values twice and dated both, and the four days with no list are listed on the page.
 
 The score is a 6-factor composite — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — weighted most toward Trend and Relative Strength and least toward Momentum. The factor set and that ordering are on /how-it-works and don't change without a changelog entry. Every score ships with one plain-English sentence explaining what's driving it.
 
-The scorecard is the part I want HN to tear apart. It's 52 days and 478 calls deep, and the top-10 is currently beating SPY about 47% of the time — i.e. slightly worse than a coin flip. I'm posting that number on purpose. The transparency is the product; the early hit rate is not the pitch, and I expect it to move both directions as the sample grows.
+The scorecard is the part I want HN to tear apart. It's [DAYS] trading days and [CALLS] calls deep, and the share of picks that beat SPY the next session is on /scorecard with its sample size. The transparency is the product; the hit rate is not the pitch, and I expect it to move both directions as the sample grows.
 
-The published record is live (no delay) and needs no account: the daily Top 10, a page per scored ticker, the full scorecard and the raw CSV/JSON export. Pro is $8.25/mo billed annually for the full ~2,500-ticker live scan + alerts. Premium is $16.58/mo annually for + Congress trades + SEC Form 4. The published record never asks for an account or a card. An account puts a card on file at first sign-in and starts the 30-day Premium trial — $0 today, first charge on day 30, one click to cancel.
+The published record needs no account: the daily Top 10, a page per scored ticker, the public scorecard (per-day entries on a 7-day delay) and the raw CSV/JSON export. Prices are delayed about 15 minutes, and most score inputs are daily readings. Pro is $8.25/mo billed annually for every row of the scan (about 11,500 US stocks and ETFs) + alerts. Premium is $16.58/mo annually for + per-ticker SEC Form 4 filings + API. Signing up takes an email and a password. A card starts the 30-day Premium trial — $0 today, first charge on day 30, one click to cancel.
 
 Built solo from Melbourne. Genuinely interested in what HN finds wrong with the methodology — and which factor I'm under-weighting.
 ```
@@ -181,7 +216,7 @@ Built solo from Melbourne. Genuinely interested in what HN finds wrong with the 
 ## Only you can do these (I can't — accounts / cards / your identity)
 
 1. **Post the three above** from your own aged Reddit + HN accounts (new accounts get shadow-banned; HN needs karma to submit). Public outreach identity is "Christian Piyatilaka."
-2. **Answer comments in the first hour.** Keep the voice descriptive — never "buy/sell/should/recommend." If someone challenges the 47% record, agree it's below coin-flip and point at /scorecard. That candor is what earns the upvotes.
+2. **Answer comments in the first hour.** Keep the voice descriptive — never "buy/sell/should/recommend." If someone challenges the record, agree it's below coin-flip and point at /scorecard. That candor is what earns the upvotes.
 3. **Reddit karma wall:** if either account is under ~30 comment-karma, spend a few days commenting genuinely in the sub first, or the post won't clear the filter.
 
 ## What's already done for you (so you don't redo it)

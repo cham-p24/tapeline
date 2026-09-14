@@ -1,5 +1,12 @@
 # Tapeline — Launch strategy (consolidated)
 
+> **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
+>
+> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 70 to 80 seconds (gaps of 71 to 74 seconds measured on 14 September 2026), and most score inputs are daily, so a score usually changes about once a day. In-app pages do not update on their own, and public pages are cached snapshots that can be an hour or more old. Nothing is real-time, sub-60s or "every minute".
+> - **Coverage.** About 11,500 US stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs updated once a day. 2,500 was a snapshot setting, fixed by #763/#765 and corrected in copy by #826.
+>
+> Measurements, times and approved wording: `docs/COPY_FACTS.md`.
+
 This document ties together every strategic discussion from the build
 sessions: where Tapeline stands today, who it's competing with, what
 the product surface looks like vs the field, what SEO pushes will
@@ -26,7 +33,7 @@ ad-hoc analyses in chat.
   running across ~2,500 actively-scored tickers. The weights are
   INTERNAL — PR #342 stripped them from the public site; never write
   them into marketing, briefs or outreach copy
-- Sub-60s tick cadence; news refresh every 5 min (Massive + Finnhub
+- Sub-60s tick cadence *(15 September 2026: not true — a pass takes about 70 to 80 seconds and prices are delayed about 15 minutes; see `docs/COPY_FACTS.md`)*; news refresh every 5 min (Massive + Finnhub
   parallel merge, including international names)
 - Public surfaces: `/`, `/pricing`, `/how-it-works`, `/scorecard`,
   `/security`, `/status`, `/changelog`, `/blog`, `/compare/{finviz,

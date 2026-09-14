@@ -23,18 +23,41 @@
 > cherry-picked out, because posting from it is how the flagged line escapes.
 
 
-> **WHERE THE CARD SITS — updated 2026-09-05. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-09-15. Check every claim below against `docs/COPY_FACTS.md` and `docs/PRICING.md` before posting.**
+>
+> **WHAT CHANGED ON 14 SEPTEMBER 2026 — read before posting anything below.**
+> The founder approved an integrity wave on 14 September 2026 that corrected the
+> product and the site. Drafts below were written before it. False lines found
+> on 15 September 2026 were corrected in place, but check each one against
+> `docs/COPY_FACTS.md`, which has the measurements and times:
+>
+> - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
+>   covered stock and ETF about every 70 to 80 seconds during US market hours,
+>   and a score usually changes about once a day. Do not call anything live,
+>   real-time, sub-60s or "every minute".
+> - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
+>   updated once a day. Not ~2,500.
+> - **Congressional trades and squeeze detection do not exist today.** Do not
+>   offer either as a feature, a Premium benefit or a score input.
+> - **The record:** entries are not re-ranked or deleted. We have corrected
+>   recorded values twice, and said so: prices on 25 August 2026, and scores from
+>   18 May to 12 June capped on 15 June 2026. No top 10 was recorded for
+>   31 August, 2 September, 4 September or 9 September 2026.
+> - **The pre-charge email** goes about 7 days before the first charge.
 >
 > **Signing up takes an email and a password.** The account it makes lands on
-> the Free plan and opens the live scanner — the top ten scored rows of any
+> the Free plan and opens the scanner — the top ten scored rows of any
 > scan, one saved screen. **A card is what starts the 30-day Premium trial**
 > (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
-> than the first ten, plus alerts, CSV export and the Congressional and insider
-> feeds.
+> than the first ten, plus alerts, CSV export and per-ticker SEC Form 4
+> filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -108,7 +131,7 @@ Char count: ~990. Add `tapeline.io/scorecard` in first comment.
 ## Post #5 — The six factors, and the order they're weighted in
 
 ```
-Tapeline scores every US stock on six factors, and the ordering is public:
+Tapeline scores about 11,500 US stocks and ETFs on six factors, and the ordering is public:
 
 Trend carries the most, then Relative Strength, then Fundamentals / Smart Money / Macro, with Momentum the lightest.
 
@@ -132,7 +155,7 @@ Char count: ~840. Add `tapeline.io/how-it-works` in first comment.
 
 SEC Form 4 insider transactions — officers and directors trading their own company's stock, filed within 2 business days — netted by direction and dollar value over a recent window. That is the whole input.
 
-Two things it is not. It isn't 13F: a quarterly snapshot filed up to 45 days after the quarter ends is old news by the time you see it, so Tapeline doesn't score it at all. And it isn't Congressional disclosure: Tapeline ingests STOCK Act filings and publishes them as their own feed in the product, but they are not folded into this sub-score, and the methodology page says so.
+Two things it is not. It isn't 13F: a quarterly snapshot filed up to 45 days after the quarter ends is old news by the time you see it, so Tapeline doesn't score it at all. And it isn't congressional disclosure: Tapeline does not publish congressional trade data, and none feeds this sub-score.
 
 "Smart Money" is also deliberately a mid-weighted factor, not a top one. Lagged data shouldn't dominate the score, and a filing records that a transaction happened, never why. Still better than vibes.
 ```
@@ -194,7 +217,7 @@ The pick was a high-conviction call. The next session it underperformed SPY by 4
 
 Most stock scanner services would never show you this. They'd quietly update the methodology, retroactively adjust the weights, or just not back-check at all. The marketing keeps saying their "AI" or "proprietary algorithm" is winning.
 
-I built /scorecard to be different. Every miss stays on the page. Every win stays on the page. Nothing gets edited. The /changelog tracks any methodology change in version-controlled markdown — if the formula ever changes, the change has to be argued for in writing first.
+I built /scorecard to be different. Every miss stays on the page. Every win stays on the page. Entries are not re-ranked or deleted, and the two corrections we made to recorded values are dated on /changelog. The /changelog tracks any methodology change in version-controlled markdown — if the formula ever changes, the change has to be argued for in writing first.
 
 The point of doing it this way isn't that Tapeline never misses. It's that when Tapeline misses, you'll see it.
 ```
@@ -226,13 +249,13 @@ Char count: ~1,360 (within LinkedIn's 3000 cap). Add nothing in comments.
 ## Post #11 — Why "Free" shows the real product, not a crippled demo
 
 ```
-The Tapeline free surface doesn't show a feature-stripped demo. It shows the actual product, live.
+The Tapeline free surface doesn't show a feature-stripped demo. It shows the actual product.
 
 Most SaaS free tiers cripple core functionality — fewer rows, no exports, no filters. The idea is to frustrate users into upgrading. That's the wrong incentive: it teaches users that the product is annoying.
 
-The published record needs no account at all: the daily Top 10, a page per scored ticker, the complete scorecard, and the raw CSV/JSON export. A free account adds the top 10 scanner rows, live, with 12 ticker look-ups a day — each with the full 6-factor breakdown and the full reason sentence. The gate is breadth and volume, not freshness.
+The published record needs no account at all: the daily Top 10, a page per scored ticker, the public scorecard (per-day entries on a 7-day delay), and the raw CSV/JSON export. A free account adds the top 10 scanner rows, with 12 ticker look-ups a day — each with the full 6-factor breakdown and the full reason sentence. The gate is breadth and volume, not freshness: every plan sees the same prices, delayed about 15 minutes.
 
-If ten names a day is enough, that's the right tier. If you want to scan the full ~2,500-ticker universe live, Pro ($8.25/month annual) opens it up.
+If ten names a day is enough, that's the right tier. If you want every row of the scan (about 11,500 US stocks and ETFs), Pro ($8.25/month annual) opens it up.
 
 I'd rather a user understand what Tapeline does for free, decide it doesn't fit their workflow, and not pay, than have someone upgrade because the free tier was deliberately annoying and then churn in week two.
 
@@ -321,9 +344,9 @@ We lose on:
 We win on:
 - Public factor set and weight ordering, plus a public per-pick record
   (not "proprietary algorithm")
-- Daily back-checked picks vs SPY, append-only, every loser still on
-  the page
-- One-click cancel, a T-3 reminder email before the first charge, and
+- Daily back-checked picks vs SPY, every loser still on the page,
+  corrections and missing days dated
+- One-click cancel, a reminder email about 7 days before the first charge, and
   30-day money back
 
 The reason most "best scanner" articles are useless is that they're
@@ -402,8 +425,8 @@ The five tests I'd run before paying for any of them — and what
 the vague answer to each one tells you:
 
 1. Can you see every pick, including the losers?
-   Right answer: a URL to the daily picks log, append-only, losers
-   visible. Vague answer: "67% win rate based on internal testing"
+   Right answer: a URL to the daily picks log, losers visible,
+   corrections dated. Vague answer: "67% win rate based on internal testing"
    with no link.
 
 2. Is the benchmark named?

@@ -1,18 +1,50 @@
 # Product Hunt launch kit — the Reddit-free fast channel (2026-08-01)
 
-> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-09-15. Check every claim below against `docs/COPY_FACTS.md` and `docs/PRICING.md` before posting.**
 >
-> From 2026-08-22 a **new account must put a card on file at first sign-in**
-> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
-> 30-day Premium trial, first charge on day 30, one click to cancel before then).
-> Accounts created **before** that date are grandfathered: they keep the free
-> access they signed up for and are never asked for a card.
+> **WHAT CHANGED ON 14 SEPTEMBER 2026 — read before posting anything below.**
+> The founder approved an integrity wave on 14 September 2026 that corrected the
+> product and the site. Drafts below were written before it. False lines found
+> on 15 September 2026 were corrected in place, but check each one against
+> `docs/COPY_FACTS.md`, which has the measurements and times:
 >
-> So: **no line in this file may say an account is free, that there is a free
-> tier a new user can sign up for, or that signing up needs no card.** What is
-> still true and should be said instead — the **published record is free with no
-> account at all**: the daily Top 10, the complete scorecard, a page per scored
-> ticker, and the raw CSV/JSON export.
+> - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
+>   covered stock and ETF about every 70 to 80 seconds during US market hours,
+>   and a score usually changes about once a day. Do not call anything live,
+>   real-time, sub-60s or "every minute".
+> - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
+>   updated once a day. Not ~2,500.
+> - **Congressional trades and squeeze detection do not exist today.** Do not
+>   offer either as a feature, a Premium benefit or a score input.
+> - **The record:** entries are not re-ranked or deleted. We have corrected
+>   recorded values twice, and said so: prices on 25 August 2026, and scores from
+>   18 May to 12 June capped on 15 June 2026. No top 10 was recorded for
+>   31 August, 2 September, 4 September or 9 September 2026.
+> - **The pre-charge email** goes about 7 days before the first charge.
+>
+> **Signing up takes an email and a password.** The account it makes lands on
+> the Free plan and opens the scanner — the top ten scored rows of any
+> scan, one saved screen. **A card is what starts the 30-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
+> cancel before then), and the trial is what turns on every matching row rather
+> than the first ten, plus alerts, CSV export and per-ticker SEC Form 4
+> filings.
+>
+> The **published record is free with no account at all**: the daily Top 10, the
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
+>
+> So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
+> IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
+> this order: the record needs no account; signing up takes an email and a
+> password; a card starts the trial.
+>
+> _History: until 15 September 2026 this block was headed "CARD GATE —
+> 2026-08-22" and described the card wall on new accounts, and told writers
+> that no line may call an account free. That was true only while the wall
+> ran (#548, 2026-08-22, to #683, 2026-08-30)._
 >
 > **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
 > equation.** `/how-it-works` names the six factors and their weight *ordering*
@@ -76,7 +108,7 @@ The stock scanner that publishes its track record
 
 **Description** (260 char max):
 ```
-Every scanner shows you picks and hides what happened next. Tapeline scores every US stock 0–100 on six named factors, explains each in one line, and logs every daily top-10 vs SPY next day — wins and losses, never edited. Record free to read, no account.
+Every scanner shows you picks and hides what happened next. Tapeline scores ~11,500 US stocks & ETFs 0–100 on six named factors and logs its daily top-10 vs SPY next day — losses kept, corrections dated. Record free to read, no account.
 ```
 
 ---
@@ -90,20 +122,20 @@ I built Tapeline because every stock scanner I'd paid for had the same tell: the
 
 So Tapeline does the opposite three ways:
 
-1. One score, explained. Every US stock gets a 0–100 score from six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum) — with a plain-English sentence on every row saying what's driving it. The six factors and their weight ordering are public at /how-it-works.
+1. One score, explained. About 11,500 US stocks and ETFs get a 0–100 score from six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum) — with a plain-English sentence on every row saying what's driving it. The six factors and their weight ordering are public at /how-it-works.
 
-2. A record you can't edit. Every market day it freezes the top 10 and logs each name's next-day return vs SPY. Wins stay, losses stay, nothing gets quietly deleted. It's ~52 days deep and — honestly — the top-10 is beating SPY only about 47% of the time so far. I'm posting that on purpose. The point is that it's auditable, not that it's magic.
+2. A record that keeps its losses. At the close it freezes the day's top 10 and logs each name's next-day return vs SPY. Wins stay, losses stay; entries are not re-ranked or deleted, the two corrections we made to recorded values are dated, and so are the four days with no list. It's [DAYS] trading days deep (pull it from /api/scorecard on launch day), and the share of picks that beat SPY the next session is on /scorecard with its sample size. The point is that it's auditable, not that it's magic.
 
-3. You can download the whole record and check my math (/verify).
+3. You can download the record (up to 7 days ago) and check my math (/verify).
 
-The published record is genuinely usable on its own (live scores, the daily Top 10, a page per ticker, the full scorecard). Pro is $9.99/mo, Premium $19.99/mo (Congress trades + SEC Form 4 insider buys). The published record never asks for an account or a card. An account puts a card on file at first sign-in and starts the 30-day Premium trial — $0 charged today, first charge on day 30, one click to cancel.
+The published record is genuinely usable on its own (scores, the daily Top 10, a page per ticker, the public scorecard with per-day entries on a 7-day delay). Prices are delayed about 15 minutes. Pro is $9.99/mo, Premium $19.99/mo (per-ticker SEC Form 4 filings + API). The published record never asks for an account or a card. Signing up takes an email and a password. A card starts the 30-day Premium trial — $0 charged today, first charge on day 30, one click to cancel.
 
 Built solo from Melbourne. I'd genuinely love for this crowd to tear apart the methodology — which factor am I under-weighting? What would make the back-check defensible over a 1-year horizon instead of 1-day?
 ```
 
 **Voice rules for replies:** describe, never prescribe. Never "buy/sell/should/
-recommend/beat the market." If someone challenges the 47% record, agree it's
-below a coin flip and link /scorecard — that candor is what earns upvotes here.
+recommend/beat the market." If someone challenges the record, don't argue
+the number: agree with what /scorecard shows and link it — that candor is what earns upvotes here.
 
 ---
 
