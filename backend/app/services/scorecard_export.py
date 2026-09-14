@@ -386,7 +386,7 @@ KNOWN_LIMITATIONS: list[dict[str, str]] = [
         "status": (
             "From 2026-09-14 (PR #824) an empty Form 4 answer removes the value "
             "and the ticker's stored filings; a ticker holding a value with no "
-            "filing on file is re-checked at the next daily run (PR #FOLLOWUP). "
+            "filing on file is re-checked at the next daily run (PR #833). "
             "Lists not changed."
         ),
     },
