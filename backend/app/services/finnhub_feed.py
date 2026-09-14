@@ -31,6 +31,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.services.vendor_errors import VendorThrottledError, VendorUnavailableError
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -49,7 +50,7 @@ CACHE_TTL_INSIDER_HOURS = 24            # Insider Form 4 refresh daily
 THROTTLED_STATUSES = frozenset({401, 429})
 
 
-class FinnhubThrottledError(Exception):
+class FinnhubThrottledError(VendorThrottledError):
     """Finnhub refused the key (429 throttle or 401), not the symbol.
 
     Raised only when a caller passes `raise_failures=True`, which only the
@@ -70,7 +71,7 @@ class FinnhubThrottledError(Exception):
         self.status = status
 
 
-class FinnhubUnavailableError(Exception):
+class FinnhubUnavailableError(VendorUnavailableError):
     """Finnhub did not answer: any non-200 other than a throttle, a transport
     error or timeout, or a 200 whose body is not the JSON object it sends.
 
@@ -494,7 +495,7 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
 
 
 async def set_recent_insider_transactions_db(
-    symbol: str, txns: list[dict[str, Any]],
+    symbol: str, txns: list[dict[str, Any]], *, source: str = "edgar",
 ) -> None:
     """Bulk-replace this symbol's insider transactions in the DB.
 
@@ -561,6 +562,7 @@ async def set_recent_insider_transactions_db(
                 transaction_price=round(price, 4),
                 transaction_value=round(abs(share_change * price), 2),
                 code=(t.get("code") or "")[:4],
+                source=source,
             )
         )
     if collapsed:

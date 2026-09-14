@@ -3,6 +3,7 @@ from app.models.api_key import ApiKey
 from app.models.calendar_events import EarningsEvent, IPOEvent
 from app.models.cap_events import CapEvent
 from app.models.congress import CongressTrade
+from app.models.edgar_form4_filing import EdgarForm4Filing
 from app.models.email_verification_token import EmailVerificationToken
 from app.models.embed_impression import EmbedImpression
 from app.models.funnel_events import FUNNEL_EVENTS, FunnelEvent
@@ -40,6 +41,7 @@ __all__ = [
     "CongressTrade",
     "DailyScorecardEntry",
     "EarningsEvent",
+    "EdgarForm4Filing",
     "EmailVerificationToken",
     "EmbedImpression",
     "FunnelEvent",
