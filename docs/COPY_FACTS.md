@@ -81,6 +81,10 @@ deleted. We have corrected recorded values twice, and said so: prices on
   above 100 was set to 100 and the originals were not kept: all 190 entries
   from 18 May to 12 June 2026 now read 100. That one was not disclosed until
   14 September 2026.
+- **Who sees what.** Reading the scorecard needs no account. Without Pro or
+  Premium the per-day entries show on a 7-day delay (`_FREE_DELAY_DAYS` in
+  `backend/app/routers/scorecard.py`); the summary figures are not delayed.
+  Say "the public scorecard needs no account", not "the full record, live, free".
 - **Four missing days.** No top 10 was recorded for 31 August, 2 September,
   4 September or 9 September 2026. None was filled in afterwards.
 <!-- copy-compliance-allow record-never-edited -- this line lists the banned phrasings in order to ban them -->
@@ -115,7 +119,7 @@ deleted. We have corrected recorded values twice, and said so: prices on
 
 - **Free:** signing up is free and needs no card. Top 10 scanner rows, 12 ticker
   look-ups per UTC day, a 5-ticker watchlist, 1 saved screen, no alert rules, and
-  the full public scorecard.
+  the public scorecard (per-day entries on a 7-day delay).
 - **Anonymous visitors are not metered** on ticker look-ups. Do not state a
   number for use without an account.
 - **Pro:** $9.99 a month, or $99 a year ($8.25 a month billed annually). Up to
