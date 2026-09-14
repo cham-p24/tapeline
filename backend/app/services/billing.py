@@ -957,3 +957,56 @@ async def card_on_file_for_invoice(invoice: Any) -> dict[str, Any] | None:
         "exp_month": _nested(card, "exp_month"),
         "exp_year": _nested(card, "exp_year"),
     }
+
+
+async def subscription_has_other_paid_invoice(
+    subscription_id: str, invoice_id: str | None,
+) -> bool | None:
+    """Has `subscription_id` already been paid for, by an invoice other than
+    `invoice_id`? True / False, or None when Stripe could not be asked.
+
+    The paid-welcome email and the founder's revenue alert fire on a
+    subscription's FIRST invoice with money on it (routers/webhooks.py,
+    `invoice.payment_succeeded`). A `stripe_webhook_events` latch stops a
+    second send, but the latch cannot answer this for a subscription that was
+    paid for before the latch was being written. On 2026-09-14 one live Pro
+    subscription was exactly that: paid $9.99 on 2026-08-29, no latch row. Its
+    first renewal would otherwise have told a month-old customer "You're in —
+    welcome" and told the founder about a new sale that was a renewal.
+
+    The invoice cannot answer it either. A trial converting and an ordinary
+    renewal both arrive as `billing_reason="subscription_cycle"`, and a
+    referral credit makes the first invoice $0 so the first PAID one is a
+    cycle invoice too. Stripe's own invoice history is the only record that
+    can, so ask it: one read, and only for a subscription with no latch yet.
+
+    `status="paid"` and `subscription=` are real list filters, checked against
+    the live account on 2026-09-14 (read-only). $0 paid invoices — a trial
+    start, a 100%-off referral month — are not payment and are skipped.
+
+    Never raises. None (no key, or the call failed) lets the caller choose the
+    conservative answer instead of guessing.
+    """
+    if not settings.stripe_secret_key or not subscription_id:
+        return None
+    from app.services.stripe_compat import stripe_field
+
+    try:
+        page = await asyncio.to_thread(
+            stripe.Invoice.list,
+            subscription=subscription_id,
+            status="paid",
+            limit=100,
+        )
+    except Exception:
+        logger.exception(
+            "stripe.paid_invoice_history_failed sub=%s", subscription_id,
+        )
+        return None
+    for inv in stripe_field(page, "data", []) or []:
+        if invoice_id and stripe_field(inv, "id") == invoice_id:
+            continue
+        paid = stripe_field(inv, "amount_paid", 0)
+        if isinstance(paid, int) and not isinstance(paid, bool) and paid > 0:
+            return True
+    return False
