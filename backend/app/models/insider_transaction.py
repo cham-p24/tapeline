@@ -69,6 +69,13 @@ class InsiderTransaction(Base):
     # A=grant/award, M=option exercise, G=gift, F=tax via shares, D=disposition,
     # C=conversion of derivative.
     code: Mapped[str] = mapped_column(String(4), nullable=False, default="")
+    #: Where the row came from. "edgar" for every row written since the insider
+    #: pass switched to SEC EDGAR (migration 0069); NULL for rows the Finnhub
+    #: pass wrote before it, which the switchover re-reads and replaces. The
+    #: empty-answer guard in `signal_publisher._clear_smart_money_reading` only
+    #: trusts "edgar" rows: a Finnhub row contradicting an EDGAR answer is the
+    #: old vendor's attribution, not evidence the answer is wrong.
+    source: Mapped[str | None] = mapped_column(String(12), nullable=True, default="edgar")
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )

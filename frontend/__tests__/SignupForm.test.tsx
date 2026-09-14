@@ -411,7 +411,10 @@ describe("SignUpPage", () => {
     // Checkout ($0 today + the exact date), the cancel flow, and the
     // pre-charge notice from run_trial_precharge_drip (about 7 days out).
     expect(sub).toMatch(/takes a card/i);
-    expect(sub).toMatch(/\$0 today/i);
+    // "$0 today" until 2026-09-14. The subhead now says the trial is a
+    // separate step from creating the account, and that step may be taken on
+    // a later day, so its $0 is "that day". The H1 keeps the ad's "$0 today".
+    expect(sub).toMatch(/\$0 that day/i);
     expect(sub).toMatch(/exact date of the first charge/i);
     expect(sub).toContain(`about ${PRECHARGE_NOTICE_DAYS} days ahead`);
     expect(sub).not.toMatch(/three days/i);
@@ -734,7 +737,9 @@ describe("SignUpPage", () => {
     // require is the claim that needs no account at all: the published record.
     render(<SignUpPage />);
     const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
-    expect(text).toMatch(/the daily Top 10, the whole back-checked scorecard/i);
+    // "the whole back-checked scorecard" until 2026-09-14: per-day entries reach
+    // anonymous and free readers after a delay, so "whole" overclaimed.
+    expect(text).toMatch(/the daily Top 10, the back-checked scorecard/i);
     expect(text).toMatch(/raw CSV\/JSON export are open to everyone/i);
   });
 

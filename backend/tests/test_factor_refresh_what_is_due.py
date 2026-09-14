@@ -142,8 +142,19 @@ def _no_dated_backlog_rule(monkeypatch: pytest.MonkeyPatch) -> None:
     the 8-day horizon, a seeded equity stamped "a day ago" with no reading also
     matches it, and a horizon test would be measuring the wrong rule. It is
     tested on its own, at fixed instants, in
-    tests/test_fundamentals_reading_survives_restart.py."""
+    tests/test_fundamentals_reading_survives_restart.py.
+
+    `_SMART_MONEY_EDGAR_SINCE` is the same kind of instant for smart money, and
+    is tested in tests/test_edgar_form4.py.
+
+    The insider pass no longer sleeps between symbols (`_INSIDER_PACE_SECONDS`
+    is 0 since the switch to EDGAR, which paces per request). These tests move
+    their clock only through the passes' own sleeps, so they give the insider
+    pass the same 1.1s a call as the fundamentals pass: what they pin is how the
+    phase spends time, not what one call costs."""
     monkeypatch.setattr(sp, "_FUNDAMENTALS_UNSAVED_BEFORE", datetime(1970, 1, 1, tzinfo=UTC))
+    monkeypatch.setattr(sp, "_SMART_MONEY_EDGAR_SINCE", datetime(1970, 1, 1, tzinfo=UTC))
+    monkeypatch.setattr(sp, "_INSIDER_PACE_SECONDS", 1.1)
 
 
 def _fundamentals_vendor(
@@ -221,7 +232,7 @@ def _insider_vendor(
             for d in (1, 2, 3)
         ]
 
-    monkeypatch.setattr("app.services.finnhub_feed.fetch_insider_transactions", _fetch)
+    monkeypatch.setattr("app.services.edgar_form4.fetch_insider_transactions", _fetch)
     return calls
 
 

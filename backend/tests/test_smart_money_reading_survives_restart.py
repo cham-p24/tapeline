@@ -99,7 +99,7 @@ def _vendor(
             for d in (1, 2, 3)
         ]
 
-    monkeypatch.setattr("app.services.finnhub_feed.fetch_insider_transactions", _fetch)
+    monkeypatch.setattr("app.services.edgar_form4.fetch_insider_transactions", _fetch)
     return calls
 
 

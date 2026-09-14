@@ -412,8 +412,13 @@ async def test_non_equities_keep_their_monthly_horizon() -> None:
     assert (await sp._factor_due_counts(now=AT))[0] == 0
 
 
-async def test_the_smart_money_rotation_is_untouched() -> None:
+async def test_the_smart_money_rotation_is_untouched(monkeypatch: pytest.MonkeyPatch) -> None:
     """Mutation: apply the rule to both stamp columns - a smart-money stamp 26
-    hours old is served inside its 36-hour horizon."""
+    hours old is served inside its 36-hour horizon.
+
+    Smart money has its own dated rule (`_SMART_MONEY_EDGAR_SINCE`, tested in
+    tests/test_edgar_form4.py), which this stamp would also match; it is moved
+    out of the way so this test still measures the fundamentals rule only."""
+    monkeypatch.setattr(sp, "_SMART_MONEY_EDGAR_SINCE", datetime(1970, 1, 1, tzinfo=UTC))
     await _seed("META", last_fundamentals_at=AT, last_smart_money_at=CUT - 2 * H)
     assert (await sp._factor_due_counts(now=AT))[1] == 0
