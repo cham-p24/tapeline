@@ -365,7 +365,7 @@ export const TERMS: GlossaryTerm[] = [
       "Divide the session's traded volume by the average session volume over a lookback window — commonly a few weeks to a few months. Intraday versions compare volume so far today against the average volume by the same time of day, which is necessary because volume is heavily concentrated near the open and the close.",
     matters:
       "Raw volume is not comparable between securities — a mega-cap's quiet session dwarfs a small-cap's busiest one — so normalising against a security's own baseline is what makes participation legible across a scan. Swing traders read it as a participation check on any price event: the same percentage move on ordinary volume and on many times ordinary volume are different events. An elevated reading says more people traded, not which direction they were leaning.",
-    related: { href: "/app/scanner", label: "The live scanner" },
+    related: { href: "/app/scanner", label: "The scanner" },
     see: ["volume", "average-dollar-volume", "breakout", "bid-ask-spread"],
   },
   {
@@ -383,8 +383,8 @@ export const TERMS: GlossaryTerm[] = [
     matters:
       "Sector membership explains a large share of any individual security's movement, so knowing which sectors have been moving separates company-specific behaviour from a sector-wide move that lifts or drags every name in it. The caution worth stating: rotation is identified after it is under way. A ranking of the last quarter is a description of the last quarter, and the popular idea that sectors rotate in a fixed order through an economic cycle is a stylised model, not a measured regularity.",
     tapeline:
-      "Tapeline publishes a live per-sector ranking of the scored universe, and the Relative Strength factor is measured against a single broad-market benchmark rather than a sector one — so a whole sector moving together shows up in every name in it.",
-    related: { href: "/sectors", label: "Live sector rankings" },
+      "Tapeline publishes a per-sector ranking of the scored universe, and the Relative Strength factor is measured against a single broad-market benchmark rather than a sector one — so a whole sector moving together shows up in every name in it.",
+    related: { href: "/sectors", label: "Sector rankings" },
     see: ["relative-strength", "market-breadth", "market-regime", "beta"],
   },
 
@@ -646,7 +646,7 @@ export const TERMS: GlossaryTerm[] = [
       "Sum the shares executed across all venues over the period. Consolidated volume aggregates every exchange and reporting facility; single-venue figures are lower and not comparable to it. Volume is heavily concentrated around the opening and closing auctions, so any intraday comparison has to be against the same time of day.",
     matters:
       "Volume is the participation dimension underneath every price move: the same percentage change on very light and very heavy trading are different events, because one describes a price agreed by few participants and the other a price agreed by many. The persistent misreading is treating volume as directional. A session with heavy volume and a falling price tells you many participants transacted, not that sellers outnumbered buyers — by construction, they cannot.",
-    related: { href: "/app/scanner", label: "The live scanner" },
+    related: { href: "/app/scanner", label: "The scanner" },
     see: ["relative-volume", "average-dollar-volume", "accumulation-distribution", "breakout"],
   },
   {
@@ -666,7 +666,7 @@ export const TERMS: GlossaryTerm[] = [
       "Dollar volume is the constraint that decides which securities a given trader can realistically transact in, and it is the reason a scan result can be arithmetically correct and practically unusable. Thin securities also produce noisy inputs for everything else — period returns, relative-strength differences and momentum readings all become erratic when few trades set the price.",
     tapeline:
       "Tapeline applies a liquidity floor to the ranked scanner and the public scorecard for this reason. The floor can be switched off on the scanner to browse the full scored universe.",
-    related: { href: "/app/scanner", label: "The live scanner" },
+    related: { href: "/app/scanner", label: "The scanner" },
     see: ["volume", "relative-volume", "bid-ask-spread", "float"],
   },
   {
@@ -839,7 +839,7 @@ export const TERMS: GlossaryTerm[] = [
       "Realised volatility is the standard deviation of periodic returns over a past window, usually rescaled to a common time unit for comparability. Implied volatility is derived from current options prices by solving an options-pricing model for the volatility input that reproduces the observed price. The first summarises what happened; the second summarises what options are currently priced for.",
     matters:
       "Volatility is the scaling factor that makes different securities comparable: the same percentage move means something different in a security that typically moves a little and one that typically moves a lot. It is also the input underneath most position-sizing arithmetic. The known limits are that it clusters — calm periods and turbulent ones both persist, so a recent reading is a poor guide to a distant one — and that standard deviation treats upside and downside variation identically.",
-    related: { href: "/market-regime", label: "The live market regime view" },
+    related: { href: "/market-regime", label: "The market regime view" },
     see: ["average-true-range", "vix", "drawdown", "beta"],
   },
   {
@@ -912,7 +912,7 @@ export const TERMS: GlossaryTerm[] = [
       "The calculation aggregates the prices of a wide strip of index options across strikes at two nearby expiries, and interpolates between them to produce a constant 30-day horizon. The inputs are current option prices, so the index reflects what participants are paying for optionality right now, not a survey and not a forecast anyone has published.",
     matters:
       "The VIX summarises expected market-wide movement in one number, which is why it is the standard shorthand for market conditions. Two misreadings are worth naming. It is not directional — it measures expected size of movement, not expected direction, though in practice it rises most when the index falls because that is when demand for downside protection concentrates. And it is not a forecast of the level of the index; it is a price for expected movement, which can be systematically above or below what subsequently occurs.",
-    related: { href: "/market-regime", label: "The live market regime view" },
+    related: { href: "/market-regime", label: "The market regime view" },
     see: ["volatility", "market-regime", "market-breadth", "beta"],
   },
   {
@@ -930,7 +930,7 @@ export const TERMS: GlossaryTerm[] = [
       "Common measures include the count of advancing securities against declining ones, the running total of that difference as an advance-decline line, the share of members trading above a longer moving average, and counts of new highs against new lows. Each is computed over a defined universe, and the choice of universe changes the answer — an equal-weighted view and a capitalisation-weighted view can disagree sharply.",
     matters:
       "Breadth separates a broad advance from a narrow one, which matters because a capitalisation-weighted index can rise on a handful of very large members while most of its constituents are flat or falling. For a swing trader picking individual securities, that distinction bears directly on how representative the index is of what any given name is doing. Breadth is a description of current participation, not a leading indicator, despite frequently being presented as one.",
-    related: { href: "/market-regime", label: "The live market regime view" },
+    related: { href: "/market-regime", label: "The market regime view" },
     see: ["market-regime", "sector-rotation", "vix", "relative-strength"],
   },
   {

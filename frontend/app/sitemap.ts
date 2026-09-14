@@ -296,7 +296,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
   // Strategy listicle pages — /best-stocks-for/{day-traders, swing-traders,
-  // momentum, dividend, value}. Each page sorts/filters the live scanner
+  // momentum, dividend, value}. Each page sorts/filters the scanner
   // differently so the table content is unique per slug (no dup-content risk).
   const strategyEntries: MetadataRoute.Sitemap = STRATEGIES.map((s) => ({
     url: `${base}/best-stocks-for/${s.slug}`,

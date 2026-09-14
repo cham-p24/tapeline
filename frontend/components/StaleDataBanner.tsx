@@ -69,10 +69,10 @@ export function StaleDataBanner() {
 
   const copy =
     warn.kind === "down"
-      ? "API unreachable. Data on this page may not be live."
+      ? "API unreachable. Data on this page may be out of date."
       : warn.kind === "degraded"
       ? "System is in a degraded state. Some data may be stale."
-      : `Scanner data is ~${warn.minutes} min old (worker hasn't ticked recently).`;
+      : `The worker last wrote scanner data ~${warn.minutes} min ago (it hasn't run recently), on top of the usual ~15-minute price delay.`;
 
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warn/30 bg-warn/5 px-4 py-2 text-sm text-warn">

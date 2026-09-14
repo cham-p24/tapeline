@@ -103,12 +103,13 @@ export default function UsagePage() {
           unit="alerts"
         />
         <UsageCard
-          title="Data freshness"
+          title="Price delay"
           used={data.metrics.data_delay_minutes}
           cap={0}
           pct={0}
           unit="min delay"
           inverse
+          note="Our price vendor's delay. It is the same on every plan."
         />
         <UsageCard
           title="API requests today"

@@ -35,6 +35,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models.newsletter import NewsletterSubscriber
 from app.services.email import send_email
+from app.services.freshness import PRICE_DELAY_PHRASE
+from app.services.universe import SCORED_TICKERS_IN_COPY
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -503,7 +505,7 @@ def _render_daily_digest(
     </table>
 
     <div style="margin:28px 0;padding:20px;background:#0a0a0a;border:1px solid #27272a;border-radius:8px;">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#fb923c;margin-bottom:8px;">Live, sub-60s scoring on every US ticker</div>
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#fb923c;margin-bottom:8px;">Six-factor scores on ~{SCORED_TICKERS_IN_COPY:,} US stocks and ETFs · prices {PRICE_DELAY_PHRASE}</div>
       <div style="font-size:15px;font-weight:600;color:#f4f4f5;line-height:1.45;">
         See your watchlist scored the same way. Set alerts when one of these
         composites crosses your threshold.

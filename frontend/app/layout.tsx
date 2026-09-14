@@ -108,7 +108,7 @@ export const metadata: Metadata = {
   keywords: [
     "stock scanner",
     "quantitative scoring",
-    "live market scanner",
+    "stock market scanner",
     "insider Form 4",
     "market regime",
     "retail trading",
@@ -146,7 +146,7 @@ export const metadata: Metadata = {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "Tapeline — Read the tape. Live.",
+        alt: "Tapeline — Read the tape.",
       },
     ],
   },

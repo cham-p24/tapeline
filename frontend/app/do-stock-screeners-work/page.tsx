@@ -304,7 +304,7 @@ export default async function DoStockScreenersWorkPage() {
         </ol>
 
         {/* Worked example — the honest record, descriptive framing (compliance).
-            Every figure in this block is read from the live scorecard summary;
+            Every figure in this block is read from the scorecard summary;
             when that read fails the block renders with no figure in it rather
             than with a remembered one. */}
         <h2 className="mt-12 text-2xl font-semibold tracking-tight">A worked example: one screener that shows its record</h2>
@@ -415,7 +415,7 @@ export default async function DoStockScreenersWorkPage() {
         <div className="mt-12 rounded-2xl border border-border bg-panel p-6 text-center sm:p-8">
           <h2 className="text-xl font-semibold">Check the picks against SPY yourself</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-            Live six-factor scores on the full scanner, on a 30-day Premium trial &mdash; $0 today. The record stays public either way, with no account.
+            Six-factor scores on the full scanner, on a 30-day Premium trial &mdash; $0 today. The record stays public either way, with no account.
           </p>
           <Link href="/signup" className="mt-5 inline-flex items-center justify-center rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90">
             Sign up &rarr;

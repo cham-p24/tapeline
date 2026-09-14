@@ -62,6 +62,7 @@ from app.services.email_design import (
     ticker_card,
     watchlist_table,
 )
+from app.services.freshness import PRICE_DELAY_MINUTES, PRICE_DELAY_PHRASE
 
 # Freemium caps quoted in email copy. Referencing the tier.py constants (the
 # single source of truth) instead of hardcoding numbers means a freemium
@@ -439,8 +440,9 @@ def render_welcome_email(
         body = (
             h1(f"Welcome, {user_name}.")
             + lead(
-                "Your <strong>Tapeline account</strong> is live. Three live "
-                "scores from the scanner right now:"
+                "Your <strong>Tapeline account</strong> is live. Three "
+                "scores from the scanner as of this email (prices are "
+                f"{PRICE_DELAY_PHRASE}):"
             )
             + picks_html
             + button(
@@ -479,7 +481,7 @@ def render_welcome_email(
     return shell(
         body,
         preheader=(
-            "Your Tapeline account is live — three live scores inside."
+            "Your Tapeline account is live — three scores inside."
             if picks else "Your Tapeline account is live — open the scanner."
         ),
     )
@@ -720,7 +722,7 @@ def render_trial_day7_email(user_name: str, summary: dict | None = None) -> str:
         )
         + _pricing_card(
             "Pro", "$9.99", "$8.25", "$99", "$20",
-            "Full live scanner, regime, watchlist, email alerts, daily briefing.",
+            "Full scanner, regime, watchlist, email alerts, daily briefing.",
             accent=False,
         )
         + _pricing_card(
@@ -892,7 +894,8 @@ def render_trial_expired_email(
         h1("Your Tapeline trial ended.")
         + lead(
             f"{user_name}, your 30-day Premium trial ended overnight. Your "
-            f"account is now on the Free tier — still live data, but capped "
+            f"account is now on the Free tier — the same data (prices "
+            f"{PRICE_DELAY_PHRASE}, as on every plan), but capped "
             f"at the top {FREE_SCANNER_ROWS} scanner rows and "
             f"{FREE_DAILY_LOOKUPS} ticker look-ups a day, with no smart "
             f"alerts."
@@ -1448,9 +1451,10 @@ def render_subscription_started_email(
     return shell(
         h1(f"You're in, {user_name}.")
         + lead(
-            f"Welcome to Tapeline <strong>{tier_label}</strong>. Your full data "
-            f"feed is live — every score live-updating, every alert channel on, "
-            f"the full universe scanner unlocked."
+            f"Welcome to Tapeline <strong>{tier_label}</strong>. Your plan is "
+            f"on — every alert channel, the full universe scanner, every row. "
+            f"Prices are {PRICE_DELAY_PHRASE}, and scores are recalculated "
+            f"through US market hours."
         )
         + card(
             f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Your subscription</div>'
@@ -1482,7 +1486,7 @@ def render_subscription_started_email(
             f"style=\"color:{LIGHT_MUTED};text-decoration:underline;\">30-day money "
             f"back</a> — {refund_clause}"
         ),
-        preheader=f"Welcome to Tapeline {tier_label} — your full data feed is live.",
+        preheader=f"Welcome to Tapeline {tier_label} — your plan is on.",
     )
 
 
@@ -1519,7 +1523,7 @@ def render_payment_failed_email(
     if final_attempt:
         urgency_line = (
             f"This was the last automatic retry. Update your card now or your "
-            f"account drops to Free and you lose live {tier_label} access."
+            f"account drops to Free and you lose {tier_label} access."
         )
     elif attempt_count == 1:
         urgency_line = "Stripe will retry automatically over the next few days."
@@ -1634,7 +1638,7 @@ def render_checkout_abandoned_email(
             f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Your plan</div>'
             f'<div class="tl-fg" style="margin-top:6px;font-size:18px;font-weight:700;color:{LIGHT_FG};font-family:{FONT_SANS};">{price_line}</div>'
             f'<p class="tl-fg" style="margin:10px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">'
-            f"Full universe scanner, live scores, regime + heatmap, and "
+            f"Full universe scanner, every row, regime + heatmap, and "
             f"every alert channel — unlocked the moment you finish."
             f"</p>"
             + button(f"Finish upgrading to {tier_label}", resume_url),
@@ -1678,7 +1682,8 @@ def render_subscription_canceled_email(
             f"and you won't be charged again."
         )
         + muted_paragraph(
-            f"After that your account moves to Free — still live data, but "
+            f"After that your account moves to Free — the same data (prices "
+            f"{PRICE_DELAY_PHRASE}, as on every plan), but "
             f"capped at the top {FREE_SCANNER_ROWS} scanner rows and "
             f"{FREE_DAILY_LOOKUPS} ticker look-ups a day, with alerts switched "
             f"off. Your watchlist, saved scans, and alert rules are kept on "
@@ -1728,7 +1733,7 @@ def render_save_offer_accepted_email(user_name: str, *, tier: str) -> str:
         )
         + muted_paragraph(
             "Glad you're sticking around. Pick up right where you left off — the "
-            "scanner, your watchlist, and every alert channel are all live."
+            "scanner, your watchlist, and every alert channel are all on."
         )
         + button(
             "Open the scanner",
@@ -1989,7 +1994,7 @@ def _free_tier_changelog_lines() -> list[str]:
     """
     lines = [
         f"{FREE_DAILY_LOOKUPS} full ticker look-ups a day.",
-        f"{FREE_SCANNER_ROWS} live scanner rows (live data, not delayed).",
+        f"{FREE_SCANNER_ROWS} scanner rows (prices delayed about {PRICE_DELAY_MINUTES} minutes, as on every plan).",
         "A saved screen, which re-runs each time you open it.",
     ]
     # The browser-alert line that used to close this list is gone rather than
@@ -2065,7 +2070,7 @@ def render_free_tier_changelog_email(user_name: str) -> str:
                 else "The free plan now includes "
             )
             + f"{FREE_DAILY_LOOKUPS} look-ups a day and "
-            f"{FREE_SCANNER_ROWS} live scanner rows."
+            f"{FREE_SCANNER_ROWS} scanner rows."
         ),
     )
 
@@ -2726,7 +2731,7 @@ def render_free_trial_invite_email(
     3. **Never tell the recipient the product is shut to them.** It is not,
        and has not been since the route wall came down on 2026-08-30 (#683).
        Everyone who receives this already has the free plan running — the top
-       ten scored rows on live data, one saved screen, a watchlist — plus the
+       ten scored rows, one saved screen, a watchlist — plus the
        daily picks and the public record. So the ask here is about what a card
        ADDS, never about getting in, and the sentence covering a "no" may say
        their account stays exactly as it is, because it does. The
@@ -2831,7 +2836,7 @@ def render_free_trial_last_invite_email(user_name: str) -> str:
             "recorded values twice (prices on 25 August 2026, and scores from 18 May "
             "to 12 June capped on 15 June 2026), and both corrections are dated there. "
             "Without a paid plan the day-by-day rows reach you on a seven-day "
-            "delay; the headline stats are live for everyone."
+            "delay; the headline stats include every row, for everyone."
         )
         + muted_paragraph(
             "The honest state of that record is on the page: at the current "

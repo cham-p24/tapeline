@@ -135,7 +135,7 @@ export default async function ComparePage({ params }: { params: Promise<{ matchu
         <div className="mx-auto max-w-2xl px-4 py-24 text-center">
           <h1 className="text-2xl font-bold">{parsed.a} vs {parsed.b}</h1>
           <p className="mt-3 text-muted">
-            Scores are refreshing right now. Reload in a moment, or open the live scanner.
+            Scores are refreshing right now. Reload in a moment, or open the scanner.
           </p>
           <Link href="/app/scanner" className="mt-6 inline-block text-accent hover:underline">
             Open the scanner →

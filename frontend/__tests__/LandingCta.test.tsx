@@ -37,7 +37,7 @@ describe("LandingCta", () => {
   it("renders a primary signup CTA with the scanner-forward, trial-terms copy", () => {
     render(<LandingCta from="screener" showPreview={false} />);
     const primary = screen.getByRole("link", {
-      name: new RegExp(`try the live scanner — ${TRIAL_DAYS}-day trial`, "i"),
+      name: new RegExp(`try the scanner — ${TRIAL_DAYS}-day trial`, "i"),
     });
     expect(primary).toBeInTheDocument();
     expect(primary).toHaveAttribute("href", "/signup?from=screener");
@@ -46,12 +46,12 @@ describe("LandingCta", () => {
   it("message-matches the signup page via the ?from= slug", () => {
     const { rerender } = render(<LandingCta from="finviz" showPreview={false} />);
     expect(
-      screen.getByRole("link", { name: /try the live scanner/i }),
+      screen.getByRole("link", { name: /try the scanner/i }),
     ).toHaveAttribute("href", "/signup?from=finviz");
 
     rerender(<LandingCta from="compare" showPreview={false} />);
     expect(
-      screen.getByRole("link", { name: /try the live scanner/i }),
+      screen.getByRole("link", { name: /try the scanner/i }),
     ).toHaveAttribute("href", "/signup?from=compare");
   });
 
@@ -87,7 +87,7 @@ describe("LandingCta", () => {
   it("shows the scanner preview (product proof) by default", () => {
     render(<LandingCta from="screener" />);
     expect(screen.getByTestId("scanner-preview")).toBeInTheDocument();
-    expect(screen.getByText(/a live preview of the tapeline scanner/i)).toBeInTheDocument();
+    expect(screen.getByText(/a preview of the tapeline scanner/i)).toBeInTheDocument();
   });
 
   it("suppresses the preview when showPreview is false", () => {
@@ -95,7 +95,7 @@ describe("LandingCta", () => {
     expect(screen.queryByTestId("scanner-preview")).toBeNull();
     // The CTA + offer strip still render.
     expect(
-      screen.getByRole("link", { name: /try the live scanner/i }),
+      screen.getByRole("link", { name: /try the scanner/i }),
     ).toBeInTheDocument();
   });
 });

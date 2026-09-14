@@ -197,7 +197,7 @@ export function TickerRecord({ symbol, record }: { symbol: string; record: unkno
             A flag is a day this ticker appeared in the published daily top-10.
             Only a few hundred of the ~8,900 symbols we score have ever appeared,
             so this is the ordinary answer for most tickers &mdash; it does not
-            mean anything is missing. {symbol} still carries a live score and
+            mean anything is missing. {symbol} still carries a score and
             factor breakdown above.
           </p>
           <p className="mt-3 text-sm">
