@@ -144,7 +144,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
-    description="Tapeline — live quantitative market scanner API",
+    description="Tapeline — quantitative market scanner API (prices delayed about 15 minutes)",
     lifespan=lifespan,
 )
 

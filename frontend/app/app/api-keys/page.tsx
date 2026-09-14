@@ -114,7 +114,7 @@ export default function ApiKeysPage() {
         <p className="text-sm text-muted">
           Programmatic access to the Tapeline scores. Mint a key, authenticate with the{" "}
           <code className="rounded bg-panel px-1 py-0.5 text-xs">X-API-Key</code> header, and pull the
-          live universe, any ticker, or the macro regime. Premium includes{" "}
+          scored universe, any ticker, or the macro regime. Premium includes{" "}
           <strong className="text-fg">1,000 requests/day</strong>.
         </p>
       </div>

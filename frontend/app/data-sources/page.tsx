@@ -3,11 +3,12 @@ import { MarketingNav } from "@/components/MarketingNav";
 import { MarketingFooter } from "@/components/MarketingFooter";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { pageMeta } from "@/lib/seo";
+import { PRICE_FRESHNESS_SENTENCE } from "@/lib/freshness";
 
 export const metadata = pageMeta({
   title: "Tapeline Data Categories — What Powers Every Score",
   description:
-    "The data categories Tapeline reads from: live market data, fundamentals, macro indicators, SEC filings, news, analyst ratings. Composite score and labels are Tapeline's own derived output.",
+    "The data categories Tapeline reads from: market data, fundamentals, macro indicators, SEC filings, news, analyst ratings. Composite score and labels are Tapeline's own derived output.",
   path: "/data-sources",
 });
 
@@ -29,7 +30,7 @@ type Category = {
 // it's attributed at the point of display, not aggregated here.
 const CATEGORIES: Category[] = [
   {
-    name: "Live market data",
+    name: "Market data",
     usedFor: [
       "Equity + ETF prices, OHLC bars, volumes",
       "Trend and relative-strength calculations",
@@ -38,7 +39,9 @@ const CATEGORIES: Category[] = [
     ],
     surfaceArea:
       "Every ticker price, every chart, every percentage change, the heatmap tiles, the scanner table.",
-    refreshCadence: "Sub-60 seconds during US market hours.",
+    // Measured 14 Sep 2026: the vendor snapshot was ~15 min behind and
+    // worker passes landed 70-74 s apart. Daily bars are read once a day.
+    refreshCadence: `${PRICE_FRESHNESS_SENTENCE} Daily OHLC bars (used for trend and relative strength) are read about once a day.`,
     publicRecord: false,
   },
   {
@@ -63,7 +66,7 @@ const CATEGORIES: Category[] = [
     ],
     surfaceArea:
       "The Regime tile on every dashboard page. The Macro sub-factor on every ticker. The Fear & Greed composite on /app/regime.",
-    refreshCadence: "Hourly cache, refreshed on next worker tick.",
+    refreshCadence: "Daily readings: the VIX, 10-year yield and dollar index are end-of-day series, so the regime and Macro sub-factor usually change at most once a day.",
     publicRecord: true,
   },
   {
@@ -106,7 +109,7 @@ const CATEGORIES: Category[] = [
   {
     name: "News wire",
     usedFor: [
-      "Live cashtag-tagged headlines per ticker",
+      "Cashtag-tagged headlines per ticker",
       "Sentiment-tagged headlines for the breaking-news bar",
     ],
     surfaceArea:

@@ -210,7 +210,7 @@ def _render_html(
         ticker_sub     = "Sorted by movement since you added each name."
     else:
         ticker_heading = "Top 3 by composite score"
-        ticker_sub     = "Across the live universe."
+        ticker_sub     = "Across the scored universe, as of this email."
 
     # Per-ticker rows — show baseline delta only when baseline exists
     def _ticker_row(t: Ticker) -> str:

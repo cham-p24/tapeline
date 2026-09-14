@@ -520,7 +520,7 @@ async def trial_offer(
           Whether this account can start a trial, and — when it can't — the
           plain sentence explaining why. Declining is a normal outcome and
           leaves the user somewhere real: an account that says no keeps the
-          free tier — top-ten rows on live data, one saved screen, a
+          free tier — top-ten rows, one saved screen, a
           watchlist — and is not sent anywhere.
       card_required
           True, and it is about the TRIAL. There used to be a

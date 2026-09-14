@@ -100,7 +100,7 @@ if (typeof window !== "undefined") {
 //   collected no card: the visitor could not reach the product without one.
 //
 //   #683 (2026-08-30) removed the wall. Signing up is an email and a password
-//   and lands on a FREE PLAN that runs the live scanner — top ten scored rows
+//   and lands on a FREE PLAN that runs the scanner — top ten scored rows
 //   of any scan, live, one saved screen, a five-symbol watchlist, twelve
 //   ticker pages a day. So the #536 wording is true again and the #548 wording
 //   is now the false one. There is no bait-and-switch left to warn about here.
@@ -137,7 +137,7 @@ export const FROM_COPY: Record<string, { h1: string; sub: string }> = {
   },
   scorecard: {
     h1: "You've seen the record. Now run the scanner.",
-    sub: `The scanner scores ${activeScoredLabel} US stocks and ETFs. Sign up with no card and the free plan shows the top ${FREE_LIMITS.scannerRows} rows of any scan, live. A card starts the ${TRIAL_LENGTH_LABEL} Premium trial: $0 charged that day, cancel in one click.`,
+    sub: `The scanner scores ${activeScoredLabel} US stocks and ETFs. Sign up with no card and the free plan shows the top ${FREE_LIMITS.scannerRows} rows of any scan. A card starts the ${TRIAL_LENGTH_LABEL} Premium trial: $0 charged that day, cancel in one click.`,
   },
   compare: {
     h1: "Switching to Tapeline?",
@@ -674,7 +674,7 @@ function SignUpForm() {
           <ul className="mt-2 space-y-2 text-sm text-muted">
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-              <span><span className="text-fg">Full universe, live scores</span> — not the top-10-row free view</span>
+              <span><span className="text-fg">Full universe, every row</span> — not the top-10-row free view</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />

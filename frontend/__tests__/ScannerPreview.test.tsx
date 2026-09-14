@@ -82,7 +82,11 @@ describe("ScannerPreview — real data mode", () => {
     render(await ScannerPreview());
 
     expect(screen.getByText(/actual top-scoring tickers/i)).toBeInTheDocument();
-    expect(screen.getByText(/refreshed every 30 min/i)).toBeInTheDocument();
+    // Integrity 2026-09-14: the snapshot can be an hour old or more (ISR with
+    // serve-stale) and prices are vendor-delayed about 15 minutes.
+    expect(screen.getByText(/saved snapshot that can be an hour old or more/i)).toBeInTheDocument();
+    expect(screen.getByText(/prices delayed about 15 min/i)).toBeInTheDocument();
+    expect(screen.queryByText(/refreshed every 30 min/i)).toBeNull();
     expect(screen.getByText(/top 6 of today.s top 10/i)).toBeInTheDocument();
     // 7 API items in, 6 rendered. Each record is two <tr>s — the numbers row
     // plus the phone-only "Why" line (lg:hidden) — so header + 6 x 2 = 13.

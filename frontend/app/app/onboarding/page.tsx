@@ -239,8 +239,8 @@ function OnboardingHandoff() {
           Setting up your account
         </h1>
         <p className="mt-2 text-sm text-muted">
-          We&apos;re starting your watchlist with the top-scored names on the
-          live tape. You can remove them anytime.
+          We&apos;re starting your watchlist with the top-scored names in the
+          scanner. You can remove them anytime.
         </p>
       </div>
     </main>

@@ -58,11 +58,11 @@ export default function SupportPage() {
         <h2 className="mt-14 text-2xl font-semibold tracking-tight">Before you email — quick answers</h2>
         <div className="mt-6 divide-y divide-border/60">
           <Faq
-            q="Is Tapeline live and healthy right now?"
+            q="Is Tapeline up and healthy right now?"
             a={
               <>
                 See <Link href="/status" className="text-accent hover:underline">/status</Link> for the
-                live system status — auto-refreshes every 30 seconds. If the API or worker is degraded
+                system status — it re-checks every 30 seconds while open. If the API or worker is degraded
                 you'll see it there before you have to ask us.
               </>
             }
@@ -79,7 +79,7 @@ export default function SupportPage() {
                     email and a password and lands here. The honest answer is
                     unchanged — nothing changes unless you choose the trial,
                     and the trial takes a card. */}
-                Your account is on Free tier. Free shows live scores for the top {FREE_LIMITS.scannerRows}{" "}scanner rows
+                Your account is on Free tier. Free shows scores for the top {FREE_LIMITS.scannerRows}{" "}scanner rows
                 by design — it's the same product, just narrower, and it stays that way at no cost:
                 top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day{freeHasWatchlist() ? `, ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}.
                 The 30-day Premium trial is a separate step you choose, and it does take a card:

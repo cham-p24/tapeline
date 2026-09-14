@@ -28,11 +28,11 @@ export const STRATEGIES: StrategyConfig[] = [
     slug: "day-traders",
     display: "Day Traders",
     h1: "Best Stocks to Day Trade — Today's Top 30 by Move + Composite Score",
-    metaTitle: "Best Stocks to Day Trade Today — Live Top 30 | Tapeline",
+    metaTitle: "Best Stocks to Day Trade Today — Top 30 | Tapeline",
     metaDescription:
-      "30 US stocks with the biggest moves today that also score 60+ on Tapeline's 6-factor composite — momentum confirmed by trend and relative strength. Sub-60s refresh. Public scorecard, losses kept.",
+      "30 US stocks with the biggest moves today that also score 60+ on Tapeline's 6-factor composite — momentum confirmed by trend and relative strength. Prices delayed ~15 min. Public scorecard, losses kept.",
     lede:
-      "Day trading lives or dies on confluence: setups where the score, the trend, the relative strength, and the day's price action all point the same direction. The list below ranks today's US tickers sorted by today's 1-day move, filtered to names with a Tapeline composite at or above 60. The tape is fresh — the underlying scores re-tick sub-60 seconds during market hours.",
+      "Day trading lives or dies on confluence: setups where the score, the trend, the relative strength, and the day's price action all point the same direction. The list below ranks today's US tickers sorted by today's 1-day move, filtered to names with a Tapeline composite at or above 60. Be clear on freshness: prices are delayed about 15 minutes, and this page is a saved snapshot that can be an hour old or more, so it is not a tool for timing entries.",
     apiParams: { sort: "change_pct_1d", order: "desc", min_score: "60", limit: "30" },
     factorEmphasis: "momentum + trend",
     faq: [
@@ -42,11 +42,11 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "How often does the day-trading list update?",
-        a: "Underlying scores update sub-60 seconds during US market hours. The 1-day change column is live. This snapshot view caches for an hour server-side to avoid hammering the API on every search-engine crawl; the live scanner at /app/scanner shows the real-time ranking.",
+        a: "Prices are delayed about 15 minutes, and scores usually change about once a day because most of their inputs are daily readings. This page is a saved snapshot: it is cached for an hour, and the first visit after that still gets the old copy, so it can be an hour old or more. The scanner at /app/scanner shows the latest ranking when you open it.",
       },
       {
-        q: "What's the difference between this and your live scanner?",
-        a: "This page is a SEO-friendly opinionated view: top 30 by today's move, filtered to score 60+. The live scanner at /app/scanner is the full scored universe (about 11,500 US stocks and ETFs) with every filter exposed (sort by any factor, threshold any sub-score, filter by sector or signal label). This page is for surfacing candidates; the scanner is for working through them.",
+        q: "What's the difference between this and your scanner?",
+        a: "This page is a SEO-friendly opinionated view: top 30 by today's move, filtered to score 60+. The scanner at /app/scanner is the full scored universe (about 11,500 US stocks and ETFs) with every filter exposed (sort by any factor, threshold any sub-score, filter by sector or signal label). This page is for surfacing candidates; the scanner is for working through them.",
       },
       {
         q: "Why filter to score 60+ rather than just 'biggest movers'?",
@@ -57,7 +57,7 @@ export const STRATEGIES: StrategyConfig[] = [
   {
     slug: "swing-traders",
     display: "Swing Traders",
-    h1: "Best Swing Trade Stocks Right Now — Live Top 30 by Score",
+    h1: "Best Swing Trade Stocks Right Now — Top 30 by Score",
     // metaTitle / metaDescription rewritten 2026-05-19 against GSC data:
     // page sat at position 12.4 with 304 impressions over 90 days (biggest
     // single-page impression bucket on the site), but the previous 87-char
@@ -73,7 +73,7 @@ export const STRATEGIES: StrategyConfig[] = [
     // "best swing trade stocks" / "swing trade stocks" / "swing trading stocks".
     metaTitle: "Best Swing Trade Stocks 2026 — Top 30 by Score | Tapeline",
     metaDescription:
-      "Today's 30 best swing trade stocks, ranked by Tapeline's composite score — live scores, daily refresh, next-day scorecard vs SPY.",
+      "Today's 30 best swing trade stocks, ranked by Tapeline's composite score — cached snapshot, next-day scorecard vs SPY.",
     lede:
       "Swing trading rewards the names where multiple factors line up over multiple sessions. The list below ranks US tickers by Tapeline composite score — the six factors weighted most toward Trend and Relative Strength and least toward Momentum — filtered to a minimum score of 65 (top third of the distribution). Sorted by composite descending. The composite is the best summary number for a multi-day setup.",
     apiParams: { sort: "score", order: "desc", min_score: "65", limit: "30" },
@@ -116,7 +116,7 @@ export const STRATEGIES: StrategyConfig[] = [
     // and removes the old "Top…Top" repetition.
     metaTitle: "Momentum Stocks List 2026 — Top 30 5-Day Movers | Tapeline",
     metaDescription:
-      "An updated momentum stocks list — the 30 biggest 5-day US movers also scoring 60+ on Tapeline's composite score. Live, daily refresh.",
+      "An updated momentum stocks list — the 30 biggest 5-day US movers also scoring 60+ on Tapeline's composite score. Cached snapshot.",
     lede:
       "Momentum without score confirmation is a coin flip. Pure 'biggest 5-day movers' lists are dominated by news pops, short squeezes, and reversals that fail in the next session. The list below filters to composite 60+ before sorting by 5-day change — the move PLUS the underlying factor confluence. Trend, relative strength, smart money: if those agree with the recent momentum, you've got a structural runner. If they don't, you've got a name to fade.",
     apiParams: { sort: "change_pct_5d", order: "desc", min_score: "60", limit: "30" },
@@ -146,7 +146,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Best Dividend Stocks — Quality Scored by the Six-Factor Composite",
     metaTitle: "Best Dividend Stocks 2026 — Utilities Ranked by Tapeline Score",
     metaDescription:
-      "Live ranking of US Utilities-sector dividend names — scored by the Tapeline six-factor composite. Quality dividend names ranked by trend + fundamentals confluence. Free to read, no account; Pro at $8.25/mo annual.",
+      "Ranking of US Utilities-sector dividend names — scored by the Tapeline six-factor composite. Quality dividend names ranked by trend + fundamentals confluence. Free to read, no account; Pro at $8.25/mo annual.",
     lede:
       "Dividend investing fails when 'high yield' is the only filter — high yields are often the market pricing in dividend risk. The right filter is yield in the context of quality: are the fundamentals strong, is the trend confirming, is the sector regime supportive? The list below ranks US tickers in the Utilities sector — the classic income-oriented, dividend-rich corner of the market — by Tapeline composite, the same six-factor formula that prices in trend, fundamentals, and macro alongside the yield. High score in a dividend sector means yield WITH durability.",
     apiParams: { sort: "score", order: "desc", min_score: "55", sector: "Utilities", limit: "30" },
@@ -166,7 +166,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "Should I cross-check with another tool?",
-        a: "For deep dividend-specific research (payout-ratio history, dividend-growth streaks, ex-div schedule), Simply Wall St's Snowflake includes a Dividends dimension that's purpose-built. Many dividend investors run Tapeline for the live composite + Simply Wall St for the dividend-specific deep dive. See the head-to-head comparison.",
+        a: "For deep dividend-specific research (payout-ratio history, dividend-growth streaks, ex-div schedule), Simply Wall St's Snowflake includes a Dividends dimension that's purpose-built. Many dividend investors run Tapeline for the composite + Simply Wall St for the dividend-specific deep dive. See the head-to-head comparison.",
       },
     ],
   },
@@ -176,7 +176,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Best Value Stocks — Quality Composite at Reasonable Multiples",
     metaTitle: "Best Value Stocks 2026 — Score Confluence | Tapeline",
     metaDescription:
-      "Live ranking of US value-investor candidates — Tapeline composite filter on quality fundamentals with the score in the constructive range. Six-factor scoring catches value traps before you do. Free to read, no account; 30-day Premium trial takes a card, $0 today.",
+      "Ranking of US value-investor candidates — Tapeline composite filter on quality fundamentals with the score in the constructive range. Six-factor scoring catches value traps before you do. Free to read, no account; 30-day Premium trial takes a card, $0 today.",
     lede:
       "Value investing fails when you buy a stock just because it's cheap. The market is usually cheap-for-a-reason; the trick is separating temporarily cheap from structurally broken. Tapeline's composite is built on six factors, with Fundamentals carrying material — but not leading — weight; a strong fundamentals score combined with a constructive overall composite (score 55-75 — the upper-middle of the distribution, not the top) is where value setups actually live. Top of the distribution is already-priced-in; bottom is broken. The middle, filtered to quality, is the value-investor zone.",
     apiParams: { sort: "score", order: "desc", min_score: "55", limit: "30" },
@@ -192,7 +192,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "How is this different from Simply Wall St's value screen?",
-        a: "Simply Wall St's Value dimension is bottom-up DCF-style — intrinsic value vs current price, with their internal model. Useful but cadence is daily. Tapeline's value-zone filter is composite-based, live, and contextualised by macro and smart-money signals — it tells you not just whether the stock is undervalued by their model, but whether the market regime is supportive of the rerating. Different angles on the same problem.",
+        a: "Simply Wall St's Value dimension is bottom-up DCF-style — intrinsic value vs current price, with their internal model. Useful but cadence is daily. Tapeline's value-zone filter is composite-based (most of its inputs are also daily readings) and contextualised by macro and smart-money signals — it tells you not just whether the stock is undervalued by their model, but whether the market regime is supportive of the rerating. Different angles on the same problem.",
       },
       {
         q: "What signal labels suit value investors?",
@@ -208,10 +208,10 @@ export const STRATEGIES: StrategyConfig[] = [
   {
     slug: "penny-stocks",
     display: "Penny Stocks",
-    h1: "Best Penny Stocks — Live Top 30 Under $5 by Composite Score",
+    h1: "Best Penny Stocks — Top 30 Under $5 by Composite Score",
     metaTitle: "Best Penny Stocks 2026 — Top 30 Under $5 by Score | Tapeline",
     metaDescription:
-      "30 US penny stocks (under $5) ranked by Tapeline's composite score. Score-filtered so the list isn't just 'cheap and dying'. Live, daily refresh.",
+      "30 US penny stocks (under $5) ranked by Tapeline's composite score. Score-filtered so the list isn't just 'cheap and dying'. Cached snapshot.",
     lede:
       "Pure 'cheapest stocks' lists are a guaranteed loss machine — most names under $5 are cheap for a reason (deteriorating fundamentals, failed growth stories, dilution risk). The list below filters US tickers under $5 to a composite score of 35+, which removes the structurally broken names and leaves the small-cap candidates that at least have factor confluence. Tapeline's six-factor formula treats a $3 stock the same way it treats a mega-cap: trend, fundamentals, smart money, macro, momentum. Cheap isn't a strategy. Cheap with the score behind it might be.",
     apiParams: { sort: "score", order: "desc", max_price: 5, min_score: "35", limit: "30" },
@@ -238,10 +238,10 @@ export const STRATEGIES: StrategyConfig[] = [
   {
     slug: "under-10",
     display: "Under $10",
-    h1: "Best Stocks Under $10 — Live Top 30 by Tapeline Score",
+    h1: "Best Stocks Under $10 — Top 30 by Tapeline Score",
     metaTitle: "Best Stocks Under $10 in 2026 — Top 30 by Score | Tapeline",
     metaDescription:
-      "30 best US stocks priced under $10, ranked by Tapeline's composite score. Quality-filtered so cheap doesn't mean broken. Live universe, daily refresh.",
+      "30 best US stocks priced under $10, ranked by Tapeline's composite score. Quality-filtered so cheap doesn't mean broken. Cached snapshot.",
     lede:
       "Stocks priced under $10 sit between the penny-stock void and the mid-cap mainstream — a sweet spot of underfollowed names where score-based scoring can still find edge. Tapeline ranks every US ticker under $10 by composite score, filters to 45+ (the lower half of CONSTRUCTIVE), and surfaces the top 30. Cheap names with the trend, fundamentals, or relative strength backing them up.",
     apiParams: { sort: "score", order: "desc", max_price: 10, min_score: "45", limit: "30" },
@@ -261,7 +261,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What if I want to see all cheap stocks, not just the top 30?",
-        a: "The live scanner at /app/scanner has full price-range filtering — set min_price/max_price to any range you want, then sort and filter by score, sector, signal label. The list above is an SEO-friendly opinionated view; the scanner is the working tool.",
+        a: "The scanner at /app/scanner has full price-range filtering — set min_price/max_price to any range you want, then sort and filter by score, sector, signal label. The list above is an SEO-friendly opinionated view; the scanner is the working tool.",
       },
     ],
   },
@@ -272,10 +272,10 @@ export const STRATEGIES: StrategyConfig[] = [
     // "growth stocks" 178 + "best growth stocks" 80, 586 impressions at pos ~23).
     // Sort stays "1M Move" in the title — this list sorts by change_pct_1m, not
     // score, so a "by Score" title would be inaccurate.
-    h1: "Best Growth Stocks Right Now — Live Top 30 by 1-Month Move",
-    metaTitle: "Best Growth Stocks 2026 — Live Top 30 by 1M Move | Tapeline",
+    h1: "Best Growth Stocks Right Now — Top 30 by 1-Month Move",
+    metaTitle: "Best Growth Stocks 2026 — Top 30 by 1M Move | Tapeline",
     metaDescription:
-      "Today's best US growth stocks, ranked by 1-month move and filtered to composite 65+ on Tapeline's published six-factor methodology. Live, daily refresh.",
+      "Today's best US growth stocks, ranked by 1-month move and filtered to composite 65+ on Tapeline's published six-factor methodology. Cached snapshot.",
     lede:
       "Growth investing rewards stocks where the price has been moving up over weeks, not days — sustained advance backed by improving fundamentals and broadening participation. The list below ranks US tickers by 1-month percentage change, filtered to composite score 65+ (the lower half of STRONG SETUP). Pure '1-month winners' lists pick up bounces from broken names; the score filter keeps the structurally healthy ones.",
     apiParams: { sort: "change_pct_1m", order: "desc", min_score: "65", limit: "30" },
@@ -305,7 +305,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Stocks Breaking Out Today — Top 30 by 1-Day Move + Score",
     metaTitle: "Stocks Breaking Out Today 2026 — Top 30 Movers + Score | Tapeline",
     metaDescription:
-      "30 US stocks with the biggest 1-day move today, filtered to composite 70+. The 'biggest movers + factor confluence' filter that pure-momentum lists miss. Live.",
+      "30 US stocks with the biggest 1-day move today, filtered to composite 70+. The 'biggest movers + factor confluence' filter that pure-momentum lists miss. Cached snapshot.",
     lede:
       "Breakout scans live or die on the score filter. A pure 'biggest 1-day movers' list is mostly noise — small-caps spiking on news, short squeezes, low-quality penny stocks. The list below ranks today's biggest US movers, filtered to composite 70+ (STRONG SETUP and above). That's the breakout-with-confluence cluster: the move plus the trend, relative strength, and fundamentals confirming it. Real breakouts, not head-fakes.",
     apiParams: { sort: "change_pct_1d", order: "desc", min_score: "70", limit: "30" },
@@ -321,11 +321,11 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What time of day is best to scan?",
-        a: "Late morning (US ET) is typically the sweet spot — early-day moves driven by overnight news have settled, and the names showing 1-day moves backed by score confluence are the ones likely to continue. Tapeline's underlying scores refresh sub-60 seconds during market hours, so the list updates throughout the session.",
+        a: "Late morning (US ET) is typically the sweet spot — early-day moves driven by overnight news have settled, and the names showing 1-day moves backed by score confluence are the ones likely to continue. Tapeline's prices are delayed about 15 minutes and this page is a saved snapshot that can be an hour old or more, so treat the list as a starting point to check, not an intraday feed.",
       },
       {
         q: "Do I need to act intraday or can I act on a daily-close breakout?",
-        a: "Both work. The 1-day move column is live during the session and final at close. Tapeline's scorecard back-checks against next-session return — so the model is built around next-session continuation, not intraday continuation. Daily-close breakouts that the model picks up tend to extend in the next 1-3 sessions; intraday breakouts often mean-revert by end of day.",
+        a: "Both work. The 1-day move column changes during the session (from prices delayed about 15 minutes) and is final at close. Tapeline's scorecard back-checks against next-session return — so the model is built around next-session continuation, not intraday continuation. Daily-close breakouts that the model picks up tend to extend in the next 1-3 sessions; intraday breakouts often mean-revert by end of day.",
       },
     ],
   },
@@ -335,7 +335,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Best AI Stocks — Tech-Sector Leaders Scored by the Tapeline Composite",
     metaTitle: "Best AI Stocks 2026 — Tech Leaders by Tapeline Score | Tapeline",
     metaDescription:
-      "Top 30 US Information Technology names ranked by Tapeline's composite score. The AI cluster filtered for trend + fundamentals confluence. Live, daily refresh.",
+      "Top 30 US Information Technology names ranked by Tapeline's composite score. The AI cluster filtered for trend + fundamentals confluence. Cached snapshot.",
     lede:
       "Every retail trader wants a piece of the AI story. The problem is that 'AI stocks' as a screen is messy — it's not a sector and the qualifying companies range from semis (NVDA, AMD) to hyperscalers (MSFT, GOOGL, META, AMZN) to applied-AI plays (PLTR, ORCL). The list below filters to Information Technology — the GICS sector with the densest AI exposure — and ranks by Tapeline composite. The score knows trend, relative strength, and fundamentals matter more than the headline label.",
     apiParams: { sort: "score", order: "desc", min_score: "60", sector: "Information Technology", limit: "30" },
@@ -365,7 +365,7 @@ export const STRATEGIES: StrategyConfig[] = [
     h1: "Highest-Scored US Stocks Right Now — Tapeline's HIGH CONVICTION Tier",
     metaTitle: "Highest Scored Stocks Today — Top 30 HIGH CONVICTION | Tapeline",
     metaDescription:
-      "The 30 US stocks scoring highest on Tapeline's composite score — HIGH CONVICTION tier (score 85+). Live ranking, daily public scorecard.",
+      "The 30 US stocks scoring highest on Tapeline's composite score — HIGH CONVICTION tier (score 85+). Cached ranking, daily public scorecard.",
     lede:
       "The HIGH CONVICTION tier is the top 1-3% of the universe at any time — names where Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum all agree. The list below ranks them by composite score. The daily top 10 across the whole universe is back-checked against next-session SPY return at /scorecard, losses kept. This is the most concentrated view of the model's strongest signals.",
     apiParams: { sort: "score", order: "desc", signal: "HIGH CONVICTION", limit: "30" },

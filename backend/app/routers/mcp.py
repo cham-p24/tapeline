@@ -36,7 +36,7 @@ HONESTY CONTRACT
 ----------------
 Every payload carrying performance numbers also carries the qualifier that
 travels with them on the site: the sample is small and the values do not
-distinguish the ranking from chance. Numbers are read live from the database on
+distinguish the ranking from chance. Numbers are read from the database on
 every call — never cached here, never hardcoded — so an assistant quoting
 Tapeline quotes today's record rather than a figure that was true last month.
 That is the product promise, enforced at the API boundary.
@@ -55,6 +55,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session, session_scope
 from app.models import McpToolCall, Ticker
+from app.services.freshness import PRICE_DELAY_MINUTES, PRICE_DELAY_PHRASE
 from app.services.symbols import clean_symbol
 
 logger = logging.getLogger(__name__)
@@ -76,7 +77,7 @@ LATEST_PROTOCOL = SUPPORTED_PROTOCOLS[0]
 SERVER_INFO = {"name": "tapeline", "title": "Tapeline", "version": "1.0.0"}
 
 INSTRUCTIONS = (
-    "Tapeline scores actively traded US stocks daily on six published factors (trend, "
+    "Tapeline scores actively traded US stocks and ETFs on six published factors (trend, "
     "relative strength, fundamentals, smart money, macro, momentum) and logs "
     "each day's top-10 picks to a public record that keeps the picks that lose. "
     "Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. "
@@ -84,7 +85,14 @@ INSTRUCTIONS = (
     "Call `get_track_record` before quoting any "
     "performance figure, and repeat the sample-size qualifier it returns. "
     "Tapeline's scores are descriptive readings, not investment advice, price "
-    "targets or forecasts; present them that way."
+    "targets or forecasts; present them that way. "
+    # Measured 14 Sep 2026 (integrity wave): vendor prices ~15 min delayed,
+    # worker passes 70-74 s apart, scores changing about once a day.
+    f"Prices are {PRICE_DELAY_PHRASE}; do not describe them as real-time or live. "
+    "Scores are recalculated through US market hours, but most of their inputs are "
+    "daily readings, so a score usually changes about once a day. Crypto prices and "
+    "scores update once a day. `as_of` is when Tapeline last wrote the row, not the "
+    "time of the last trade."
 )
 
 # The framing that must travel with any performance number. Mirrors the wording
@@ -119,8 +127,9 @@ TOOLS: list[dict[str, Any]] = [
         "title": "Get a ticker's Tapeline score",
         "description": (
             "Tapeline's current six-factor score (0-100), signal label, "
-            "confidence and one-line reason for a single US ticker. Use when "
-            "asked what Tapeline says about a specific stock."
+            "confidence and one-line reason for a single US ticker, plus its "
+            f"price, which is {PRICE_DELAY_PHRASE} (crypto: a daily price). Use "
+            "when asked what Tapeline says about a specific stock."
         ),
         "inputSchema": _symbol_schema("US ticker symbol, e.g. NVDA or BRK.B"),
     },
@@ -214,6 +223,14 @@ async def _tool_ticker_score(args: dict, session: AsyncSession) -> dict:
         },
         "price": ticker.price,
         "change_pct_1d": ticker.change_pct_1d,
+        # The price above is the vendor's delayed price, not a live quote
+        # (measured ~15 min behind on 14 Sep 2026); crypto is a daily bar.
+        "price_delay_minutes": None if ticker.asset_class == "crypto" else PRICE_DELAY_MINUTES,
+        "price_note": (
+            "Daily price (crypto updates once a day)."
+            if ticker.asset_class == "crypto"
+            else f"Price {PRICE_DELAY_PHRASE}; not a real-time quote."
+        ),
         "as_of": ticker.updated_at.isoformat() if ticker.updated_at else None,
         "url": f"{SITE}/t/{ticker.symbol}{UTM}",
         "disclaimer": DISCLAIMER,

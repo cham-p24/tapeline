@@ -530,7 +530,7 @@ export default function WatchlistPage() {
       )}
 
       {/* Track record — the Premium blend of watchlist + scorecard: each
-          watched ticker's live score alongside its own next-day-vs-SPY record.
+          watched ticker's current score alongside its own next-day-vs-SPY record.
           Self-gates (Premium → data, Free/Pro → upgrade teaser) and self-hides
           when nothing is watched. */}
       <WatchlistTrackRecord />

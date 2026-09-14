@@ -101,10 +101,10 @@ export function BreakingNewsBar() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-down opacity-75" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-down" />
           </span>
-          Live news
+          News
         </span>
         <span className="text-[10px] text-subtle">
-          {items.length}{" "}headlines · refreshing every 60s
+          {items.length}{" "}headlines · checked every 60s
         </span>
         <Link href="/app/news" className="ml-auto text-[11px] text-muted hover:text-fg">
           view all →

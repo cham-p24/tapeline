@@ -112,12 +112,12 @@ export function ScorecardClient() {
             <div>
               <strong className="text-fg">Entries shown are delayed {data.summary.delay_days} days.</strong>{" "}
               <span className="text-muted">
-                The delay is a product gate on the live ranking, not a filter on the record — no
-                entry is withheld beyond it. Live entries are a Pro / Premium feature.
+                The delay is a product gate on the most recent entries, not a filter on the record — no
+                entry is withheld beyond it. The most recent entries are a Pro / Premium feature.
               </span>
             </div>
             <Link href="/pricing" className="btn-primary whitespace-nowrap text-sm">
-              See live picks &rarr;
+              See recent picks &rarr;
             </Link>
           </div>
         </div>

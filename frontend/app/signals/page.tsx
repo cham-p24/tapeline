@@ -32,9 +32,9 @@ import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 const PREVIEW_ROWS = 10;
 
 export const metadata = pageMeta({
-  title: "All Tapeline-Scored Tickers — Live 6-Factor Universe",
+  title: "All Tapeline-Scored Tickers — 6-Factor Universe",
   description:
-    "Every US stock Tapeline scores, ranked by the live 0-100 composite. " +
+    "Every US stock Tapeline scores, ranked by the 0-100 composite. " +
     "Same published methodology as our public scorecard. Sign up to see the full universe.",
   path: "/signals",
 });
@@ -364,7 +364,7 @@ export default async function SignalsPage() {
             </p>
             <div className="mt-3 flex flex-wrap gap-3">
               <Link href="/app/scanner" className="btn-primary">
-                Open the live scanner &rarr;
+                Open the scanner &rarr;
               </Link>
               <Link href="/pricing" className="btn-ghost">
                 See pricing

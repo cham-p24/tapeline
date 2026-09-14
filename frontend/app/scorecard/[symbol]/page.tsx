@@ -80,7 +80,7 @@ export default function TickerScorecardPage() {
                 <span className="text-muted">
                   Today&rsquo;s composite score: {data.summary.current_score != null ? data.summary.current_score.toFixed(1) : "pending"}
                   {data.summary.current_signal ? <> · <span className="uppercase tracking-wide">{data.summary.current_signal}</span></> : null}.
-                  Live tracking on the {" "}
+                  Current score on the {" "}
                   <Link href={`/t/${encodeURIComponent(sym)}`} className="text-accent hover:underline">{sym} ticker page</Link>.
                 </span>
               </div>
@@ -96,11 +96,11 @@ export default function TickerScorecardPage() {
                   <div>
                     <strong className="text-fg">Rows shown are delayed {data.summary.delay_days} days.</strong>{" "}
                     <span className="text-muted">
-                      Live rows are a Pro / Premium feature. Summary stats above are real-time.
+                      The most recent rows are a Pro / Premium feature. Summary stats above include every row.
                     </span>
                   </div>
                   <Link href="/pricing" className="btn-primary whitespace-nowrap text-sm">
-                    See live rows &rarr;
+                    See recent rows &rarr;
                   </Link>
                 </div>
               </div>
@@ -182,7 +182,7 @@ export default function TickerScorecardPage() {
 
             <div className="mt-10 flex flex-wrap gap-3">
               <Link href={`/t/${encodeURIComponent(sym)}`} className="btn-primary text-sm">
-                See {sym} live →
+                See {sym}'s ticker page →
               </Link>
               <Link href="/scorecard" className="btn-ghost text-sm">
                 Back to full scorecard
