@@ -292,8 +292,8 @@ def insider_rows_are_the_stamped_fetch(
 async def _rebuild_unsaved_smart_money_scores() -> int:
     """Put back smart-money readings the insider pass computed but nothing saved.
 
-    THE LOSS. The insider pass puts its score only into this process's
-    `_SMART_MONEY_SCORE_CACHE`. The Ticker row receives it later: from the tick
+    THE LOSS. The insider pass used to put its score only into this process's
+    `_SMART_MONEY_SCORE_CACHE`. The Ticker row received it later: from the tick
     for rows the sheet does not own, and from the sheet upsert - which runs only
     when the sheet changes - for rows it does. A restart in between lost the
     reading, and the pass's stamp then hid the symbol from the refresh. On
@@ -301,6 +301,12 @@ async def _rebuild_unsaved_smart_money_scores() -> int:
     and META among them, each with its Form 4 rows on file. #812's script
     repaired them once. This repeats that repair at every boot, so the next
     restart cannot lose them again.
+
+    The pass now writes each reading onto its row with its stamp
+    (`signal_publisher._flush_insider_attempts`), because this repair cannot
+    see a reading that replaced an OLDER stored value: it only looks at NULL
+    rows. What is left for it here is a reading the pass stamped without
+    writing - a row another writer kept changing - and rows from before that.
 
     Rebuilt only for rows whose sub_smart_money is NULL, never for an X: crypto
     pair, and only where the stored rows are the stamped fetch

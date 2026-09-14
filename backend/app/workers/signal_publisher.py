@@ -3121,8 +3121,10 @@ async def _save_factor_readings(
     their run, waiting for the sheet - while the tick's own rows lost ~0. That
     left 1,548 such equities at NEUTRAL 50, ADBE, JPM, COST, V, CAT, PEP, MRK
     and BA among them. The metric blob that could rebuild a lost reading is on
-    Fly's ephemeral disk, which the same deploy wipes, so unlike smart money
-    there is nothing to rebuild from.
+    Fly's ephemeral disk, which the same deploy wipes, so there is nothing to
+    rebuild from. The insider pass writes through here too: its boot rebuild
+    repairs only NULL rows, so it never restored a new reading that had
+    replaced an older stored value (see `_flush_insider_attempts`).
 
     WHAT IS WRITTEN. The factor, and the `score` and `signal` recomputed from it
     and the five factors already on the row, exactly as `_merged_factor_set`
@@ -3211,6 +3213,41 @@ async def _flush_fundamentals_attempts(
         logger.exception("fundamentals.save_failed size=%d", len(answered))
     await _stamp_factor_attempts(
         "last_fundamentals_at", [s for s in pending if s not in answered], now,
+    )
+
+
+async def _flush_insider_attempts(
+    pending: list[str], readings: dict[str, float],
+) -> None:
+    """Record a batch of insider attempts: symbols with a reading are written
+    with it (`_save_factor_readings`), the rest are only stamped.
+
+    The boot rebuild (`finnhub_feed._rebuild_unsaved_smart_money_scores`) is no
+    substitute for the write: it repairs only rows whose sub_smart_money is
+    NULL, so a new reading replacing an OLDER stored value on a sheet-owned row
+    was lost to any restart before the sheet next changed.
+
+    Measured on production 2026-09-14 (read-only), over equities whose stored
+    Form 4 rows are the fetch their stamp records: of 2,203 sheet-owned rows,
+    21 held a value that cannot come from #812's collapse of colliding Form 4
+    lines (every line the same sign) and differed from their own rows' score,
+    BXP 18.0 against 90.0 among them; the tick's own rows had 1 in 1,242.
+    Where lines were mixed, 7.8% differed against a 4.9% baseline. All but 2
+    of the differences of 5 points or more were stamped before that day's
+    13:02 UTC deploy, i.e. already lost.
+    """
+    now = datetime.now(UTC)
+    answered = {s: readings[s] for s in pending if s in readings}
+    try:
+        await _save_factor_readings(
+            "last_smart_money_at", "sub_smart_money", answered, now,
+        )
+    except Exception:
+        # A row whose write did not land is not stamped either, so it stays due
+        # and is asked again.
+        logger.exception("insider.save_failed size=%d", len(answered))
+    await _stamp_factor_attempts(
+        "last_smart_money_at", [s for s in pending if s not in answered], now,
     )
 
 
@@ -3723,7 +3760,9 @@ async def _refresh_insider_cache(
     """
     Pre-fetch of Finnhub insider Form 4 transactions. Populates
     _SMART_MONEY_SCORE_CACHE so polygon_feed reads a real sub_smart_money per
-    tick, and stamps `last_smart_money_at` so the next run resumes.
+    tick, writes each reading onto its row with the composite recomputed beside
+    it (`_save_factor_readings`), and stamps `last_smart_money_at` so the next
+    run resumes.
 
     An EMPTY answer retires the symbol's reading and its stored Form 4 rows;
     see `_clear_smart_money_reading`. None is not an answer.
@@ -3760,6 +3799,8 @@ async def _refresh_insider_cache(
     recent_failures: deque[bool] = deque(maxlen=_FACTOR_FAILURE_WINDOW)
     stopped = False
     pending: list[str] = []
+    # This batch's readings, written onto their rows as the batch is stamped.
+    readings: dict[str, float] = {}
     i = 0
     while i < len(symbols):
         if deadline is not None and monotonic() >= deadline:
@@ -3776,6 +3817,8 @@ async def _refresh_insider_cache(
             if txns:
                 score = compute_smart_money_score(txns)
                 set_cached_smart_money_score(sym, score)
+                if score is not None:
+                    readings[sym] = score
                 # Persist to the DB-backed insider feed (cross-process, so
                 # the api machine can read what the worker writes).
                 await set_recent_insider_transactions_db(sym, txns)
@@ -3802,10 +3845,8 @@ async def _refresh_insider_cache(
             # Form 4 rows written within INSIDER_STAMP_LAG of their stamp, and
             # a stamp held back through repeated pauses could fall outside it.
             if pending:
-                await _stamp_factor_attempts(
-                    "last_smart_money_at", pending, datetime.now(UTC),
-                )
-                pending = []
+                await _flush_insider_attempts(pending, readings)
+                pending, readings = [], {}
             await asyncio.sleep(_FACTOR_THROTTLE_PAUSE_SECONDS)
             continue
         except Exception as exc:
@@ -3819,7 +3860,8 @@ async def _refresh_insider_cache(
         throttled_in_a_row = 0
         recent_failures.append(failed)
         # Stamped on ATTEMPT - a company with no Form 4 filings in the last 90
-        # days is a real answer, not an outstanding request.
+        # days is a real answer, not an outstanding request - and written onto
+        # the row when there was a reading (see _save_factor_readings).
         pending.append(sym)
         attempted += 1
         i += 1
@@ -3832,13 +3874,9 @@ async def _refresh_insider_cache(
             break
         await asyncio.sleep(1.1)  # stay well under 60/min
         if len(pending) >= _FACTOR_STAMP_BATCH:
-            await _stamp_factor_attempts(
-                "last_smart_money_at", pending, datetime.now(UTC),
-            )
-            pending = []
-    await _stamp_factor_attempts(
-        "last_smart_money_at", pending, datetime.now(UTC),
-    )
+            await _flush_insider_attempts(pending, readings)
+            pending, readings = [], {}
+    await _flush_insider_attempts(pending, readings)
 
     # A failing count must not swallow the return value below.
     try:

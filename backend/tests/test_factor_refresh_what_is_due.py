@@ -49,7 +49,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.db import session_scope
 from app.models import InsiderTransaction, Ticker
@@ -463,6 +463,8 @@ async def test_the_phase_ends_when_stamps_do_not_land(
         return None
 
     monkeypatch.setattr(sp, "_stamp_factor_attempts", _stamps_lost)
+    # A reading's stamp rides in the same UPDATE as the reading.
+    monkeypatch.setattr(sp, "_save_factor_readings", _stamps_lost)
     await _seed([
         {"symbol": f"NP{i}", "volume": 100 - i, "last_fundamentals_at": NOW}
         for i in range(5)
@@ -673,16 +675,36 @@ async def test_a_restart_no_longer_loses_a_reading_the_pass_computed(
 ) -> None:
     """The whole loop, on the path that lost 2,404 sheet-owned rows.
 
-    The pass scores OXY into memory; the process dies before any writer saves
-    it; the new process warms; the sheet refresh writes the cache onto the row.
+    The pass now writes its reading onto the row itself. What is left for the
+    rebuild is a reading the pass stamped WITHOUT writing: another writer kept
+    changing the row, so the compare-and-set missed every attempt. That stamp
+    must still sit within INSIDER_STAMP_LAG of the Form 4 rows, or the rebuild
+    will not trust them. The pass scores OXY into memory; the process dies
+    before any writer saves it; the new process warms; the sheet refresh writes
+    the cache onto the row.
     Mutation: not calling the rebuild from the warm - the row ends up NULL."""
     from app.services.sheet_feed import parse_all_signals_csv, upsert_tickers
 
     await _seed([{"symbol": "OXY"}])
     _insider_vendor(monkeypatch)
+    real_held = sp._held_factors
+    races = 0
+
+    async def _always_racing(symbols: list[str], columns: list[str]) -> Any:
+        nonlocal races
+        races += 1
+        held = await real_held(symbols, columns)
+        async with session_scope() as s:
+            await s.execute(
+                update(Ticker).where(Ticker.symbol == "OXY").values(sub_trend=float(races))
+            )
+        return held
+
+    monkeypatch.setattr(sp, "_held_factors", _always_racing)
     await sp._refresh_insider_cache(limit=1)
     expected = finnhub_feed.get_cached_smart_money_score("OXY")
     assert expected == 10.0
+    assert races == sp._FACTOR_SAVE_ATTEMPTS
 
     # The restart: memory gone, and nothing ever put the value on the row.
     monkeypatch.setattr(finnhub_feed, "_SMART_MONEY_SCORE_CACHE", {})
