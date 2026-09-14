@@ -52,6 +52,18 @@ const METHODOLOGY_LOG: LogEntry[] = [
       "At 13:30 UTC on 14 September 2026, 856 tickers held a Smart Money value although no SEC Form 4 filing for them was on file: 629 ETFs, 222 stocks and 5 commodity futures contracts. 42 of those values are below 10 or above 90, and the Form 4 calculation only produces values from 10 to 90. Where the values came from has not been established. 16 of the 100 entries recorded from 24 August to 11 September 2026 were ranked while the ticker held such a value: BBH on 24, 25, 26 and 28 August and 1, 3 and 8 September; BBP on 25, 26 and 28 August and 1 September; BIB on 26 August and 1 September; and PLX on 8, 10 and 11 September. Each of those four values is the same on every day of our stored score history, which begins on 24 August 2026. The same tickers also appear in 7 entries recorded before that date: BBH on 19 and 21 August, BBP on 20 August, and BIB on 7, 12, 13 and 20 August 2026. Whether they held such a value on those days cannot be checked. For these tickers two statements were not true: the Smart Money methodology page says a ticker with no disclosed filings in the window has no reading at all, and the 2026-08-23 entry for #620 says a missing reading stays blank. From 14 September 2026 (#824), when the source we read Form 4 filings from reports none for a ticker in the window, its Smart Money value is removed, its stored filings are deleted, and its score is recomputed with that factor counted as neutral, unless a filing we already hold from that source records a transaction in the last 80 days. A reading whose filings have all left the window is removed at the ticker's next re-check, not at once. A ticker holding a value with no filing on file becomes due for a re-check at the next daily run, ahead of other Smart Money re-checks, instead of on its usual schedule, which for ETFs and futures contracts is about monthly (#833). No recorded entry was changed.",
     ref: "#824, #833",
   },
+  // The Smart Money source switch. Facts from backend/app/services/edgar_form4.py
+  // and #837; counts verified read-only against the production database at
+  // 21:48 UTC on 2026-09-14. The insider pages' own wording is updated
+  // separately once the last vendor-sourced rows are gone.
+  {
+    date: "2026-09-14",
+    kind: "methodology",
+    title: "Insider Form 4 filings now come from SEC EDGAR instead of a data vendor",
+    body:
+      "From 14 September 2026 the Smart Money factor reads corporate-insider Form 4 filings from SEC EDGAR, the SEC's own filing system, instead of through a data vendor. What is read also changed. Only the common-stock table of each filing is counted, not the table of options and other derivative securities. An amended filing (Form 4/A) replaces the filing it amends instead of being counted as well. A ticker with no Form 4 filer of its own on EDGAR, which includes most ETFs and funds, has no reading. A transaction line whose share count is too large for our database is left out rather than failing the whole ticker (#837). A ticker's stored filings and its Smart Money value change over at its next successful re-check, about every two days for a stock and about monthly for an ETF or futures contract; until then its vendor-sourced filings and value remain. The switch made every ticker due for a re-check at once, and at 21:48 UTC on 14 September 2026, 95 stored filing lines from the vendor remained, for 6 tickers. No recorded entry was changed.",
+    ref: "#835, #837",
+  },
   // ── Integrity wave, approved by the founder on 2026-09-14 ──────────────
   // The entries dated 2026-09-14 below are disclosures made on that date. The
   // entries dated 2026-09-10, 2026-09-06 (#766), 2026-08-23 and 2026-06-15

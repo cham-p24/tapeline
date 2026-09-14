@@ -230,6 +230,11 @@ describe("rendered static pages", () => {
       // The guard is 80 days on the transaction date, not the 90-day window.
       "unless a filing we already hold from that source records a transaction in the last 80 days",
       "becomes due for a re-check at the next daily run, ahead of other Smart Money re-checks",
+      // #835: the Form 4 source switch, dated, with what was read differently.
+      "Insider Form 4 filings now come from SEC EDGAR instead of a data vendor",
+      "Only the common-stock table of each filing is counted",
+      "change over at its next successful re-check",
+      "95 stored filing lines from the vendor remained, for 6 tickers",
     ]) {
       expect(text).toContain(needle);
     }
