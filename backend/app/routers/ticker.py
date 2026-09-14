@@ -602,7 +602,39 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         # instead of the cap arriving as a surprise 402. Anonymous callers
         # aren't metered here, so `lookups` stays None for them.
         lookups_payload: dict | None = None
-        if user is not None:
+        receipt_payload: str | None = None
+        # A background refetch by the in-app page (useLiveStream, after a live
+        # bridge event). It is served WITHOUT metering: no look-up spent, no
+        # 402, no cap hit, no founder email, no ticker_view, no activation. For
+        # a metered user it must carry today's receipt for THIS symbol (see
+        # services/usage.py "Stream refetches"), else it is refused with 409
+        # and still costs and records nothing. Read from query_params rather
+        # than declared as parameters so the handler signature is unchanged.
+        stream_refetch = request.query_params.get("src") == "stream"
+        if user is not None and stream_refetch:
+            from app.services.usage import (
+                is_metered,
+                lookup_receipt,
+                peek_ticker_lookup,
+                verify_lookup_receipt,
+            )
+
+            if is_metered(user) and not verify_lookup_receipt(
+                request.query_params.get("receipt"), user.id, symbol
+            ):
+                raise HTTPException(
+                    409,
+                    detail={
+                        "error": "refetch_not_viewed",
+                        "message": (
+                            "A background refresh needs a look-up of this "
+                            "ticker today. Reload the page."
+                        ),
+                    },
+                )
+            lookups_payload = _lookup_meter_payload(await peek_ticker_lookup(session, user))
+            receipt_payload = lookup_receipt(user.id, symbol)
+        elif user is not None:
             meter = await consume_ticker_lookup(session, user)
             if not meter["allowed"]:
                 # Free user out of daily look-ups — the conversion wall. Log the
@@ -621,6 +653,11 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
                     },
                 )
             lookups_payload = _lookup_meter_payload(meter)
+            # Proof of this allowed look-up, echoed by the page on its stream
+            # refetches so they are served without spending another.
+            from app.services.usage import lookup_receipt
+
+            receipt_payload = lookup_receipt(user.id, symbol)
 
             # An allowed lookup, i.e. a real ticker view by a signed-in user.
             # Placed AFTER the 402 branch above so a refusal is recorded as a
@@ -853,6 +890,10 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         # callers, who aren't metered on this endpoint). limit=null means
         # unmetered — paid tier, active trial, or first-session grace.
         "lookups": lookups_payload,
+        # Signed-in callers only: today's receipt for this user and symbol. The
+        # in-app page sends it back with `src=stream` refetches. Null for
+        # anonymous callers (not metered here, nothing to prove).
+        "lookup_receipt": receipt_payload,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
     }
 

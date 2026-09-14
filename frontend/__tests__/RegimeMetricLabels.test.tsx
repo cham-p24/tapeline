@@ -25,9 +25,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 
-vi.mock("@/lib/useLiveStream", () => ({
-  useLiveStream: () => ({ status: "live", lastUpdate: null }),
-}));
+vi.mock("@/lib/useLiveStream", () => {
+  // Stable like the real hook's useCallback: pages list it in effect deps.
+  const markLoaded = () => {};
+  return {
+    useLiveStream: () => ({ status: "connected", lastUpdate: null, markLoaded }),
+  };
+});
 
 // The page body is wrapped in <Paywall>, which returns null while the user
 // context loads. Pass children through so we can assert on the real content.

@@ -28,12 +28,16 @@ vi.mock("@/components/UserContext", () => ({
 // The page subscribes to the backend SSE stream — jsdom has no EventSource,
 // and the re-poll behaviour is covered by asserting which api.* fn is called.
 vi.mock("@/components/LiveBadge", () => ({
-  LiveBadge: () => <span>Live</span>,
+  LiveBadge: () => <span data-testid="live-badge">Updated 10:00</span>,
 }));
 
-vi.mock("@/lib/useLiveStream", () => ({
-  useLiveStream: () => ({ status: "live", lastUpdate: null }),
-}));
+vi.mock("@/lib/useLiveStream", () => {
+  // Stable like the real hook's useCallback: pages list it in effect deps.
+  const markLoaded = () => {};
+  return {
+    useLiveStream: () => ({ status: "connected", lastUpdate: null, markLoaded }),
+  };
+});
 
 const fullRow = {
   symbol: "NVDA",
@@ -148,6 +152,7 @@ describe("SqueezePage", () => {
       // No table shell (headers, column tooltips) over an empty list.
       expect(container.querySelector("table")).toBeNull();
       expect(text).not.toMatch(/\bLive\b/);
+      expect(screen.queryByTestId("live-badge")).not.toBeInTheDocument();
       expect(text).not.toContain("FCX");
       expect(text).not.toContain("BKNG");
       expect(screen.queryByText(/shown on Free/)).not.toBeInTheDocument();

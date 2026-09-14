@@ -60,7 +60,7 @@ export default function HeatmapPage() {
   const load = useCallback(async () => {
     // Tier decides the endpoint — don't fire until the session resolves, or
     // we'd guess wrong and eat a 403.
-    if (userLoading) return;
+    if (userLoading) return false;
     try {
       if (!hasFullHeatmap) {
         // Free / signed-out: the public sector aggregate. Same underlying
@@ -69,7 +69,7 @@ export default function HeatmapPage() {
         const r = await heatmapPreview();
         setPreviewSectors(r.sectors || []);
         setLoadError(null);
-        return;
+        return true;
       }
       const r = await api.heatmap(debouncedSearch || undefined);
       setSectors(r.sectors || []);
@@ -84,17 +84,23 @@ export default function HeatmapPage() {
         });
       }
       setLoadError(null);
+      return true;
     } catch (e) {
       // 401 (signed out), 5xx (backend hiccup) land here. A failed load must
       // never masquerade as an empty market — surface the error and keep the
       // page alive instead of crashing the tree.
       setLoadError(errorMessage(e));
       setSectors([]);
+      return false;
     }
   }, [debouncedSearch, hasFullHeatmap, userLoading]);
 
-  useEffect(() => { load(); }, [load]);
-  const { status, lastUpdate } = useLiveStream(load);
+  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived.
+  const { status, lastUpdate, markLoaded } = useLiveStream(load);
+  useEffect(() => {
+    void load().then((ok) => { if (ok) markLoaded(); });
+  }, [load, markLoaded]);
 
   // Client-side sector filter sits on top of the (already-server-filtered)
   // sector list. Keeping it client-side means changing the dropdown is
