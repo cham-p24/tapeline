@@ -168,7 +168,7 @@ export const FROM_COPY: Record<string, { h1: string; sub: string }> = {
   // not: creating the account starts nothing, and the trial is chosen later.
   trial: {
     h1: "$0 today. The charge date is on the page.",
-    sub: `Creating an account takes an email and a password and starts no trial. The ${TRIAL_LENGTH_LABEL} Premium trial is a separate step: it takes a card and charges $0 today — the exact date of the first charge is shown before you confirm, we email you about ${PRECHARGE_NOTICE_DAYS} days ahead of it, and one click ends the trial before then. Reading the public record needs no account either way.`,
+    sub: `Creating an account takes an email and a password and starts no trial. The ${TRIAL_LENGTH_LABEL} Premium trial is a separate step: it takes a card and charges $0 that day — the exact date of the first charge is shown before you confirm, we email you about ${PRECHARGE_NOTICE_DAYS} days ahead of it, and one click ends the trial before then. Reading the public record needs no account either way.`,
   },
 };
 
@@ -921,8 +921,7 @@ function SignUpForm() {
             <p className="mt-2">
               You do not need an account &mdash; or a card &mdash; to read the record: the daily
               Top 10, the back-checked scorecard, a page per scored ticker and the raw
-              CSV/JSON export are open to everyone. Accounts created before 22 August 2026 keep
-              the free access they signed up for and are never asked for a card.
+              CSV/JSON export are open to everyone.
             </p>
             <p className="mt-2 text-[11px] text-subtle">
               <span className="text-muted">{REFUND.short}</span> if you change your mind ·

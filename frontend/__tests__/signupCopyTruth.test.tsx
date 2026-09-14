@@ -21,7 +21,7 @@
  * the old copy cannot satisfy or trip it.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render } from "@testing-library/react";
+import { render, within } from "@testing-library/react";
 import type { Metadata } from "next";
 
 import SignUpPage from "@/app/signup/page";
@@ -55,11 +55,36 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
 }));
 
+// The proof block ("days on the record" + the /scorecard link) mounts only
+// once /api/scorecard returns a summary with days_tracked > 0. A bare `{}`
+// makes SignUpForm's `d.summary.days_tracked` throw inside a swallowed
+// .catch, so the block never rendered and its copy went unchecked.
+const SCORECARD_FIXTURE = {
+  summary: {
+    days_tracked: 5,
+    is_delayed: true,
+    delay_days: 7,
+    entries_scored: 0,
+    entries_excluded_outliers: 0,
+    avg_1d_return: null,
+    median_1d_return: null,
+    avg_alpha_vs_spy: null,
+    median_alpha_vs_spy: null,
+    hit_rate_beat_spy: null,
+  },
+  days: {},
+};
+
 beforeEach(() => {
   nav.search = new URLSearchParams();
   vi.stubGlobal(
     "fetch",
-    vi.fn(() => Promise.resolve({ ok: true, json: async () => ({}) })),
+    vi.fn((url: unknown) =>
+      Promise.resolve({
+        ok: true,
+        json: async () => (String(url).includes("/api/scorecard") ? SCORECARD_FIXTURE : {}),
+      }),
+    ),
   );
 });
 
@@ -77,6 +102,9 @@ const TRIAL_AT_SIGNUP: RegExp[] = [
   /\baccount\s*[—–:|-]\s*[^.;·]{0,30}\btrial\b/i,
   // "Sign up for your 30-day trial"
   /\bsign(?:ing)?[-\s]?up\b[^.;·]{0,15}\b(?:for|to)\s+(?:a|an|the|your)\s+[^.;·]{0,25}\btrial\b/i,
+  // The same claim, trial first: "your 30-day Premium trial starts the moment
+  // you create your account", "trial begins when you sign up"
+  /\btrial\b[^.;·]{0,40}\b(?:starts?|begins?|activates?|unlocks?)\b[^.;·]{0,30}\b(?:sign(?:ing)?[-\s]?up|register(?:ing)?|creat(?:e|ing)\s+(?:an\s+|your\s+)?account|account\s+is\s+created)\b/i,
   // "first charge on day 30" — a day count only means something from a start
   /\bfirst charge on day \d+/i,
   /\bfree trial\b/i,
@@ -131,10 +159,15 @@ function metaStrings(m: Metadata): Record<string, string> {
   };
 }
 
-/** Renders /signup?from=<key> and returns the H1 and its subhead as one string. */
-function renderHead(key: string): { head: string; page: string } {
+/**
+ * Renders /signup?from=<key> and returns the H1 and its subhead as one string,
+ * plus the whole page's text. Waits for the scorecard proof block to mount, so
+ * `page` includes its copy.
+ */
+async function renderHead(key: string): Promise<{ head: string; page: string }> {
   nav.search = new URLSearchParams(key === "_default" ? "" : `from=${key}`);
   const { container, unmount } = render(<SignUpPage />);
+  await within(container).findByText(/days on the record/);
   const h1 = container.querySelector("h1");
   const head = squash(`${h1?.textContent ?? ""}. ${h1?.nextElementSibling?.textContent ?? ""}`);
   const page = squash(container.textContent ?? "");
@@ -193,8 +226,8 @@ describe("FROM_COPY, rendered for every ?from= key", () => {
     }
   });
 
-  it.each(keys)("from=%s: no trial at sign-up, no overclaim, trial length is TRIAL_DAYS", (key) => {
-    const { head } = renderHead(key);
+  it.each(keys)("from=%s: no trial at sign-up, no overclaim, trial length is TRIAL_DAYS", async (key) => {
+    const { head } = await renderHead(key);
     expect(head).toContain(FROM_COPY[key].h1);
     for (const pat of TRIAL_AT_SIGNUP) expect(head, `${key}: ${pat}`).not.toMatch(pat);
     for (const pat of OVERCLAIMS) expect(head, `${key}: ${pat}`).not.toMatch(pat);
@@ -207,8 +240,8 @@ describe("FROM_COPY, rendered for every ?from= key", () => {
     }
   });
 
-  it.each(keys)("from=%s: the whole rendered page makes no overclaim", (key) => {
-    const { page } = renderHead(key);
+  it.each(keys)("from=%s: the whole rendered page makes no overclaim", async (key) => {
+    const { page } = await renderHead(key);
     for (const pat of [...TRIAL_AT_SIGNUP, ...OVERCLAIMS]) {
       const m = page.match(pat);
       expect(m, `${key}: ${pat} …${m ? page.slice(Math.max(0, m.index! - 60), m.index! + 60) : ""}…`).toBeNull();
@@ -216,27 +249,49 @@ describe("FROM_COPY, rendered for every ?from= key", () => {
     for (const n of statedTrialLengths(page)) expect(n, key).toBe(TRIAL_DAYS);
   });
 
-  it("from=screener describes the scorecard as it is: misses, gaps and corrections", () => {
-    const { head } = renderHead("screener");
+  it("the scorecard proof block renders, and its link promises what /scorecard shows", async () => {
+    const { page } = await renderHead("_default");
+    // The count and its label are sibling spans, so textContent joins them.
+    expect(page).toMatch(/5\s*days on the record/);
+    expect(page).toContain(
+      "See the recorded top tens and the next session's move against SPY, misses included",
+    );
+    expect(page).not.toMatch(/winners and losers/i);
+  });
+
+  it("no cohort line implies newer accounts are asked for a card", async () => {
+    // "Accounts created before 22 August 2026 … are never asked for a card"
+    // contrasted a cohort the #683 wall removal erased, and "never asked for a
+    // card" is untrue for anyone who later picks the card-taking trial.
+    const { page } = await renderHead("_default");
+    expect(page).not.toMatch(/before 22 August 2026/i);
+    expect(page).not.toMatch(/never asked for a card/i);
+  });
+
+  it("from=screener describes the scorecard as it is: misses, gaps and corrections", async () => {
+    const { head } = await renderHead("screener");
     expect(head).toMatch(
       /public scorecard: each day's top-ten scores with the next session's move against SPY, misses included, gaps and corrections dated/,
     );
   });
 
-  it("from=scorecard takes the universe size and the free row cap from their constants", () => {
-    const { head } = renderHead("scorecard");
+  it("from=scorecard takes the universe size and the free row cap from their constants", async () => {
+    const { head } = await renderHead("scorecard");
     expect(head).toContain(`scores ${activeScoredLabel} US stocks and ETFs`);
     expect(head).toContain(`top ${FREE_LIMITS.scannerRows} rows of any scan`);
   });
 
-  it("from=trial says creating the account starts no trial", () => {
-    const { head } = renderHead("trial");
+  it("from=trial says creating the account starts no trial", async () => {
+    const { head } = await renderHead("trial");
     expect(head).toMatch(/Creating an account takes an email and a password and starts no trial\./);
     expect(head).toMatch(/Premium trial is a separate step/);
+    // The step may be taken on a later day than the sign-up visit, so its $0
+    // is "that day", as in every other variant, not "today".
+    expect(head).toMatch(/it takes a card and charges \$0 that day/);
   });
 
-  it("the transparency footer no longer calls the scorecard 'whole'", () => {
-    const { page } = renderHead("_default");
+  it("the transparency footer no longer calls the scorecard 'whole'", async () => {
+    const { page } = await renderHead("_default");
     expect(page).toMatch(/the daily Top 10, the back-checked scorecard, a page per scored ticker/);
   });
 });
@@ -249,7 +304,7 @@ describe("the trial length is derived from TRIAL_DAYS, not typed", () => {
     vi.resetModules();
   });
 
-  it("metadata and every FROM_COPY entry follow a changed TRIAL_DAYS", async () => {
+  it("metadata, every FROM_COPY entry and the rendered page follow a changed TRIAL_DAYS", async () => {
     const FAKE = TRIAL_DAYS + 15;
     vi.resetModules();
     vi.doMock("@/lib/trial", async (importOriginal) => ({
@@ -270,5 +325,18 @@ describe("the trial length is derived from TRIAL_DAYS, not typed", () => {
       for (const n of lengths) expect(n, k).toBe(FAKE);
       if (/\btrial\b/i.test(v.sub)) expect(lengths.length, k).toBeGreaterThan(0);
     }
+
+    // The JSX body states the trial length too ("N days from the day the card
+    // goes on", "the first charge N days later"). Render the re-imported page
+    // with a React and testing-library from the same fresh module graph, or
+    // the hooks would run against a second React instance.
+    const rtl = await import("@testing-library/react");
+    const { default: Page } = await import("@/app/signup/page");
+    const { container, unmount } = rtl.render(<Page />);
+    const text = squash(container.textContent ?? "");
+    unmount();
+    const pageLengths = statedTrialLengths(text);
+    expect(pageLengths.length).toBeGreaterThan(0);
+    for (const n of pageLengths) expect(n, "rendered page").toBe(FAKE);
   });
 });
