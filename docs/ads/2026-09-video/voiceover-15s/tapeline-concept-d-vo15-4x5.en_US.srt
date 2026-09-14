@@ -1,0 +1,24 @@
+1
+00:00:00,200 --> 00:00:02,550
+Swing traders don't need more ideas.
+
+2
+00:00:02,550 --> 00:00:04,280
+They need one number per ticker.
+
+3
+00:00:05,000 --> 00:00:08,000
+The trial takes a card
+and charges nothing today.
+
+4
+00:00:08,000 --> 00:00:09,410
+One click cancels.
+
+5
+00:00:10,133 --> 00:00:11,470
+tapeline.io.
+
+6
+00:00:11,470 --> 00:00:13,103
+Not investment advice.
