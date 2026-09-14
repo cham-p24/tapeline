@@ -1,10 +1,11 @@
-"""Durable once-per-period claims for the worker's founder jobs.
+"""Durable once-per-period claims for founder jobs.
 
 The weekly SEO digest was latched in process memory and ran inline in the
-tick. On a Monday every restart forgot the latch, ran the digest again inside
-the tick, and the 240s watchdog killed it: measured 2026-09-14 18:45Z, four
-minutes with no price pass after the deploy. `job_period_claims` holds the
-claim in the database instead, so a restart neither re-runs nor re-sends it.
+worker tick. On a Monday every restart forgot the latch, ran the digest again
+inside the tick, and the 240s watchdog killed it: measured 2026-09-14 18:45Z,
+four minutes with no price pass after the deploy. The digest now runs from
+GitHub Actions, and `job_period_claims` holds its once-a-week claim, so a
+re-run neither re-crawls nor re-sends a finished week.
 
 Additive only: one new table.
 
@@ -28,6 +29,7 @@ def upgrade() -> None:
         "job_period_claims",
         sa.Column("job", sa.String(length=64), primary_key=True),
         sa.Column("period", sa.String(length=32), primary_key=True),
+        sa.Column("owner", sa.String(length=36), nullable=False),
         sa.Column(
             "claimed_at", sa.DateTime(timezone=True),
             server_default=sa.func.now(), nullable=False,

@@ -136,6 +136,8 @@ def test_the_five_fixed_ones_claim_before_and_roll_back():
     for var, prev in (
         ("_last_eod_digest_date", "_eod_prev"),
         ("_last_weekly_newsletter_token", "_weekly_prev"),
+        # _last_seo_digest_token was one of the five. The digest has since
+        # left the tick for seo-weekly-digest.yml, taking its latch with it.
         ("_last_growth_tick_date", "_growth_prev"),
         # The fifth. A hand-written regex sweep found four; this one is nested
         # inside the 21:15 freeze block, so the sweep's backward walk to the
@@ -187,13 +189,3 @@ def test_the_detector_actually_detects():
         "the detector no longer recognises the wedge shape, so "
         "test_no_cadence_latch_is_stamped_after_its_work proves nothing"
     )
-
-
-def test_the_seo_digest_claims_before_dispatch_and_rolls_back_in_its_job():
-    """The SEO digest left the tick (it is detached and latched in the
-    database, see test_seo_digest_latch.py), so its rollback moved with it.
-    The token is still claimed in the tick before the dispatch."""
-    src = inspect.getsource(sp.tick)
-    assert re.search(r"_seo_prev = _last_seo_digest_token\s*\n\s*_last_seo_digest_token = ", src)
-    job = inspect.getsource(sp._run_weekly_seo_digest)
-    assert re.search(r"except Exception:\s*\n\s*_last_seo_digest_token = previous_token", job)
