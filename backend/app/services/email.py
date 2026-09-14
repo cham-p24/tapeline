@@ -1397,9 +1397,12 @@ def render_subscription_started_email(
     currency: str = "usd",
     next_charge_iso: str | None = None,
 ) -> str:
-    """Welcome-to-paid. Fires once on the FIRST `customer.subscription.created`
-    Stripe webhook for a user (replay-safe via stripe_webhook_events dedup +
-    the "no prior Subscription row" check at the webhook site).
+    """Welcome-to-paid. Fires once per subscription, when its FIRST invoice
+    with `amount_paid > 0` succeeds (`invoice.payment_succeeded`, latched on
+    `paid_start:{subscription}` in stripe_webhook_events — see
+    routers/webhooks.py:_welcome_on_first_paid_invoice). Never on a status
+    change: a trial's subscription goes active before its first charge.
+    `amount_cents` is the invoice's amount_paid, not the list price.
 
     Tone:
       - Receipt-clean (acknowledge what they just paid for)
@@ -1408,8 +1411,8 @@ def render_subscription_started_email(
         welcome which is for trial users with no commitment yet)
       - Acknowledges the 30-day refund window without leading with it
 
-    Arguments map directly to fields available on the Stripe subscription
-    object in the webhook handler — see routers/webhooks.py.
+    Arguments are resolved from the paid invoice (and the subscription
+    metadata it carries) in the webhook handler — see routers/webhooks.py.
     """
     tier_label = tier.capitalize()
     period_label = "year" if billing_period == "annual" else "month"

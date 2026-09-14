@@ -32,15 +32,26 @@ def test_trial_start_is_not_wired_to_the_paid_receipt():
     """status 'trialing' must NOT reach render_subscription_started_email."""
     assert "is_trial_start" in WEBHOOKS
     assert "render_trial_started_email" in WEBHOOKS
-    # The paid receipt must sit behind is_paid_start. (The identical status
-    # tuple appears elsewhere for TIER GRANTING, which is correct — a trialist
-    # should get premium access — so check the receipt's own guard, not the
-    # string.)
-    receipt_at = WEBHOOKS.index("render_subscription_started_email")
-    guard_at = WEBHOOKS.index("if is_paid_start and user.email:")
-    trial_guard_at = WEBHOOKS.index("if is_trial_start and user.email:")
-    assert guard_at < receipt_at, "the paid receipt is no longer behind is_paid_start"
-    assert trial_guard_at < guard_at, "trial-start branch must precede the receipt"
+    # The paid receipt lives only in the paid-invoice helper, which the
+    # subscription-status branch never calls. (The identical status tuple
+    # appears elsewhere for TIER GRANTING, which is correct — a trialist
+    # should get premium access.) The call-site guarantee is an AST check in
+    # test_billing_edge_cases.py; this keeps the lifecycle-level wiring.
+    import ast
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(WEBHOOKS))
+    helper = next(
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.AsyncFunctionDef) and n.name == "_welcome_on_first_paid_invoice"
+    )
+    receipt_calls = [
+        n for n in ast.walk(helper)
+        if isinstance(n, ast.Call)
+        and getattr(n.func, "id", None) == "render_subscription_started_email"
+    ]
+    assert receipt_calls, "the paid receipt is no longer behind the paid-invoice helper"
+    assert "if is_trial_start and user.email:" in WEBHOOKS
 
 
 def test_conversion_from_trial_sends_the_paid_receipt():
@@ -55,12 +66,15 @@ def test_conversion_from_trial_sends_the_paid_receipt():
     active the prior status was past_due, so the receipt and the founder's
     revenue alert both stayed silent on a sale that had completed.
 
-    `is_paid_start` now latches "has this subscription EVER been active",
-    reusing the stripe_webhook_events idempotency table. The behavioural cases
-    live in test_billing_edge_cases.py; this keeps the wiring assertion that
+    That was replaced by an "ever been active" latch, which was premature in
+    the other direction: Stripe sets a converting trial active about an hour
+    before it charges. Since 2026-09-14 the receipt fires on the first
+    `invoice.payment_succeeded` with amount_paid > 0, latched on the same
+    `paid_start:` row. The behavioural cases live in
+    test_paid_welcome_waits_for_money.py; this keeps the wiring assertion that
     belongs with the rest of the lifecycle.
     """
-    assert "is_paid_start" in WEBHOOKS
+    assert "_welcome_on_first_paid_invoice" in WEBHOOKS
     assert "paid_start:" in WEBHOOKS, "the first-charge latch is gone"
 
     # The bug, pinned shut. Checked against EXECUTABLE source only: WEBHOOKS is

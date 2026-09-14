@@ -18,6 +18,12 @@ Both are invisible on the happy path, which is why both shipped broken.
    and must NOT be mistaken for a new sale. A naive fix ("prior_status in
    (trialing, past_due)") would send a fresh receipt and ping the founder about
    new revenue every time a long-standing subscriber's card recovered.
+
+UPDATE 2026-09-14: the "ever been active" latch that replaced prior_status was
+itself premature — Stripe sets a converting trial active about an hour before
+it charges, so "You're in" went out ahead of declined first charges. The
+receipt and alert now wait for the first invoice with money on it; see
+test_paid_welcome_waits_for_money.py.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -111,36 +117,53 @@ class TestFirstChargeDetection:
 
 
 class TestPaidStartLatch:
-    """`is_paid_start` must answer "has this subscription EVER been active",
-    not "what was its status a moment ago"."""
+    """The welcome + founder alert answer "is this the subscription's first
+    invoice with money on it", not "has its status ever been active".
+
+    `active` is not money: at the end of a card-required trial Stripe sets the
+    subscription active about an hour BEFORE it charges, and on 2026-09-12 and
+    2026-09-14 that sent "You're in" ahead of a first charge that was declined.
+    The trigger is now `invoice.payment_succeeded`. The behavioural cases run
+    through the real signed webhook in test_paid_welcome_waits_for_money.py;
+    this class keeps the decision table readable.
+    """
 
     @staticmethod
-    def _fires(status, latch_already_claimed):
-        # The shape of the production condition.
-        return status == "active" and not latch_already_claimed
+    def _fires(amount_paid, billing_reason, latch_already_claimed, earlier_paid_invoice):
+        # The shape of the production condition in _welcome_on_first_paid_invoice.
+        if amount_paid <= 0 or latch_already_claimed:
+            return False
+        if billing_reason == "subscription_create":
+            return True
+        return earlier_paid_invoice is False
 
-    def test_trial_converting_cleanly_fires(self):
-        assert self._fires("active", False) is True
+    def test_a_direct_paid_checkout_fires(self):
+        assert self._fires(999, "subscription_create", False, None) is True
 
-    def test_trial_converting_via_a_declined_first_attempt_still_fires(self):
-        """trialing -> past_due -> active. The old prior_status check missed
-        this entirely: the sale completed and nobody was told."""
-        # past_due did not claim the latch, because it is not active.
-        assert self._fires("past_due", False) is False
-        # …so when the retry succeeds, the latch is still free and it fires.
-        assert self._fires("active", False) is True
+    def test_trial_converting_via_a_declined_first_attempt_fires_at_the_charge(self):
+        """trialing -> active -> payment_failed -> past_due -> paid. The old
+        prior_status check missed the eventual sale; the "ever active" latch
+        announced it before the decline. Nothing until the money, then once."""
+        assert self._fires(0, "subscription_cycle", False, False) is False  # the decline
+        assert self._fires(1999, "subscription_cycle", False, False) is True
 
     def test_dunning_recovery_on_an_established_sub_does_not_fire(self):
-        """Also past_due -> active, but the latch was claimed long ago. This is
-        the error a naive fix introduces: a fresh receipt and a founder revenue
-        ping every time an old subscriber's card recovers."""
-        assert self._fires("active", True) is False
+        """past_due -> paid on an old subscription: the latch was claimed long
+        ago, or Stripe's history shows it paid before. This is the error a naive
+        fix introduces: a fresh receipt and a founder revenue ping every time an
+        old subscriber's card recovers."""
+        assert self._fires(1999, "subscription_cycle", True, None) is False
+        assert self._fires(1999, "subscription_cycle", False, True) is False
 
     def test_a_redelivery_does_not_double_send(self):
-        assert self._fires("active", True) is False
+        assert self._fires(1999, "subscription_cycle", True, False) is False
 
-    def test_a_trial_start_never_fires_it(self):
-        assert self._fires("trialing", False) is False
+    def test_a_zero_dollar_invoice_never_fires_it(self):
+        """A trial start or a 100%-off referral month."""
+        assert self._fires(0, "subscription_create", False, None) is False
+
+    def test_unknown_history_does_not_fire(self):
+        assert self._fires(1999, "subscription_cycle", False, None) is False
 
 
 class TestProductionActuallyUsesTheLatch:
@@ -184,7 +207,56 @@ class TestProductionActuallyUsesTheLatch:
     def test_the_paid_start_latch_is_present(self):
         code = self._code()
         assert "paid_start:" in code
-        assert "is_paid_start" in code
+        assert "_welcome_on_first_paid_invoice" in code
+
+    def test_the_welcome_and_alert_are_sent_only_from_the_paid_invoice_path(self):
+        """A call-site check on the AST, not a text search: the welcome email
+        and the founder alert may be called from `_welcome_on_first_paid_invoice`
+        and nowhere else, and that helper may be awaited only from the
+        invoice.payment_succeeded branch. Putting either back on a subscription
+        status re-creates the "You're in" before the charge."""
+        import ast
+        import inspect
+        import textwrap
+
+        from app.routers import webhooks
+
+        tree = ast.parse(textwrap.dedent(inspect.getsource(webhooks)))
+
+        def _callee(node: ast.Call) -> str | None:
+            return getattr(node.func, "id", getattr(node.func, "attr", None))
+
+        funcs = {
+            n.name: n for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        helper = funcs["_welcome_on_first_paid_invoice"]
+        for name in ("render_subscription_started_email", "notify_founder_new_subscription"):
+            everywhere = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and _callee(n) == name]
+            in_helper = [n for n in ast.walk(helper) if isinstance(n, ast.Call) and _callee(n) == name]
+            assert in_helper, f"{name} is no longer sent from the paid-invoice helper"
+            assert len(everywhere) == len(in_helper), (
+                f"{name} is called outside _welcome_on_first_paid_invoice"
+            )
+
+        # The helper is awaited exactly once, inside the payment_succeeded branch.
+        handler = funcs["stripe_webhook"]
+        callers = []
+        for branch in ast.walk(handler):
+            if not isinstance(branch, ast.If):
+                continue
+            test = branch.test
+            if not (
+                isinstance(test, ast.Compare)
+                and isinstance(test.comparators[0], ast.Constant)
+            ):
+                continue
+            label = test.comparators[0].value
+            for stmt in branch.body:
+                for n in ast.walk(stmt):
+                    if isinstance(n, ast.Call) and _callee(n) == "_welcome_on_first_paid_invoice":
+                        callers.append(label)
+        assert callers == ["invoice.payment_succeeded"], callers
 
     def test_the_failed_payment_email_is_told_which_kind_of_charge(self):
         """Matched on the AST keyword argument, not on the text "first_charge=".
