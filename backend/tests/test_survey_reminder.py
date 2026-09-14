@@ -14,9 +14,12 @@ normally eyeball in a dry run is pinned here instead:
     manual re-dispatch skips that person; one Resend never had is retried;
   * consecutive unknown outcomes (an outage) stop the run, so it does not
     stamp the whole audience unreminded;
-  * an account whose `drip_state` cannot hold the stamp is skipped, counted;
+  * an account whose `drip_state` cannot hold the stamp is skipped, counted,
+    and warned about on a line of its own; one a mid-run drip fills is not
+    overflowed by the stamp;
   * the newsletter half runs on the first run only, and only when that run
-    left a trace (that table has no marker);
+    left a trace (that table has no marker); a re-run that stops never tells
+    the operator to force a list an earlier run may have mailed;
   * the workflow passes --quiet, and under --quiet no address reaches the
     public log — not from send_email's own `to=` lines, not from an exception
     message, not from an uncaught traceback;
@@ -605,7 +608,7 @@ async def test_a_run_whose_only_stamp_is_outcome_unknown_still_mails_the_list(
 
 
 async def test_consecutive_unknown_outcomes_stop_the_run(
-    https, monkeypatch: pytest.MonkeyPatch,
+    https, monkeypatch: pytest.MonkeyPatch, capsys,
 ) -> None:
     """Resend answering 5xx (or timing out) on every request at 17:07 UTC.
 
@@ -613,6 +616,10 @@ async def test_consecutive_unknown_outcomes_stop_the_run(
     whole audience and nobody is ever reminded. The run stops after
     UNKNOWN_OUTCOME_LIMIT in a row, leaves everyone after that unstamped for a
     re-run, and holds the newsletter half (it has no marker to retry from).
+
+    The re-run is green and does not mail the list either, so its newsletter
+    line must say the list may still be unmailed. Otherwise the only record
+    of that is the earlier red run's log.
     """
     attempted: list[str] = []
 
@@ -636,6 +643,7 @@ async def test_consecutive_unknown_outcomes_stop_the_run(
     ), counts
     stamped = {e for e in everyone if ss.REMINDER_TOKEN in await _state(e)}
     assert stamped == set(attempted), f"attempted {attempted}, stamped {sorted(stamped)}"
+    assert "newsletter phase: HELD" in capsys.readouterr().out
 
     # Resend recovers: a re-run reaches exactly the people never attempted.
     delivered: list[str] = []
@@ -645,8 +653,13 @@ async def test_consecutive_unknown_outcomes_stop_the_run(
         return {"id": "re_ok"}
 
     monkeypatch.setattr("app.services.email.send_email", _resend_up)
-    await ss.run_reminder(send=True, quiet=True)
+    again = await ss.run_reminder(send=True, quiet=True)
     assert sorted(delivered) == sorted(set(everyone) - set(attempted)), delivered
+    assert not any(again[k] for k in ss.FELL_SHORT), again  # green: nothing flags it
+    out = capsys.readouterr().out
+    assert "newsletter phase: SKIPPED" in out, out  # self-test: the list stayed unmailed
+    assert "the list was NOT mailed" in out, out
+    assert "--force-newsletter once over flyctl ssh" in out, out
 
 
 async def test_an_outage_holds_the_list_even_when_forced(
@@ -670,6 +683,157 @@ async def test_an_outage_holds_the_list_even_when_forced(
     counts = await ss.run_reminder(send=True, quiet=True, force_newsletter=True)
     assert "reader@example.com" not in attempted, attempted
     assert counts["newsletter_held"] == 1, counts
+
+
+async def test_a_re_run_that_stops_does_not_hold_a_list_an_earlier_run_mailed(
+    https, monkeypatch: pytest.MonkeyPatch, capsys,
+) -> None:
+    """Reproduced in review of 7d1506b: every newsletter subscriber reminded twice.
+
+    Run 1 delivers one account, two more fail before reaching Resend, and the
+    list is mailed; the run exits red. The re-dispatch retries those two, gets
+    a 502 for both and stops. It used to print HELD, count the list as
+    `newsletter_held` (so the job went red on it) and say to run
+    --force-newsletter, which mails the list a second time.
+    """
+    list_sends: list[str] = []
+
+    async def _two_accounts_refused(**kw):
+        if kw["to"] == "reader@example.com":
+            list_sends.append(kw["to"])
+            return {"id": "re_ok"}
+        if kw["to"] == "acct0@example.com":
+            return {"id": "re_ok"}
+        raise httpx.ConnectError("refused", request=_REQ)
+
+    monkeypatch.setattr("app.services.email.send_email", _two_accounts_refused)
+    async with session_scope() as s:
+        for i in range(3):
+            await _user(s, f"acct{i}@example.com")
+        await _sub(s, "reader@example.com")
+
+    first = await ss.run_reminder(send=True, quiet=True)
+    assert (first["accounts_sent"], first["failed"], first["newsletter_sent"]) == (1, 2, 1), first
+    assert "newsletter phase: running" in capsys.readouterr().out
+
+    async def _gateway_502(**kw):
+        if kw["to"] == "reader@example.com":
+            list_sends.append(kw["to"])
+        raise _status(502)
+
+    monkeypatch.setattr("app.services.email.send_email", _gateway_502)
+    second = await ss.run_reminder(send=True, quiet=True)
+    out = capsys.readouterr().out
+
+    assert "STOPPED" in out and second["unknown"] == ss.UNKNOWN_OUTCOME_LIMIT, out  # self-test
+    assert second["newsletter_held"] == 0, second
+    assert "newsletter phase: HELD" not in out, out
+    assert "run with --force-newsletter" not in out, out
+    assert "--force-newsletter once" not in out, out
+    assert "newsletter phase: SKIPPED: the account phase stopped" in out, out
+    assert list_sends == ["reader@example.com"], list_sends
+
+
+async def test_accounts_held_counts_only_the_accounts_never_attempted(
+    https, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The outage starts after a delivery and a failure, so the count is pinned
+    where `len(accounts) - stamped` (3) and `len(accounts) - unknown` (4) would
+    both be wrong. Outcomes follow the call order, not an address, because the
+    collector does not order its rows."""
+    outcomes = iter(["sent", "failed", "unknown", "unknown"])
+    attempted: list[str] = []
+
+    async def _then_an_outage(**kw):
+        attempted.append(kw["to"])
+        outcome = next(outcomes, "sent")
+        if outcome == "failed":
+            raise httpx.ConnectError("refused", request=_REQ)
+        if outcome == "unknown":
+            raise _status(503)
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _then_an_outage)
+    async with session_scope() as s:
+        for i in range(6):
+            await _user(s, f"acct{i}@example.com")
+
+    counts = await ss.run_reminder(send=True, quiet=True)
+    assert len(attempted) == 4, attempted
+    assert (
+        counts["accounts_sent"], counts["failed"], counts["unknown"], counts["accounts_held"],
+    ) == (1, 1, 2, 2), counts
+
+
+def test_a_full_drip_state_gets_its_own_warning_and_the_run_stays_green(
+    https, monkeypatch: pytest.MonkeyPatch, capsys, run_main,
+) -> None:
+    """The product update stamps `drip_state` the day before, using up room, so
+    Wednesday's count can be higher than any dry run showed. A tally entry is
+    easy to miss on a run nobody watches. It is not a shortfall, though: a
+    re-run cannot fix it, and red would stay red on every re-run."""
+    monkeypatch.setattr("app.services.email.send_email", _send_that("sent"))
+    capacity = User.__table__.c.drip_state.type.length
+
+    async def _go() -> None:
+        async with session_scope() as s:
+            await _user(s, "roomy@example.com")
+            await _user(s, "full@example.com", extra_tokens=("x" * capacity,))
+    asyncio.run(_go())
+
+    run_main(["--reminder", "--send", "--quiet"])  # raises SystemExit if red
+
+    out = capsys.readouterr().out
+    assert "no_room_for_token=1" in out, out  # self-test: the account was skipped
+    assert "WARNING: 1 account(s) not reminded: drip_state full" in out, out
+    assert "@" not in out, out
+
+
+async def test_a_drip_recorded_mid_run_cannot_overflow_the_stamp(
+    https, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Room is checked at collection, but the stamp appends to the row as it is
+    when the stamp runs. Here the worker records a drip during the send that
+    leaves one character too few. On Postgres the old UPDATE raised
+    StringDataRightTruncation after the email had gone and aborted the run.
+    SQLite does not enforce VARCHAR(255), so the same bug shows here as a
+    drip_state longer than the column."""
+    from sqlalchemy import update
+
+    capacity = User.__table__.c.drip_state.type.length
+    attempted: list[str] = []
+
+    async def _worker_drips_during_the_send(**kw):
+        attempted.append(kw["to"])
+        if kw["to"] == "tight@example.com":
+            async with session_scope() as s:
+                current = await s.scalar(
+                    select(User.drip_state).where(User.email == "tight@example.com")
+                )
+                filler = "w" * (capacity - len(ss.REMINDER_TOKEN) - len(current) - 1)
+                await s.execute(
+                    update(User).where(User.email == "tight@example.com")
+                    .values(drip_state=current + "," + filler)
+                )
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _worker_drips_during_the_send)
+    async with session_scope() as s:
+        await _user(s, "tight@example.com")
+        await _user(s, "roomy@example.com")
+
+    counts = await ss.run_reminder(send=True, quiet=True)
+    assert sorted(attempted) == ["roomy@example.com", "tight@example.com"], attempted
+    async with session_scope() as s:
+        state = await s.scalar(select(User.drip_state).where(User.email == "tight@example.com"))
+    assert len(state) <= capacity, f"the stamp overflowed drip_state: {len(state)} > {capacity}"
+    assert ss.REMINDER_TOKEN not in _toks(state)
+    assert (counts["accounts_sent"], counts["unknown"]) == (1, 1), counts
+
+    # The row is still too full to take the token, so a re-run skips it.
+    attempted.clear()
+    await ss.run_reminder(send=True, quiet=True)
+    assert attempted == [], f"a re-run mailed {attempted} again"
 
 
 async def test_unknown_outcomes_that_are_not_consecutive_do_not_stop_the_run(
