@@ -159,7 +159,7 @@ export function AnonSignupNudge({ symbol }: { symbol: string }) {
               false, so that branch sells it as a Pro perk instead.
               CARD HONESTY (#683, 2026-08-30): the card ask moved off the front
               door. Signing up is an email and a password, and the account lands
-              on the free plan with the live scanner already open, so this body
+              on the free plan with the scanner already open, so this body
               says that plainly. Two things it must NOT do: imply the TRIAL is
               card-free (it is not), or promise alerts — free is now zero on
               every channel, email and web push alike. The card buys the
@@ -169,13 +169,13 @@ export function AnonSignupNudge({ symbol }: { symbol: string }) {
           <h2 className="text-base sm:text-lg font-semibold tracking-tight text-fg">
             {freeHasWatchlist()
               ? "You’re exploring — save your tickers"
-              : "You’re exploring — an account opens the live scanner"}
+              : "You’re exploring — an account opens the scanner"}
           </h2>
           <p className="mt-1 max-w-xl text-sm text-muted">
             {freeHasWatchlist() ? (
               <>
                 You&rsquo;ve looked at a few tickers. An account saves them to a
-                watchlist and opens the live scanner &mdash; an email and a
+                watchlist and opens the scanner &mdash; an email and a
                 password, no card. Being told when their scores move is the part
                 that takes one: a card starts the 30-day Premium trial, $0 that
                 day, one click to cancel before day 30. Or keep reading the
@@ -183,7 +183,7 @@ export function AnonSignupNudge({ symbol }: { symbol: string }) {
               </>
             ) : (
               <>
-                You&rsquo;ve looked at a few tickers. An account opens the live
+                You&rsquo;ve looked at a few tickers. An account opens the
                 scanner and raises how many you can look up in a day &mdash; an
                 email and a password, no card. A saved watchlist and score alerts
                 come with a card, which starts a 30-day Premium trial &mdash; $0

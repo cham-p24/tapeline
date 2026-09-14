@@ -17,6 +17,7 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, jsonLdScript, pressContactPageJsonLd } from "@/lib/jsonld";
 import { PRICING, usd, usdCompact } from "@/lib/pricing";
 import { TRIAL_DAYS } from "@/lib/trial";
+import { PRICE_FRESHNESS_SENTENCE, SCORE_CADENCE_SENTENCE } from "@/lib/freshness";
 
 export const metadata = pageMeta({
   title: "Tapeline Press Kit — Logos, Fact Sheet, Founder Bio",
@@ -47,8 +48,10 @@ const FACT_SHEET = [
   // and its length comes from lib/trial.ts so this line cannot say two numbers at once again.
   { label: "Premium trial",   value: `${TRIAL_DAYS}-day Premium; card required, $0 charged today, first charge on day ${TRIAL_DAYS}` },
   { label: "Universe scored", value: "About 11,500 US-listed stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs scored separately and updated once a day" },
-  { label: "Update cadence",  value: "Sub-60 seconds during US market hours" },
-  { label: "Data categories", value: "Live market data, fundamentals, macro indicators, SEC filings, news wire" },
+  // Measured 14 Sep 2026 (integrity wave): vendor prices ~15 min delayed,
+  // worker passes 70-74 s apart, scores change about once a day.
+  { label: "Update cadence",  value: `${PRICE_FRESHNESS_SENTENCE} ${SCORE_CADENCE_SENTENCE}` },
+  { label: "Data categories", value: "Market data (prices delayed about 15 minutes), fundamentals, macro indicators, SEC filings, news" },
   { label: "Integrations",    value: "Public MCP server for AI assistants (tapeline.io/mcp) · CSV export · API (tapeline.io/developers)" },
   { label: "Press contact",   value: "press@tapeline.io" },
   { label: "Last updated",    value: LAST_UPDATED_DISPLAY },
@@ -59,7 +62,7 @@ const ONE_LINER =
 
 // Prices interpolate from lib/pricing.ts so a future reprice can't strand a
 // stale figure in the most-copied paragraph on the site.
-const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every ticker in the scored universe (about 11,500 US-listed stocks and ETFs) gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — updated sub-60s during US market hours. Each day's top-10 picks are published to a public scorecard and back-checked against SPY the next session. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin, priced annual-first at Pro ${usdCompact(PRICING.pro.annual)}/yr and Premium ${usdCompact(PRICING.premium.annual)}/yr, with a concierge Trader tier at ${usdCompact(PRICING.trader.annual)}/yr.`;
+const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every ticker in the scored universe (about 11,500 US-listed stocks and ETFs) gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — recalculated on each worker pass during US market hours over prices delayed about 15 minutes, though most inputs are daily readings, so a score usually changes about once a day. Each day's top-10 picks are published to a public scorecard and back-checked against SPY the next session. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin, priced annual-first at Pro ${usdCompact(PRICING.pro.annual)}/yr and Premium ${usdCompact(PRICING.premium.annual)}/yr, with a concierge Trader tier at ${usdCompact(PRICING.trader.annual)}/yr.`;
 
 const PULL_QUOTES = [
   {
@@ -125,7 +128,7 @@ const BRAND_ASSETS = [
  * 2540×1520 actual pixels) of the four launch surfaces, committed 2026-08.
  */
 const SCREENSHOT_FILES = [
-  { label: "Live scanner (home)", href: "/press/tapeline-scanner.png" },
+  { label: "Scanner (home)", href: "/press/tapeline-scanner.png" },
   { label: "Public scorecard", href: "/press/tapeline-scorecard.png" },
   { label: "Per-ticker page", href: "/press/tapeline-ticker.png" },
   { label: "Verify-a-pick page", href: "/press/tapeline-verify.png" },
@@ -133,7 +136,7 @@ const SCREENSHOT_FILES = [
 
 const SCREENSHOTS = [
   {
-    label: "Live scanner",
+    label: "Scanner",
     desc: "The main scanner UI showing the composite score, signal label, and plain-English Why per ticker.",
     href: "/",
   },

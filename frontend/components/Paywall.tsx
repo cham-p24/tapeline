@@ -186,8 +186,8 @@ export function PaywallModal({
   // real data behind it, so neither may render as "<X> is on Pro/Premium".
   // A caller passing either key gets the neutral "This feature" fallback.
   const featureName = ({
-    "scanner.full": "Full live scanner",
-    "scanner.live": "Live scanner updates",
+    "scanner.full": "Every scanner row",
+    "scanner.live": "Every scanner row",
     "watchlist": "Watchlist with smart alerts",
     "regime.full": "Full regime dashboard",
     "heatmap": "Market heatmap",

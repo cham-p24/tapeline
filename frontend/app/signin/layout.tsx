@@ -6,7 +6,7 @@ import { pageMeta } from "@/lib/seo";
 export const metadata = pageMeta({
   title: "Sign In — Tapeline",
   description:
-    "Sign in to your Tapeline account to access the live quantitative stock scanner, watchlists, and alerts.",
+    "Sign in to your Tapeline account to access the quantitative stock scanner, watchlists, and alerts.",
   path: "/signin",
 });
 

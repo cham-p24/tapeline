@@ -71,7 +71,7 @@ export function LookupWall({
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-muted">
             Detailed score look-ups{sym ? ` like ${sym}` : ""} are metered on the
-            free plan. Upgrade for unlimited look-ups, the real-time
+            free plan. Upgrade for unlimited look-ups, every row of the
             full-universe scanner, and smart alerts.
           </p>
           <p className="mt-2 text-sm text-muted">
@@ -108,7 +108,7 @@ export function LookupWall({
               record, which the footnote offers. */}
           <p className="mt-3 text-sm leading-relaxed text-muted">
             You&rsquo;ve reached {countPhrase} as a guest. An account is an email and a
-            password, no card &mdash; it opens live scores, more look-ups each day
+            password, no card &mdash; it opens the scanner, more look-ups each day
             {freeHasWatchlist() ? ", a watchlist," : ","} and the top ten scored rows of
             any scan. Adding a card starts a 30-day Premium trial and shows every matching
             row instead of the first ten &mdash; $0 that day, one click to cancel before

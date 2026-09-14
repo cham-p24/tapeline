@@ -14,6 +14,7 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { SIGNALS } from "../signals";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+import { PUBLIC_SNAPSHOT_FOOTER } from "@/lib/freshness";
 
 // Render on-demand and cache for 5 minutes (ISR). Matches the per-fetch
 // `revalidate: 3600` below and the "5-minute snapshot" contract, and keeps this
@@ -87,7 +88,7 @@ export async function generateMetadata({ params }: { params: Promise<{ signal: s
   }
   return pageMeta({
     title: `${signal.display} Stocks Today (Tapeline Score ${signal.range})`,
-    description: `Live ranking of US stocks at the ${signal.display} signal level (Tapeline Score ${signal.range}). Sub-60s updates in US market hours, six named factors with the weight ordering published.`,
+    description: `Ranking of US stocks at the ${signal.display} signal level (Tapeline Score ${signal.range}). Cached snapshot, prices delayed ~15 min, six named factors with the weight ordering published.`,
     path: `/signal/${signal.slug}`,
   });
 }
@@ -100,7 +101,7 @@ function signalFaq(display: string, range: string, blurb: string) {
     },
     {
       q: `How is the ${display} list calculated?`,
-      a: `Every US ticker in the scanner universe (about 11,500 US stocks and ETFs) is scored sub-60s using the same six named factors — weighted most toward Trend and Relative Strength and least toward Momentum. Names whose composite score falls in the ${range} band get the ${display} label automatically. The list above shows the top names currently in this tier, sorted by score.`,
+      a: `Every US ticker in the scanner universe (about 11,500 US stocks and ETFs) is scored on the same six named factors — weighted most toward Trend and Relative Strength and least toward Momentum. Names whose composite score falls in the ${range} band get the ${display} label automatically. The list above shows the top names currently in this tier, sorted by score.`,
     },
     {
       q: `Should I buy ${display} stocks?`,
@@ -108,7 +109,7 @@ function signalFaq(display: string, range: string, blurb: string) {
     },
     {
       q: `How often does the ${display} list update?`,
-      a: `Underlying scores re-tick every minute during US market hours. This landing page caches the snapshot for 5 minutes to avoid hammering the API on every crawl; the in-app scanner shows live ticks.`,
+      a: `The public list is a saved snapshot: it is cached for an hour, and the first visit after that still gets the old copy while a new one is built, so it can be an hour old or more. Prices are delayed about 15 minutes, and scores usually change about once a day because most of their inputs are daily readings. The in-app scanner shows the latest data when you open it.`,
     },
     {
       q: `Where can I see the ${display} historical track record?`,
@@ -179,9 +180,9 @@ export default async function SignalPage({ params }: { params: Promise<{ signal:
         <section className="mt-10">
           {tickers.length === 0 ? (
             <div className="rounded-xl border border-border bg-panel p-8 text-center">
-              <p className="text-muted">No live snapshot available right now.</p>
+              <p className="text-muted">No snapshot available right now.</p>
               <p className="mt-3 text-sm text-subtle">
-                The {signal.display} list refreshes every 5 minutes — check back shortly. Or
+                The {signal.display} list is rebuilt at most about once an hour — check back later. Or
                 browse the{" "}
                 <Link href="/scorecard" className="text-accent hover:underline">
                   full public scorecard
@@ -246,7 +247,7 @@ export default async function SignalPage({ params }: { params: Promise<{ signal:
         <section className="mt-12 rounded-xl border border-border bg-panel/40 p-6">
           <h2 className="text-lg font-semibold">How {signal.display} is determined</h2>
           <p className="mt-3 text-sm text-muted leading-relaxed">
-            Every US ticker in the active scanner universe is scored sub-60s using the public
+            Every US ticker in the active scanner universe is scored with the public
             six-factor composite:{" "}
             <strong>Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum —
             weighted most toward Trend and Relative Strength, least toward Momentum</strong>
@@ -302,7 +303,7 @@ export default async function SignalPage({ params }: { params: Promise<{ signal:
         </nav>
 
         <p className="mt-10 text-xs text-subtle text-center">
-          Snapshot cached 5 minutes. Sub-60s tick during market hours. Not investment advice — see{" "}
+          {PUBLIC_SNAPSHOT_FOOTER} Not investment advice — see{" "}
           <Link href="/legal/risk" className="text-accent hover:underline">
             risk disclosure
           </Link>

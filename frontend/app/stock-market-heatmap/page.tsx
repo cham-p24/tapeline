@@ -11,9 +11,9 @@ const API_BASE =
   "https://api.tapeline.io";
 
 export const metadata = pageMeta({
-  title: "Stock Market Heatmap — Live Sector Performance | Tapeline",
+  title: "Stock Market Heatmap — Sector Performance | Tapeline",
   description:
-    "Live US market heatmap grouped by GICS sector, tiles sized by dollar volume, coloured by performance. Hover any tile for the underlying Tapeline score. Sub-60s refresh during market hours.",
+    "US market heatmap grouped by GICS sector, tiles sized by dollar volume, coloured by performance. Hover any tile for the underlying Tapeline score. Prices delayed about 15 minutes.",
   path: "/stock-market-heatmap",
 });
 
@@ -75,16 +75,17 @@ export default async function StockMarketHeatmapPage() {
     <SeoFeaturePage
       slug="stock-market-heatmap"
       eyebrow="Feature · Heatmap"
-      h1="Stock Market Heatmap — Live Sector + Ticker Performance"
-      lede="A heatmap is the fastest way to read what the market is actually doing right now: which sectors are rotating in, which are bleeding, where the volume is going. Tapeline's heatmap groups the live universe by GICS sector, sizes each tile by dollar volume, and colours by 1-day performance. Hover any tile for the underlying Tapeline composite score."
+      h1="Stock Market Heatmap — Sector + Ticker Performance"
+      lede="A heatmap is the fastest way to read what the market is doing today: which sectors are rotating in, which are bleeding, where the volume is going. Tapeline's heatmap groups the scored universe by GICS sector, sizes each tile by dollar volume, and colours by 1-day performance. Hover any tile for the underlying Tapeline composite score."
       methodology={{
         heading: "How the heatmap is built",
         body: (
           <>
             <p>
-              The data spine is the same live ticker universe powering the
-              scanner: about 11,500 US equities + ETFs, scored sub-60 seconds during
-              market hours. Each ticker is grouped under one of the 11 GICS
+              The data spine is the same ticker universe powering the
+              scanner: about 11,500 US equities + ETFs. Prices are delayed about
+              15 minutes and re-read about every 70-80 seconds during US market
+              hours. Each ticker is grouped under one of the 11 GICS
               top-level sectors (plus three Tapeline buckets for Commodities,
               Funds &amp; ETFs, and Uncategorized) via{" "}
               <code className="font-mono text-xs">services/sector.canonical_sector()</code>{" "}
@@ -119,7 +120,7 @@ export default async function StockMarketHeatmapPage() {
       faq={[
         {
           q: "How is this different from the Finviz / TradingView heatmap?",
-          a: "Two things. First, every tile is joined to the Tapeline composite score — so you see not just 'tech is up 1.4% today' but 'tech is up 1.4% today and these are the 5 highest-scoring names driving it'. Second, the live feed is sub-60s, not delayed; the Finviz heatmap caches more aggressively. Same shape of visualisation, more useful underlying join.",
+          a: "Two things. First, every tile is joined to the Tapeline composite score — so you see not just 'tech is up 1.4% today' but 'tech is up 1.4% today and these are the 5 highest-scoring names driving it'. Second, be clear on freshness: Tapeline's prices are delayed about 15 minutes, and this public page is a saved snapshot that can be an hour old or more. Same shape of visualisation, a different underlying join.",
         },
         {
           q: "What sectors does Tapeline cover?",
@@ -127,11 +128,11 @@ export default async function StockMarketHeatmapPage() {
         },
         {
           q: "Can I drill down into a sector?",
-          a: "Yes, on the live /app/heatmap page — click any sector tile to expand into the per-ticker grid for that sector, sorted by dollar volume. Search for any symbol to highlight it across sectors. The public showcase above is a top-level sector view only.",
+          a: "Yes, on the /app/heatmap page — click any sector tile to expand into the per-ticker grid for that sector, sorted by dollar volume. Search for any symbol to highlight it across sectors. The public showcase above is a top-level sector view only.",
         },
         {
           q: "How often does the heatmap refresh?",
-          a: "Underlying scores update sub-60 seconds during US market hours. The public showcase above caches for 5 minutes; the in-app heatmap is live, refreshing on the worker tick.",
+          a: "Prices are delayed about 15 minutes, and Tapeline re-reads them for every covered stock and ETF about every 70-80 seconds during US market hours. Scores are recalculated on each pass, but most of their inputs are daily readings, so a score usually changes about once a day. The public showcase above is a saved snapshot that can be an hour old or more. The in-app heatmap shows the latest data when you open it; reload to see newer numbers.",
         },
         {
           q: "Does the heatmap include commodities and ETFs?",
@@ -148,12 +149,9 @@ export default async function StockMarketHeatmapPage() {
         <div className="mb-3 flex items-baseline justify-between">
           <p className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted">
             Sector snapshot · 1D %
-            {live && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-up">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-up" />
-                Live
-              </span>
-            )}
+            {/* No "Live" badge (integrity wave 2026-09-14): at 14:09 UTC this
+                block was served ~60 minutes old, from a pre-open build, under
+                a pulsing "Live". It is a cached snapshot of delayed prices. */}
           </p>
           <Link href="/app/heatmap" className="text-[10px] uppercase tracking-wider text-accent hover:underline">
             Full heatmap →
@@ -175,9 +173,12 @@ export default async function StockMarketHeatmapPage() {
         </div>
       </div>
       <p className="mt-3 text-xs text-subtle">
-        {live ? "Live sector aggregate — refreshed every 5 minutes." : "Snapshot example."} The{" "}
+        {live
+          ? "Sector aggregate from a saved snapshot that can be an hour old or more, over prices delayed about 15 minutes."
+          : "Snapshot example."}{" "}
+        The{" "}
         <Link href="/app/heatmap" className="text-accent hover:underline">
-          live heatmap
+          in-app heatmap
         </Link>{" "}
         drills into each sector with per-ticker tiles sized by volume,
         coloured by 1D / 1W / 1M, and joined to the Tapeline composite.

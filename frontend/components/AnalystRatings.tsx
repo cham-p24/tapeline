@@ -58,7 +58,7 @@ export function AnalystRatings({ symbol, currentPrice }: Props) {
           No analyst consensus tracked for {symbol} from our current data sources.
           Coverage is uneven across providers — primary US-listed names land first,
           UK / international ADRs and smaller names land later. The 6-factor Tapeline
-          Score doesn't depend on street coverage and updates live regardless.
+          Score doesn't depend on street coverage and is recalculated regardless.
         </p>
       </div>
     );

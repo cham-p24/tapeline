@@ -14,6 +14,7 @@ from app.models import Ticker, User
 from app.services.asset_class import ASSET_CLASS_PATTERN, asset_bucket_clause
 from app.services.auth import current_user_optional
 from app.services.cap_events import record_cap_hit
+from app.services.freshness import data_delayed_minutes
 from app.services.funnel_events import record_funnel_event
 from app.services.scan_log import record_scan_log
 from app.services.ticker_freshness import live_clauses
@@ -470,11 +471,12 @@ async def list_scanner(
     ):
         await record_cap_hit(session, user.id, "scanner_rows", tier)
 
-    # Read the delay from tier.py. Post-freemium-retune (2026-06-20) every tier
-    # is LIVE (data_delay_minutes = 0) — the old 24h Free delay cliff is gone;
-    # Free is now gated by row-cap + the daily ticker-lookup meter instead. Kept
-    # config-driven so re-introducing a delay is a one-line tier.py change.
-    delay_minutes = tier_limit(tier, "data_delay_minutes")
+    # The TRUE delay behind these prices: the vendor's ~15-minute delay
+    # (services/freshness.PRICE_DELAY_MINUTES, measured 14 Sep 2026) plus any
+    # tier-imposed delay from tier.py (0 for every tier since the 2026-06-20
+    # retune). This field read 0 for every tier while the vendor plan was
+    # 15-minute delayed, which told every consumer the data was undelayed.
+    delay_minutes = data_delayed_minutes(tier_limit(tier, "data_delay_minutes"))
     return {
         "count": len(rows),
         "tier": tier.value,

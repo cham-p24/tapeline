@@ -10,6 +10,6 @@ export default async function OG() {
     eyebrow: "FEATURE",
     title: "Market Regime Indicator.",
     subtitle:
-      "Live Risk On / Neutral / Risk Off classifier — VIX + breadth + rates + SPY momentum synthesised into one read. Pro feature.",
+      "Risk On / Neutral / Risk Off classifier — VIX + breadth + rates + SPY momentum synthesised into one read. Pro feature.",
   });
 }

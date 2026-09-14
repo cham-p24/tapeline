@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCountUp } from "@/lib/useCountUp";
+import { PASS_INTERVAL_SHORT, PRICE_DELAY_MINUTES } from "@/lib/freshness";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.tapeline.io";
 
@@ -73,11 +74,17 @@ export function LiveCounters() {
         value={newsAnim != null ? newsAnim.toLocaleString() : "—"}
         sub="rolling, ~5min refresh"
       />
+      {/* Was "Scoring cadence 60s" with a pulsing dot. Measured 14 Sep 2026:
+          worker passes land 70-74 s apart (the tick plus a 60 s sleep), and
+          the prices a pass writes are vendor-delayed ~15 minutes. */}
       <Counter
-        label="Scoring cadence"
-        value="60s"
-        sub={data.age != null ? `last tick ${data.age}s ago` : "every market tick"}
-        live
+        label="Worker pass"
+        value={PASS_INTERVAL_SHORT}
+        sub={
+          data.age != null
+            ? `last pass ${data.age}s ago · prices delayed ${PRICE_DELAY_MINUTES} min`
+            : `in market hours · prices delayed ${PRICE_DELAY_MINUTES} min`
+        }
       />
       <Counter
         label="Current regime"

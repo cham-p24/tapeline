@@ -292,7 +292,7 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
   const meta = pageMeta({
     title: `Is ${t.symbol} a Buy in 2026? The Tapeline Score Breakdown`,
     description:
-      `Live Tapeline 6-factor score on ${t.symbol} (${t.name}) — composite, ` +
+      `Tapeline 6-factor score on ${t.symbol} (${t.name}) — composite, ` +
       `signal label, Trend / Relative Strength / Fundamentals / Smart Money / ` +
       `Macro / Momentum sub-scores, plain-English reason, and the public ` +
       `scorecard's track record. Same formula, every ticker, every day.`,
@@ -369,7 +369,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
   const articleUrl = `https://tapeline.io/blog/ticker/${t.symbol}`;
   const article = articleJsonLd({
     title: `Is ${t.symbol} a Buy in 2026? The Tapeline Score Breakdown`,
-    description: `Live Tapeline 6-factor score on ${t.symbol} (${t.name}) with full sub-score breakdown and methodology.`,
+    description: `Tapeline 6-factor score on ${t.symbol} (${t.name}) with full sub-score breakdown and methodology.`,
     url: articleUrl,
     publishedAt: "2026-05-14T00:00:00Z",
     author: "Tapeline",
@@ -387,8 +387,8 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
       q: `What is ${t.symbol}'s Tapeline score?`,
       a:
         composite !== null
-          ? `${t.symbol} (${t.name}) currently scores ${composite.toFixed(1)} out of 100 on Tapeline's 6-factor composite — signal label "${signal ?? "—"}". The score updates every minute during US market hours.`
-          : `${t.symbol} (${t.name}) is in Tapeline's scoring universe. The composite score is computed from six weighted factors and updates every minute during US market hours.`,
+          ? `${t.symbol} (${t.name}) currently scores ${composite.toFixed(1)} out of 100 on Tapeline's 6-factor composite — signal label "${signal ?? "—"}". The score usually changes about once a day, because most of its inputs are daily readings.`
+          : `${t.symbol} (${t.name}) is in Tapeline's scoring universe. The composite score is computed from six weighted factors and usually changes about once a day, because most of its inputs are daily readings.`,
     },
     {
       q: `How is the ${t.symbol} score calculated?`,
@@ -422,7 +422,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
     {
       q: `How often does the ${t.symbol} Tapeline score update?`,
       a:
-        `The composite score recomputes every minute during US market hours (9:30 AM to 4:00 PM ET) on the live data feeds. This page caches each fetch for 30 minutes to keep crawler load light; the interactive product page at tapeline.io/t/${t.symbol} updates in real time. Outside market hours, the score holds at the previous close's value.`,
+        `The composite is recalculated during US market hours (9:30 AM to 4:00 PM ET), but most of its inputs are daily readings, so it usually changes about once a day, and prices are delayed about 15 minutes. This page caches each fetch for 30 minutes, and a cached copy can be served while it refreshes, so it can be older than that; the product page at tapeline.io/t/${t.symbol} is a cached snapshot too, and can be an hour old or more. Outside market hours, the score holds at the previous close's value.`,
     },
   ]);
 
@@ -475,7 +475,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
               </p>
             )}
             <p className="mt-5 text-xs text-muted">
-              Live data from <code className="rounded bg-panel px-1.5 py-0.5">/api/ticker/{t.symbol}</code>. The score refreshes every minute during US market hours; this page caches each fetch for 30 minutes.
+              Data from <code className="rounded bg-panel px-1.5 py-0.5">/api/ticker/{t.symbol}</code>, cached by this page for 30 minutes (and served stale while it refreshes). Prices are delayed about 15 minutes; the score usually changes about once a day.
             </p>
           </div>
         </section>
@@ -620,7 +620,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
                 <span className="text-muted transition-transform group-open:rotate-45">+</span>
               </summary>
               <p className="mt-2 text-sm text-muted leading-relaxed">
-                The composite recomputes every minute during US market hours on the live feeds. This page caches each fetch for 30 minutes to keep crawler load light; <Link href={`/t/${t.symbol}`} className="text-accent hover:underline">/t/{t.symbol}</Link> updates in real time. Outside market hours, the score holds at the previous close's value.
+                The composite is recalculated during US market hours, but most of its inputs are daily readings, so it usually changes about once a day, and prices are delayed about 15 minutes. This page caches each fetch for 30 minutes and can be older than that; <Link href={`/t/${t.symbol}`} className="text-accent hover:underline">/t/{t.symbol}</Link> is a cached snapshot too and can be an hour old or more. Outside market hours, the score holds at the previous close's value.
               </p>
             </details>
             <details className="group py-4">
@@ -645,23 +645,23 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
         </section>
 
         <section className="mt-12">
-          <h2 className="text-2xl font-semibold tracking-tight">How to Track {t.symbol} Live on Tapeline</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">How to Track {t.symbol} on Tapeline</h2>
           <p className="mt-3 text-base text-fg leading-relaxed">
-            The interactive {t.symbol} page lives at <Link href={`/t/${t.symbol}`} className="text-accent hover:underline">/t/{t.symbol}</Link> — same data, plus a live radar chart, news feed, and watchlist add. The full scanner covering about 11,500 US stocks and ETFs is at <Link href="/app/scanner" className="text-accent hover:underline">/app/scanner</Link>.
+            The interactive {t.symbol} page lives at <Link href={`/t/${t.symbol}`} className="text-accent hover:underline">/t/{t.symbol}</Link> — same data, plus a radar chart, news feed, and watchlist add. The full scanner covering about 11,500 US stocks and ETFs is at <Link href="/app/scanner" className="text-accent hover:underline">/app/scanner</Link>.
           </p>
           <p className="mt-3 text-base text-fg leading-relaxed">
-            The public pages — this one, /t/{t.symbol}, the daily Top 10 and the full scorecard — are free to read with no account, which is enough to evaluate the methodology. Pro ($8.25/mo billed annually, or $9.99 monthly) unlocks the full scanner (about 11,500 US stocks and ETFs) with unlimited look-ups, watchlist alerts on score moves, and the IPO/earnings calendar. Premium ($16.58/mo annually, $19.99 monthly) adds recent insider buys (SEC Form 4). A new account takes an email and a password and lands on the free plan — the top ten scored rows of any scan, live. The 30-day Premium trial is a separate step, and that step takes a card: $0 charged that day, first charge on day 30, cancel in one click before then.
+            The public pages — this one, /t/{t.symbol}, the daily Top 10 and the full scorecard — are free to read with no account, which is enough to evaluate the methodology. Pro ($8.25/mo billed annually, or $9.99 monthly) unlocks the full scanner (about 11,500 US stocks and ETFs) with unlimited look-ups, watchlist alerts on score moves, and the IPO/earnings calendar. Premium ($16.58/mo annually, $19.99 monthly) adds recent insider buys (SEC Form 4). A new account takes an email and a password and lands on the free plan — the top ten scored rows of any scan. The 30-day Premium trial is a separate step, and that step takes a card: $0 charged that day, first charge on day 30, cancel in one click before then.
           </p>
         </section>
 
         <div className="mt-16 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/5 via-panel to-panel p-8">
-          <h2 className="text-xl font-semibold tracking-tight">See {t.symbol}'s live score now.</h2>
+          <h2 className="text-xl font-semibold tracking-tight">See {t.symbol}'s current score.</h2>
           <p className="mt-2 text-sm text-muted">
-            30-day Premium trial — starting it takes a card, $0 charged that day, cancel in one click before the day-{TRIAL_DAYS} charge. A free account is an email and a password and gets the top ten scored rows live. Or read the public record instead, which never asks for an account. The six-factor formula above runs on {t.symbol} and every other liquid US ticker every minute.
+            30-day Premium trial — starting it takes a card, $0 charged that day, cancel in one click before the day-{TRIAL_DAYS} charge. A free account is an email and a password and gets the top ten scored rows. Or read the public record instead, which never asks for an account. The six-factor formula above runs on {t.symbol} and every other liquid US ticker on every worker pass during US market hours.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href={`/t/${t.symbol}`} className="btn-accent">
-              Open the live {t.symbol} page &rarr;
+              Open the {t.symbol} page &rarr;
             </Link>
             <Link href="/signup" className="btn-ghost">
               Start the 30-day Premium trial

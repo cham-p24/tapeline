@@ -102,7 +102,7 @@ function EmbedMock() {
           <span className="font-mono text-2xl font-bold text-up">91</span>
         </div>
         <div className="mt-1 text-[10px] uppercase tracking-wider text-subtle">
-          Tapeline Score · live
+          Tapeline Score
         </div>
         <div className="mt-2 border-t border-border/60 pt-1.5 text-[9px] text-subtle">
           Powered by tapeline.io
@@ -401,10 +401,10 @@ export default function WhatsNewPage() {
         <FeatureRow
           flip
           where="tapeline.io/embed"
-          title="A live score badge you can embed anywhere"
+          title="A score badge you can embed anywhere"
           body={
             <>
-              Drop a live Tapeline Score into a blog post, Substack or GitHub README. Two flavours:
+              Drop a Tapeline Score into a blog post, Substack or GitHub README. Two flavours:
               an <strong className="text-fg">iframe widget</strong> for web pages and an{" "}
               <strong className="text-fg">SVG badge</strong> at tapeline.io/badge/&#123;TICKER&#125;
               that renders in GitHub markdown. Free, no auth, no API key — it shows the same score
@@ -440,8 +440,8 @@ export default function WhatsNewPage() {
           body={
             <>
               A new account takes an <strong className="text-fg">email and a password</strong> and
-              lands on the Free plan, which opens the live scanner at the{" "}
-              <strong className="text-fg">top ten scored rows</strong> — live data, no delay — plus
+              lands on the Free plan, which opens the scanner at the{" "}
+              <strong className="text-fg">top ten scored rows</strong> — prices delayed about 15 minutes, as on every plan — plus
               one saved screen, a 5-symbol watchlist and 12 ticker pages a day. A card is the
               separate step that starts the 30-day Premium trial, and it is what turns on every
               matching row, a second saved screen, alerts, CSV export and insider filings:{" "}
@@ -548,7 +548,7 @@ export default function WhatsNewPage() {
           <h2 className="text-2xl font-semibold tracking-tight">See it for yourself</h2>
           <p className="mx-auto mt-2 max-w-md text-muted">
             The record is free to read with no account. A free account takes an email and a
-            password and opens the live scanner at the top ten scored rows; a card is what starts
+            password and opens the scanner at the top ten scored rows; a card is what starts
             the 30-day Premium trial &mdash; $0 today.
           </p>
           <Button href="/signup" variant="primary" shape="rounded" className="mt-6">

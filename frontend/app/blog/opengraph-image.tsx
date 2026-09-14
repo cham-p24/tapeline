@@ -16,7 +16,7 @@ import RootOgImage from "../opengraph-image";
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const alt = "Tapeline — Read the tape. Live.";
+export const alt = "Tapeline — Read the tape.";
 
 export default function Image() {
   return RootOgImage();

@@ -159,8 +159,8 @@ export default async function DailyPicksPage() {
                 The Top 10 right now
               </h2>
               <p className="mt-2 text-sm text-muted">
-                Free-tier view (live scores, so this list can change during the
-                day). Email subscribers get a Top 10 from the same composite
+                Free-tier view from a saved snapshot that can be an hour old or
+                more, so it can differ from the scanner. Email subscribers get a Top 10 from the same composite
                 each US market morning.
               </p>
             </div>
@@ -261,7 +261,7 @@ export default async function DailyPicksPage() {
               <div className="text-3xl font-bold text-accent">10</div>
               <h3 className="mt-2 font-semibold text-fg">Picks per day</h3>
               <p className="mt-1 text-sm text-muted leading-relaxed">
-                The 10 highest-scoring US tickers from the live composite,
+                The 10 highest-scoring US tickers from the composite,
                 ranked. Same set, ranked by composite, every morning.
               </p>
             </div>
@@ -280,7 +280,7 @@ export default async function DailyPicksPage() {
               <h3 className="mt-2 font-semibold text-fg">Free to read, free to run</h3>
               <p className="mt-1 text-sm text-muted leading-relaxed">
                 The daily email needs no account at all. An account takes an
-                email and a password, and the free plan runs the live scanner on
+                email and a password, and the free plan runs the scanner on
                 the top ten scored rows. Alerts and the full universe are what
                 the trial adds — no pressure.
               </p>
@@ -313,7 +313,7 @@ export default async function DailyPicksPage() {
       <section className="py-10 sm:py-14 text-center">
         <div className="mx-auto max-w-2xl px-6">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Want the same composite, live and on your own watchlist?
+            Want the same composite on your own watchlist?
           </h2>
           <p className="mt-3 text-muted">
             An account takes an email and a password: the free plan runs the
