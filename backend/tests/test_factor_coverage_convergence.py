@@ -307,7 +307,7 @@ async def test_the_insider_pass_stamps_its_own_column(
         return []
 
     monkeypatch.setattr(
-        "app.services.finnhub_feed.fetch_insider_transactions", _fake_txns,
+        "app.services.edgar_form4.fetch_insider_transactions", _fake_txns,
     )
 
     await signal_publisher._refresh_insider_cache()
