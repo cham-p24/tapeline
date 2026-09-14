@@ -80,7 +80,8 @@ export default function HoldingsPage() {
         <h1 className="text-2xl font-bold tracking-tight">Recent insider buys</h1>
         <p className="text-sm text-muted">
           SEC Form 4 filings across the active universe — officers, directors and 10%+ owners
-          trading their own company&apos;s stock. Each stock is re-checked about every two days.
+          trading their own company&apos;s stock. Each stock is re-checked about every two days,
+          but our data vendor&apos;s filings can run weeks behind SEC EDGAR.
           This is the data behind the Smart Money pillar of every Tapeline Score.
         </p>
       </div>
@@ -257,10 +258,12 @@ export default function HoldingsPage() {
       <p className="mt-4 text-xs text-subtle">
         {/* Cadence: backend/app/workers/signal_publisher.py
             _EQUITY_FACTOR_DUE_AFTER (36h) on the 24h factor chain, so each
-            stock is re-read about every 48h; non-equities every 30 days.
+            stock is re-read about every 48h; non-equities every 30 days. The
+            vendor lag is measured, not hedged: on 2026-09-14 its newest Form 4
+            for AAPL/NVDA/META was 14/67/30 days behind EDGAR's.
             Pinned by __tests__/insiderRefreshCadenceCopy.test.tsx. */}
-        Source: SEC Form 4 filings, through a data vendor that can run behind SEC
-        EDGAR. Each stock&rsquo;s filings are re-checked about every two days
+        Source: SEC Form 4 filings, through a data vendor whose filings can run weeks
+        behind SEC EDGAR. Each stock&rsquo;s filings are re-checked about every two days
         (ETFs and other non-stocks about monthly) across the tickers we track.
         Codes: P = open-market buy, S = open-market sale, A = grant/award,
         M = option exercise, G = gift, F = payment of tax via shares.

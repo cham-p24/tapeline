@@ -157,10 +157,11 @@ export default async function InsiderBuyingPage() {
               trade by a director, officer, or 10%+ shareholder. The form
               discloses the transaction code, share count, price, and resulting
               ownership. Tapeline pulls Form 4 transactions from its data vendor
-              (Finnhub) for the stocks it scores. That refresh runs once a day
-              and works through the stock universe in batches, so not every
-              stock is re-checked every day, and the vendor itself can run
-              behind SEC EDGAR.
+              (Finnhub) for the stocks it scores, re-checking each stock about
+              every two days (ETFs about monthly). The vendor&rsquo;s filings
+              can run weeks behind SEC EDGAR, so recent filings on EDGAR may not
+              be in our data yet. This is not a real-time or complete record of
+              insider trading.
             </p>
             <p>
               This page shows only transaction code <strong>P</strong> (a
@@ -204,7 +205,7 @@ export default async function InsiderBuyingPage() {
         },
         {
           q: "How often does the list update?",
-          a: "This page is rebuilt hourly from our database. Insider filings reach that database from our data vendor in a once-a-day refresh that works through the stock universe in batches, so not every stock is re-checked every day. The vendor can also run behind SEC EDGAR: on 14 September 2026 the newest open-market buy in our data was dated 31 August 2026. The newest trade date is printed under the table so you can see how current the list is.",
+          a: "This page is rebuilt hourly from our database. We re-check each stock's Form 4 filings with our data vendor about every two days (ETFs about monthly). The vendor itself runs behind SEC EDGAR: when we checked on 14 September 2026, its newest Form 4 filing for Apple, NVIDIA and Meta was 14, 67 and 30 days older than the newest one on EDGAR, and the newest open-market buy in our data was dated 31 August 2026. The newest trade date is printed under the table so you can see how current the list is.",
         },
         {
           q: "What tier do I need?",

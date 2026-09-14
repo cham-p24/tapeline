@@ -78,9 +78,11 @@ const CATEGORIES: Category[] = [
     // Form 4 cadence is the smart-money horizon in
     // backend/app/workers/signal_publisher.py (_EQUITY_FACTOR_DUE_AFTER, 36h,
     // on a 24h chain = re-read about every 48h; non-equities 30 days). It was
-    // "daily" here while the real rotation was ~30 days (#822).
+    // "daily" here while the real rotation was ~30 days (#822). The vendor's
+    // own lag is larger: on 2026-09-14 its newest Form 4 for AAPL/NVDA/META
+    // was 14/67/30 days behind SEC EDGAR's.
     refreshCadence:
-      "Form 4 re-checked about every two days per stock (ETFs and other non-stocks about monthly), through a data vendor that can run behind SEC EDGAR. 8-Ks every 5 minutes.",
+      "Form 4 re-checked about every two days per stock (ETFs and other non-stocks about monthly), through a data vendor whose filings can run weeks behind SEC EDGAR. 8-Ks every 5 minutes.",
     publicRecord: true,
   },
   {

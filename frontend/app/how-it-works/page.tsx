@@ -25,7 +25,7 @@ const HOW_FAQ = [
   },
   {
     q: "How often does the score update?",
-    a: "Scores re-tick every minute during market hours and persist between sessions. Most data feeds (price, volume, RSI, MACD, regime) update sub-60s; fundamentals refresh on company filing cadence. Insider Form 4 filings are pulled from a data vendor in a once-a-day refresh that works through the stock universe in batches, so not every stock is re-checked every day, and the vendor can run behind SEC EDGAR.",
+    a: "Scores re-tick every minute during market hours and persist between sessions. Most data feeds (price, volume, RSI, MACD, regime) update sub-60s; fundamentals refresh on company filing cadence. Insider Form 4 filings are re-checked with a data vendor about every two days per stock (about monthly for ETFs), and the vendor's filings can run weeks behind SEC EDGAR.",
   },
   {
     q: "What is the per-ticker confidence percentage?",

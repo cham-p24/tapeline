@@ -19,6 +19,14 @@
  * The first block reads those numbers out of the backend, so moving a horizon
  * or the chain's latch fails HERE, next to the copy that quotes them, rather
  * than silently turning "about every two days" into a false claim.
+ *
+ * RE-CHECKING OFTEN IS NOT THE SAME AS BEING CURRENT. After #822 re-read every
+ * equity, the newest open-market buy in production was still 31 August 2026.
+ * The vendor, not the pipeline: on 14 September 2026 Finnhub's newest Form 4
+ * filing for AAPL, NVDA and META was 27 Aug, 6 Jul and 12 Aug, against 10, 11
+ * and 11 Sep on SEC EDGAR — 14, 67 and 30 days behind. "A vendor that CAN run
+ * behind EDGAR" understated that, so every surface that states the cadence
+ * must also say the vendor's filings can run WEEKS behind.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -45,6 +53,9 @@ import HoldingsPage from "@/app/app/holdings/page";
 import RoadmapPage from "@/app/roadmap/page";
 import DataSourcesPage from "@/app/data-sources/page";
 import PublicTickerPage from "@/app/t/[symbol]/page";
+import InsiderBuyingPage from "@/app/insider-buying/page";
+import HowItWorksPage from "@/app/how-it-works/page";
+import { FACTORS } from "@/app/how-it-works/factors";
 import { useUser } from "@/components/UserContext";
 import { api } from "@/lib/api";
 
@@ -57,10 +68,16 @@ const STALE_CLAIMS = [
   /form 4 daily/i,
   /within hours of sec filing/i,
   /20 minutes/i,
+  // True once, and vaguer than the code now is (#817's pre-#822 wording).
+  /once-a-day refresh/i,
+  /not every stock is re-checked every day/i,
+  // Understates a measured 14-67 day vendor lag.
+  /vendor (that |itself )?can run behind SEC EDGAR/i,
 ];
 
 const TWO_DAYS = /about every two days/i;
 const MONTHLY = /about monthly/i;
+const WEEKS_BEHIND = /filings can run weeks behind SEC EDGAR/;
 
 // ── The numbers the copy quotes, read from the backend ──────────────────────
 
@@ -149,6 +166,7 @@ describe("/app/holdings", () => {
 
     const header = screen.getByText(/officers, directors and 10%\+ owners/);
     expect(header.textContent).toMatch(TWO_DAYS);
+    expect(header.textContent).toMatch(WEEKS_BEHIND);
     expect(header.textContent).not.toMatch(/live data/i);
 
     const filterBar = screen.getByText(/tracked · /);
@@ -157,7 +175,7 @@ describe("/app/holdings", () => {
     const note = screen.getByText(/Source: SEC Form 4 filings/);
     expect(note.textContent).toMatch(TWO_DAYS);
     expect(note.textContent).toMatch(MONTHLY);
-    expect(note.textContent).toMatch(/can run behind SEC EDGAR/);
+    expect(note.textContent).toMatch(WEEKS_BEHIND);
 
     expectNoStaleClaim(container.textContent ?? "");
   });
@@ -170,6 +188,7 @@ describe("/roadmap shipped item", () => {
     const { container } = render(<RoadmapPage />);
     const item = screen.getByText(/SEC Form 4 transactions \(officers/);
     expect(item.textContent).toMatch(TWO_DAYS);
+    expect(item.textContent).toMatch(WEEKS_BEHIND);
     expectNoStaleClaim(container.textContent ?? "");
   });
 });
@@ -180,6 +199,7 @@ describe("/data-sources SEC filings cadence", () => {
     const cadence = screen.getByText(/^Form 4 re-checked/);
     expect(cadence.textContent).toMatch(TWO_DAYS);
     expect(cadence.textContent).toMatch(MONTHLY);
+    expect(cadence.textContent).toMatch(WEEKS_BEHIND);
     // The 8-K half of the same sentence is untouched.
     expect(cadence.textContent).toContain("8-Ks every 5 minutes.");
     expectNoStaleClaim(container.textContent ?? "");
@@ -242,10 +262,62 @@ describe("/t/[symbol] FAQ", () => {
     expect(answer).toBeDefined();
     expect(answer!.acceptedAnswer.text).toMatch(TWO_DAYS);
     expect(answer!.acceptedAnswer.text).toMatch(MONTHLY);
+    expect(answer!.acceptedAnswer.text).toMatch(WEEKS_BEHIND);
 
     // The visible FAQ mirrors the schema.
     expect(container.textContent).toContain(answer!.acceptedAnswer.text);
     expectNoStaleClaim(container.textContent ?? "");
     expectNoStaleClaim(JSON.stringify(faq));
+  });
+});
+
+describe("/insider-buying, /how-it-works and the Smart Money factor", () => {
+  beforeEach(() => {
+    (useUser as ReturnType<typeof vi.fn>).mockReturnValue({ user: null, loading: false });
+  });
+
+  it("/insider-buying states the cadence, the lag, and the measurement behind it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          count: 1,
+          items: [{
+            symbol: "TSTA", insider_name: "DOE JANE", transaction_date: "2026-08-31",
+            share_change: 1000, transaction_price: 10, transaction_value: 10000, code: "P",
+          }],
+        }),
+      })),
+    );
+    const { container } = render(await InsiderBuyingPage());
+    const text = container.textContent ?? "";
+
+    const methodology = screen.getByText(/re-checking each stock about/);
+    expect(methodology.textContent).toMatch(TWO_DAYS);
+    expect(methodology.textContent).toMatch(WEEKS_BEHIND);
+    expect(methodology.textContent).toMatch(/not a real-time or complete record/);
+
+    // The freshness FAQ carries the dated measurement, visibly and in JSON-LD.
+    const measured = /14 September 2026, its newest Form 4 filing for Apple, NVIDIA and Meta was 14, 67 and 30 days older than the newest one on EDGAR/;
+    expect(text).toMatch(TWO_DAYS);
+    expect(text).toMatch(measured);
+    expect(container.innerHTML.match(new RegExp(measured.source, "g"))?.length).toBeGreaterThanOrEqual(2);
+    expectNoStaleClaim(container.innerHTML);
+  });
+
+  it("/how-it-works FAQ states the cadence and the lag", () => {
+    const { container } = render(<HowItWorksPage />);
+    expect(container.innerHTML).toMatch(/re-checked with a data vendor about every two days per stock/);
+    expect(container.innerHTML).toMatch(WEEKS_BEHIND);
+    expectNoStaleClaim(container.innerHTML);
+  });
+
+  it("the Smart Money factor copy states the cadence and the lag", () => {
+    const copy = JSON.stringify(FACTORS.find((f) => f.slug === "smart-money"));
+    expect(copy).toMatch(TWO_DAYS);
+    expect(copy).toMatch(WEEKS_BEHIND);
+    expectNoStaleClaim(copy);
   });
 });
