@@ -122,16 +122,34 @@ async def test_an_overrun_starts_the_next_cycle_promptly_and_says_so(one_cycle) 
     assert any("tick.overrun" in w for w in warnings), warnings
 
 
-async def test_a_killed_cycle_does_not_add_a_whole_interval(one_cycle) -> None:
-    """The watchdog kills a hung tick at TICK_TIMEOUT_SECONDS. Waiting another
-    full minute after that only widened the gap."""
+async def test_a_killed_cycle_gets_a_recovery_pause_not_a_whole_interval(one_cycle) -> None:
+    """The watchdog kills a hung tick at TICK_TIMEOUT_SECONDS. A kill usually
+    means something the tick waits on is slow, so the next cycle waits a
+    recovery step - not the old full minute, and not a one-second breath that
+    piles straight back onto a struggling database. Mutations: passing no
+    timeout count to the pause; the one-second floor after a kill."""
     _clock, slept, _warnings, set_tick = one_cycle
     set_tick(float(sp.TICK_TIMEOUT_SECONDS), raises=TimeoutError())
 
     with pytest.raises(_StopLoop):
         await sp.main()
 
-    assert slept == [sp._MIN_CYCLE_PAUSE_SECONDS]
+    assert slept == [sp._TIMEOUT_RECOVERY_STEP_SECONDS]
+    assert sp._MIN_CYCLE_PAUSE_SECONDS < sp._TIMEOUT_RECOVERY_STEP_SECONDS < 60
+
+
+def test_the_recovery_pause_grows_with_consecutive_kills_and_stops_at_the_interval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mutations: a recovery pause that ignores the count; no cap."""
+    monkeypatch.setattr(sp.settings, "score_refresh_seconds", 60, raising=False)
+    step = sp._TIMEOUT_RECOVERY_STEP_SECONDS
+    killed = float(sp.TICK_TIMEOUT_SECONDS)
+    assert sp._seconds_until_next_cycle(killed, consecutive_timeouts=1) == step
+    assert sp._seconds_until_next_cycle(killed, consecutive_timeouts=3) == 3 * step
+    assert sp._seconds_until_next_cycle(killed, consecutive_timeouts=50) == 60.0
+    # An ordinary overrun, with no kill behind it, keeps the short breath.
+    assert sp._seconds_until_next_cycle(75.0) == sp._MIN_CYCLE_PAUSE_SECONDS
 
 
 async def test_a_quiet_tick_logs_no_overrun(one_cycle) -> None:
@@ -353,3 +371,36 @@ async def test_a_failed_boot_warm_leaves_the_rebuild_due(one_cycle, monkeypatch:
         )
     finally:
         sp._last_active_universe_refresh = None
+
+
+async def test_concurrent_rebuilds_run_one_at_a_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The tick's rebuild and sheet_feed's rebuild share the worker's event loop,
+    the rotating cursor and the list. A rebuild awaits the database between
+    reading the cursor and advancing it; interleaved, both read one cursor and
+    advance it once, so a backlog window is never offered, and whichever ends
+    last overwrites the list.
+
+    Measured as overlap rather than through the cursor: the SQLite test pool
+    hands out one connection at a time, which serialises the two rebuilds by
+    accident and hides the race that Postgres's pool of ten allows. Mutation: no
+    rebuild lock."""
+    inside = 0
+    most = 0
+
+    async def _slow_rebuild(target_size: int | None = None) -> int:
+        nonlocal inside, most
+        inside += 1
+        most = max(most, inside)
+        await asyncio.sleep(0.05)
+        inside -= 1
+        return 0
+
+    monkeypatch.setattr(universe_mod, "_refresh_active_universe", _slow_rebuild)
+
+    await asyncio.gather(
+        universe_mod.refresh_active_universe(),
+        universe_mod.refresh_active_universe(),
+        universe_mod.refresh_active_universe(),
+    )
+
+    assert most == 1, f"{most} rebuilds ran at once; they share the cursor and the list"
