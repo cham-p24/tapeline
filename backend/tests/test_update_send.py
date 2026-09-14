@@ -6,6 +6,8 @@ property a human would normally eyeball in a dry run is pinned here instead:
 
   * a dry run sends nothing; --send stamps each recipient; a re-run is a no-op;
   * a send whose outcome is unknown (Resend may have it) is stamped, not retried;
+  * an outage stops the run without stamping the rest, and a run that fell
+    short exits non-zero;
   * the RE_ENGAGEMENT opt-out, undeliverable, sunset and Resend suppression hold;
   * newsletter-only subscribers are deduplicated against EVERY account;
   * the open-access sentence reaches account holders only;
@@ -548,6 +550,154 @@ async def test_a_run_that_stamps_no_account_does_not_mail_the_list(
     assert [m["to"] for m in outbox] == ["reader@example.com"]
 
 
+# ── An outage stops the run; a run that fell short exits non-zero ───────────
+
+def _scripted(calls: list[str], script: dict):
+    """A send_email whose Nth call (1-based) raises script[N]() if listed, else delivers."""
+    async def _send(**kw):
+        calls.append(kw["to"])
+        make = script.get(len(calls))
+        if make is not None:
+            raise make()
+        return {"id": f"re_{len(calls)}"}
+
+    return _send
+
+
+def _newsletter_line(out: str) -> str:
+    (line,) = [ln for ln in out.splitlines() if ln.startswith("newsletter phase:")]
+    return line
+
+
+@pytest.mark.parametrize("force_newsletter", [False, True], ids=["plain", "forced"])
+async def test_consecutive_unknown_outcomes_stop_the_run(
+    https, monkeypatch: pytest.MonkeyPatch, capsys, force_newsletter: bool,
+) -> None:
+    """Unknown outcomes are stamped (layer 4), so an outage answering 5xx or
+    timing out on every call would stamp the whole audience and mail nobody.
+    A delivery and a refused connection come first, so `accounts_held` is
+    proven to be the accounts left untried — not the audience less the stamps,
+    or less the unknowns. The list is held even when forced."""
+    calls: list[str] = []
+    monkeypatch.setattr("app.services.email.send_email", _scripted(calls, {
+        2: NEVER_REACHED_RESEND["connection_refused"],
+        3: OUTCOME_UNKNOWN["http_504"],
+        4: OUTCOME_UNKNOWN["read_timeout"],
+    }))
+    emails = [f"acct{i}@example.com" for i in range(6)]
+    async with session_scope() as s:
+        for e in emails:
+            await _user(s, e)
+        await _sub(s, "reader@example.com")
+
+    counts = await us.run(send=True, quiet=True, force_newsletter=force_newsletter)
+    out = capsys.readouterr().out
+    assert len(calls) == 4 and "reader@example.com" not in calls, calls
+    assert (counts["accounts_sent"], counts["failed"], counts["unknown"],
+            counts["accounts_held"], counts["newsletter_held"]) == (1, 1, 2, 2, 1), counts
+    held = [e for e in emails if e not in calls]
+    assert len(held) == 2
+    for e in held:
+        assert us.UPDATE_TOKEN not in await _state(e), f"{e} was never attempted but is stamped"
+    assert "STOPPED:" in out and _newsletter_line(out).startswith("newsletter phase: HELD"), out
+
+    # Resend healthy again: a re-run sends each unstamped account exactly once,
+    # leaves the list alone, and says the list may never have been mailed.
+    retry_calls: list[str] = []
+    monkeypatch.setattr("app.services.email.send_email", _scripted(retry_calls, {}))
+    retry = await us.run(send=True, quiet=True)
+    out = capsys.readouterr().out
+    assert sorted(retry_calls) == sorted([*held, calls[1]]), retry_calls
+    assert (retry["accounts_held"], retry["newsletter_held"]) == (0, 0), retry
+    assert "HELD" in _newsletter_line(out), out
+
+
+async def test_unknown_outcomes_with_a_delivery_between_them_do_not_stop_the_run(
+    https, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    unknown = OUTCOME_UNKNOWN["http_500"]
+    monkeypatch.setattr("app.services.email.send_email", _scripted(calls, {1: unknown, 3: unknown, 5: unknown}))
+    async with session_scope() as s:
+        for i in range(5):
+            await _user(s, f"acct{i}@example.com")
+        await _sub(s, "reader@example.com")
+    counts = await us.run(send=True, quiet=True)
+    assert len(calls) == 6 and calls[-1] == "reader@example.com", calls
+    assert (counts["unknown"], counts["accounts_held"], counts["newsletter_sent"]) == (3, 0, 1), counts
+
+
+async def test_an_outage_on_a_re_run_never_holds_the_list_the_first_run_mailed(
+    https, monkeypatch: pytest.MonkeyPatch, capsys,
+) -> None:
+    """The double send found in the survey reminder's review: run 1 mails the
+    list with two accounts refused; the re-run hits two 502s and stops. Holding
+    the list there would print an instruction to force it — a second mailing."""
+    calls: list[str] = []
+    refused = NEVER_REACHED_RESEND["connection_refused"]
+    monkeypatch.setattr("app.services.email.send_email", _scripted(calls, {2: refused, 3: refused}))
+    async with session_scope() as s:
+        for i in range(3):
+            await _user(s, f"acct{i}@example.com")
+        await _sub(s, "reader@example.com")
+    first = await us.run(send=True, quiet=True)
+    assert (first["failed"], first["newsletter_sent"]) == (2, 1), first
+    capsys.readouterr()
+
+    retry_calls: list[str] = []
+    bad_gateway = lambda: _status(502)  # noqa: E731
+    monkeypatch.setattr("app.services.email.send_email", _scripted(retry_calls, {1: bad_gateway, 2: bad_gateway}))
+    retry = await us.run(send=True, quiet=True)
+    out = capsys.readouterr().out
+    assert len(retry_calls) == 2 and "reader@example.com" not in retry_calls, retry_calls
+    assert "STOPPED:" in out, out
+    assert retry["newsletter_held"] == 0, retry
+    assert "--force-newsletter" not in out, out
+
+
+#: A send that reached everyone. `governed` and `would_send` are not shortfalls:
+#: a dry run is all `would_send`.
+_CLEAN = {
+    "accounts_sent": 3, "newsletter_sent": 2, "would_send": 4, "governed": 1,
+    "not_sent": 0, "failed": 0, "unknown": 0, "accounts_held": 0, "newsletter_held": 0,
+}
+
+
+def _main_returning(monkeypatch: pytest.MonkeyPatch, counts: dict) -> None:
+    async def _fake_run(**_kw):
+        return counts
+
+    monkeypatch.setattr(us, "run", _fake_run)
+    monkeypatch.setattr(us.asyncio, "set_event_loop_policy", lambda _p: None)
+
+
+@pytest.mark.parametrize("key", ["failed", "unknown", "not_sent", "accounts_held", "newsletter_held"])
+def test_a_run_that_fell_short_exits_non_zero(
+    monkeypatch: pytest.MonkeyPatch, capsys, restore_root_logging, key: str,
+) -> None:
+    """Nobody watches the 17:07 run; a green check is all anyone will look at."""
+    _main_returning(monkeypatch, {**_CLEAN, key: 1})
+    with pytest.raises(SystemExit) as exited:
+        us.main(["--send", "--quiet"])
+    assert exited.value.code == 1
+    out = capsys.readouterr().out
+    assert f"FELL SHORT: {{'{key}': 1}}" in out and "@" not in out, out
+
+
+def test_a_refused_run_exits_non_zero_and_a_clean_run_does_not(
+    monkeypatch: pytest.MonkeyPatch, capsys, restore_root_logging,
+) -> None:
+    _main_returning(monkeypatch, {})  # the lock's loss value
+    with pytest.raises(SystemExit) as exited:
+        us.main(["--send", "--quiet"])
+    assert exited.value.code == 1
+    assert "refused:" in capsys.readouterr().out
+
+    _main_returning(monkeypatch, dict(_CLEAN))
+    us.main(["--send", "--quiet"])  # no SystemExit
+    assert "FELL SHORT" not in capsys.readouterr().out
+
+
 async def test_a_killed_run_keeps_the_tokens_it_already_earned(
     https, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -849,7 +999,7 @@ def test_main_quiet_routes_logs_through_the_redactor(
         logging.getLogger("app.services.email").warning(
             "email.skipped reason=no_api_key to=%s", "leak@example.com",
         )
-        return {}
+        return {"accounts_sent": 1}
 
     monkeypatch.setattr(us, "run", _fake_run)
     monkeypatch.setattr(us.asyncio, "set_event_loop_policy", lambda _p: None)
