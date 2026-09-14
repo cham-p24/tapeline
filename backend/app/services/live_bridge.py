@@ -55,6 +55,24 @@ exponential backoff (capped at ``MAX_BACKOFF_SECONDS``). The watermarks it has
 already published are kept, so a DB blip neither crashes the API nor replays
 an old event. Cancellation (app shutdown) is the only way out of the loop.
 
+A read that never returns (a connection that hangs after checkout; the engine
+has a pool timeout but no statement timeout) is cut off after
+``READ_TIMEOUT_SECONDS`` and handled like any other failure, so the loop can
+never stall silently.
+
+US session only. The worker does not pause when the market is closed: its main
+loop has no market-hours check and every pass re-stamps ``updated_at`` on every
+scored row, nights and weekends included, while the prices it writes do not
+move. Forwarding those writes would make the in-app badge read
+"Auto-refreshing · updated 03:14" on a Sunday next to Friday's closing prices.
+So the bridge polls and publishes only inside the US extended session
+(``SESSION_OPEN_ET`` to ``SESSION_CLOSE_ET`` Eastern, pre-market through
+after-hours, on trading days per ``scorecard_backcheck.is_trading_day``).
+Outside it the bridge sends nothing and does not query the database. The first
+poll after the session opens publishes the overnight advance once, so an open
+page loads the newest data a single time. Browsers keep their SSE connection
+and heartbeat pings the whole time; the badge falls back to "Updated HH:MM".
+
 Multiple API machines. Each machine's process has its own broker, its own
 subscribers and its own bridge. They do not coordinate and do not need to.
 """
@@ -64,7 +82,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 from sqlalchemy import text
@@ -77,6 +95,11 @@ POLL_INTERVAL_SECONDS = 15.0
 SETTLE_SECONDS = 10.0
 #: Ceiling for the retry delay after consecutive poll failures.
 MAX_BACKOFF_SECONDS = 300.0
+#: A watermark read slower than this is abandoned and counted as a failure.
+READ_TIMEOUT_SECONDS = 10.0
+#: US extended session, Eastern time: pre-market open to after-hours close.
+SESSION_OPEN_ET = time(4, 0)
+SESSION_CLOSE_ET = time(20, 0)
 
 #: Event names, shared with the worker's in-process publishes
 #: (workers/signal_publisher.py) so the browser handles both identically.
@@ -88,6 +111,37 @@ WATERMARK_SQL = text(
     "(select max(updated_at) from tickers where score is not null) as tickers_at, "
     "(select max(updated_at) from regime_state) as regime_at"
 )
+
+
+def _nth_sunday(year: int, month: int, n: int) -> date:
+    first = date(year, month, 1)
+    first_sunday = first + timedelta(days=(6 - first.weekday()) % 7)
+    return first_sunday + timedelta(weeks=n - 1)
+
+
+def us_eastern(now: datetime) -> datetime:
+    """``now`` as naive US Eastern wall-clock time.
+
+    Computed from the US DST rule (second Sunday of March 02:00 local to first
+    Sunday of November 02:00 local) rather than ``zoneinfo``, so it does not
+    depend on the host having a tz database installed.
+    """
+    utc = now.astimezone(UTC).replace(tzinfo=None)
+    year = utc.year
+    dst_start = datetime.combine(_nth_sunday(year, 3, 2), time(7, 0))  # 02:00 EST
+    dst_end = datetime.combine(_nth_sunday(year, 11, 1), time(6, 0))   # 02:00 EDT
+    offset = -4 if dst_start <= utc < dst_end else -5
+    return utc + timedelta(hours=offset)
+
+
+def in_us_extended_session(now: datetime) -> bool:
+    """True from ``SESSION_OPEN_ET`` to ``SESSION_CLOSE_ET`` on a US trading day."""
+    from app.services.scorecard_backcheck import is_trading_day
+
+    et = us_eastern(now)
+    if not is_trading_day(et.date()):
+        return False
+    return SESSION_OPEN_ET <= et.time() < SESSION_CLOSE_ET
 
 
 @dataclass(frozen=True)
@@ -145,6 +199,8 @@ class LiveBridge:
         interval: float = POLL_INTERVAL_SECONDS,
         settle: float = SETTLE_SECONDS,
         max_backoff: float = MAX_BACKOFF_SECONDS,
+        read_timeout: float = READ_TIMEOUT_SECONDS,
+        in_session: Callable[[datetime], bool] = in_us_extended_session,
     ) -> None:
         self._publish = publish
         self._read = read
@@ -153,6 +209,8 @@ class LiveBridge:
         self._interval = interval
         self._settle = settle
         self._max_backoff = max_backoff
+        self._read_timeout = read_timeout
+        self._in_session = in_session
         self._baselined = False
         # Last value we published (or baselined on), per watermark.
         self._published: dict[str, datetime | None] = {}
@@ -176,9 +234,11 @@ class LiveBridge:
     async def poll_once(self) -> str | None:
         """One read. Returns the event name published, or None.
 
-        Raises whatever the read raises; :meth:`run` owns retry and backoff.
+        Raises whatever the read raises, or ``TimeoutError`` if it takes longer
+        than ``read_timeout``; :meth:`run` owns retry and backoff. Does not check
+        the session; :meth:`run` does.
         """
-        marks = await self._read()
+        marks = await asyncio.wait_for(self._read(), timeout=self._read_timeout)
         now = self._clock()
 
         if not self._baselined:
@@ -236,6 +296,13 @@ class LiveBridge:
         logger.info("live_bridge.started interval=%.0fs settle=%.0fs",
                     self._interval, self._settle)
         while True:
+            if not self._in_session(self._clock()):
+                # Market closed: the worker's writes carry no new prices.
+                # Neither query nor publish; a failure streak does not carry
+                # over into the next session.
+                self.failures = 0
+                await self._sleep(self._interval)
+                continue
             try:
                 await self.poll_once()
                 self.failures = 0

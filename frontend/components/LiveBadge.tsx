@@ -13,16 +13,20 @@ import { AUTO_REFRESH_WINDOW_MS, type LiveStatus } from "@/lib/useLiveStream";
  * session). It now states only what the page is doing:
  *
  *   auto        "Auto-refreshing · updated HH:MM"  (time the last update arrived)
- *   connected   "Updated HH:MM"                     (time the data was last loaded)
+ *   connected   "Updated HH:MM"                     (time the data last loaded successfully)
+ *               "Connected"                         (before the first successful load)
  *   connecting  "Updated HH:MM" once data has loaded, else "Connecting…"
- *   offline     "Offline · updated HH:MM"
+ *   offline     "Offline · updated HH:MM", or "Offline" before any load
+ *
+ * "Auto-refreshing" appears only while update events really arrive, which is
+ * only during the US extended session (the API's live bridge does not forward
+ * the worker's off-hours writes) and only on pages that leave auto-refresh on.
  *
  * The delay disclosure ("prices delayed about 15 minutes") belongs to page
  * copy, not to this badge.
  */
 
-/** Accepts the legacy "live" value some test mocks still pass; it renders as "connected". */
-type BadgeStatus = LiveStatus | "live";
+type BadgeStatus = LiveStatus;
 
 export function formatBadgeTime(d: Date): string {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });

@@ -32,11 +32,19 @@ export default function EarningsPage() {
 
   const load = useCallback(async () => {
     const r = await fetch(`${API_BASE}/api/earnings?days=14`, { credentials: "include", cache: "no-store" });
-    if (r.ok) setRows((await r.json()).items);
-    else handle401(r.status);
+    if (r.ok) {
+      setRows((await r.json()).items);
+      return true;
+    }
+    handle401(r.status);
+    return false;
   }, []);
-  useEffect(() => { load(); }, [load]);
-  const { status, lastUpdate } = useLiveStream(load);
+  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived.
+  const { status, lastUpdate, markLoaded } = useLiveStream(load);
+  useEffect(() => {
+    void load().then((ok) => { if (ok) markLoaded(); });
+  }, [load, markLoaded]);
 
   // Client-side filtering (no /api/earnings filter params), applied before
   // we group by date so empty days drop out of the grouped view entirely.

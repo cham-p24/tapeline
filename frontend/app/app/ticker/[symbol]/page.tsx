@@ -154,6 +154,7 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
       setData(await api.ticker(symbol));
       setError(null);
       setLookupLimit(null);
+      return true;
     } catch (e: unknown) {
       // 402 → free/anon daily look-up cap. Render the LookupWall (upgrade or
       // sign-up variant) instead of the generic error card. Clear any stale
@@ -165,20 +166,34 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         // Funnel: only the logged-in FREE variant is a cap hit. The anon
         // "signup_required" wall is a sign-up prompt, not a free→paid cap.
         if (e.reason === "free_lookup_limit") trackCapHit("daily_lookups", "ticker");
-        return;
+        return false;
       }
       setError(errorMessage(e));
+      return false;
     }
   }, [symbol]);
 
-  useEffect(() => { load(); }, [load]);
+  // Auto-refresh only for callers who are never metered. Every GET
+  // /api/ticker/{symbol} by a metered free user spends one of their daily
+  // look-ups, and at the cap it is a 402, a daily_lookups cap hit and a
+  // founder email, so refetching once per worker pass would use up the day's
+  // budget in minutes and then swap the page for the look-up wall.
+  const lookupMeter =
+    (data as (TickerDetail & { lookups?: LookupMeter | null }) | null)?.lookups ?? null;
+  const autoRefresh =
+    !!user && user.tier !== "free" && (lookupMeter === null || lookupMeter.limit === null);
   // Track this visit so it appears in the "Recent" pill row across the app.
   useEffect(() => { recordTickerVisit(symbol); }, [symbol]);
   // GA4 engagement event — declared in lib/gtag.ts but never fired until now,
   // so ticker-detail depth was invisible in the funnel. Re-fires per symbol
   // (each is a distinct view), fire-and-forget.
   useEffect(() => { trackEvent("view_ticker", { symbol }); }, [symbol]);
-  const { status, lastUpdate } = useLiveStream(load);
+  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived.
+  const { status, lastUpdate, markLoaded } = useLiveStream(load, { enabled: autoRefresh });
+  useEffect(() => {
+    void load().then((ok) => { if (ok) markLoaded(); });
+  }, [load, markLoaded]);
   // Score count-up — called unconditionally here, before the loading/error
   // early-returns below, so the hook count never changes between renders
   // (react-hooks/rules-of-hooks). `data` is null while loading, so pass null

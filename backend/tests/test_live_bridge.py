@@ -197,6 +197,130 @@ async def test_run_survives_a_db_error_backs_off_and_does_not_replay(caplog):
     assert bridge.failures == 0
 
 
+async def test_a_read_that_never_returns_times_out_and_is_retried(caplog):
+    """A connection that hangs after checkout must not stall the loop silently."""
+    clock, pub = FakeClock(T0 + timedelta(seconds=100)), Recorder()
+    calls = 0
+
+    async def read() -> Watermarks:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            await asyncio.Event().wait()  # never returns
+        return wm(0, 0) if calls == 1 else wm(70, 70)
+
+    delays: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        delays.append(seconds)
+        if len(delays) == 3:
+            raise asyncio.CancelledError
+
+    bridge = LiveBridge(
+        publish=pub, read=read, clock=clock, sleep=fake_sleep,
+        interval=15, read_timeout=0.05,
+    )
+    with (
+        caplog.at_level(logging.WARNING, logger="app.services.live_bridge"),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await asyncio.wait_for(bridge.run(), timeout=5)
+
+    assert calls == 3
+    assert delays == [15, 30, 15]
+    assert [e for e, _ in pub.events] == [lb.SCORES_EVENT]
+    assert any("live_bridge.poll_failed" in r.getMessage() for r in caplog.records)
+
+
+async def test_outside_the_us_session_it_neither_reads_nor_publishes():
+    """The worker re-stamps rows all night; those passes carry no new prices."""
+    # Sun 13 Sep 2026 07:14 UTC = 03:14 EDT.
+    clock, pub = FakeClock(datetime(2026, 9, 13, 7, 14, tzinfo=UTC)), Recorder()
+    reads = 0
+
+    async def read() -> Watermarks:
+        nonlocal reads
+        reads += 1
+        return wm(reads * 70, reads * 70)
+
+    sleeps = 0
+
+    async def fake_sleep(seconds: float) -> None:
+        nonlocal sleeps
+        sleeps += 1
+        clock.advance(seconds)
+        if sleeps == 20:
+            raise asyncio.CancelledError
+
+    bridge = LiveBridge(publish=pub, read=read, clock=clock, sleep=fake_sleep, interval=15)
+    with pytest.raises(asyncio.CancelledError):
+        await bridge.run()
+    assert reads == 0
+    assert pub.events == []
+
+
+async def test_first_poll_after_the_open_publishes_the_overnight_advance_once():
+    # Mon 14 Sep 2026 07:59:30 UTC = 03:59:30 EDT, 30s before pre-market opens.
+    start = datetime(2026, 9, 14, 7, 59, 30, tzinfo=UTC)
+    clock, pub = FakeClock(start), Recorder()
+    overnight = start - timedelta(hours=1)
+    reads = 0
+
+    async def read() -> Watermarks:
+        nonlocal reads
+        reads += 1
+        return Watermarks(tickers_at=overnight, regime_at=overnight)
+
+    sleeps = 0
+
+    async def fake_sleep(seconds: float) -> None:
+        nonlocal sleeps
+        sleeps += 1
+        clock.advance(seconds)
+        if sleeps == 6:
+            raise asyncio.CancelledError
+
+    bridge = LiveBridge(publish=pub, read=read, clock=clock, sleep=fake_sleep, interval=15)
+    # Pretend a previous session published an older write.
+    bridge._baselined = True
+    bridge._published = {"tickers": overnight - timedelta(hours=10),
+                         "regime": overnight - timedelta(hours=10)}
+    with pytest.raises(asyncio.CancelledError):
+        await bridge.run()
+    assert reads == 4  # 03:59:30 and 03:59:45 skipped; 04:00:00 onwards read
+    assert [e for e, _ in pub.events] == [lb.SCORES_EVENT]
+
+
+@pytest.mark.parametrize(
+    ("utc", "expected"),
+    [
+        (datetime(2026, 9, 14, 7, 59, tzinfo=UTC), False),   # Mon 03:59 EDT
+        (datetime(2026, 9, 14, 8, 0, tzinfo=UTC), True),     # Mon 04:00 EDT
+        (datetime(2026, 9, 14, 14, 0, tzinfo=UTC), True),    # Mon 10:00 EDT
+        (datetime(2026, 9, 14, 23, 59, tzinfo=UTC), True),   # Mon 19:59 EDT
+        (datetime(2026, 9, 15, 0, 0, tzinfo=UTC), False),    # Mon 20:00 EDT
+        (datetime(2026, 9, 12, 14, 0, tzinfo=UTC), False),   # Saturday
+        (datetime(2026, 9, 13, 14, 0, tzinfo=UTC), False),   # Sunday
+        (datetime(2026, 9, 7, 14, 0, tzinfo=UTC), False),    # Labor Day
+        (datetime(2026, 11, 26, 15, 0, tzinfo=UTC), False),  # Thanksgiving
+        (datetime(2026, 12, 14, 8, 30, tzinfo=UTC), False),  # Mon 03:30 EST
+        (datetime(2026, 12, 14, 9, 0, tzinfo=UTC), True),    # Mon 04:00 EST
+        (datetime(2027, 1, 5, 0, 59, tzinfo=UTC), True),     # Mon 19:59 EST
+        (datetime(2027, 1, 5, 1, 0, tzinfo=UTC), False),     # Mon 20:00 EST
+    ],
+)
+def test_in_us_extended_session(utc, expected):
+    assert lb.in_us_extended_session(utc) is expected
+
+
+def test_us_eastern_follows_the_dst_rule():
+    # 2026: DST from Sun 8 Mar 07:00 UTC to Sun 1 Nov 06:00 UTC.
+    assert lb.us_eastern(datetime(2026, 3, 8, 6, 59, tzinfo=UTC)).hour == 1
+    assert lb.us_eastern(datetime(2026, 3, 8, 7, 0, tzinfo=UTC)).hour == 3
+    assert lb.us_eastern(datetime(2026, 11, 1, 5, 59, tzinfo=UTC)).hour == 1
+    assert lb.us_eastern(datetime(2026, 11, 1, 6, 0, tzinfo=UTC)).hour == 1
+
+
 async def test_backoff_is_capped():
     bridge = LiveBridge(publish=Recorder(), interval=15, max_backoff=300)
     bridge.failures = 10

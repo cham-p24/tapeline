@@ -32,11 +32,15 @@ The initial test set covers the highest-leverage surfaces:
 - **ScannerPreview.test.tsx** — landing-hero scanner shows descriptive
   labels (HIGH CONVICTION etc.), never prescriptive ones (BUY NOW etc.) —
   protects the publisher's-exemption legal posture
+- **LiveBadge.test.tsx** — the SSE stream hook (useLiveStream, with a small
+  in-file EventSource mock) and the freshness badge: pings never read as
+  updates, the badge never says "Live", "Auto-refreshing" only while update
+  events arrive, failed loads never move the "Updated" time, and
+  `enabled: false` pages never refetch
 
 ## What's not covered (yet)
 
 - API client / lib/api.ts — needs `msw` for HTTP mocking, easy add later
-- Live SSE stream hook (useLiveStream) — needs `eventsource-mock`
 - Full page render of /app/scanner — needs API mocking + provider stubs
 - E2E flows (signup → scanner → paywall) — Playwright would land later
 

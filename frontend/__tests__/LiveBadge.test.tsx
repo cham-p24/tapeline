@@ -10,6 +10,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
+import { useEffect } from "react";
 
 import { LiveBadge, badgeLabel, formatBadgeTime } from "@/components/LiveBadge";
 import {
@@ -55,8 +56,20 @@ class MockEventSource {
 
 const START = new Date("2026-09-14T14:00:00Z");
 
-function Harness({ onUpdate }: { onUpdate: () => void | Promise<unknown> }) {
-  const { status, lastUpdate } = useLiveStream(onUpdate);
+function Harness({
+  onUpdate,
+  enabled,
+  markOnMount = true,
+}: {
+  onUpdate: () => void | boolean | Promise<unknown>;
+  enabled?: boolean;
+  /** Stands in for the page's own mount load succeeding. */
+  markOnMount?: boolean;
+}) {
+  const { status, lastUpdate, markLoaded } = useLiveStream(onUpdate, { enabled });
+  useEffect(() => {
+    if (markOnMount) markLoaded();
+  }, [markLoaded, markOnMount]);
   return <LiveBadge status={status} lastUpdate={lastUpdate} />;
 }
 
@@ -205,6 +218,78 @@ describe("LiveBadge driven by useLiveStream", () => {
     expect(badgeText()).toBe(`Updated ${formatBadgeTime(refetched)}`);
   });
 
+  it("before any successful load: 'Connected', never a time for data that did not arrive", () => {
+    render(<Harness onUpdate={vi.fn()} markOnMount={false} />);
+    const es = MockEventSource.latest();
+    act(() => es.emit("hello"));
+    act(() => {
+      vi.advanceTimersByTime(25_000);
+      es.emit("ping");
+    });
+    expect(badgeText()).toBe("Connected");
+    expectNeverLive();
+  });
+
+  const failedRefetches: Array<[string, () => boolean | Promise<unknown>]> = [
+    ["resolves to false", () => Promise.resolve(false)],
+    ["returns false", () => false],
+    ["rejects", () => Promise.reject(new Error("502"))],
+  ];
+  it.each(failedRefetches)("a failed refetch (%s) keeps the previous load time", async (_label, impl) => {
+    const onUpdate = vi.fn(impl);
+    render(<Harness onUpdate={onUpdate} />);
+    const es = MockEventSource.latest();
+    act(() => es.emit("hello"));
+    act(() => vi.advanceTimersByTime(70_000));
+    act(() => es.emit("update"));
+    await act(async () => {
+      vi.advanceTimersByTime(COALESCE_MS);
+    });
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      vi.advanceTimersByTime(AUTO_REFRESH_WINDOW_MS + 15_000);
+    });
+    expect(badgeText()).toBe(`Updated ${formatBadgeTime(START)}`);
+  });
+
+  it("enabled: false (metered free pages): updates neither refetch nor show Auto-refreshing", async () => {
+    const onUpdate = vi.fn(() => Promise.resolve(true));
+    render(<Harness onUpdate={onUpdate} enabled={false} />);
+    const es = MockEventSource.latest();
+    act(() => es.emit("hello"));
+    for (let i = 0; i < 5; i++) {
+      await act(async () => {
+        vi.advanceTimersByTime(72_000);
+        es.emit("update");
+      });
+      expect(badgeText()).toBe(`Updated ${formatBadgeTime(START)}`);
+      expect(screen.getByTestId("live-badge").getAttribute("data-tone")).toBe("connected");
+      expectNeverLive();
+    }
+    await act(async () => {
+      vi.advanceTimersByTime(10 * 60_000);
+    });
+    expect(onUpdate).not.toHaveBeenCalled();
+
+    act(() => es.fail(true));
+    expect(badgeText()).toBe(`Offline · updated ${formatBadgeTime(START)}`);
+  });
+
+  it("turning auto-refresh off drops a refetch that was already pending", async () => {
+    const onUpdate = vi.fn(() => Promise.resolve(true));
+    const { rerender } = render(<Harness onUpdate={onUpdate} />);
+    const es = MockEventSource.latest();
+    act(() => es.emit("hello"));
+    act(() => es.emit("update"));
+    expect(badgeText()).toMatch(/^Auto-refreshing/);
+    rerender(<Harness onUpdate={onUpdate} enabled={false} />);
+    await act(async () => {
+      vi.advanceTimersByTime(MIN_REFETCH_GAP_MS * 2);
+    });
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(badgeText()).toBe(`Updated ${formatBadgeTime(START)}`);
+  });
+
   it("closes the stream and pending timers on unmount", () => {
     const onUpdate = vi.fn();
     const { unmount } = render(<Harness onUpdate={onUpdate} />);
@@ -229,9 +314,6 @@ describe("LiveBadge rendered from props", () => {
     ["auto", t],
     ["offline", null],
     ["offline", t],
-    // Legacy value still passed by some page-test mocks.
-    ["live", null],
-    ["live", t],
   ] as const)("never says Live or pulses (status=%s, lastUpdate=%s)", (status, lastUpdate) => {
     vi.setSystemTime(new Date(t.getTime() + 30_000));
     render(<LiveBadge status={status} lastUpdate={lastUpdate} />);
@@ -244,11 +326,6 @@ describe("LiveBadge rendered from props", () => {
     expect(badgeLabel("auto", t, t.getTime() + 60_000).text).toBe(
       `Auto-refreshing · updated ${formatBadgeTime(t)}`,
     );
-  });
-
-  it("the legacy 'live' status renders as connected, not live", () => {
-    expect(badgeLabel("live", t, t.getTime()).text).toBe(`Updated ${formatBadgeTime(t)}`);
-    expect(badgeLabel("live", null, t.getTime()).text).toBe("Connected");
   });
 
   it("deriveLiveStatus: pings never make 'auto'; only a recent update does", () => {

@@ -10,27 +10,44 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *   - `hello` once on connect, `ping` after 25s of quiet. Neither says any
  *     data changed. They only prove the connection is open.
  *   - `update` when the API's live bridge (backend/app/services/live_bridge.py)
- *     sees a new database write, about once per worker pass (~70-80s apart
- *     during US market hours). Before that bridge existed the worker's
- *     publishes never reached the API, and a 300s capture on 14 Sep 2026
- *     received 0 update events while this hook reported "live" off pings.
+ *     sees a new database write, about once per worker pass (~70-80s apart).
+ *     The worker writes around the clock (it does not pause when the market
+ *     is closed), but the bridge forwards writes only during the US extended
+ *     session, 04:00-20:00 ET on trading days, because off-hours passes carry
+ *     no new prices. Before that bridge existed the worker's publishes never
+ *     reached the API, and a 300s capture on 14 Sep 2026 received 0 update
+ *     events while this hook reported "live" off pings.
  *
  * Status is therefore driven by what actually happened, not by the socket:
  *   - "auto"       an update event arrived within AUTO_REFRESH_WINDOW_MS, so
  *                  the page really is refetching on its own.
- *   - "connected"  the stream is open but no update has arrived recently (or
- *                  ever): outside market hours, or updates are not flowing.
+ *   - "connected"  the stream is open but no update arrived within
+ *                  AUTO_REFRESH_WINDOW_MS: just connected, a deploy gap,
+ *                  outside the US extended session (the bridge does not
+ *                  forward off-hours writes), the bridge is not publishing,
+ *                  or the page turned auto-refresh off (`enabled: false`).
  *   - "connecting" before the first hello.
  *   - "offline"    the connection dropped; we are reconnecting.
  *
  * `lastUpdate` is the time the badge should print:
  *   - in "auto", when the last update event arrived;
- *   - otherwise, when this page's data was last loaded, as far as the hook
- *     knows: mount time, then each update-triggered refetch (when the callback
- *     returns a promise, the time it resolved). A page that also refetches on
- *     filter changes can call `markLoaded()` after those loads.
+ *   - otherwise, when this page's data last loaded SUCCESSFULLY, as far as
+ *     the hook knows: the page calls `markLoaded()` after its own loads
+ *     succeed (mount, filter changes), and the hook stamps each
+ *     update-triggered refetch that succeeds. A refetch counts as failed when
+ *     the callback throws, rejects, or returns/resolves to `false`; pages whose
+ *     `load` swallows its own errors return `false` from the catch. Until the
+ *     first successful load `lastUpdate` is null, and the badge says
+ *     "Connected" rather than a time for data that never arrived.
  *
- * Refetch pacing: one worker pass produces one event, but events are still
+ * `enabled` (default true). Pass `enabled: false` where a refetch costs the
+ * user something: a metered endpoint (the free daily ticker look-ups) or one
+ * that records a free-tier cap hit and emails the founder on every call (the
+ * squeeze preview). While disabled the hook never schedules a refetch, never
+ * reports "auto", and drops any refetch already pending. The stream stays
+ * open so the badge can still show "Offline".
+ *
+ * Refetch pacing: a normal worker pass produces one event, but events are still
  * coalesced so a page never refetches more than once per MIN_REFETCH_GAP_MS.
  * An event inside that gap schedules one trailing refetch at the end of it,
  * so a newer pass is never dropped. Both constants are pinned to the bridge's
@@ -68,21 +85,41 @@ export function deriveLiveStatus(
   return "connected";
 }
 
-export function useLiveStream(onUpdate: () => void | Promise<unknown>): {
+export type LiveStreamOptions = {
+  /** False turns auto-refresh off for this page. Default true. */
+  enabled?: boolean;
+};
+
+/** A refetch that returns `false` (or a promise resolving to it) failed. */
+export type LiveRefetch = () => void | boolean | Promise<unknown>;
+
+export function useLiveStream(
+  onUpdate: LiveRefetch,
+  options: LiveStreamOptions = {},
+): {
   status: LiveStatus;
   lastUpdate: Date | null;
   markLoaded: () => void;
 } {
+  const enabled = options.enabled ?? true;
   const [connection, setConnection] = useState<Connection>("connecting");
   const [lastEventAt, setLastEventAt] = useState<Date | null>(null);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [now, setNow] = useState<number>(0);
   const cb = useRef(onUpdate);
-  // Keep the ref pointing at the latest callback without writing during
+  const enabledRef = useRef(enabled);
+  const cancelPendingRefetch = useRef<() => void>(() => {});
+  // Keep the refs pointing at the latest values without writing during
   // render (react-hooks/refs).
   useEffect(() => {
     cb.current = onUpdate;
   });
+  useEffect(() => {
+    enabledRef.current = enabled;
+    // Turning auto-refresh off drops a pending refetch. The status below
+    // already ignores update events while disabled.
+    if (!enabled) cancelPendingRefetch.current();
+  }, [enabled]);
 
   const markLoaded = useCallback(() => {
     setLoadedAt(new Date());
@@ -90,8 +127,8 @@ export function useLiveStream(onUpdate: () => void | Promise<unknown>): {
 
   useEffect(() => {
     // Set after mount (not in initial state) so server and client render the
-    // same markup. The page's own mount fetch starts at the same moment.
-    setLoadedAt(new Date());
+    // same markup. No load stamp here: the page's own fetch has not succeeded
+    // yet, and may not.
     setNow(Date.now());
     const recheck = setInterval(() => setNow(Date.now()), RECHECK_MS);
     return () => clearInterval(recheck);
@@ -111,9 +148,9 @@ export function useLiveStream(onUpdate: () => void | Promise<unknown>): {
 
     function runRefetch() {
       refetchTimer = null;
-      if (cancelled) return;
+      if (cancelled || !enabledRef.current) return;
       lastRefetchAt = Date.now();
-      let result: void | Promise<unknown>;
+      let result: void | boolean | Promise<unknown>;
       try {
         result = cb.current();
       } catch {
@@ -121,17 +158,23 @@ export function useLiveStream(onUpdate: () => void | Promise<unknown>): {
       }
       if (result && typeof (result as Promise<unknown>).then === "function") {
         (result as Promise<unknown>).then(
-          () => {
-            if (!cancelled) setLoadedAt(new Date());
+          (value) => {
+            // `false` = the page caught its own error: keep the previous time.
+            if (!cancelled && value !== false) setLoadedAt(new Date());
           },
           () => {
             /* the page owns its error state; keep the previous load time */
           },
         );
-      } else {
+      } else if (result !== false) {
         setLoadedAt(new Date());
       }
     }
+
+    cancelPendingRefetch.current = () => {
+      if (refetchTimer) clearTimeout(refetchTimer);
+      refetchTimer = null;
+    };
 
     function scheduleRefetch() {
       if (refetchTimer) return; // one pending refetch absorbs further events
@@ -155,6 +198,10 @@ export function useLiveStream(onUpdate: () => void | Promise<unknown>): {
       });
       es.addEventListener("update", () => {
         backoffMs = 1000;
+        setConnection("open");
+        // Auto-refresh turned off by the page: the event proves the socket is
+        // open and nothing else. No refetch, no "auto".
+        if (!enabledRef.current) return;
         const at = new Date();
         setLastEventAt(at);
         setNow(at.getTime());
@@ -200,7 +247,7 @@ export function useLiveStream(onUpdate: () => void | Promise<unknown>): {
     };
   }, []);
 
-  const status = deriveLiveStatus(connection, lastEventAt, now);
+  const status = deriveLiveStatus(connection, enabled ? lastEventAt : null, now);
   const lastUpdate = status === "auto" ? lastEventAt : loadedAt;
   return { status, lastUpdate, markLoaded };
 }
