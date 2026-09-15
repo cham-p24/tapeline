@@ -31,7 +31,7 @@ from app.services.auth import current_user_optional, current_user_required
 from app.services.finnhub_feed import (
     fetch_analyst_ratings,
     fetch_basic_financials,
-    fetch_insider_transactions,
+    get_recent_insider_transactions_db,
 )
 from app.services.news_feed import fetch_news_for_ticker
 from app.services.percentile import peer_percentiles
@@ -346,6 +346,10 @@ _FLAG_ROWS_SERIALISED_CAP = 60
 # window of GET /api/ticker/{symbol}/insider (days_back=90), so the number a
 # locked visitor is shown is the number of rows the unlocked tab would open on.
 _INSIDER_COUNT_WINDOW_DAYS = 90
+
+# Rows the Insider tab returns. The 90-day window of a heavy filer runs to ~150
+# lines (TSM held 144 on 2026-09-14), so this only bounds a pathological symbol.
+_INSIDER_TAB_ROW_CAP = 500
 
 
 def _flag_record_payload(
@@ -987,22 +991,29 @@ async def ticker_insider(
 ) -> dict:
     """Recent Form 4 insider transactions for a ticker — Premium only.
 
-    Returns insider buys/sells from Finnhub for the last `days_back` days
-    (default 90, clamped to [1, 365] to bound upstream cost). Each row
-    carries filer name, transaction date, share change, transaction price,
-    and the SEC transaction code (P=purchase, S=sale, A=award, M=option
-    exercise, G=gift, F=tax withholding).
+    Returns the ticker's stored Form 4 lines for the last `days_back` days,
+    newest trade first: the rows the worker's insider pass read from SEC EDGAR
+    (`services/edgar_form4.py`) into `insider_transactions` - the same rows
+    /api/holdings, /insider-buying and the Smart Money factor use. Each row
+    carries filer name, transaction date, share change, transaction price, and
+    the SEC transaction code (P=purchase, S=sale, A=award, M=option exercise,
+    G=gift, F=tax withholding).
+
+    It used to call Finnhub live (cached 24h). Since #835 the rest of the site
+    reads EDGAR, and Finnhub's Form 4 data ran 14-67 days behind EDGAR for
+    AAPL/NVDA/META on 2026-09-14 - so this tab showed older filings than the
+    Holdings page beside it, and a different number from the `gated_counts`
+    figure a locked visitor is promised (see _INSIDER_COUNT_WINDOW_DAYS).
+
+    `days_back` is clamped to [1, _INSIDER_COUNT_WINDOW_DAYS]: the pass stores
+    a 90-day window, so a longer request would silently return 90 days while
+    the response claimed more ("no Form 4 filings in the last 365 days").
 
     Mirrors the Premium gating on /api/holdings — Form 4 is explicit
     Premium territory per the tier model. The frontend Paywall handles the
     upsell card; this endpoint also enforces the gate so the data can't be
     sniffed via direct API call from a Free or Pro session.
-
-    Cached 24h at the adapter layer (per-symbol).
     """
-    # Short-lived session, released BEFORE the upstream Finnhub call (see the
-    # ticker_ratings note + app/db.py — avoids pinning a pooled connection
-    # across the multi-second upstream, which exhausted the pool on 2026-06-01).
     async with SessionLocal() as session:
         user = await current_user_required(request, session)
         allowed = has_feature(Tier(user.tier), "insider.form4")
@@ -1010,12 +1021,23 @@ async def ticker_insider(
         raise HTTPException(403, "Insider transactions require Premium tier")
 
     sym = symbol.upper()
-    days = max(1, min(days_back, 365))
-    rows = await fetch_insider_transactions(sym, days_back=days)
+    days = max(1, min(days_back, _INSIDER_COUNT_WINDOW_DAYS))
+    rows = await get_recent_insider_transactions_db(
+        days=days, limit=_INSIDER_TAB_ROW_CAP, symbol=sym,
+    )
     return {
         "symbol": sym,
         "days_back": days,
-        "transactions": rows or [],
+        "transactions": [
+            {
+                "filer_name": r["insider_name"],
+                "transaction_date": r["transaction_date"],
+                "share_change": r["share_change"],
+                "transaction_price": r["transaction_price"],
+                "code": r["code"],
+            }
+            for r in rows
+        ],
     }
 
 
