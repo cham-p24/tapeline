@@ -102,6 +102,21 @@ SAFETY
     .github/workflows/product-update-send.yml, and the test that reads the
     worker's send hours from its source.
 
+AN OUTAGE STOPS THE RUN; A RUN THAT FELL SHORT EXITS NON-ZERO
+-------------------------------------------------------------
+Layer 4 stamps every unknown outcome, so if Resend answered 5xx or timed out on
+every call, the run would stamp the whole audience and mail nobody. So
+UNKNOWN_OUTCOME_LIMIT unknown outcomes in a row (no delivery between them) stop
+the account phase: the accounts after them are not attempted, carry no stamp,
+and are counted as `accounts_held` for a re-run. On a first run the newsletter
+half is HELD too, even under --force-newsletter. On a re-run it is left alone
+without an instruction to force it, because the earlier run may already have
+mailed the list. Ported from the survey reminder (#831), with its review's fix.
+
+Nobody watches the 17:07 run, so `main` exits 1 — printing `refused:` or a
+`FELL SHORT:` line, counts only — when the lock was refused or any FELL_SHORT
+count is non-zero. A dry run, and a re-run that finds everyone stamped, exit 0.
+
 Usage:
     python -m app.scripts.update_send                   # dry run
     python -m app.scripts.update_send --send --quiet    # what the workflow runs
@@ -132,6 +147,14 @@ UPDATE_TOKEN = "product_update_2026_09"
 #: Invisible on the page — the link text is derived without the query string —
 #: and lets the scorecard's traffic from this one email be told apart.
 SCORECARD_UTM = "utm_source=email&utm_medium=email&utm_campaign=product_update_2026_09"
+
+#: Unknown outcomes in a row that stop the account phase. See "AN OUTAGE STOPS
+#: THE RUN" in the module docstring.
+UNKNOWN_OUTCOME_LIMIT = 2
+
+#: Counts meaning an eligible person was not knowably reached by this run. Any
+#: of them non-zero makes `main` exit 1.
+FELL_SHORT = ("failed", "unknown", "not_sent", "accounts_held", "newsletter_held")
 
 
 def _state_tokens(drip_state: str | None) -> set[str]:
@@ -297,11 +320,15 @@ async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False
     counts = {
         "accounts_sent": 0, "newsletter_sent": 0, "would_send": 0,
         "governed": 0, "not_sent": 0, "failed": 0, "unknown": 0,
+        "accounts_held": 0, "newsletter_held": 0,
     }
     # Accounts this run stamped, whether delivered or outcome-unknown. Layer 3
     # asks whether a re-run could tell this run happened, and either kind of
     # stamp answers yes; `accounts_sent` alone would not count the second.
     stamped = 0
+    # Unknown outcomes since the last delivery, and whether they stopped the run.
+    unknown_streak = 0
+    stopped = False
 
     async with session_scope() as session:
         # Decided BEFORE anything is sent, and parsed in Python — see layer 2.
@@ -317,7 +344,7 @@ async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False
         print(f"newsletter: {len(news)} eligible; skipped: {_tally(n_skipped)}")
 
         governor = worker_governor()
-        for u in accounts:
+        for position, u in enumerate(accounts, start=1):
             greeting = first_name(u.name)
             if not send:
                 counts["would_send"] += 1
@@ -366,22 +393,51 @@ async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False
             governor.record(u)
             stamped += 1
             if outcome == "sent":
+                unknown_streak = 0
                 counts["accounts_sent"] += 1
                 show(f"  SENT        {u.email}")
-            else:
-                counts["unknown"] += 1
-                show(f"  UNKNOWN     {u.email} (stamped; check Resend's log)")
+                continue
+            unknown_streak += 1
+            counts["unknown"] += 1
+            show(f"  UNKNOWN     {u.email} (stamped; check Resend's log)")
+            if unknown_streak >= UNKNOWN_OUTCOME_LIMIT:
+                stopped = True
+                counts["accounts_held"] = len(accounts) - position
+                print(
+                    f"STOPPED: {unknown_streak} sends in a row had an unknown outcome, "
+                    f"so Resend looks unhealthy. {counts['accounts_held']} account(s) "
+                    "after them were not attempted and carry no stamp: re-run once "
+                    "Resend is healthy."
+                )
+                break
 
-        # Layer 3. Dry runs report what the first real run would do.
-        if force_newsletter:
+        # Layer 3 and the outage stop. Dry runs report what the first real run would do.
+        if stopped and first_run:
+            run_news, why = False, (
+                "HELD: the account phase stopped on unknown outcomes. Check Resend's "
+                "log, then run with --force-newsletter over flyctl ssh"
+            )
+            counts["newsletter_held"] = len(news)
+        elif stopped:
+            run_news, why = False, (
+                "SKIPPED: the account phase stopped, and an earlier run already stamped "
+                "accounts. Whether the list was mailed is in that run's log "
+                "('newsletter phase: running' means it was); do not force it blind"
+            )
+        elif force_newsletter:
             run_news, why = True, "FORCED by --force-newsletter"
         elif not first_run:
-            run_news, why = False, "SKIPPED: an earlier run already stamped accounts"
+            run_news, why = False, (
+                "SKIPPED: an earlier run already stamped accounts. If that run printed "
+                "'newsletter phase: HELD' or never reached this line, the list was never "
+                "mailed: check Resend's log, then run with --force-newsletter once"
+            )
         elif send and stamped == 0:
             run_news, why = False, (
                 "SKIPPED: this run stamped no account, so a re-run could not tell "
                 "the list had been mailed"
             )
+            counts["newsletter_held"] = len(news)
         else:
             run_news, why = True, "running"
         print(f"newsletter phase: {why}")
@@ -479,9 +535,19 @@ def main(argv: list[str] | None = None) -> None:
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-    asyncio.run(run(
+    counts = asyncio.run(run(
         send=args.send, quiet=args.quiet, force_newsletter=args.force_newsletter,
     ))
+    if counts == {}:
+        # The lock's loss value; without this line a refused run's log is silent.
+        print("\nrefused: another product update run holds the lock; this run sent nothing.\n")
+        sys.exit(1)
+    short = {k: counts[k] for k in FELL_SHORT if counts.get(k)}
+    if short:
+        # Counts only, never an address: this log is public.
+        print(f"FELL SHORT: {short} — exiting 1 so this run shows red. Read the "
+              "result line before re-running.\n")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

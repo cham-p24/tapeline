@@ -381,7 +381,20 @@ async def list_scanner(
     # Each row also carries whether the removed card wall would have blocked
     # this scan, which is how the wall's cost gets counted without splitting
     # traffic — see models/funnel_events.py.
-    if user is not None:
+    # A background refetch is not a scan. The in-app scanner re-runs this
+    # request with src=stream each time the API's live bridge announces a
+    # worker pass (services/live_bridge.py), about every 70-80s while the page
+    # is open. Counting those as scan_run would mark an idle open tab as an
+    # active user on every day it stays open, and logging them would add a
+    # scan_logs row per open tab per pass (~750 a day each) that describes a
+    # screen nobody asked for. So a refetch records nothing: no scan_run, no
+    # scan_logs row, no cap hit. Honouring the marker unconditionally is safe
+    # because it only silences bookkeeping; the tier clamps above (row cap,
+    # offset pin) apply to every request, so src=stream reads nothing a normal
+    # request by the same user could not.
+    background_refetch = src == "stream"
+
+    if user is not None and not background_refetch:
         await record_funnel_event(user, "scan_run")
 
         # ── WHAT THIS SCAN ACTUALLY WAS ─────────────────────────────────────
@@ -444,7 +457,18 @@ async def list_scanner(
         except Exception:
             logger.exception("scanner.scan_log_failed user=%s", user.id)
 
-    if user is not None and tier is Tier.FREE and row_cap > 0 and len(rows) >= row_cap:
+    # Not for background refetches: record_cap_hit writes a cap_events row AND
+    # emails the founder on every call, and a free user's capped page fills on
+    # every refetch, so one open tab would send ~50 emails an hour. The row cap
+    # itself is still enforced above for every request; a client that sends
+    # src=stream only silences the notification, never the limit.
+    if (
+        user is not None
+        and not background_refetch
+        and tier is Tier.FREE
+        and row_cap > 0
+        and len(rows) >= row_cap
+    ):
         await record_cap_hit(session, user.id, "scanner_rows", tier)
 
     # The TRUE delay behind these prices: the vendor's ~15-minute delay

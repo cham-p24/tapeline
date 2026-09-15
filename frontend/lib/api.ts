@@ -499,7 +499,7 @@ export type CongressTrade = {
 };
 
 /**
- * One row of the Recent Insider Buys feed (SEC Form 4 via Finnhub).
+ * One row of the Recent Insider Buys feed (SEC Form 4, read from SEC EDGAR).
  * Replaces the legacy 13F HoldingItem shape — see /api/holdings router
  * for the schema change rationale.
  */

@@ -1307,6 +1307,15 @@ async def fetch_insider_transactions(
             data = r.json()
             if not isinstance(data, dict):
                 raise ValueError(f"expected a JSON object, got {type(data).__name__}")
+            # Only an explicit list is an answer. `data.get("data") or []` read
+            # {}, {"error": ...} and {"data": null} as "no filings" and cached
+            # that for 24h. The worker's insider pass reads SEC EDGAR since #835
+            # and no longer calls this, but the ticker page's insider endpoint
+            # still does, and a body that says nothing is not "no filings".
+            if not isinstance(data.get("data"), list):
+                raise ValueError(
+                    f"expected a data list, got {type(data.get('data')).__name__}",
+                )
     except (FinnhubThrottledError, FinnhubUnavailableError):
         raise
     except Exception as exc:
@@ -1316,7 +1325,7 @@ async def fetch_insider_transactions(
             ) from exc
         return None
 
-    raw = data.get("data") or []
+    raw = data["data"]
     rows: list[dict[str, Any]] = []
     for it in raw:
         rows.append({

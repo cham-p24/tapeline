@@ -42,9 +42,14 @@ export default function NewsPage() {
   const load = useCallback(async () => {
     const r = await api.news(debouncedSymbol || undefined, 50);
     setItems(r.items);
+    return true;
   }, [debouncedSymbol]);
-  useEffect(() => { load(); }, [load]);
-  const { status, lastUpdate } = useLiveStream(load);
+  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived.
+  const { status, lastUpdate, markLoaded } = useLiveStream(load);
+  useEffect(() => {
+    void load().then((ok) => { if (ok) markLoaded(); });
+  }, [load, markLoaded]);
 
   const visibleItems = items.filter((n) => matchesSelect(sentiment, sentimentBucket(n.sentiment)));
   const filtersActive = !!symbol.trim() || !!sentiment;

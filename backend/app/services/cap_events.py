@@ -64,8 +64,18 @@ async def record_cap_hit(
             logger.warning("cap_hit.unknown_cap cap=%s user=%s", cap, user_id)
             return
 
-        session.add(CapEvent(user_id=user_id, cap=cap, tier=tier_value))
+        event = CapEvent(user_id=user_id, cap=cap, tier=tier_value)
+        session.add(event)
         await session.commit()
+
+        # One email per user per cap per UTC day. The row above is written for
+        # every refusal (the funnel counts hits), but the inbox is for a human
+        # to reply to a person, and a person reloading a wall, or a page that
+        # refetches on its own, must not send the founder one email a minute.
+        # Checked AFTER the commit, against rows strictly older than this one,
+        # so two concurrent hits cannot both stay silent.
+        if await _already_notified_today(session, user_id, cap, event.id):
+            return
 
         # Tell the founder NOW, not in a weekly digest.
         #
@@ -92,6 +102,40 @@ async def record_cap_hit(
             await session.rollback()
         except Exception:
             logger.exception("cap_hit.rollback_failed cap=%s user=%s", cap, user_id)
+
+
+async def _already_notified_today(
+    session: AsyncSession, user_id: str, cap: str, event_id: int | None
+) -> bool:
+    """True when an earlier cap_events row for this user and cap exists today (UTC).
+
+    That earlier row is the hit that sent (or tried to send) today's email.
+    Any failure here reads as False: a duplicate email is the cheaper error.
+    """
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    try:
+        stmt = (
+            select(CapEvent.created_at)
+            .where(CapEvent.user_id == user_id, CapEvent.cap == cap)
+            .order_by(CapEvent.id.desc())
+            .limit(1)
+        )
+        if event_id is not None:
+            stmt = stmt.where(CapEvent.id < event_id)
+        previous = (await session.execute(stmt)).scalar_one_or_none()
+    except Exception:
+        logger.exception("cap_hit.throttle_check_failed cap=%s user=%s", cap, user_id)
+        return False
+    if previous is None:
+        return False
+    if isinstance(previous, str):
+        previous = datetime.fromisoformat(previous)
+    if previous.tzinfo is None:
+        previous = previous.replace(tzinfo=UTC)
+    return previous.astimezone(UTC).date() == datetime.now(UTC).date()
 
 
 async def _notify_founder_of_cap_hit(

@@ -14,7 +14,7 @@ from datetime import UTC, date, datetime, timedelta
 from time import monotonic
 from typing import Any
 
-from sqlalchemy import bindparam, case, delete, desc, func, select, update
+from sqlalchemy import bindparam, case, delete, desc, func, select, true, update
 from sqlalchemy.exc import IntegrityError
 
 from app.config import get_settings
@@ -22,6 +22,7 @@ from app.db import session_scope
 from app.models import (
     CongressTrade,
     DailyScorecardEntry,
+    InsiderTransaction,
     NewsItem,
     RegimeState,
     SqueezeSetup,
@@ -38,6 +39,7 @@ from app.models import (
 # congress_trades table simply stops accruing rows until a real disclosure feed
 # is wired.
 from app.services.dblock import LOCK_SCORECARD_FREEZE, try_xact_lock
+from app.services.edgar_form4 import EdgarUnavailableError
 from app.services.finnhub_feed import (
     CACHE_TTL_FUNDAMENTALS_HOURS,
     CACHE_TTL_INSIDER_HOURS,
@@ -347,6 +349,21 @@ _last_score_snapshot_date: str | None = None
 # consumed by the per-tick snapshot upsert so the market feed can't clobber the
 # authoritative Tapeline composite. Empty when no sheet is configured.
 _sheet_governed_symbols: frozenset[str] = frozenset()
+
+
+#: How often the snapshot list is rebuilt from the table.
+#:
+#: It was hourly, so a row added or first scored mid-session waited up to an
+#: hour for its first minute-by-minute price. The rebuild is one indexed read of
+#: the tickers table (no vendor call), so five minutes costs nothing measurable.
+ACTIVE_UNIVERSE_REFRESH_SECONDS = 300
+
+
+def _active_universe_refresh_due(now: datetime) -> bool:
+    """True when the snapshot list should be rebuilt on this tick."""
+    return _last_active_universe_refresh is None or (
+        now - _last_active_universe_refresh
+    ).total_seconds() >= ACTIVE_UNIVERSE_REFRESH_SECONDS
 
 
 def _mock_writes_enabled() -> bool:
@@ -1159,19 +1176,19 @@ async def tick() -> None:
         _last_universe_refresh = started
         _spawn(_refresh_universe(), key="universe_refresh")
 
-    # Hourly active-scoring-universe refresh (top-N by daily $-volume from
-    # the DB-tracked 5,757). Cheap query — keeps the cache that
-    # polygon_feed.fetch_snapshots reads each tick within an hour of fresh.
+    # Active universe refresh, every ACTIVE_UNIVERSE_REFRESH_SECONDS. Cheap
+    # query - keeps the list polygon_feed.fetch_snapshots reads each tick within
+    # minutes of the table.
     _set_stage("active_universe_refresh")
     global _last_active_universe_refresh
-    if _last_active_universe_refresh is None or (
-        started - _last_active_universe_refresh
-    ).total_seconds() >= 3600:
+    if _active_universe_refresh_due(started):
         from app.services.universe import refresh_active_universe
         # Stamped before the work — see the news refresh.
         _last_active_universe_refresh = started
         try:
-            n = await refresh_active_universe()
+            # wait=False: never queue inside the tick behind a rebuild that a
+            # detached task started - see refresh_active_universe.
+            n = await refresh_active_universe(wait=False)
             logger.info("active_universe.refreshed count=%d", n)
         except Exception:
             logger.exception("active_universe.refresh_failed")
@@ -2795,6 +2812,23 @@ _FUNDAMENTALS_UNSAVED_BEFORE = datetime(2026, 9, 13, 23, 0, tzinfo=UTC)
 #: re-read on their horizon.
 _SMART_MONEY_EDGAR_SINCE = datetime(2026, 9, 14, 14, 10, tzinfo=UTC)
 
+#: A row holding a smart-money value with NO Form 4 row on file is due again
+#: once its stamp is this old, whatever its asset class's horizon says.
+#:
+#: Such a value is not a reading of any filing we hold. On 2026-09-14 (read-only)
+#: 856 non-crypto rows held one - 629 ETFs, 222 equities, 5 commodity futures
+#: contracts - and 16 of the 100 entries recorded from 24 Aug to 11 Sep were
+#: ranked with one. #824 only retires a value when the symbol is asked again, and
+#: non-equities are asked every 30 days, so the ETFs among them would have
+#: stayed until 7-13 Oct. `_select_factor_symbols` also asks about these rows
+#: first, because #835 made ~11,800 rows due at once.
+#:
+#: The floor is the factor phase's budget, so a symbol whose call fails - and is
+#: stamped, still holding its value - is not handed back inside the same phase.
+#: An answer settles the row either way: trades write Form 4 rows, an empty
+#: answer clears the value.
+_UNBACKED_SMART_MONEY_RECHECK_AFTER = timedelta(seconds=_FACTOR_PHASE_BUDGET_SECONDS)
+
 #: What a factor pass does when Finnhub throttles the KEY (429, or 401).
 #:
 #: Pause, then ask for the SAME symbol again. After this many consecutive
@@ -2864,7 +2898,34 @@ def _factor_due_clause(stamp_col: Any, now: datetime) -> Any:
         )
     if stamp_col.key == "last_smart_money_at":
         due = due | (stamp_col < _SMART_MONEY_EDGAR_SINCE)
-    return due
+        due = due | (
+            _unbacked_smart_money()
+            & (stamp_col < now - _UNBACKED_SMART_MONEY_RECHECK_AFTER)
+        )
+    return due & _factor_scope_clause(stamp_col)
+
+
+def _unbacked_smart_money() -> Any:
+    """SQL predicate: the row holds a smart-money value with no Form 4 row on file."""
+    return (
+        Ticker.sub_smart_money.is_not(None)
+        & ~select(InsiderTransaction.id)
+        .where(InsiderTransaction.symbol == Ticker.symbol)
+        .exists()
+    )
+
+
+def _factor_scope_clause(stamp_col: Any) -> Any:
+    """SQL predicate: rows this factor's pass asks the vendor about at all.
+
+    Crypto pairs are out of the insider pass: no issuer files a Form 4 for a
+    token. On 2026-09-14 all 106 X: pairs had been asked, 0 held a reading, and
+    each empty answer now opens a clear. The gap query applies this too, so the
+    due count and the selection still cover exactly the same rows.
+    """
+    if stamp_col.key == "last_smart_money_at":
+        return Ticker.symbol.not_like("X:%")
+    return true()
 
 
 async def _factor_due_counts(now: datetime | None = None) -> tuple[int, int]:
@@ -3042,7 +3103,7 @@ async def _select_factor_symbols(
         # do than its share allows. Costs nothing extra: one query either way.
         gaps = list((await session.execute(
             select(Ticker.symbol)
-            .where(stamp_col.is_(None))
+            .where(stamp_col.is_(None), _factor_scope_clause(stamp_col))
             .order_by(
                 desc(func.coalesce(Ticker.volume * Ticker.price, -1)),
                 desc(func.coalesce(Ticker.market_cap, -1)),
@@ -3056,11 +3117,26 @@ async def _select_factor_symbols(
         # oldest stamp first within each group. A plain stamp order used to
         # serve a 30-day-old ETF stamp ahead of a 40-hour-old equity one.
         head = gaps[:fill_cap]
+        # Smart money puts unbacked values ahead of even the equities: a value
+        # with no filing behind it is not a reading at all, it is on published
+        # rankings until it is asked about, and it is cheap to ask about (EDGAR
+        # answers most non-equities from its ticker map with no request). After
+        # #835 made ~11,800 rows due at once, equities-first would not have
+        # reached the 629 unbacked ETFs inside a day's phase budget.
+        priority = (
+            case(
+                (_unbacked_smart_money(), 0),
+                (Ticker.asset_class == "equity", 1),
+                else_=2,
+            )
+            if stamp_col.key == "last_smart_money_at"
+            else case((Ticker.asset_class == "equity", 0), else_=1)
+        )
         refresh = list((await session.execute(
             select(Ticker.symbol)
             .where(stamp_col.is_not(None), _factor_due_clause(stamp_col, now))
             .order_by(
-                case((Ticker.asset_class == "equity", 0), else_=1),
+                priority,
                 stamp_col.asc(),
                 Ticker.symbol.asc(),
             )
@@ -3700,7 +3776,16 @@ _INSIDER_PACE_SECONDS = 0.0
 _INSIDER_EMPTY_CONTRADICTED_WITHIN = timedelta(days=_INSIDER_WINDOW_DAYS - 10)
 
 
-async def _clear_smart_money_reading(symbol: str) -> bool:
+class EmptyAnswerContradictedError(EdgarUnavailableError):
+    """An empty answer that a stored EDGAR filing inside the window contradicts.
+
+    A failed call like any other EdgarUnavailableError, and counted as one. It
+    has its own type so the pass can tell a vendor answering `[]` for companies
+    that do file from an ordinary outage; see `insider.empty_contradicted_stop`.
+    """
+
+
+async def _clear_smart_money_reading(symbol: str) -> tuple[bool, bool]:
     """Retire a symbol's smart-money reading: SEC EDGAR holds no Form 4 filings
     for it in the window (or lists no filer for the ticker at all).
 
@@ -3727,6 +3812,16 @@ async def _clear_smart_money_reading(symbol: str) -> bool:
     so the tick cannot write the old value back (see `_SMART_MONEY_CLEARED`).
     If the write fails, nothing has changed and the caller counts a failure.
 
+    COMPARE-AND-SET, as #825's `_save_factor_readings`. The UPDATE writes only
+    the columns the clear changes, and only while all six factors still hold the
+    values the new composite was computed from. A sheet upsert or a tick chunk
+    that changed one in between makes it miss; the row is re-read and tried
+    again, up to _FACTOR_SAVE_ATTEMPTS times. Without that, a clear could put a
+    sheet-owned row's older factors back beside a composite built from them,
+    and on such a row nothing corrects it until the sheet next changes. If every
+    attempt misses, the Form 4 rows still go and the mark still lands, so the
+    row's owner writes None on its next write.
+
     Raises EdgarUnavailableError, changing nothing, when a stored filing
     contradicts the empty answer; see `_INSIDER_EMPTY_CONTRADICTED_WITHIN`. Only
     rows EDGAR itself supplied count as a contradiction: a pre-switch Finnhub row
@@ -3734,52 +3829,79 @@ async def _clear_smart_money_reading(symbol: str) -> bool:
     example a 2x single-stock ETF carrying its underlying's insiders), and the
     switchover exists to replace exactly those.
 
-    Returns whether the row held a reading.
+    Crypto pairs are left alone: no Form 4 exists for a token, and their score
+    is a different factor set that this composite must not overwrite.
+
+    Returns (cleared a reading, deleted EDGAR-sourced Form 4 rows). "Cleared"
+    is True only when this call's UPDATE landed; a clear that lost every
+    attempt returns False and is logged as contended, so the pass's `cleared`
+    count matches the rows the database actually changed. Only EDGAR rows count
+    as filings for the same reason as the contradiction guard: deleting
+    pre-switch Finnhub rows is the switchover, not evidence of a vendor fault.
     """
-    from app.models import InsiderTransaction
-    from app.services.edgar_form4 import EdgarUnavailableError
     from app.services.finnhub_feed import clear_cached_smart_money_score
 
     sym = symbol.upper()
+    if sym.startswith("X:"):
+        return False, False
     sheet_owned = _sheet_governed_symbols if _sheet_is_scoring_source() else frozenset()
-    held = False
+    # The columns the clear changes. On a sheet-owned row, only what
+    # sheet_feed.upsert_tickers itself writes; otherwise the tick's full set.
+    written = (
+        {"sub_smart_money", "score", "signal"} if sym in sheet_owned
+        else {"sub_smart_money", "score", "signal", "reason", "confidence_pct"}
+    )
+    cleared = False
     async with session_scope() as session:
-        newest = await session.scalar(
-            select(func.max(func.nullif(InsiderTransaction.transaction_date, "")))
+        newest, edgar_rows = (await session.execute(
+            select(
+                func.max(func.nullif(InsiderTransaction.transaction_date, "")),
+                func.count(),
+            )
             .where(InsiderTransaction.symbol == sym, InsiderTransaction.source == "edgar")
-        )
+        )).one()
         recent = (date.today() - _INSIDER_EMPTY_CONTRADICTED_WITHIN).isoformat()
         if newest is not None and newest >= recent:
-            raise EdgarUnavailableError(
+            raise EmptyAnswerContradictedError(
                 "submissions",
                 f"empty answer contradicts a stored filing dated {newest}",
             )
         await session.execute(
             delete(InsiderTransaction).where(InsiderTransaction.symbol == sym)
         )
-        row = (await session.execute(
-            select(
-                Ticker.sector, Ticker.price,
-                *(getattr(Ticker, col) for col in FACTOR_COLUMNS),
-            ).where(Ticker.symbol == sym)
-        )).one_or_none()
-        if row is not None and row.sub_smart_money is not None:
-            held = True
+        for _attempt in range(_FACTOR_SAVE_ATTEMPTS):
+            row = (await session.execute(
+                select(
+                    Ticker.sector, Ticker.price,
+                    *(getattr(Ticker, col) for col in FACTOR_COLUMNS),
+                ).where(Ticker.symbol == sym)
+            )).one_or_none()
+            if row is None or row.sub_smart_money is None:
+                break
+            factors = {col: getattr(row, col) for col in FACTOR_COLUMNS}
             values = _merged_factor_set(
                 {"symbol": sym, "sector": row.sector, "price": row.price},
-                {col: getattr(row, col) for col in FACTOR_COLUMNS},
-                cleared=_SMART_MONEY_ONLY,
+                factors, cleared=_SMART_MONEY_ONLY,
             )
-            if sym in sheet_owned:
-                # Only what sheet_feed.upsert_tickers itself writes.
-                del values["confidence_pct"], values["reason"]
-            await session.execute(
+            result = await session.execute(
                 update(Ticker)
-                .where(Ticker.symbol == sym)
-                .values({**values, "updated_at": Ticker.updated_at})
+                .where(
+                    Ticker.symbol == sym,
+                    *(getattr(Ticker, c).is_not_distinct_from(v) for c, v in factors.items()),
+                )
+                .values({
+                    **{k: values[k] for k in written},
+                    "updated_at": Ticker.updated_at,
+                })
+                .execution_options(synchronize_session=False)
             )
+            if result.rowcount == 1:  # type: ignore[attr-defined]
+                cleared = True
+                break
+        else:
+            logger.warning("insider.clear_contended symbol=%s left_to_the_mark", sym)
     clear_cached_smart_money_score(sym)
-    return held
+    return cleared, bool(edgar_rows)
 
 
 async def _refresh_insider_cache(
@@ -3822,9 +3944,12 @@ async def _refresh_insider_cache(
     logger.info("insider.refresh_started count=%d", len(symbols))
     refreshed = 0
     cleared = 0
+    cleared_with_filings = 0
     attempted = 0
     throttled_in_a_row = 0
     recent_failures: deque[bool] = deque(maxlen=_FACTOR_FAILURE_WINDOW)
+    # Which of those failures were empty answers a stored filing contradicts.
+    recent_contradictions: deque[bool] = deque(maxlen=_FACTOR_FAILURE_WINDOW)
     stopped = False
     pending: list[str] = []
     # This batch's readings, written onto their rows as the batch is stamped.
@@ -3851,10 +3976,12 @@ async def _refresh_insider_cache(
                 # the api machine can read what the worker writes).
                 await set_recent_insider_transactions_db(sym, txns, source="edgar")
                 refreshed += 1
-            elif txns is not None and await _clear_smart_money_reading(sym):
+            elif txns is not None:
                 # [] is EDGAR answering "no Form 4 filings in 90 days" (or no
                 # filer for this ticker). Failures raise above.
-                cleared += 1
+                held, had_filings = await _clear_smart_money_reading(sym)
+                cleared += held
+                cleared_with_filings += held and had_filings
         except VendorThrottledError as exc:
             # Same rule as the fundamentals pass: a throttle is not an answer.
             throttled_in_a_row += 1
@@ -3883,10 +4010,12 @@ async def _refresh_insider_cache(
             else:
                 logger.exception("insider.fetch_failed symbol=%s", sym)
             failed = True
+            contradicted = isinstance(exc, EmptyAnswerContradictedError)
         else:
-            failed = False
+            failed = contradicted = False
         throttled_in_a_row = 0
         recent_failures.append(failed)
+        recent_contradictions.append(contradicted)
         # Stamped on ATTEMPT - a company with no Form 4 filings in the last 90
         # days is a real answer, not an outstanding request - and written onto
         # the row when there was a reading (see _save_factor_readings).
@@ -3898,6 +4027,18 @@ async def _refresh_insider_cache(
                 "insider.failing_stop failed=%d of_last=%d attempted=%d unanswered=%d",
                 sum(recent_failures), len(recent_failures), attempted, len(symbols) - i,
             )
+            if 2 * sum(recent_contradictions) >= sum(recent_failures):
+                # ERROR, so Sentry raises it. The vendor is answering `[]` for
+                # companies we hold recent filings for, and every clear this
+                # pass made before the stop may be one of those too. The surge
+                # alert below cannot see it: the stop comes long before that
+                # alert's minimum sample.
+                logger.error(
+                    "insider.empty_contradicted_stop contradicted=%d failed=%d "
+                    "attempted=%d cleared_with_filings=%d",
+                    sum(recent_contradictions), sum(recent_failures), attempted,
+                    cleared_with_filings,
+                )
             stopped = True
             break
         if _INSIDER_PACE_SECONDS:
@@ -3913,10 +4054,40 @@ async def _refresh_insider_cache(
     except Exception:
         feed_size = -1
     logger.info(
-        "insider.refreshed scored=%d cleared=%d attempted=%d score_cache=%d feed_size=%d",
-        refreshed, cleared, attempted, smart_money_cache_size(), feed_size,
+        "insider.refreshed scored=%d cleared=%d cleared_with_filings=%d attempted=%d "
+        "score_cache=%d feed_size=%d",
+        refreshed, cleared, cleared_with_filings, attempted,
+        smart_money_cache_size(), feed_size,
     )
+    if _insider_clear_surge(attempted, refreshed, cleared_with_filings):
+        # ERROR, so Sentry raises it: see _INSIDER_CLEAR_SURGE_RATIO.
+        logger.error(
+            "insider.cleared_surge cleared_with_filings=%d scored=%d attempted=%d",
+            cleared_with_filings, refreshed, attempted,
+        )
     return stopped
+
+
+#: Readings retired from symbols WITH Form 4 rows on file, per reading scored,
+#: above which one insider pass is reported as a likely vendor fault.
+#:
+#: An empty answer now deletes data, and the contradiction guard only protects
+#: symbols with a filing inside 80 days. A vendor returning `[]` for everyone
+#: would still clear every reading whose filings are older than that before
+#: anything else noticed. Clears of values with no filing on file do not count:
+#: those are the unbacked values re-asked on purpose (see
+#: _UNBACKED_SMART_MONEY_RECHECK_AFTER), and the first run that reaches them
+#: retires hundreds with almost nothing scored. The first slice after #824
+#: deployed, measured 2026-09-14, scored 73 and cleared 41 readings in all.
+_INSIDER_CLEAR_SURGE_RATIO = 3
+_INSIDER_CLEAR_SURGE_MIN_ATTEMPTED = 100
+
+
+def _insider_clear_surge(attempted: int, scored: int, cleared_with_filings: int) -> bool:
+    return (
+        attempted >= _INSIDER_CLEAR_SURGE_MIN_ATTEMPTED
+        and cleared_with_filings > _INSIDER_CLEAR_SURGE_RATIO * scored
+    )
 
 
 _SECTOR_BACKFILL_BATCH = 20
@@ -4647,6 +4818,15 @@ async def main() -> None:
     try:
         n = await refresh_active_universe()
         logger.info("active_universe.warmed count=%d", n)
+        # The first tick would otherwise rebuild the list it was just given -
+        # but only if it WAS given one. refresh_active_universe never raises:
+        # a failed read logs and returns the size of the cache, which is 0 on
+        # a fresh process. Stamping then would hold the rebuild back for
+        # ACTIVE_UNIVERSE_REFRESH_SECONDS while every tick priced the 112-symbol
+        # fallback, instead of retrying on the first tick as it always did.
+        if n > 0:
+            global _last_active_universe_refresh
+            _last_active_universe_refresh = datetime.now(UTC)
     except Exception:
         # Never block the worker on this: an empty cache degrades to the mock
         # fallback, which is bad but survivable, whereas not starting is not.
@@ -4660,8 +4840,9 @@ async def main() -> None:
     #
     # It is a HANG detector, not a pacing knob, and the distinction is what the
     # old value got wrong. Ticks are strictly sequential — `await wait_for(tick())`
-    # then `await sleep(interval)` — so a slow tick delays the next one and can
-    # never overlap it. Nothing is protected by keeping the ceiling tight.
+    # then a sleep until the next cycle is due — so a slow tick delays the next
+    # one and can never overlap it. Nothing is protected by keeping the ceiling
+    # tight.
     #
     # 60 was pure headroom when a healthy tick was ~6s at 2,500 symbols. At
     # 12,000 (#763) the MANDATORY snapshot write alone approaches it, so the
@@ -4677,6 +4858,7 @@ async def main() -> None:
 
     while True:
         cycle_started = datetime.now(UTC)
+        cycle_clock = monotonic()
         try:
             await asyncio.wait_for(tick(), timeout=TICK_TIMEOUT_SECONDS)
             consecutive_timeouts = 0
@@ -4718,7 +4900,49 @@ async def main() -> None:
                     logger.exception("tick.timeout_streak.sentry_capture_failed")
         except Exception:
             logger.exception("tick.failure")
-        await asyncio.sleep(settings.score_refresh_seconds)
+        await asyncio.sleep(_seconds_until_next_cycle(
+            monotonic() - cycle_clock, consecutive_timeouts=consecutive_timeouts,
+        ))
+
+
+#: The shortest pause between two cycles, even after one that overran.
+#: A breath for the background jobs sharing this event loop, not a pacing knob.
+_MIN_CYCLE_PAUSE_SECONDS = 1.0
+
+#: After the watchdog KILLS a tick, the pause before the next cycle grows by
+#: this much per consecutive kill, capped at the interval. A kill usually means
+#: something the tick waits on is slow - the database, the vendor - and starting
+#: again after one second only adds load to it.
+_TIMEOUT_RECOVERY_STEP_SECONDS = 5.0
+
+
+def _seconds_until_next_cycle(elapsed: float, *, consecutive_timeouts: int = 0) -> float:
+    """How long to sleep so cycles START every `score_refresh_seconds`.
+
+    The loop used to sleep the whole interval AFTER each tick, so the real
+    period was the interval plus the tick. Measured in production on
+    2026-09-14: ticks of 11-16 seconds put passes 71-76 seconds apart, and no
+    ticker was ever refreshed once a minute. Sleeping only the remainder
+    makes the interval the period.
+
+    A cycle that took the whole interval or longer starts the next one after
+    `_MIN_CYCLE_PAUSE_SECONDS`, and says so: an overrun means a minute was
+    missed, and that should be visible in the logs rather than absorbed.
+
+    A cycle the watchdog killed is different: it waits
+    `_TIMEOUT_RECOVERY_STEP_SECONDS` per consecutive kill, up to the interval,
+    so whatever made the tick hang gets time to recover.
+    """
+    interval = float(settings.score_refresh_seconds)
+    floor = _MIN_CYCLE_PAUSE_SECONDS
+    if consecutive_timeouts > 0:
+        floor = max(floor, min(interval, _TIMEOUT_RECOVERY_STEP_SECONDS * consecutive_timeouts))
+    if elapsed >= interval:
+        logger.warning(
+            "tick.overrun elapsed=%.1fs interval=%.0fs pause=%.0fs",
+            elapsed, interval, floor,
+        )
+    return max(floor, interval - elapsed)
 
 
 if __name__ == "__main__":

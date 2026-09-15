@@ -7,11 +7,10 @@ score the top N by `volume * price` (rough $-volume proxy) — the cutoff
 naturally lands around the bottom of the S&P MidCap 400, which is where
 liquidity drops off.
 
-The list is cached in-process for ~1 hour because a stock's daily $-volume
-doesn't churn meaningfully on a faster cadence and we don't want the
-worker doing a DB roundtrip on every tick. Worker calls
-`refresh_active_universe()` once on boot + hourly thereafter via the
-existing universe-refresh schedule.
+The list is cached in-process and rebuilt every few minutes (see
+`signal_publisher.ACTIVE_UNIVERSE_REFRESH_SECONDS`), so a newly added row is
+priced within minutes rather than within the hour. Worker calls
+`refresh_active_universe()` once on boot and on that cadence thereafter.
 
 Falls back to `mock_feed.TICKER_UNIVERSE` when the DB query returns empty
 (first boot before the universe-discovery cron has run, schema-empty
@@ -19,8 +18,10 @@ test environments, etc.) so dev / staging never hard-fail on this path.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,18 @@ SCORED_TICKERS_IN_COPY = 11_500
 # The point is to let liquidity be MEASURED rather than assumed. A ticker
 # that gets its snapshot and turns out to be illiquid then loses on dollar
 # volume like everything else — which is a real answer. Never looking is not.
-BOOTSTRAP_SLOTS = int(_os.environ.get("UNIVERSE_BOOTSTRAP_SLOTS", "250"))
+#
+# 2026-09-14: raised 250 -> 5,000, so every never-scored stock and ETF is in
+# EVERY pass, not one hourly window of them. Measured in production during the
+# US session: 250 non-crypto rows sat 15-60 minutes stale beside 11,562 rows
+# written within the last two minutes, and they were exactly the never-scored
+# rows outside the current window. Many had a live price and real volume
+# (HONIV 7.1M shares, UCFI 5.4M, ADBT 6.6M) — they were simply not being asked
+# about. The founder's requirement is every ticker, every minute. 5,000 is a
+# runaway guard: at 250 symbols per request it is 20 requests at most, and the
+# table held 265 never-scored stocks and ETFs when this was set. If the backlog
+# ever exceeds it, the window rotates as before and nothing is pinned.
+BOOTSTRAP_SLOTS = int(_os.environ.get("UNIVERSE_BOOTSTRAP_SLOTS", "5000"))
 
 # Module-level cache of (symbol, name, sector) tuples.
 _active_universe: list[tuple[str, str, str]] = []
@@ -113,11 +125,57 @@ _refreshed_at: float = 0.0
 _bootstrap_cursor: int = 0
 
 
-async def refresh_active_universe(target_size: int | None = None) -> int:
+#: One rebuild at a time, per event loop.
+#:
+#: Two callers share the worker's loop - the tick's scheduled rebuild and
+#: sheet_feed's rebuild after a sheet adds tickers - and a rebuild awaits the
+#: database between reading `_bootstrap_cursor` and advancing it. Interleaved,
+#: both read the same cursor, serve the same window and advance it once, so a
+#: backlog window is skipped; and whichever finishes last overwrites the list.
+#: Created per loop, because an asyncio.Lock that has waited on one loop cannot
+#: be used on another (the test suite runs a loop per test).
+_refresh_lock: asyncio.Lock | None = None
+_refresh_lock_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _rebuild_lock() -> asyncio.Lock:
+    global _refresh_lock, _refresh_lock_loop
+    loop = asyncio.get_running_loop()
+    if _refresh_lock is None or _refresh_lock_loop is not loop:
+        _refresh_lock = asyncio.Lock()
+        _refresh_lock_loop = loop
+    return _refresh_lock
+
+
+async def refresh_active_universe(target_size: int | None = None, *, wait: bool = True) -> int:
+    """Refresh the cached active universe from the DB, one rebuild at a time.
+
+    See `_rebuild_lock` for why concurrent rebuilds are serialised.
+
+    `wait=False` is for the tick. If another rebuild holds the lock, it returns
+    at once with the current list size instead of queueing. The holder can be a
+    detached task with no watchdog of its own (sheet_feed's rebuild after a
+    sheet insert), and there is no statement timeout on the engine. If its query
+    hangs, a waiting tick would sit at the lock until the 240s watchdog killed
+    it, every rebuild, until a restart. The rebuild in flight refreshes the list
+    anyway.
+    """
+    lock = _rebuild_lock()
+    if not wait and lock.locked():
+        logger.info(
+            "universe.refresh_skipped_in_flight count=%d - another rebuild holds the lock",
+            len(_active_universe),
+        )
+        return len(_active_universe)
+    async with lock:
+        return await _refresh_active_universe(target_size)
+
+
+async def _refresh_active_universe(target_size: int | None = None) -> int:
     """Refresh the cached active universe from the DB.
 
     Returns the number of tickers in the new cache. Worker calls this on
-    boot + hourly. Falls back to the hardcoded mock list if the DB query
+    boot and every few minutes. Falls back to the hardcoded mock list if the DB query
     returns no rows (which only happens before the universe-discovery
     cron has run).
     """
@@ -206,61 +264,82 @@ async def refresh_active_universe(target_size: int | None = None) -> int:
             # universe unable to grow, because a ticker needs a snapshot to
             # earn a score and needs a score to be snapshotted.
             #
-            # Ordered by symbol so the intake is deterministic, and WINDOWED by
-            # a rotating cursor so it actually drains.
+            # Ordered by symbol so the intake is deterministic. When the whole
+            # never-scored backlog fits in the slots - the normal case - it is
+            # ALL admitted on every refresh, so a never-scored stock is priced
+            # every minute like any other.
             #
-            # The original comment here claimed "once a symbol is scored it
-            # drops out of this query, so the next refresh picks up where this
-            # one left off". That only holds for symbols that CAN be scored. A
-            # symbol the provider has no data for never scores, never drops
-            # out, and — being alphabetically early — occupies the same slot on
-            # every refresh, forever. Verified in production on 2026-09-07:
-            # 4,414 unscored rows, and the worker log showed the same window
-            # (ACQQ, ACRT, ACSP, ADAMK, ADBT, ADIGW, ...) going out tick after
-            # tick. The intake was pinned to the front of the alphabet and the
-            # other ~4,150 had never once been looked at.
-            #
-            # The cursor advances a window per refresh and wraps, so every
-            # unscored ticker gets its turn regardless of whether the ones
-            # ahead of it are scoreable. At 250 slots on the hourly refresh the
-            # whole backlog is offered inside a day.
+            # Only a backlog larger than the slots is WINDOWED, by a rotating
+            # cursor, so it still drains. The original comment here claimed
+            # "once a symbol is scored it drops out of this query, so the next
+            # refresh picks up where this one left off". That only holds for
+            # symbols that CAN be scored. A symbol the provider has no data for
+            # never scores, never drops out, and — being alphabetically early —
+            # occupies the same slot on every refresh, forever. Verified in
+            # production on 2026-09-07: 4,414 unscored rows, and the worker log
+            # showed the same window (ACQQ, ACRT, ACSP, ADAMK, ADBT, ADIGW, ...)
+            # going out tick after tick.
             if BOOTSTRAP_SLOTS > 0:
                 global _bootstrap_cursor
                 seen = {row[0] for row in rows}
+                unscored_scope = (
+                    Ticker.score.is_(None),
+                    # Same exclusion as above: a never-scored crypto pair must
+                    # not be handed to the equity snapshot either.
+                    func.coalesce(Ticker.asset_class, "") != "crypto",
+                )
+                # Counted over EXACTLY the rows the window below reads. This
+                # count used to include never-scored crypto while the window
+                # excluded it, so the cursor wrapped against a total the window
+                # could never reach and whole refreshes came back short.
                 unscored_total = (
                     await session.execute(
                         select(func.count())
                         .select_from(Ticker)
-                        .where(Ticker.score.is_(None))
+                        .where(*unscored_scope)
                     )
                 ).scalar_one()
-                # Wrap before use so the offset can never run past the end and
-                # return an empty window (which would stall intake silently).
-                if unscored_total:
-                    _bootstrap_cursor %= unscored_total
-                else:
+
+                def _window(offset: int, limit: int) -> Any:
+                    return (
+                        select(Ticker.symbol, Ticker.name, Ticker.sector)
+                        .where(*unscored_scope)
+                        .order_by(Ticker.symbol.asc())
+                        .offset(offset)
+                        .limit(limit)
+                    )
+
+                if unscored_total <= BOOTSTRAP_SLOTS:
                     _bootstrap_cursor = 0
-                b = await session.execute(
-                    select(Ticker.symbol, Ticker.name, Ticker.sector)
-                    .where(Ticker.score.is_(None))
-                    # Same exclusion as above: a never-scored crypto pair must
-                    # not be handed to the equity snapshot either.
-                    .where(func.coalesce(Ticker.asset_class, "") != "crypto")
-                    .order_by(Ticker.symbol.asc())
-                    .offset(_bootstrap_cursor)
-                    .limit(BOOTSTRAP_SLOTS)
-                )
-                _bootstrap_cursor += BOOTSTRAP_SLOTS
+                    intake = list((await session.execute(
+                        _window(0, BOOTSTRAP_SLOTS)
+                    )).all())
+                else:
+                    # Wrap before use so the offset can never run past the end,
+                    # and read round the end of the table, so a window that
+                    # starts near the end is never short.
+                    _bootstrap_cursor %= unscored_total
+                    intake = list((await session.execute(
+                        _window(_bootstrap_cursor, BOOTSTRAP_SLOTS)
+                    )).all())
+                    short = BOOTSTRAP_SLOTS - len(intake)
+                    if short > 0:
+                        intake += list((await session.execute(
+                            _window(0, short)
+                        )).all())
+                    _bootstrap_cursor = (
+                        _bootstrap_cursor + BOOTSTRAP_SLOTS
+                    ) % unscored_total
                 added = [
                     (row[0], row[1] or row[0], row[2] or "Unknown")
-                    for row in b.all()
+                    for row in intake
                     if row[0] and row[0] not in seen
                 ]
                 if added:
                     logger.info(
-                        "universe.bootstrap admitting %d never-scored tickers "
+                        "universe.bootstrap admitting %d of %d never-scored tickers "
                         "(first=%s last=%s)",
-                        len(added), added[0][0], added[-1][0],
+                        len(added), unscored_total, added[0][0], added[-1][0],
                     )
                 rows.extend(added)
     except Exception:

@@ -124,25 +124,80 @@ async def notify_founder_new_subscription(
     billing_period: str | None,
     amount: float | None,
     currency: str | None,
+    plan_price: float | None = None,
 ) -> None:
     """Real-time ping to the founder when someone actually starts paying.
 
     The counterpart to `notify_founder_new_signup` and the more important half:
-    a signup is a maybe, a subscription is revenue. Called from the Stripe
-    webhook on the same once-per-subscription branch that sends the customer
-    their welcome email, so it inherits that branch's de-duplication and can't
-    fire twice for one subscription.
+    a signup is a maybe, a subscription is revenue. Called only from
+    `routers/webhooks.py:_welcome_on_first_paid_invoice`, on
+    `invoice.payment_succeeded` for the subscription's FIRST invoice with
+    `amount_paid > 0` — the same once-per-subscription `paid_start:` latch that
+    sends the customer their welcome email, so it can't fire twice for one
+    subscription. It no longer fires on a subscription turning active: a trial
+    goes active about an hour before Stripe attempts the charge.
+
+    `amount` is what the invoice actually charged; `plan_price` is the plan's
+    price per billing period. They are printed on separate, labelled lines. The
+    old single line ("tier: premium (monthly) · 10.00 USD") read a discounted
+    first charge as the monthly price.
     """
-    price = ""
+    cur = (currency or "usd").upper()
+    lines = [
+        "💰 New Tapeline subscription — first payment received",
+        email or "(no email on the account)",
+        f"tier: {tier}" + (f" ({billing_period})" if billing_period else ""),
+    ]
     if amount is not None:
-        price = f" · {amount:.2f} {(currency or 'usd').upper()}"
-    period = f" ({billing_period})" if billing_period else ""
+        lines.append(f"charged today: {amount:.2f} {cur}")
+    if plan_price is not None:
+        per = {"annual": " per year", "monthly": " per month"}.get(billing_period or "", "")
+        differs = amount is not None and round(amount, 2) != round(plan_price, 2)
+        lines.append(
+            f"plan price: {plan_price:.2f} {cur}{per}"
+            + (" before any discount or credit" if differs else "")
+        )
     await deliver_founder_alert(
         subject=f"💰 New Tapeline subscription — {email}",
+        text="\n".join(lines),
+    )
+
+
+async def notify_founder_paid_invoice_unannounced(
+    *,
+    reason: str,
+    amount: float,
+    currency: str | None,
+    email: str | None,
+    customer: str | None,
+    subscription: str | None,
+) -> None:
+    """A subscription invoice was PAID, and neither the customer welcome nor
+    `notify_founder_new_subscription` went out for it.
+
+    `_welcome_on_first_paid_invoice` refuses to send when it cannot prove the
+    charge is a first charge (Stripe's invoice history unavailable) or cannot
+    find the account (no linked customer, no user_id in the subscription
+    metadata, no Subscription row). Both are the safe call for the customer.
+    For the founder they lose revenue silently: no latch is claimed, so at the
+    next renewal Stripe's history shows a paid invoice and the latch is then
+    claimed WITHOUT an alert — the first sale is never announced at all. This
+    says so at the moment it happens, with the amount charged, and claims
+    nothing about whether it is a first charge.
+    """
+    cur = (currency or "usd").upper()
+    await deliver_founder_alert(
+        subject=f"⚠️ Paid Tapeline invoice, no welcome sent — {amount:.2f} {cur}",
         text=(
-            "💰 New Tapeline subscription\n"
-            f"{email}\n"
-            f"tier: {tier}{period}{price}"
+            "⚠️ A Tapeline subscription invoice was paid, but no welcome email "
+            "and no new-subscription alert went out for it\n"
+            f"charged: {amount:.2f} {cur}\n"
+            f"why: {reason}\n"
+            f"account: {email or 'not matched to a Tapeline account'}\n"
+            f"stripe customer: {customer or '-'}\n"
+            f"stripe subscription: {subscription or '-'}\n"
+            "Check Stripe before contacting the customer: this may be a first "
+            "payment or a renewal."
         ),
     )
 

@@ -97,3 +97,36 @@ def crypto_display_symbol(symbol: Any) -> str | None:
     if not VALID_CRYPTO_SYMBOL_RE.match(s):
         return None
     return s[2:-3]
+
+
+#: A class share as Yahoo-style sources write it: BRK-B. The market-data vendor,
+#: and so every row discovery creates, spells it BRK.B.
+_HYPHEN_CLASS_SHARE_RE = re.compile(r"^([A-Z]{1,5})-([A-Z])$")
+
+
+def vendor_share_class_symbol(symbol: str) -> str:
+    """Spell a class share the vendor's way: "BRK-B" -> "BRK.B". Anything else is
+    returned unchanged.
+
+    A guard for symbols read from the signal-system workbook. The workbook has
+    spelled class shares Yahoo-style in the past: the BRK-A and BRK-B rows
+    exist, and the sheet has not written them since at least 2026-08-24, the
+    first daily score snapshot (their trend, RS and momentum are identical in
+    every snapshot since). As of 2026-09-14 the workbook writes BRK.A and BRK.B,
+    and ALL SIGNALS has no hyphenated tickers, so today
+    this changes nothing. It keeps a return to hyphens from recreating a
+    second, never-priced row beside the one the vendor prices. The only
+    hyphenated non-crypto symbols in the table are BRK-A and BRK-B, so the
+    mapping cannot land on a symbol the vendor spells with a hyphen.
+
+    Deliberately narrow: a one-letter class after one to five letters. A longer
+    suffix is not a class share and is left alone (XYZ-WT, BAC-PL), and so are
+    preferred shares (BAC.PRL), foreign listings (FFH.TO, RCI-B.TO) and futures
+    (CL=F).
+
+    NOT applied to the serving path. `clean_symbol` still returns "BRK-B", so
+    /t/BRK-B keeps resolving the row that exists until someone decides what to
+    do with it.
+    """
+    m = _HYPHEN_CLASS_SHARE_RE.match(symbol)
+    return f"{m.group(1)}.{m.group(2)}" if m else symbol

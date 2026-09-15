@@ -376,7 +376,8 @@ export default function ScannerPage() {
         totalMatched:
           (r as { total_matched?: number | null }).total_matched ?? null,
       });
-    } catch (e) { console.error(e); setLoadError(true); }
+      return true;
+    } catch (e) { console.error(e); setLoadError(true); return false; }
     finally { setLoading(false); }
   }, [minScore, maxScore, sort, order, sector, signal, assetClass, includeLeveraged, debouncedSearch, page]);
 
@@ -399,12 +400,17 @@ export default function ScannerPage() {
     setPage(0);
   }
 
-  useEffect(() => { load(); }, [load]);
   // Inline arrow rather than passing `load` directly, so the automatic
-  // refetch is labelled as such. Safe: useLiveStream keeps its callback in
-  // a ref refreshed every commit, so a new closure each render does not
-  // churn the EventSource.
-  const { status, lastUpdate } = useLiveStream(() => load("stream"));
+  // refetch is labelled as such (src=stream: the backend records no cap hit
+  // and no scan_run for it). Safe: useLiveStream keeps its callback in a ref
+  // refreshed every commit, so a new closure each render does not churn the
+  // EventSource.
+  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived.
+  const { status, lastUpdate, markLoaded } = useLiveStream(() => load("stream"));
+  useEffect(() => {
+    void load().then((ok) => { if (ok) markLoaded(); });
+  }, [load, markLoaded]);
 
   const canExportCsv = canUse(user, "csv_export");
 

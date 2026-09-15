@@ -145,16 +145,19 @@ async def test_insider_premium_via_dev_bypass(client):
 
 @pytest.mark.asyncio
 async def test_insider_days_back_clamped_high(client):
-    """days_back > 365 must clamp down. Bounds upstream cost — without
-    this a malicious caller could ask Finnhub for 10 years of data
-    per request, blowing through the rate limit."""
+    """days_back above the stored window clamps to it. The tab reads the rows
+    the worker's EDGAR pass stores, which cover 90 days: echoing a larger
+    days_back would claim "no Form 4 filings in the last 365 days" over data
+    that only goes back 90. (It clamped to 365 while it called Finnhub live.)"""
+    from app.routers.ticker import _INSIDER_COUNT_WINDOW_DAYS
+
     async with client:
         r = await client.get(
             "/api/ticker/AAPL/insider?days_back=99999",
             headers={"Authorization": "Bearer dev-bypass"},
         )
         assert r.status_code == 200
-        assert r.json()["days_back"] == 365
+        assert r.json()["days_back"] == _INSIDER_COUNT_WINDOW_DAYS == 90
 
 
 @pytest.mark.asyncio

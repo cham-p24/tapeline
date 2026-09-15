@@ -62,7 +62,7 @@ export default function SqueezePage() {
   const load = useCallback(async () => {
     // Don't fire until the session resolves — the tier decides the endpoint,
     // and guessing wrong just produces a 403.
-    if (userLoading) return;
+    if (userLoading) return false;
     try {
       if (hasFullFeed) {
         const r = await api.squeeze();
@@ -75,14 +75,26 @@ export default function SqueezePage() {
       }
       setLoadError(null);
       setLoaded(true);
+      return true;
     } catch (e) {
       // A failed load must never masquerade as the "No squeeze setups right
       // now" empty state — keep whatever rows we have and surface the error.
       setLoadError(errorMessage(e));
+      return false;
     }
   }, [hasFullFeed, userLoading]);
-  useEffect(() => { load(); }, [load]);
-  const { status, lastUpdate } = useLiveStream(load);
+  // No auto-refresh on the free preview: every GET /api/squeeze/preview by a
+  // free user while more setups exist records a squeeze_preview cap hit (the
+  // founder email is throttled to one per user per day, the row is not), and
+  // the API's live bridge announces a new pass about every 70-80 seconds
+  // during the US session. `enabled: false` also stops the refetch on a
+  // reconnect hello.
+  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived.
+  const { status, lastUpdate, markLoaded } = useLiveStream(load, { enabled: hasFullFeed });
+  useEffect(() => {
+    void load().then((ok) => { if (ok) markLoaded(); });
+  }, [load, markLoaded]);
 
   const visibleRows = rows.filter(
     (r) =>

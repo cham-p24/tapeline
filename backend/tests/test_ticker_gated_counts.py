@@ -178,3 +178,44 @@ async def test_no_congressional_count_is_published(client):
         counts = r.json()["gated_counts"]
 
         assert not any("congress" in k.lower() for k in counts), counts
+
+
+@pytest.mark.asyncio
+async def test_the_unlocked_tab_opens_on_the_rows_the_count_promised(client, monkeypatch):
+    """The Premium Insider tab (GET /api/ticker/{symbol}/insider) returns the
+    stored rows the count was taken over: this symbol, inside the window, newest
+    trade first.
+
+    Until 2026-09-15 the tab called Finnhub live while the count read the stored
+    rows the insider pass writes - since #835 those come from SEC EDGAR, and
+    Finnhub ran 14-67 days behind it - so a locked visitor could be promised
+    "3 Form 4 filings" and unlock a different list. Mutation: restore the live
+    vendor call - it raises below."""
+    async def _no_vendor(*a, **k):
+        raise AssertionError("the Insider tab called Finnhub")
+
+    monkeypatch.setattr("app.services.finnhub_feed.fetch_insider_transactions", _no_vendor)
+    async with client:
+        await _reset(SYM, OTHER, EMPTY)
+        await _seed()
+
+        count = (await client.get(f"/api/ticker/{SYM}")).json()["gated_counts"]["insider_form4"]
+        r = await client.get(
+            f"/api/ticker/{SYM}/insider",
+            headers={"Authorization": "Bearer dev-bypass"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        rows = body["transactions"]
+
+        assert body["days_back"] == _INSIDER_COUNT_WINDOW_DAYS
+        assert len(rows) == count == 3
+        assert [row["transaction_date"] for row in rows] == [
+            _days_ago(1), _days_ago(30), _days_ago(_INSIDER_COUNT_WINDOW_DAYS - 1),
+        ]
+        assert {row["filer_name"] for row in rows} == {INSIDER_NAME}
+        assert set(rows[0]) == {
+            "filer_name", "transaction_date", "share_change", "transaction_price", "code",
+        }
+        assert 999_999 not in [row["share_change"] for row in rows]  # the stale row
+        assert 42 not in [row["share_change"] for row in rows]       # the other symbol

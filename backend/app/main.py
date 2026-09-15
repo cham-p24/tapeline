@@ -137,8 +137,22 @@ def _check_session_secret() -> None:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("app.startup env=%s", settings.app_env)
     _check_session_secret()
-    yield
-    logger.info("app.shutdown")
+    # The worker's broker publishes never leave the worker process, so this
+    # API process turns database writes into SSE update events itself.
+    # See services/live_bridge.py.
+    from app.services.live_bridge import LiveBridge
+    from app.services.pubsub import broker as _broker
+
+    live_bridge = LiveBridge(publish=_broker.publish)
+    if settings.live_bridge_enabled:
+        live_bridge.start()
+    else:
+        logger.info("live_bridge.disabled")
+    try:
+        yield
+    finally:
+        await live_bridge.stop()  # a no-op when it never started
+        logger.info("app.shutdown")
 
 
 app = FastAPI(
