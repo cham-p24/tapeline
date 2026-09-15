@@ -6145,24 +6145,62 @@ _PRODUCT_UPDATE_OPENER = (
 )
 
 #: (heading, body). Bold in the HTML part; own line in the text part.
+#:
+#: REWORDED 2026-09-14 after the founder's "go on 1-5, reword the email" (13:24
+#: UTC), once the stall, universe and score-change sentences were checked
+#: against the PRs and production and found false or misleading. That reply
+#: asked for a rewording; it did not approve this text. What each withdrawn
+#: sentence said and why is in test_update_send.py, which fails if any returns.
+#:
+#: FOUNDER APPROVAL OF THIS EXACT TEXT — APPROVED.
+#: The founder was shown the complete rendered text for both audiences (account
+#: holder and newsletter: subject, body and footer, rendered from commit 53ca5df
+#: with the send replaced by a capture) and asked to reply "yes, send this" or
+#: "hold". At about 21:53 UTC on 14 September 2026 he replied, verbatim: "YES".
+#: That reply was to that rendered text. Any change to this copy after 53ca5df
+#: is not covered by it. Keep this record identical to the one above
+#: APPROVED_COPY in backend/tests/test_update_send.py.
 PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
     (
-        "Scores and prices stopped updating for about a day.",
-        "From 15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner "
-        "kept showing numbers that were not being refreshed. Over the following "
-        "day it stalled several more times before recovering on its own. The "
+        "Scores were not kept up to date for most of 6 to 11 September.",
+        "From 6 September our scoring kept failing to finish its work. Three of "
+        "the six factors — trend, relative strength and momentum — kept using "
+        "price data fetched on 6 September until fixes on 10 and 11 September, "
+        "and nothing on the site said those three factors were out of date. From "
+        "15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner "
+        "showed numbers that were not being refreshed at all. Our monitoring "
+        "restarted the machines that run "
+        "scoring many times over those days. That did not fix it, and it made "
+        "things worse: each restart threw away work in progress, and the "
+        "restarts also started a second copy of scoring alongside the first. The "
         "cause was our own code plus a server that could not keep up with the "
-        "larger universe described below. Both are fixed: scoring now runs on a "
-        "dedicated machine, and it has not stalled since 11 September.",
+        "larger universe described below. We fixed the problems we had found in "
+        "our code on 10 September, but scoring fell behind again, and on 11 "
+        "September we moved it to a dedicated machine. Since then, up to 14 "
+        "September, when we wrote this, our monitoring has found scoring "
+        "finishing on time at every check.",
+    ),
+    (
+        "Two other factors fell behind as well.",
+        "Company fundamentals and insider buying are refreshed by a separate job. "
+        "It was still stalled on 13 September, two days after scoring moved to "
+        "its new machine, and some readings it did fetch were lost when we "
+        "released updates to the site. We made fixes on 13 and 14 September and "
+        "began fetching the lost readings again. Insider filings had a second "
+        "problem: they reached us through a data provider whose copies could run "
+        "weeks behind the SEC's own. On 14 September we began reading them from "
+        "the SEC directly, and as each stock is re-read, its insider-buying "
+        "reading, and the score that uses it, can change.",
     ),
     (
         "The scanner now covers about 11,500 stocks and ETFs.",
-        "At the start of the month it was about 2,000. That is not new data we "
-        "bought. It is data we already had and were not refreshing. Search for "
-        "TSM, Sony or Toyota and they are there.",
+        "Until 6 September, thousands of stocks and ETFs we had already scored "
+        "could not appear in a scan. That is not new data we bought. It is data "
+        "we already had and were not refreshing. Search for TSM, Sony or Toyota "
+        "and they are there.",
     ),
     (
-        "Crypto is in: 100 pairs, updated once a day.",
+        "Crypto is in: more than 100 pairs, updated once a day.",
         "Coins sit in their own list and are never ranked against stocks, because "
         "two of our six factors — company fundamentals and insider buying — "
         "cannot exist for a coin. Prices update daily, not live. Our data plan "
@@ -6171,11 +6209,14 @@ PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
     ),
     (
         "Scores moved on 7 September, mostly down.",
-        "A renamed column in one of our data sources meant some inputs went "
-        "missing, and a missing input was being scored as neutral, which "
-        "flattered most stocks. We recalculated 4,112 scores and 3,233 of them "
-        "went down. If a score you watch dropped that week, the lower number is "
-        "the accurate one.",
+        "Three columns in one of our data sources were renamed, and we read them "
+        "as missing. We scored those missing values as neutral, which made most "
+        "of the affected scores too high. When we fixed it, a test run against "
+        "that source changed 4,088 of its 4,112 scores, and 3,233 of them went down. "
+        "Scores moved again once the stale price data described above was "
+        "replaced, and they can still move as the factor readings described "
+        "above are fetched again, so a change in a score you watch may have more "
+        "than one cause.",
     ),
 )
 
@@ -6230,8 +6271,8 @@ def render_product_update_email(
     one, because a broadcast with no working opt-out is the thing the Spam Act
     is about.
 
-    NO PREHEADER. Every other line of this email was approved word for word; a
-    preheader would be the one sentence nobody approved.
+    NO PREHEADER. Every other line of this email goes to the founder word for
+    word; a preheader would be the one sentence nobody approved.
     """
     from html import escape as _html_escape
 
