@@ -231,6 +231,29 @@ def test_a_second_amendment_of_one_original_replaces_the_first() -> None:
     assert superseded_accessions(two, parsed_two) == {"o1", "o2"}
 
 
+def test_an_amendment_replaces_every_identical_re_filing_of_its_original() -> None:
+    """A filer lodged the same Form 4 twice and then amended it: SMWB's
+    0001976408-26-000849 and -000850, both filed 2026-09-16 with the same two
+    sales, plus 4/A -000852 restating them.
+
+    Mutation: replace only the best match - the tiebreak keeps one twin, which
+    then stands beside the amendment and stores that sale twice. Since #856
+    numbered distinct lines, identical rows no longer collide on
+    uq_insider_natural, so the duplicate materialises."""
+    own = [_f("dup1", "4", "2026-09-16"), _f("dup2", "4", "2026-09-16"),
+           _f("amd", "4/A", "2026-09-16")]
+    parsed = {
+        "dup1": _r("OFFER", ["2026-09-14", "2026-09-15"]),
+        "dup2": _r("OFFER", ["2026-09-14", "2026-09-15"]),
+        "amd": _r("OFFER", ["2026-09-14", "2026-09-15"], original="2026-09-16"),
+    }
+    assert superseded_accessions(own, parsed) == {"dup1", "dup2"}
+    # A near-miss is not a twin: one line differs, so it is a real filing and
+    # the amendment leaves it alone.
+    parsed["dup2"] = _r("OFFER", ["2026-09-14", "2026-09-11"])
+    assert superseded_accessions(own, parsed) == {"dup1"}
+
+
 def test_an_amendment_finds_an_original_edgar_dated_later() -> None:
     """EDGAR dates an after-hours submission to the next business day.
     Mutation: exact-date match only - both filings count."""
