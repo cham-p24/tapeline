@@ -630,8 +630,21 @@ def superseded_accessions(
             # A newer 4/A already restates this original; this one is stale.
             replaced.add(amendment["accession"])
             continue
-        claimed.add(restated["accession"])
-        replaced.add(restated["accession"])
+        # An amendment restates one filing, but a filer can lodge that filing
+        # twice under two accessions: SMWB's 0001976408-26-000849 and -000850,
+        # both filed 2026-09-16 with the same two sales, then amended by
+        # -000852. Picking one twin leaves the other standing beside the
+        # amendment, and since #856 numbered distinct lines an identical row no
+        # longer collides on uq_insider_natural - so the sale would be stored
+        # twice. Only an EXACT re-filing counts as a twin; a filing that
+        # differs by one line is a real filing this amendment does not restate.
+        restated_keys = _line_keys(parsed[restated["accession"]])
+        twins = {
+            f["accession"] for f in candidates
+            if _line_keys(parsed[f["accession"]]) == restated_keys
+        }
+        claimed.update(twins)
+        replaced.update(twins)
     return replaced
 
 
