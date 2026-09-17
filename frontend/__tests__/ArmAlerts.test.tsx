@@ -92,6 +92,34 @@ describe("ArmAlerts — alerts activation moment", () => {
     expect(trackEvent).toHaveBeenCalledWith("alert_arm_failed", expect.objectContaining({ reason: "no_score" }));
   });
 
+  it("creates no rule for a ticker already at the top of the scale", async () => {
+    // round(96) + 5 clamped to 100 used to create a rule at a threshold a
+    // composite realistically never reaches, and then told the user "crosses
+    // 100 (it's 96 now)" — the activation moment claiming success for an
+    // alert that will never arrive.
+    mStatus.mockResolvedValue("default");
+    mWatch.mockResolvedValue({ items: [{ id: 1, symbol: "NVDA", current_score: 96.2 }] });
+    render(<ArmAlerts />);
+    fireEvent.click(await screen.findByRole("button", { name: /Turn on alerts/i }));
+    expect(await screen.findByText(/Alerts are on/i)).toBeInTheDocument();
+    expect(mCreate).not.toHaveBeenCalled();
+    expect(screen.queryByText(/crosses 100/)).not.toBeInTheDocument();
+    expect(screen.getByText(/no sensible threshold left above it/i)).toBeInTheDocument();
+    expect(trackEvent).toHaveBeenCalledWith(
+      "alert_arm_failed", expect.objectContaining({ reason: "score_at_ceiling" }),
+    );
+    expect(trackEvent).not.toHaveBeenCalledWith("alert_armed", expect.anything());
+  });
+
+  it("still arms at the top of the band that leaves headroom", async () => {
+    mStatus.mockResolvedValue("default");
+    mWatch.mockResolvedValue({ items: [{ id: 1, symbol: "NVDA", current_score: 95.0 }] });
+    render(<ArmAlerts />);
+    fireEvent.click(await screen.findByRole("button", { name: /Turn on alerts/i }));
+    expect(await screen.findByText(/Alerts are on/i)).toBeInTheDocument();
+    expect(mCreate).toHaveBeenCalledWith(expect.objectContaining({ threshold: 100 }));
+  });
+
   it("surfaces the reason and does nothing further when permission is denied", async () => {
     mStatus.mockResolvedValue("default");
     mSub.mockResolvedValue({ ok: false, reason: "You denied notification permission." });

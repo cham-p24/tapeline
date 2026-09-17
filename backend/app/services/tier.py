@@ -9,7 +9,14 @@ Tier gating — three-tier model (Free / Pro / Premium).
 - Pro $9.99/mo ($99/yr): full scanner, full universe, regime + heatmap,
   watchlist with smart alerts, email alerts, CSV export
 - Premium $19.99/mo ($199/yr): everything in Pro + SEC Form 4 insider
-  filings, unlimited email alerts, public API (1,000/day), priority support
+  filings, email alerts up to 50/day, public API (1,000/day), priority support
+
+`email_alerts_per_day` below is the PLAN's number, not the number the sender
+enforces. services/alerts.ALERT_DAILY_CEILING caps every plan at 50
+deliveries per channel per UTC day and `daily_alert_cap` takes the lower of
+the two, so Premium's 10_000 here has been unreachable since 2026-09-18. It
+is left at 10_000 as the plan entitlement; anything describing what a user
+will actually receive must read `daily_alert_cap`, never this table.
 
 The `squeeze.full` and `congress.feed` keys below are entitlement keys and are
 left exactly as they are. As of 2026-09-14 neither is described to customers
@@ -305,14 +312,19 @@ TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
         "scanner_rows": 1000,
         "watchlist_tickers": 200,
         "watchlists": 20,
-        # The plan's own cap: /pricing says "unlimited email alerts". Deliveries
-        # are still bounded by services/alerts.ALERT_DAILY_CEILING (50/day per
-        # channel), a flood guard beneath every plan, not an entitlement.
-        "email_alerts_per_day": 10_000,    # effectively unlimited
+        # The plan's own cap. NOT what a Premium user receives: deliveries are
+        # bounded by services/alerts.ALERT_DAILY_CEILING (50/day per channel)
+        # beneath every plan, and daily_alert_cap takes the lower of the two,
+        # so this 10_000 has been unreachable since 2026-09-18. /pricing used
+        # to say "unlimited email alerts" on the strength of this number; it
+        # now states 50/day, the number the sender enforces.
+        "email_alerts_per_day": 10_000,    # plan entitlement; see daily_alert_cap
         "telegram_alerts_per_day": 10_000, # vestigial + dead — Telegram alerts were
                                            # retired 2026-08-11 and nothing reads this.
                                            # Premium does NOT ship a Telegram channel.
-        "web_push_alerts": 10_000,         # effectively unlimited
+        # Web-push RULES a user may create (a count, not a rate). Uncapped in
+        # practice; the per-day DELIVERY ceiling is ALERT_DAILY_CEILING.
+        "web_push_alerts": 10_000,
         "api_requests_per_day": 1_000,
         "saved_scans": 100,
         "daily_lookups": UNLIMITED,   # no metering for paid tiers

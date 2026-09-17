@@ -10,7 +10,14 @@ type UsageData = {
   tier: string;
   metrics: {
     watchlist: { used: number; cap: number; pct: number };
+    // `cap` is what the SENDER enforces (services/alerts.daily_alert_cap):
+    // the lower of the plan's own daily cap and the cross-plan ceiling. It
+    // used to be the plan number alone, so Premium read 10,000 while 50 was
+    // the number that actually withheld an alert.
     email_alerts_today: { used: number; cap: number; pct: number };
+    // Browser push, same shape. Optional so the page still renders against an
+    // API build that predates the field.
+    web_push_alerts_today?: { used: number; cap: number; pct: number };
     // Daily ticker look-up meter. `cap: null` is the UNLIMITED sentinel (paid
     // tier / active trial / first-session grace). Optional so the page still
     // renders against an API build that predates the field.
@@ -102,6 +109,15 @@ export default function UsagePage() {
           pct={data.metrics.email_alerts_today.pct}
           unit="alerts"
         />
+        {data.metrics.web_push_alerts_today && (
+          <UsageCard
+            title="Browser push today"
+            used={data.metrics.web_push_alerts_today.used}
+            cap={data.metrics.web_push_alerts_today.cap}
+            pct={data.metrics.web_push_alerts_today.pct}
+            unit="alerts"
+          />
+        )}
         <UsageCard
           title="Price delay"
           used={data.metrics.data_delay_minutes}

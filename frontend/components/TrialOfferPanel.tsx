@@ -76,7 +76,7 @@
 "use client";
 
 import Link from "next/link";
-import { PRICING, FREE_LIMITS, usd, usdCompact, freeHasWatchlist } from "@/lib/pricing";
+import { ALERT_DAILY_CEILING, PRICING, FREE_LIMITS, usd, usdCompact, freeHasWatchlist } from "@/lib/pricing";
 import { TRIAL_DAYS } from "@/lib/trial";
 import { longDate } from "@/lib/datetime";
 import { ACTIVE_SCORED_TICKERS } from "@/lib/universe";
@@ -133,7 +133,7 @@ export function TrialOfferPanel({
       <p className="mt-1.5 text-sm text-muted">
         Every Premium feature for {TRIAL_DAYS} days: every row of the full ~{ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker
         universe, score breakdowns, recent insider buys (SEC Form 4),
-        watchlist of 200 and unlimited email alerts. Starting the trial takes a
+        watchlist of 200 and up to {ALERT_DAILY_CEILING} email alerts a day. Starting the trial takes a
         card, because it becomes a paid subscription if you keep it. Here is
         exactly what that means.
       </p>

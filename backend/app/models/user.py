@@ -448,6 +448,15 @@ class AlertRuleState(Base):
     symbol: Mapped[str] = mapped_column(String(20), primary_key=True)
     side: Mapped[str] = mapped_column(String(20), nullable=False)
     value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Consecutive undelivered retries of the crossing this row is holding back.
+    # A crossing whose delivery RAISED (or whose web push reached nobody) does
+    # not advance the side, so the next evaluation re-detects it and tries
+    # again; this counts those attempts so a permanently broken transport
+    # cannot replay one crossing forever. Reset to 0 the moment a fire is
+    # consumed. See services/alerts.MAX_DELIVERY_ATTEMPTS.
+    failures: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0", default=0,
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False,
     )
