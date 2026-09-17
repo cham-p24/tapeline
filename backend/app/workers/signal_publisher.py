@@ -822,7 +822,9 @@ async def tick() -> None:
         await broker.publish("squeeze_updated", {"count": len(squeezes)})
 
     # Evaluate alert rules against the freshly-updated state.
-    # Each evaluator is debounced internally (15min), safe to run every tick.
+    # Safe to run every tick: alerts fire on a CROSSING, remembered in
+    # alert_rule_states, not while a condition stays true (services/alerts),
+    # and one machine evaluates at a time (dblock.LOCK_ALERT_RULES).
     _set_stage("alerts")
     async with session_scope() as alert_session:
         try:

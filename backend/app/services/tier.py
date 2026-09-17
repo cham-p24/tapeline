@@ -305,6 +305,9 @@ TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
         "scanner_rows": 1000,
         "watchlist_tickers": 200,
         "watchlists": 20,
+        # The plan's own cap: /pricing says "unlimited email alerts". Deliveries
+        # are still bounded by services/alerts.ALERT_DAILY_CEILING (50/day per
+        # channel), a flood guard beneath every plan, not an entitlement.
         "email_alerts_per_day": 10_000,    # effectively unlimited
         "telegram_alerts_per_day": 10_000, # vestigial + dead — Telegram alerts were
                                            # retired 2026-08-11 and nothing reads this.
