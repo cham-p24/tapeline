@@ -1,6 +1,31 @@
 # Video creative + Meta Ad Library review — September 2026
 
-> **Current files (2026-09-14): `voiceover/` and `voiceover-15s/` only, each video with its
+> [!WARNING]
+> **DO NOT UPLOAD ANY VIDEO OR STILL IN THIS FOLDER (withdrawn 17 September 2026).** That covers
+> all 18 voice-over files this README names as the ones to upload: `voiceover/` (nine long cuts) and
+> `voiceover-15s/` (nine 15 s cuts) of concepts B2, D and E, with their `.en_US.srt` captions. It also
+> covers the older silent `tapeline-{9x16,4x5,1x1}.mp4` cuts and `stills/4x5/03-proof.png`.
+>
+> **Why.** Every one of them burns in a product frame cropped from `shot-ticker.png`, an NVDA ticker
+> page captured on 8 September 2026.
+> <!-- copy-compliance-allow * -- names words visible in the withdrawn product frame in order to flag them; not ad copy -->
+> Its pixels show "SIGNAL", "STRONG SETUP", "86% data confidence" and "As of 8 September 2026".
+> The `--ads` rules ban the first two (stock-tip vocabulary and a score-band name), and the other two
+> are an 8 September reading shown as if it were the page today. The long and silent cuts also show
+> "scores re-tick during US market hours". No gate reads pixels, so `build3.mjs` and `build.mjs` would
+> reproduce the same frame; the same notice is in `build3.mjs` and in the files it generates.
+>
+> **Concept E is not an exception, and neither are the 15 s cuts.** They do not carry the scene-02
+> line "re-scored through the US session" that #839 flags in the B2 and D long cuts; that much is
+> true. They do carry the NVDA frame, so none of the 18 can be uploaded, and no 15 s cut is a
+> substitute for a long one. The Meta text in `meta-copy-2026-09.md` was written for these videos
+> and is not ready to publish either.
+>
+> **What replaces them.** The founder has asked for a new creative direction: background music, a
+> more energetic voice, opening on the problem and the value, and the disclaimer on the end card
+> only. A re-shoot in that direction is being built as a separate ad-bench PR.
+
+> **Named as the current files on 2026-09-14, withdrawn 2026-09-17 (see above): `voiceover/` and `voiceover-15s/`, each video with its
 > `.en_US.srt`. Ad text: `meta-copy-2026-09.md`.** Everything else in this folder is
 > superseded and must not be uploaded. See
 > [Update 2026-09-14](#update-2026-09-14--concept-e-rewritten-15-s-cuts-captions) at the end.
@@ -146,7 +171,8 @@ Meta's subscription policy requires: `meta-copy-2026-09.md`.
 
 ## Update 2026-09-14 — concept E rewritten, 15 s cuts, captions
 
-**What to upload is at the end of this section.** Nothing here has been uploaded to Meta,
+**What to upload is at the end of this section; withdrawn 17 September 2026, so upload none of
+it (see the top of this file).** Nothing here has been uploaded to Meta,
 and the Ads Manager drafts (D, E, B2) still hold the 2026-09-11 files and text. Replacing
 them needs a separate founder yes.
 
@@ -229,6 +255,10 @@ the line under the product frame sits close above the disclosure, but they do no
 
 ### What to upload where
 
+**Withdrawn 17 September 2026: do not upload any file in this table, long cut or 15 s cut, for any
+concept.** Every one shows the stale NVDA product frame; see the note at the top of this file. The
+table is kept as the record of what was planned.
+
 One ad per concept. Load **every** asset below before publishing, never mid-flight: adding
 assets can restart learning (blueprint §4.2, R8). Upload each `.en_US.srt` with its video.
 
@@ -244,6 +274,9 @@ and Reels, so if only one cut can go in, use the 15 s cut.
 
 ### Superseded: do not upload
 
+- **All 18 files in `voiceover/` and `voiceover-15s/`, concept E and the 15 s cuts included**
+  (withdrawn 17 September 2026), with their captions, and `stills/4x5/03-proof.png`. Each burns in
+  the 8 September NVDA product frame described at the top of this file.
 - **Any copy of `voiceover/*.mp4` made before 2026-09-14**, including the files already in the
   D, E and B2 Ads Manager drafts. The filenames did not change; the contents did. The old E is
   false, and the old CTA's card-free wording lands one scene after the card-required trial.
@@ -275,7 +308,9 @@ folder. There is no ffprobe on the build machine, so the probe reads `ffmpeg -i`
 - **The product screenshot shows the words "SIGNAL" and "STRONG SETUP".** They are on the real
   ticker page, but in ad *text* the `--ads` linter bans both (stock-tip vocabulary and a
   score-band name). The linter cannot read pixels, so no gate catches them. Re-shooting the page
-  without that row is a creative call and was not made here.
+  without that row is a creative call and was not made here. **Closed 17 September 2026:** every
+  video and still that shows the frame is withdrawn (see the top of this file), and the re-shoot is
+  a separate ad-bench PR.
 - **B's long-cut hook still says "Every stock screener hands you 500 filters".** That line was
   out of scope. The 15 s cut asks it as a question instead: "500 filters and a blank stare?"
 - **The CTA names `tapeline.io/scorecard`**, while the ad destination may be `/signup`

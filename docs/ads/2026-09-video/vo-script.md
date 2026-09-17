@@ -8,6 +8,17 @@ Trial length, prices and the scorecard delay are read from
 `frontend/lib/trial.ts`, `frontend/lib/pricing.ts` and
 `backend/app/routers/scorecard.py` at build time.
 
+> [!WARNING]
+> **Do not upload these videos: withdrawn 17 September 2026.** All 18 (`voiceover/` long cuts and
+> `voiceover-15s/` 15 s cuts of B2, D and E) and their captions are withdrawn, concept E included.
+> Every one burns in a product frame cropped from an NVDA ticker page captured on 8 September 2026.
+> <!-- copy-compliance-allow * -- names words visible in the withdrawn product frame in order to flag them; not ad copy -->
+> Its pixels show "SIGNAL", "STRONG SETUP", "86% data confidence" and "As of 8 September 2026".
+> The `--ads` rules ban the first two, the reading is stale, and no gate reads pixels, so a rebuild
+> reproduces the same frame. A re-shoot in a new direction is being built as a separate ad-bench PR;
+> see `README.md`. This notice is written by `build3.mjs`: remove it there, and only in the PR that
+> replaces the frame.
+
 ## B2 (concept B)
 
 ### Long cut (68 spoken words)
