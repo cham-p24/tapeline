@@ -43,7 +43,7 @@ const TOOLS: Tool[] = [
     scoring: "Named factors",
     scorecard: "Per-pick public",
     tagline:
-      "The only scanner that names all six scoring factors AND back-checks every top-10 pick next-day vs SPY.",
+      "The only scanner that names all six scoring factors AND back-checks each recorded daily top-10 pick next-day vs SPY.",
   },
   {
     rank: 2,
@@ -148,7 +148,7 @@ const FAQ = [
   },
   {
     q: "What's the best stock scanner with a public track record?",
-    a: "Tapeline is the only tool on this list that auto-publishes every top-10 daily pick with the realized next-day return vs SPY at /scorecard. Most competitors report aggregate statistics; few publish a dated, per-pick record. If audit-able performance is the deciding factor, Tapeline is the only fit.",
+    a: "Tapeline is the only tool on this list that auto-publishes each recorded daily top-10 pick with the realized next-day return vs SPY at /scorecard, open to everyone 7 days after the session. Most competitors report aggregate statistics; few publish a dated, per-pick record. If audit-able performance is the deciding factor, Tapeline is the only fit.",
   },
   {
     q: "Are AI stock scanners worth it?",

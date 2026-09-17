@@ -32,6 +32,13 @@ export type MissingSession = {
   cause: string;
 };
 
+/**
+ * The day the list below was last verified against production, as it is
+ * printed in copy ("When we checked on …"). Update it together with
+ * VERIFIED_MISSING_SESSIONS so a count and its date cannot drift apart.
+ */
+export const VERIFIED_MISSING_SESSIONS_CHECKED_ON = "14 September 2026";
+
 export const VERIFIED_MISSING_SESSIONS: MissingSession[] = [
   {
     date: "2026-08-31",

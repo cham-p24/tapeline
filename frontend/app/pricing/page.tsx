@@ -8,7 +8,11 @@ import { ExitIntentModal } from "@/components/ExitIntentModal";
 import { LiveCounters } from "@/components/LiveCounters";
 import { OpenAccessBanner } from "@/components/OpenAccessBanner";
 import { PricingProof } from "./PricingProof";
-import { VERIFIED_MISSING_SESSIONS, verifiedMissingSessionsLabel } from "@/app/scorecard/recordLimitationsData";
+import {
+  VERIFIED_MISSING_SESSIONS,
+  VERIFIED_MISSING_SESSIONS_CHECKED_ON,
+  verifiedMissingSessionsLabel,
+} from "@/app/scorecard/recordLimitationsData";
 import { pageMeta } from "@/lib/seo";
 import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 // FREE_LIMITS / freeHasWatchlist are read here again. The 2026-08-30 change
@@ -189,7 +193,7 @@ export default function PricingPage() {
               Check the record before you pay.
             </h2>
             <p className="mt-2 text-sm text-muted">
-              Each daily top 10 is logged the day it prints. When we checked on 14 September 2026, {VERIFIED_MISSING_SESSIONS.length} trading days had no list ({verifiedMissingSessionsLabel()}); the scorecard names every gap. Losing days stay, and corrections are dated in the changelog. These numbers are read from the scorecard when you open this page.
+              Each daily top 10 is logged the day it prints. When we checked on {VERIFIED_MISSING_SESSIONS_CHECKED_ON}, {VERIFIED_MISSING_SESSIONS.length} trading days had no list ({verifiedMissingSessionsLabel()}); the scorecard names every gap. Losing days stay, and corrections are dated in the changelog. These numbers are read from the scorecard when you open this page.
             </p>
           </div>
           <div className="mx-auto mt-8 max-w-2xl">

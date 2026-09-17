@@ -13,7 +13,7 @@ type Item = { slug: string; title: string; desc: string; emoji: string };
 const ITEMS: Item[] = [
   { slug: "/how-it-works",  title: "The methodology", desc: "Six named factors, public methodology.", emoji: "🧮" },
   { slug: "/data-sources",  title: "Data sources",   desc: "Every feed that powers a score. Named, dated, linked.", emoji: "🗂️" },
-  { slug: "/scorecard",     title: "Public scorecard", desc: "Every top-10, back-checked vs SPY next session.", emoji: "📈" },
+  { slug: "/scorecard",     title: "Public scorecard", desc: "Each recorded daily top 10, back-checked vs SPY next session.", emoji: "📈" },
   { slug: "/verify",        title: "Verify the record", desc: "Download the raw record as CSV or JSON and check it.", emoji: "🔎" },
   { slug: "/limitations",   title: "Limitations",     desc: "What Tapeline is bad at, and what it cannot tell you.", emoji: "⚠️" },
   { slug: "/signals",       title: "All signals",    desc: "Every Tapeline-scored ticker, full universe view.", emoji: "📊" },

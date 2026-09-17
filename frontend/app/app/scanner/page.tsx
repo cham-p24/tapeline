@@ -723,7 +723,7 @@ export default function ScannerPage() {
               (useLiveStream below), so no reload is needed. The 60 s
               cadence is stated once, inside IN_APP_REFRESH_SENTENCE. */}
           <p className="text-xs text-subtle" data-testid="price-delay-note">
-            {priceDelayNote(meta?.delayMinutes)}, re-read once per pass during US market
+            {priceDelayNote(meta?.delayMinutes)}, re-read on each pass (see below) during US market
             hours (crypto: once a day). {IN_APP_REFRESH_SENTENCE}
           </p>
         </div>

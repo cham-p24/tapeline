@@ -182,8 +182,8 @@ export function WatchlistTrackRecord() {
                 Put your watchlist on the record
               </h3>
               <p className="mt-1.5 text-sm text-muted leading-relaxed">
-                Premium freezes each of your watched tickers&rsquo; score every
-                session and back-checks the next-day move against SPY — so you
+                Premium records each of your watched tickers&rsquo; score after
+                the US close and back-checks the next-day move against SPY — so you
                 get a personal, on-the-record track record for your own picks,
                 the same way the public{" "}
                 <Link href="/scorecard" className="text-accent hover:underline">
