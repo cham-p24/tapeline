@@ -40,6 +40,7 @@ from app.db import session_scope
 from app.models import (
     AlertEvent,
     AlertRule,
+    AlertRuleState,
     ApiKey,
     EmailVerificationToken,
     RoadmapVote,
@@ -74,8 +75,12 @@ def sqlite_fks_enforced():
     sqlalchemy.event.remove(Engine, "connect", _fk_on)
 
 
-async def _seed_account_with_children() -> tuple[str, str]:
-    """A realistic post-onboarding account: watchlist + items + the rest."""
+async def _seed_account_with_children() -> tuple[str, str, int]:
+    """A realistic post-onboarding account: watchlist + items + the rest.
+
+    Returns (user id, verification token, alert rule id). The rule id is
+    needed because AlertRuleState is keyed on it and carries no user_id.
+    """
     from datetime import UTC, datetime, timedelta
 
     uid = str(uuid.uuid4())
@@ -102,6 +107,10 @@ async def _seed_account_with_children() -> tuple[str, str]:
         rule = AlertRule(user_id=uid, name="r", rule_type="score", channel="email")
         s.add(rule)
         await s.flush()
+        # Crossing state hangs off the RULE, not the user, so it is the one
+        # child the user-scoped deletes cannot reach. Seeded here so both
+        # cascade tests below actually exercise it.
+        s.add(AlertRuleState(rule_id=rule.id, symbol="NVDA", side="above", value=81.0))
         s.add(
             AlertEvent(
                 user_id=uid, rule_id=rule.id, symbol="NVDA",
@@ -116,12 +125,20 @@ async def _seed_account_with_children() -> tuple[str, str]:
                 price_at_flag=100.0, score_at_flag=70.0,
             )
         )
+        rule_id = rule.id
         await s.commit()
-    return uid, token
+    return uid, token, rule_id
 
 
 async def _cleanup(uid: str) -> None:
     async with session_scope() as s:
+        await s.execute(
+            delete(AlertRuleState).where(
+                AlertRuleState.rule_id.in_(
+                    select(AlertRule.id).where(AlertRule.user_id == uid)
+                )
+            )
+        )
         for model in (
             AlertEvent, AlertRule, WatchlistItem, Watchlist, ScannerPreset,
             WebPushSubscription, RoadmapVote, WatchlistTrackRecordEntry,
@@ -142,7 +159,7 @@ async def test_cancel_deletes_an_account_that_has_onboarding_rows(
 
     from app.main import app
 
-    uid, token = await _seed_account_with_children()
+    uid, token, _rule_id = await _seed_account_with_children()
     try:
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
@@ -169,7 +186,7 @@ async def test_cancel_deletes_an_account_that_has_onboarding_rows(
 async def test_cancel_leaves_no_orphaned_child_rows(sqlite_fks_enforced):
     """Orphans are the SQLite-shaped version of the same bug: the user goes but
     their watchlist, alerts and track record survive."""
-    uid, token = await _seed_account_with_children()
+    uid, token, rule_id = await _seed_account_with_children()
     try:
         import httpx
 
@@ -198,7 +215,54 @@ async def test_cancel_leaves_no_orphaned_child_rows(sqlite_fks_enforced):
                 )
                 if n:
                     leftovers[model.__name__] = n
+            # AlertRuleState has no user_id — it is reached only through the
+            # rule. Replacing its delete() with a select() in account_purge
+            # passes every other test in this file, which is how the row
+            # survived unnoticed.
+            states = (await s.execute(
+                select(AlertRuleState).where(AlertRuleState.rule_id == rule_id)
+            )).scalars().all()
+            if states:
+                leftovers["AlertRuleState"] = len(states)
         assert not leftovers, f"orphaned rows survived the cancel: {leftovers}"
+    finally:
+        await _cleanup(uid)
+
+
+@pytest.mark.asyncio
+async def test_purge_deletes_crossing_state_without_fk_cascade():
+    """The explicit AlertRuleState delete, on the path it exists for.
+
+    Deliberately does NOT use `sqlite_fks_enforced`: with foreign keys ON,
+    ON DELETE CASCADE removes these rows whether or not account_purge asks,
+    which is why replacing that `delete()` with a `select()` passes every
+    other test in this file. SQLite defaults foreign_keys OFF — the dev and
+    test default the comment in account_purge names — and on that path the
+    explicit delete is the only thing that removes them. Postgres cascades in
+    production; this pins the fallback.
+    """
+    from app.services.account_purge import purge_user_owned_rows
+
+    uid, _token, rule_id = await _seed_account_with_children()
+    try:
+        async with session_scope() as s:
+            seeded = (await s.execute(
+                select(AlertRuleState).where(AlertRuleState.rule_id == rule_id)
+            )).scalars().all()
+            assert seeded, "seed did not create the crossing state row"
+
+            await purge_user_owned_rows(s, uid)
+            await s.commit()
+
+        async with session_scope() as s:
+            left = (await s.execute(
+                select(AlertRuleState).where(AlertRuleState.rule_id == rule_id)
+            )).scalars().all()
+        assert not left, (
+            "crossing state survived the purge — with FKs off nothing else "
+            "deletes it, so a deleted account keeps a row naming the tickers "
+            "its alert rules watched"
+        )
     finally:
         await _cleanup(uid)
 
@@ -227,7 +291,8 @@ def test_purge_covers_every_user_owned_table():
 
     src = inspect.getsource(account_purge.purge_user_owned_rows)
     for model in (
-        "AlertEvent", "AlertRule", "WatchlistItem", "Watchlist", "ScannerPreset",
+        "AlertEvent", "AlertRule", "AlertRuleState", "WatchlistItem", "Watchlist",
+        "ScannerPreset",
         "WebPushSubscription", "RoadmapVote", "WatchlistTrackRecordEntry",
         "Subscription", "ApiKey",
     ):

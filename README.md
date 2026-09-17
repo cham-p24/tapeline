@@ -55,9 +55,9 @@ Built on the same engine that powers a production personal trading bot.
 
 ## Pricing
 
-- **Free** $0 — top-10 scanner rows, live (no delay), 12 ticker look-ups per UTC day, watchlist of 5, 2 browser-push alert rules. *(Open-access promo, ends 2026-09-08: scanner rows only are lifted 10 → 1,000 for signed-in Free accounts — `tier.py:PROMO_OPEN_ACCESS_UNTIL`. Look-ups, watchlist and push caps are unchanged, no Pro feature unlocks, and anonymous visitors still see the top 10.)*
-- **Pro** $9.99/mo or $8.25/mo billed annually ($99/yr) — full universe live, squeeze + regime + heatmap, watchlist 50, email alerts (10/day), CSV export, browser push.
-- **Premium** $19.99/mo or $16.58/mo billed annually ($199/yr) — everything in Pro plus Congressional trades, Recent insider buys (SEC Form 4), unlimited email alerts, watchlist 200, saved scans 100, public API (1,000 req/day).
+- **Free** $0 — top-10 scanner rows, live (no delay), 12 ticker look-ups per UTC day, watchlist of 5, no alerts on any channel (`tier.py:FREE_WEB_PUSH_ALERTS = 0` since #683). *(Open-access promo, ends 2026-09-08: scanner rows only are lifted 10 → 1,000 for signed-in Free accounts — `tier.py:PROMO_OPEN_ACCESS_UNTIL`. Look-ups, watchlist and push caps are unchanged, no Pro feature unlocks, and anonymous visitors still see the top 10.)*
+- **Pro** $9.99/mo or $8.25/mo billed annually ($99/yr) — full universe live, squeeze + regime + heatmap, watchlist 50, email alerts (10/day), CSV export, browser push (up to 50/day).
+- **Premium** $19.99/mo or $16.58/mo billed annually ($199/yr) — everything in Pro plus Congressional trades, Recent insider buys (SEC Form 4), email alerts up to 50/day, watchlist 200, saved scans 100, public API (1,000 req/day).
 
 Accounts created from 2026-08-22 add a card at first sign-in, which starts a 14-day Premium trial: $0 that day, first charge on day 14, one click to cancel. Accounts created before that date are grandfathered and are never asked for a card. The public record — scorecard, daily picks, per-ticker pages, the CSV/JSON exports and the public API — needs no account and no card.
 

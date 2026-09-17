@@ -111,6 +111,34 @@ logger = logging.getLogger(__name__)
 # is reported when the window ends (if it still holds), not lost.
 MIN_FIRE_INTERVAL = timedelta(minutes=15)
 
+# Regime rules get a longer one. A regime label is discrete, so there is no
+# hysteresis band to put around it: a market sitting exactly on the boundary
+# between two labels can flip back and forth, and every flip in or out of the
+# watched label is a real edge. Fifteen minutes would let that oscillation
+# alert four times an hour. Six hours bounds it to the resolution a regime
+# change is actually worth reading at, and a change that persists is still
+# reported at the end of the window. There are no regime rules in production;
+# this is pre-emptive.
+REGIME_MIN_FIRE_INTERVAL = timedelta(hours=6)
+
+# How many times one crossing may be re-attempted after an UNDELIVERED send
+# before the side advances anyway and the crossing is dropped.
+#
+# A crossing whose delivery raised (Resend erroring, the push service
+# unreachable) used to be consumed regardless: the event was written
+# delivered=False, the side advanced, and the user was never told the score
+# had crossed. The side now stays put so the next evaluation re-detects the
+# crossing, throttled to one attempt per MIN_FIRE_INTERVAL. The count is
+# needed because "undelivered" is not always transient - a web-push
+# subscription that is gone but never returned 410 would otherwise replay the
+# same crossing forever, which is the failure mode this whole change exists to
+# remove. Three attempts spans ~30 minutes and costs at most three rows.
+#
+# Only a genuine delivery failure counts. A DELIBERATE suppression - email
+# prefs, a tier the channel is not on, a daily cap - is a decision, not a
+# failure: it consumes the crossing and advances the side, exactly as before.
+MAX_DELIVERY_ATTEMPTS = 3
+
 # Points a score (or squeeze spike score) must fall BELOW the threshold before
 # the rule counts it as back below. See "HYSTERESIS" in the module docstring.
 SCORE_HYSTERESIS = 1.0
@@ -304,6 +332,51 @@ def _record_side(
         st.value = value
 
 
+def _settle_crossings(
+    rule_id: int,
+    rule_states: dict[str, AlertRuleState],
+    reverts: list[tuple[str, str | None, float | None]],
+    consumed: bool,
+) -> None:
+    """Commit or roll back the sides the fire() call was based on.
+
+    `reverts` is one (symbol, side_before, value_before) per crossing that went
+    into the message. When the fire was `consumed` - delivered, or deliberately
+    suppressed - the already-recorded new side stands and the failure count
+    resets. When it was not, the side is put BACK, so the next evaluation sees
+    the same crossing again and retries the send, up to
+    MAX_DELIVERY_ATTEMPTS. The retry is throttled by MIN_FIRE_INTERVAL,
+    because _fire has already stamped `last_fired_at`.
+
+    Rolling the side back is what `evaluate_watchlist_alerts` already does with
+    `alert_zone` on an exception; this makes the rule path behave the same way.
+    """
+    for symbol, side_before, value_before in reverts:
+        st = rule_states.get(symbol)
+        if st is None:
+            continue
+        if consumed:
+            if st.failures:
+                st.failures = 0
+            continue
+        st.failures = (st.failures or 0) + 1
+        if st.failures >= MAX_DELIVERY_ATTEMPTS:
+            # Out of retries. Keep the ADVANCED side: replaying one crossing
+            # indefinitely against a transport that is not coming back is the
+            # spam this change removes. The delivered=False AlertEvent rows
+            # are the record that it was tried and lost.
+            st.failures = 0
+            logger.warning(
+                "alert.crossing_dropped rule=%s symbol=%s attempts=%s",
+                rule_id, symbol, MAX_DELIVERY_ATTEMPTS,
+            )
+            continue
+        if side_before is None:
+            continue
+        st.side = side_before
+        st.value = value_before
+
+
 def _arm(rule: AlertRule, now: datetime) -> bool:
     """Stamp the rule's first evaluation. True if this IS that first evaluation."""
     if rule.armed_at is None:
@@ -399,9 +472,9 @@ async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
         # without limit"; that fix never reached this path, and a Pro watchlist
         # holds up to 50 tickers.
         if await _email_cap_reached(session, user):
-            logger.info(
-                "alert.watchlist_email_cap_reached user=%s symbol=%s",
-                user.id, item.symbol,
+            logger.warning(
+                "alert.watchlist_email_cap_reached user=%s symbol=%s tier=%s cap=%s",
+                user.id, item.symbol, user.tier, daily_alert_cap(user, "email"),
             )
             # Same posture as the rule path: the crossing is recorded as
             # suppressed (visible in history, not counted against the cap) and
@@ -512,21 +585,28 @@ async def evaluate_score_rules(session: AsyncSession) -> int:
         _arm(rule, now)
         rule_states = states[rule.id]
         crossings: list[_Crossing] = []
+        # (symbol, side_before, value_before) for each crossing, so an
+        # undelivered send can put the side back and retry. See
+        # _settle_crossings.
+        reverts: list[tuple[str, str | None, float | None]] = []
         for t in candidates:
             if t.score is None:
                 continue
             stored = rule_states.get(t.symbol)
             previous = stored.side if stored is not None else None
+            previous_value = stored.value if stored is not None else None
             side = threshold_side(previous, t.score, rule.threshold, SCORE_HYSTERESIS)
             _record_side(session, rule_states, rule.id, t.symbol, side, t.score)
             if previous is not None and side != previous:
                 crossings.append(_Crossing(t.symbol, side, t.score))
+                reverts.append((t.symbol, previous, previous_value))
 
         if not crossings:
             continue
         msg = score_crossing_message(rule.threshold, crossings)
         lead = crossings[0]
-        await _fire(session, rule, user, lead.symbol, msg, score=lead.value)
+        consumed = await _fire(session, rule, user, lead.symbol, msg, score=lead.value)
+        _settle_crossings(rule.id, rule_states, reverts, consumed)
         fired += 1
         # Commit the new side together with the event, rule by rule: an alert
         # that has been sent must not be re-sent because a later rule's work
@@ -550,6 +630,18 @@ async def evaluate_squeeze_rules(session: AsyncSession) -> int:
     were once above) get a stored row, so an any-ticker rule does not write a
     row for the whole universe. The rule's first evaluation records and fires
     nothing, like every other type.
+
+    That re-arming is deliberately NOT the same rule the score evaluator uses,
+    where a missing reading keeps the stored side because missing data is not a
+    move. A squeeze setup either exists or it does not, so its absence IS the
+    reading. The asymmetry only bites when the absence is an artefact, and the
+    one case where it plainly is — an EMPTY publishable feed, i.e. an ingest
+    gap, a staleness window or a pipeline outage — is refused above: a tick
+    with no publishable setups anywhere records nothing and fires nothing. A
+    gap that drops SOME symbols while others still publish is still read as
+    those setups ending, and they will fire again when they return. There are
+    no squeeze rules in production and squeeze_setups has been stale since
+    18 Jul 2026, so this is the shape of the contract, not live behaviour.
     """
     now = datetime.now(UTC)
     rules = await _enabled_rules(session, "squeeze")
@@ -560,6 +652,16 @@ async def evaluate_squeeze_rules(session: AsyncSession) -> int:
         select(SqueezeSetup).where(squeeze_publishable(now))
     )
     squeezes = {s.symbol: s for s in squeezes_result.scalars().all()}
+    if not squeezes:
+        # NO publishable setup anywhere. That is not evidence that every
+        # symbol's setup ended — it is what an ingest gap, a staleness window
+        # or a squeeze pipeline outage looks like too, and the two are
+        # indistinguishable from here. Re-arming on it would make every
+        # still-above setup fire again the moment the feed returned. Record
+        # nothing and fire nothing, matching the score evaluator's rule that
+        # missing data is not a move. (squeeze_setups has been stale since
+        # 18 Jul 2026, so in production this is every tick.)
+        return 0
     states = await _load_states(session, [rule.id for rule, _ in rules])
 
     fired = 0
@@ -575,13 +677,16 @@ async def evaluate_squeeze_rules(session: AsyncSession) -> int:
         )
 
         crossed: list[SqueezeSetup] = []
+        reverts: list[tuple[str, str | None, float | None]] = []
         for sym in sorted(symbols):
             setup = squeezes.get(sym)
             stored = rule_states.get(sym)
             if stored is not None:
                 previous: str | None = stored.side
+                previous_value = stored.value
             else:
                 previous = None if first_evaluation else BELOW
+                previous_value = None
             if setup is None:
                 side, value = BELOW, None
             else:
@@ -592,6 +697,7 @@ async def evaluate_squeeze_rules(session: AsyncSession) -> int:
             _record_side(session, rule_states, rule.id, sym, side, value)
             if previous == BELOW and side == ABOVE and setup is not None:
                 crossed.append(setup)
+                reverts.append((sym, previous, previous_value))
 
         if not crossed:
             continue
@@ -608,7 +714,10 @@ async def evaluate_squeeze_rules(session: AsyncSession) -> int:
                 f"{len(crossed)} squeeze setups crossed spike {thr}: ",
                 [f"{s.symbol} (spike {s.spike_score:.1f})" for s in crossed],
             )
-        await _fire(session, rule, user, crossed[0].symbol, msg, score=crossed[0].spike_score)
+        consumed = await _fire(
+            session, rule, user, crossed[0].symbol, msg, score=crossed[0].spike_score,
+        )
+        _settle_crossings(rule.id, rule_states, reverts, consumed)
         fired += 1
         await session.commit()
 
@@ -644,6 +753,7 @@ async def evaluate_regime_rules(session: AsyncSession) -> int:
         rule_states = states[rule.id]
         stored = rule_states.get(_MARKET)
         previous = stored.side if stored is not None else None
+        previous_value = stored.value if stored is not None else None
         _record_side(session, rule_states, rule.id, _MARKET, current, None)
         if previous is None or previous == current:
             continue
@@ -660,7 +770,10 @@ async def evaluate_regime_rules(session: AsyncSession) -> int:
         )
         # Regime rules are market-wide — there is no ticker composite to
         # report, so send None rather than a placeholder 0.
-        await _fire(session, rule, user, _MARKET, msg, score=None)
+        consumed = await _fire(session, rule, user, _MARKET, msg, score=None)
+        _settle_crossings(
+            rule.id, rule_states, [(_MARKET, previous, previous_value)], consumed,
+        )
         fired += 1
         await session.commit()
 
@@ -848,7 +961,14 @@ async def _enabled_rules(session: AsyncSession, rule_type: str) -> list[tuple[Al
 
 
 def _debounced(rule: AlertRule, now: datetime) -> bool:
-    return bool(rule.last_fired_at and (now - _aware(rule.last_fired_at)) < MIN_FIRE_INTERVAL)
+    """True while `rule` is inside its post-fire quiet window.
+
+    Regime rules use the longer REGIME_MIN_FIRE_INTERVAL: they have no
+    hysteresis band, so the debounce is the only thing between a label
+    oscillating on its boundary and an alert per flip.
+    """
+    interval = REGIME_MIN_FIRE_INTERVAL if rule.rule_type == "regime" else MIN_FIRE_INTERVAL
+    return bool(rule.last_fired_at and (now - _aware(rule.last_fired_at)) < interval)
 
 
 # Delivery channel -> the tier feature that entitles a user to it. Mirrors the
@@ -989,6 +1109,36 @@ async def _email_cap_reached(session: AsyncSession, user: User) -> bool:
     return await _delivery_cap_reached(session, user, "email")
 
 
+async def _record_cap_suppression(
+    session: AsyncSession, user: User, rule: AlertRule, channel: str,
+) -> None:
+    """Log and instrument one alert dropped for hitting a daily cap.
+
+    A cap that only shows up as a red "failed" row in /app/alerts is a cap
+    nobody can act on — neither the user nor us. WARNING (not INFO) because a
+    real alert was withheld from a paying user: at ~2 crossings a day nothing
+    should ever reach 50, so a line here means either a rule set we did not
+    anticipate or a bug worth looking at.
+
+    `record_cap_hit` writes a CapEvent for FREE users only, by design — a paid
+    ceiling is not a free-to-paid conversion signal. Free users cannot reach
+    these caps today (their email cap is 0 and `_channel_entitled` refuses
+    their web push), so this is instrumentation for a policy change, not a
+    live counter. It is fire-and-forget and never raises. Only the email
+    channel is recorded, because "email_alerts" is the one delivery cap in
+    models.cap_events.CAP_NAMES — record_cap_hit drops an unknown name, and
+    filing a web-push suppression under the email name would be worse than
+    not filing it.
+    """
+    logger.warning(
+        "alert.suppressed_cap user=%s rule=%s tier=%s channel=%s cap=%s",
+        user.id, rule.id, user.tier, channel, daily_alert_cap(user, channel),
+    )
+    if channel == "email":
+        from app.services.cap_events import record_cap_hit
+        await record_cap_hit(session, user.id, "email_alerts", user.tier)
+
+
 async def _fire(
     session: AsyncSession,
     rule: AlertRule,
@@ -996,13 +1146,24 @@ async def _fire(
     symbol: str,
     message: str,
     score: float | None,
-) -> None:
+) -> bool:
     """Record the alert event and deliver it via the rule's configured channel.
 
     `score` is None for rule types that don't read the ticker's composite
     (news / congress / regime). The alert email omits the score line entirely
     in that case — it used to be passed a hardcoded 0, which rendered as a
     real-looking "Score · 0.0".
+
+    Returns whether the crossing was CONSUMED. True means the caller may
+    advance its stored side: the alert went out, or it was deliberately
+    withheld (email prefs, a channel the tier is not on, a daily cap) and
+    resending it later would not change that decision. False means the
+    delivery itself failed — the send raised, or the web push reached no
+    browser — and the caller should leave the side where it was so the
+    crossing is re-detected and retried (_settle_crossings, bounded by
+    MAX_DELIVERY_ATTEMPTS). Before this returned anything, every outcome was
+    treated as consumed: a send that raised wrote the event delivered=False,
+    the side advanced, and the user was never told the score had crossed.
     """
     message = _clip(message)
     event = AlertEvent(
@@ -1033,7 +1194,7 @@ async def _fire(
             "alert.suppressed_content_tier user=%s rule=%s type=%s tier=%s",
             user.id, rule.id, rule.rule_type, user.tier,
         )
-        return
+        return True
 
     # CHANNEL re-check at SEND time, not just at rule-creation time. Record the
     # event either way so the user can see in /app/alerts/history that the rule
@@ -1045,7 +1206,10 @@ async def _fire(
             "alert.suppressed_tier user=%s rule=%s tier=%s channel=%s",
             user.id, rule.id, user.tier, rule.channel,
         )
-        return
+        return True
+
+    # True unless a DELIVERY attempt fails; see the docstring.
+    consumed = True
 
     if rule.channel == "email":
         # Respect per-user email-prefs — alert emails are opt-out-able.
@@ -1064,10 +1228,7 @@ async def _fire(
             # DID fire, just skip the send. Rolls over at the next UTC midnight.
             event.delivered = False
             event.message = _clip(f"[suppressed: daily email alert cap reached] {message}")
-            logger.info(
-                "alert.suppressed_email_cap user=%s rule=%s tier=%s",
-                user.id, rule.id, user.tier,
-            )
+            await _record_cap_suppression(session, user, rule, "email")
         else:
             try:
                 html = render_alert_email(
@@ -1087,6 +1248,9 @@ async def _fire(
                 event.delivered = not res.get("skipped", False)
             except Exception:
                 logger.exception("alert.email_failed user=%s rule=%s", user.id, rule.id)
+                # A failed SEND is not a decision. Tell the caller to keep the
+                # stored side so the crossing is retried, rather than eating it.
+                consumed = False
     # SMS + Discord channels were retired 2026-05-04, and the Telegram channel
     # was retired 2026-08-11. The dispatch arms were removed but the underlying
     # service files + DB columns are kept so the channels can be re-enabled later
@@ -1096,10 +1260,7 @@ async def _fire(
             # Web push had no daily cap at all; see ALERT_DAILY_CEILING.
             event.delivered = False
             event.message = _clip(f"[suppressed: daily web push alert cap reached] {message}")
-            logger.info(
-                "alert.suppressed_web_push_cap user=%s rule=%s tier=%s",
-                user.id, rule.id, user.tier,
-            )
+            await _record_cap_suppression(session, user, rule, "web_push")
         else:
             try:
                 from sqlalchemy import select as _sel
@@ -1120,10 +1281,32 @@ async def _fire(
                     )
                     any_delivered = any_delivered or ok
                 event.delivered = any_delivered
+                if subs and not any_delivered:
+                    # Subscriptions exist and every one of them refused the
+                    # push. That is a delivery failure (a 410 nobody cleaned up
+                    # looks the same from here), so retry a bounded number of
+                    # times rather than eat the crossing.
+                    #
+                    # NO subscriptions is a different thing and stays consumed:
+                    # there is no transport to retry against, the user has not
+                    # subscribed a browser, and re-detecting the crossing every
+                    # 15 minutes would write a row per attempt forever without
+                    # ever reaching anyone. The event records that it fired.
+                    consumed = False
+                    logger.info(
+                        "alert.web_push_undelivered user=%s rule=%s subscriptions=%s",
+                        user.id, rule.id, len(subs),
+                    )
+                elif not subs:
+                    logger.info(
+                        "alert.web_push_no_subscription user=%s rule=%s", user.id, rule.id,
+                    )
             except Exception:
                 logger.exception("alert.web_push_failed user=%s rule=%s", user.id, rule.id)
+                consumed = False
 
     logger.info(
-        "alert.fired user=%s rule=%s type=%s symbol=%s channel=%s delivered=%s",
-        user.id, rule.id, rule.rule_type, symbol, rule.channel, event.delivered,
+        "alert.fired user=%s rule=%s type=%s symbol=%s channel=%s delivered=%s consumed=%s",
+        user.id, rule.id, rule.rule_type, symbol, rule.channel, event.delivered, consumed,
     )
+    return consumed

@@ -90,6 +90,24 @@ export const FREE_LIMITS = {
   savedScans: 1,
 } as const;
 
+/**
+ * Most alert DELIVERIES one account receives per channel per UTC day, on any
+ * plan. Mirrors backend `services/alerts.ALERT_DAILY_CEILING` ({email: 50,
+ * web_push: 50}); a plan's own lower cap still applies first, so Pro email
+ * stays 10/day.
+ *
+ * Every surface on this site called Premium alerts "unlimited", and until
+ * 2026-09-18 that was almost true in the wrong direction: the only limit on
+ * Premium email was 10,000/day and web push had none at all, which is how one
+ * user received 566 alert emails in a day and another 258 pushes. Alerts are
+ * now edge-triggered, and this ceiling is the flood guard underneath every
+ * plan. It is far above real usage — replaying the live rules gives at most
+ * two crossings per user per day — but it is a number, so we print the number
+ * instead of the word "unlimited". Anything that states an alert allowance
+ * reads it from here.
+ */
+export const ALERT_DAILY_CEILING = 50;
+
 /*
  * NO ANONYMOUS LOOK-UP ALLOWANCE IS STATED ANYWHERE (T-08, 2026-09-14).
  *

@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 // rather than be retyped here — that retyping is exactly how the Free column
 // drifted from the backend last time.
 import {
+  ALERT_DAILY_CEILING,
   PRICING,
   REFUND,
   annualSaving,
@@ -116,7 +117,7 @@ const PLANS = [
     proPlus: true,
     highlights: [
       `Recent insider buys — SEC Form 4 filings across ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} tickers`,
-      "Email alerts · unlimited (Pro: 10/day)",
+      `Email alerts · up to ${ALERT_DAILY_CEILING}/day (Pro: 10/day)`,
       "Public API access · 1,000 requests/day",
       "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
       "Priority support · same-day reply",
