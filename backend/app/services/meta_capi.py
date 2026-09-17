@@ -235,13 +235,17 @@ def fbc_value(fbclid: str | None, click_time: datetime | None = None) -> str | N
     involved and only the stored fbclid survives. A second construction site
     is a second thing to get wrong silently.
 
-    The cost of that choice, stated plainly: `click_time` is the caller's best
-    available proxy for the click (in practice the account's `created_at`),
-    and first-touch capture holds an fbclid for up to 30 days — so on a
-    delayed signup the timestamp can trail the real click by that much. Meta
-    documents falling back to observation time when the true click time is
-    unavailable, and matches primarily on the fbclid itself, so an approximate
-    timestamp degrades nothing; an absent or malformed `_fbc` would.
+    The cost of that choice, stated plainly: `click_time` is only as good as
+    what the caller can offer. `remember_browser` passes the instant the
+    browser reports capturing the click; the signup-time fallback is the
+    account's `created_at`, and first-touch capture holds an fbclid for up to
+    30 days, so on a delayed signup that can trail the real click by as much.
+    Meta documents falling back to observation time when the true click time
+    is unavailable, and matches primarily on the fbclid itself, so an
+    approximate timestamp degrades nothing; an absent or malformed `_fbc`
+    would. `remember_browser` does read the timestamp back, though
+    (`click_time_ms`), to order two clicks — so a proxy stamp there means a
+    replacement decision made on a proxy.
 
     Returns None for an empty fbclid so callers can omit the key entirely.
     """
@@ -317,6 +321,20 @@ def client_ip_ua_enabled() -> bool:
     return (os.getenv("META_CAPI_SEND_IP_UA") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+# Address ranges that can only ever be an internal hop, never a visitor:
+# RFC1918, carrier-grade NAT, and IPv6 unique-local — which is where Fly's own
+# private 6PN network (fdaa::/16) lives. Listed explicitly rather than using
+# `is_private`, whose definition also covers the documentation ranges (192.0.2,
+# 198.51.100, 203.0.113) that are a normal, public-shaped address to test with.
+_PRIVATE_NETWORKS = (
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("fc00::/7"),
+)
+
+
 def client_context(request: Any) -> tuple[str | None, str | None]:
     """(client_ip_address, client_user_agent) of the browser behind `request`.
 
@@ -329,7 +347,12 @@ def client_context(request: Any) -> tuple[str | None, str | None]:
     set by Fly's proxy from the real TCP peer, so a client cannot forge it.
     A loopback, unspecified, link-local or multicast address (local dev, the
     ASGI test client) is not a visitor and is dropped, as is a user agent that
-    is empty, overlong or carries control characters."""
+    is empty, overlong or carries control characters, and so is an address
+    from a private range (`_PRIVATE_NETWORKS`). In production `Fly-Client-IP`
+    is always the public peer, so that last one is defence in depth: it means
+    a future deployment behind a proxy, or a reader of the header that falls
+    back to the socket, stores nothing rather than storing an address that
+    identifies no visitor and would only ever dilute Meta's matching."""
     ip: str | None = None
     try:
         from app.services.rate_limit import client_ip
@@ -338,6 +361,7 @@ def client_context(request: Any) -> tuple[str | None, str | None]:
         if not (
             addr.is_loopback or addr.is_unspecified or addr.is_link_local
             or addr.is_multicast or addr.is_reserved
+            or any(addr in net for net in _PRIVATE_NETWORKS if net.version == addr.version)
         ):
             ip = str(addr)
     except (ValueError, AttributeError, TypeError):
@@ -356,6 +380,39 @@ def client_context(request: Any) -> tuple[str | None, str | None]:
     return (ip if ip and len(ip) <= CLIENT_IP_MAX else None), ua
 
 
+def click_time_ms(value: str | None) -> int | None:
+    """The click instant inside an `fb.<n>.<ms>.<token>` value, or None.
+
+    Every stored `fbc` carries the time of the click it describes — the
+    pixel's cookie because Meta wrote it there, ours because `fbc_value`
+    builds it that way. That field is the only thing that can order two
+    clicks, so it is parsed rather than trusted by arrival order."""
+    if not isinstance(value, str):
+        return None
+    parts = value.split(".")
+    if len(parts) < 4 or not parts[2].isdigit():
+        return None
+    return int(parts[2])
+
+
+# A capture time the browser reports has to be a plausible wall-clock instant:
+# after 2001 (when 13-digit epoch ms began) and no more than a day ahead of us,
+# which allows for a skewed client clock without letting one park a click in
+# the future where nothing could ever replace it.
+_CLICK_MS_FLOOR = 1_000_000_000_000
+_CLICK_MS_SKEW_ALLOWANCE = 86_400_000
+
+
+def _reported_click_ms(raw: Any) -> int | None:
+    """When the browser says it first saw a bare `fbclid`, in epoch ms."""
+    if not isinstance(raw, int) or isinstance(raw, bool):
+        return None
+    now_ms = int(datetime.now(UTC).timestamp() * 1000)
+    if raw < _CLICK_MS_FLOOR or raw > now_ms + _CLICK_MS_SKEW_ALLOWANCE:
+        return None
+    return raw
+
+
 def remember_browser(
     user: Any,
     request: Any | None = None,
@@ -363,6 +420,7 @@ def remember_browser(
     fbp: str | None = None,
     fbc: str | None = None,
     fbclid: str | None = None,
+    fbclid_at: int | None = None,
 ) -> None:
     """Store the latest browser match keys on `user` (the caller commits).
 
@@ -371,11 +429,22 @@ def remember_browser(
     * `fbp` replaces the stored value only when a valid one arrived: a
       browser with the pixel blocked sends none, and the older value still
       identifies this person's other browser.
-    * `fbc` (P3): an `_fbc` cookie wins. Otherwise a raw `fbclid` that is not
-      the first-touch `signup_fbclid`, and not the click already stored, is a
-      newer click: it is stored as `fb.1.<now>.<fbclid>`. The browser cannot
-      say when it saw that click, and Meta documents falling back to the time
-      it was observed. `signup_fbclid` itself is never written here.
+    * `fbc` (P3): Meta wants the LATEST click, and "arrived most recently" is
+      not the same thing. The two browser-side captures disagree by design —
+      `lib/utm.ts` holds the FIRST click for 30 days, while the pixel's `_fbc`
+      cookie follows the latest — and Safari caps a script-written cookie at
+      7 days, so a later request routinely carries the older stored click and
+      no cookie at all. So a stored click is replaced only by one that can be
+      shown to be newer, comparing the click instants the values carry:
+      - an `_fbc` cookie arrives with its own timestamp and is preferred over
+        any bare `fbclid` in the same request, but still has to be at least as
+        recent as what is stored;
+      - a bare `fbclid` is stamped with `fbclid_at`, when the browser saw it,
+        and may replace a stored click only when that is later. With nothing
+        stored it is taken as-is (falling back to now, which Meta documents,
+        when the browser sent no time).
+      `signup_fbclid` — first-touch, and a different question — is never
+      written here and never replaces a stored click.
 
     No-op while Meta is not configured — the values have no other use — and
     the IP address and user agent additionally wait for
@@ -389,22 +458,34 @@ def remember_browser(
         fbp_value = browser_id(fbp, max_len=FBP_MAX)
         if fbp_value:
             user.meta_fbp = fbp_value
+        stored = getattr(user, "meta_fbc", None) or ""
+        stored_ms = click_time_ms(stored)
         fbc_cookie = browser_id(fbc, max_len=FBC_MAX)
         if fbc_cookie:
-            user.meta_fbc = fbc_cookie
+            cookie_ms = click_time_ms(fbc_cookie)
+            if stored_ms is None or (cookie_ms is not None and cookie_ms >= stored_ms):
+                user.meta_fbc = fbc_cookie
             return
         click = fbclid.strip() if isinstance(fbclid, str) else ""
-        if (
+        if not (
             click
             and len(click) <= _FBCLID_MAX
             and click.isascii()
             and _CLICK_ID_RE.match(click)
             and click != (getattr(user, "signup_fbclid", None) or "")
-            and not (getattr(user, "meta_fbc", None) or "").endswith(f".{click}")
+            and not stored.endswith(f".{click}")
         ):
-            newer = fbc_value(click)
-            if newer and len(newer) <= FBC_MAX:
-                user.meta_fbc = newer
+            return
+        seen_ms = _reported_click_ms(fbclid_at)
+        if stored and (seen_ms is None or stored_ms is None or seen_ms <= stored_ms):
+            # Nothing here shows this click is the later one. Keeping what we
+            # have is the safe half of the trade: a stale click id matches the
+            # wrong ad, a missing one only costs match quality.
+            return
+        seen = datetime.fromtimestamp(seen_ms / 1000, UTC) if seen_ms is not None else None
+        newer = fbc_value(click, seen)
+        if newer and len(newer) <= FBC_MAX:
+            user.meta_fbc = newer
     except Exception:
         logger.exception("meta_capi.remember_browser_failed")
 

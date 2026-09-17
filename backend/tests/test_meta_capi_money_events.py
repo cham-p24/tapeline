@@ -505,6 +505,37 @@ async def test_a_direct_paid_checkout_is_never_counted_again_at_its_invoices(mon
     assert await _latch(f"first_charge_conversion:{sub_id}")
 
 
+async def test_a_discounted_first_charge_reports_what_was_actually_paid(monkeypatch, meta_on, ga4_on):
+    """The value is the invoice's `amount_paid`, never the plan's price.
+
+    Blueprint P5 says "why the invoice" for exactly this: a referral, win-back
+    or save-offer coupon makes the two numbers differ. Here the line is the
+    $19.99 plan but $9.99 was collected. Reading the plan price instead would
+    overstate revenue on every discounted conversion and teach Meta's delivery
+    model to bid for money the business never received - and it is the mistake
+    that looks right, because on a full-price charge the two agree, which is
+    all every other fixture in this file exercises.
+    """
+    st = Stripe(monkeypatch)
+    u = await _user()
+    sub_id = f"sub_{uuid.uuid4().hex[:24]}"
+
+    # amount_paid 999 against a 1999 plan line: half off the first month.
+    first = await _trial_to_first_charge(st, u, sub_id=sub_id, amount=999)
+    assert first["lines"]["data"][0]["amount"] == 1999, (
+        "the fixture must price the plan above what was paid, or it proves nothing"
+    )
+
+    subs = meta_events("Subscribe")
+    assert len(subs) == 1, f"expected one Subscribe at the first real charge, got {len(subs)}"
+    assert subs[0]["custom_data"] == {"value": 9.99, "currency": "USD"}, (
+        "Subscribe carried the plan's price, not what the invoice actually collected"
+    )
+    assert [p["value"] for p in ga4_purchases()] == [9.99], (
+        "the GA4 purchase carried the plan's price, not what the invoice actually collected"
+    )
+
+
 async def test_a_discounted_first_month_that_was_not_a_trial_sends_no_subscribe(monkeypatch, meta_on, ga4_on):
     """A 100%-off referral month also charges $0 at checkout. It is not a trial:
     it keeps its (zero) Purchase and its later first charge is no Subscribe."""
@@ -594,6 +625,54 @@ async def test_an_established_subscription_is_not_reported_at_renewal(monkeypatc
 
     assert st.trial_calls == [sub_id], "the renewal never reached the first-charge decision"
     assert meta_events("Subscribe") == [] and ga4_purchases() == []
+
+
+async def test_losing_the_latch_race_sends_nothing(monkeypatch, meta_on, ga4_on, caplog):
+    """Two deliveries of one invoice can be in flight at once — a Stripe retry
+    that overlaps the first attempt, or two machines. The latch INSERT is the
+    arbiter, and whichever loses it must send nothing: the winner is already
+    sending, and Meta and GA4 would otherwise each count the charge twice.
+
+    The race is real here, not simulated. The other worker writes the latch
+    row from its own session while this one is still asking Stripe whether the
+    subscription began with a trial — after the existence check, before the
+    claim, which is the only window where the two can collide.
+
+    Losing is also an ORDINARY outcome, not a failure: it must leave the
+    `claim_lost` line and no exception. That distinction is what keeps the
+    "claim, then send" order honest — code that sends anyway only looks
+    harmless here because the rolled-back session then errors on its own."""
+    from app.routers import webhooks as webhooks_mod
+
+    st = Stripe(monkeypatch)
+    u = await _user()
+    sub_id = f"sub_{uuid.uuid4().hex[:24]}"
+    latch_id = f"first_charge_conversion:{sub_id}"
+    st.trial[sub_id] = True
+    real_trial_lookup = webhooks_mod.subscription_started_with_trial
+
+    async def _other_worker_gets_there_first(sub):
+        async with session_scope() as s:
+            already = (await s.execute(
+                select(StripeWebhookEvent).where(StripeWebhookEvent.id == latch_id)
+            )).scalar_one_or_none()
+            if already is None:
+                s.add(StripeWebhookEvent(id=latch_id, event_type="first_charge_conversion"))
+        return await real_trial_lookup(sub)
+
+    monkeypatch.setattr(webhooks_mod, "subscription_started_with_trial", _other_worker_gets_there_first)
+
+    with caplog.at_level("INFO", logger="app.routers.webhooks"):
+        await _trial_to_first_charge(st, u, sub_id=sub_id)
+
+    assert meta_events("Subscribe") == [], "the charge was sent to Meta by the worker that lost the claim"
+    assert ga4_purchases() == [], "the charge was sent to GA4 by the worker that lost the claim"
+    assert await _latch(latch_id), "the winning claim was rolled back along with the loser's"
+    log = caplog.text
+    assert "first_charge_conversion_claim_lost" in log, "the lost claim was not recognised as such"
+    assert "first_charge_conversion_failed" not in log, (
+        "losing the race left an exception behind; it is a normal outcome, not an error"
+    )
 
 
 # ── P1-P3: browser keys, captured from the browser, sent on every event ─────
@@ -798,6 +877,64 @@ async def test_a_newer_fbclid_at_checkout_wins_over_first_touch(monkeypatch, met
     assert (await _row(u["id"])).signup_fbclid == "FirstTouchClick"
 
 
+# The two browser-side captures disagree on purpose, and that is the whole
+# difficulty of P3. `lib/utm.ts` keeps the FIRST click it sees for 30 days;
+# Meta's `_fbc` cookie follows the LATEST. Safari's tracking protection caps a
+# script-written cookie at 7 days, so a later checkout routinely carries the
+# older localStorage click and no cookie at all. "Arrived most recently" is
+# therefore not the same as "is the most recent click", and only the second
+# one is what Meta is asking for.
+CLICK_C = "fb.1.1758000000000.ClickC"          # seen 2025-09-16
+CLICK_B_SEEN_MS = 1757000000000                 # seen 2025-09-04, before C
+
+
+async def test_an_older_click_never_replaces_the_newer_one_already_stored(monkeypatch, meta_on):
+    u = await _user(linked=False)
+
+    # Checkout 1: the pixel's cookie (click C) and the browser's older stored
+    # click (B) arrive in the same request. The cookie is the later click.
+    await _checkout_request(monkeypatch, u["id"], body={
+        "fbc": CLICK_C, "fbclid": "ClickB", "fbclid_at": CLICK_B_SEEN_MS,
+    })
+    assert getattr(await _row(u["id"]), "meta_fbc", None) == CLICK_C, (
+        "the pixel's own cookie is the latest click and must win over a bare fbclid"
+    )
+
+    # Checkout 2: the cookie has expired, so only the older click B is left.
+    await _checkout_request(monkeypatch, u["id"], body={
+        "fbclid": "ClickB", "fbclid_at": CLICK_B_SEEN_MS,
+    })
+    assert getattr(await _row(u["id"]), "meta_fbc", None) == CLICK_C, (
+        "an older click replaced the newer one, and was stamped as if it were fresh"
+    )
+
+    # Checkout 3: the same old click with no capture time at all. Nothing can
+    # show it is newer, so the stored click stands.
+    await _checkout_request(monkeypatch, u["id"], body={"fbclid": "ClickB"})
+    assert getattr(await _row(u["id"]), "meta_fbc", None) == CLICK_C
+
+    # Checkout 4: a cookie from a browser whose last Meta click is older than
+    # the stored one — same rule, it is not an upgrade.
+    await _checkout_request(monkeypatch, u["id"], body={"fbc": "fb.1.1757100000000.ClickA"})
+    assert getattr(await _row(u["id"]), "meta_fbc", None) == CLICK_C
+
+
+async def test_a_click_seen_after_the_stored_one_replaces_it_at_its_own_time(monkeypatch, meta_on):
+    """The other half: a genuinely newer click must still get through, and it
+    is stamped with when the browser saw it, not with when it reached us."""
+    u = await _user(linked=False)
+    later_ms = 1758600000000  # 2025-09-23, after CLICK_C
+
+    await _checkout_request(monkeypatch, u["id"], body={"fbc": CLICK_C})
+    await _checkout_request(monkeypatch, u["id"], body={
+        "fbclid": "ClickD", "fbclid_at": later_ms,
+    })
+
+    assert getattr(await _row(u["id"]), "meta_fbc", None) == f"fb.1.{later_ms}.ClickD", (
+        "a newer click was either dropped or restamped with the time it arrived"
+    )
+
+
 async def test_malformed_or_non_browser_values_are_neither_stored_nor_sent(monkeypatch, meta_on, ip_ua_on):
     st = Stripe(monkeypatch)
     u = await _user(linked=False, signup_fbclid="FirstTouchClick")
@@ -871,6 +1008,53 @@ async def test_ip_and_user_agent_wait_for_their_own_switch(monkeypatch, meta_on)
 
 
 # ── the service contract ────────────────────────────────────────────────────
+
+async def test_a_data_export_shows_the_browser_keys_we_hold(monkeypatch, meta_on, ip_ua_on):
+    """GDPR Art. 15: an IP address and a user agent are personal data, so a
+    subject asking what we hold has to be able to see the ones we kept for
+    Meta. The answer must not depend on whether sending them is switched on."""
+    u = await _user(linked=False)
+    await _checkout_request(monkeypatch, u["id"], body={"fbp": BROWSER_FBP, "fbc": BROWSER_FBC})
+
+    async def _export() -> dict:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+            cookies={SESSION_COOKIE: issue_session_token(u["id"], 0)},
+        ) as c:
+            r = await c.get("/api/account/export")
+        assert r.status_code == 200, r.text
+        return json.loads(r.content)
+
+    held = (await _export()).get("advertising_identifiers", {})
+    assert held.get("meta_client_ip") == BROWSER_IP, "a stored IP address was left out of the export"
+    assert held.get("meta_client_user_agent") == BROWSER_UA
+    assert held.get("meta_fbp") == BROWSER_FBP
+    assert held.get("meta_fbc") == BROWSER_FBC
+
+    # Switching sending off stops the events carrying them; it does not make
+    # the stored values disappear from a subject-access request.
+    monkeypatch.delenv("META_CAPI_SEND_IP_UA")
+    assert (await _export())["advertising_identifiers"]["meta_client_ip"] == BROWSER_IP
+
+
+def test_an_internal_hop_is_not_a_visitors_address(ip_ua_on):
+    """Defence in depth. On Fly, `Fly-Client-IP` is always the public peer, so
+    nothing private should reach here. If that ever changes — a proxy in front,
+    or a header reader that falls back to the socket — the address identifies
+    no visitor: storing it would dilute Meta's matching and put an internal
+    address on an account row for nothing."""
+    def _req(ip: str) -> SimpleNamespace:
+        return SimpleNamespace(headers=httpx.Headers({"Fly-Client-IP": ip, "user-agent": BROWSER_UA}))
+
+    for private in ("10.1.2.3", "172.16.4.5", "192.168.0.7", "100.64.9.9", "fdaa:0:1::3"):
+        assert meta_capi.client_context(_req(private))[0] is None, private
+    # A real public address still goes through, including the documentation
+    # ranges the rest of this file tests with.
+    for public in (BROWSER_IP, "8.8.8.8", "2001:db8::1"):
+        assert meta_capi.client_context(_req(public))[0] == public, public
+    # The user agent is unaffected by any of it.
+    assert meta_capi.client_context(_req("10.1.2.3"))[1] == BROWSER_UA
+
 
 async def test_ip_and_user_agent_go_on_the_wire_unhashed_and_only_when_present(meta_on):
     await meta_capi.send_event(

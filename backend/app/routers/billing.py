@@ -159,12 +159,15 @@ class CheckoutRequest(BaseModel):
     start_trial: bool = False
     # Meta browser keys read on the page that starts the checkout (blueprint
     # P2/P3): the `_fbp` and `_fbc` cookies Meta's pixel wrote, and the
-    # latest fbclid lib/utm.ts holds. Validated and stored by
+    # fbclid lib/utm.ts holds with the epoch-millisecond instant it captured
+    # it — which is what lets the server tell an older click from a newer one
+    # rather than believing whichever arrived last. Validated and stored by
     # meta_capi.remember_browser; never required, and the generous limits are
     # so an odd cookie can never 422 a checkout.
     fbp: str | None = Field(None, max_length=4096)
     fbc: str | None = Field(None, max_length=4096)
     fbclid: str | None = Field(None, max_length=4096)
+    fbclid_at: int | None = None
 
 
 @router.post("/checkout", dependencies=[Depends(limit_strict)])
@@ -317,6 +320,7 @@ async def create_checkout(
 
     meta_capi.remember_browser(
         user, request, fbp=body.fbp, fbc=body.fbc, fbclid=body.fbclid,
+        fbclid_at=body.fbclid_at,
     )
     await session.commit()
     # `trial_end` is echoed back so the caller can restate the first-charge

@@ -76,9 +76,12 @@ type SignupExtras = {
   // 7-day click window. Optional — only paid Meta clicks carry it.
   fbclid?: string;
   // Meta's `_fbp` browser cookie, read at submit via
-  // lib/utm.ts:readFbpCookie(). NOT persisted — forwarded straight onto the
-  // server-side CompleteRegistration event as the second unhashed identifier
-  // Meta matches on. Absent whenever the pixel was blocked or never ran.
+  // lib/utm.ts:readFbpCookie(). Goes onto the server-side
+  // CompleteRegistration event as the second unhashed identifier Meta matches
+  // on, and the backend keeps the latest value as users.meta_fbp so the
+  // StartTrial / Purchase / Subscribe events that Stripe webhooks fire days
+  // later can carry it too — there is no browser present for those. Absent
+  // whenever the pixel was blocked or never ran.
   fbp?: string;
   // Self-reported "How did you hear about us?" — optional free text from the
   // signup form. Backend writes it to users.referral_source. The only

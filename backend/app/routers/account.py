@@ -38,6 +38,19 @@ async def export_my_data(
     bundle = {
         "exported_at": user.updated_at.isoformat(),
         "user": {"id": user.id, "email": user.email, "name": user.name, "tier": user.tier, "created_at": user.created_at.isoformat()},
+        # The browser identifiers kept for Meta's Conversions API (migration
+        # 0072). An IP address and a user agent are personal data under GDPR
+        # Art. 4, so an Art. 15 request has to be able to see them — and a
+        # subject who asks what we hold about them should get the same answer
+        # whether or not META_CAPI_SEND_IP_UA happens to be on, so these are
+        # read unconditionally. Meta's `_fbp`/`_fbc` are the pixel's own
+        # cookie values, reported for the same reason.
+        "advertising_identifiers": {
+            "meta_client_ip": user.meta_client_ip,
+            "meta_client_user_agent": user.meta_client_user_agent,
+            "meta_fbp": user.meta_fbp,
+            "meta_fbc": user.meta_fbc,
+        },
         "watchlist": [{"symbol": w.symbol, "note": w.note, "baseline_score": w.baseline_score, "added_at": w.added_at.isoformat()} for w in wl],
         "alert_rules": [{"name": r.name, "rule_type": r.rule_type, "symbol": r.symbol, "threshold": r.threshold, "channel": r.channel, "created_at": r.created_at.isoformat()} for r in rules],
         "alert_events": [{"symbol": e.symbol, "message": e.message, "channel": e.channel, "delivered": e.delivered, "created_at": e.created_at.isoformat()} for e in events],

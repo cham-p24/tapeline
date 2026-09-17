@@ -470,10 +470,13 @@ function SignUpForm() {
       // puts every first charge outside Meta's 7-day click window, joining it
       // to our own Stripe rows is the only honest way to count Meta payers.
       const fbclid = getStoredFbclid();
-      // Meta's own `_fbp` cookie, if its pixel wrote one. Not stored anywhere
-      // — forwarded once so the server-side registration event carries both
-      // unhashed identifiers Meta matches on. Empty whenever the pixel was
-      // blocked, which is common in this audience and must not matter.
+      // Meta's own `_fbp` cookie, if its pixel wrote one. The server-side
+      // registration event carries it as the second unhashed identifier Meta
+      // matches on, and the backend keeps the latest value (users.meta_fbp)
+      // for StartTrial, Purchase and Subscribe — those fire from Stripe
+      // webhooks days later, with no browser to read a cookie from. Empty
+      // whenever the pixel was blocked, which is common in this audience and
+      // must not matter.
       const fbp = readFbpCookie();
       // First-touch external referrer HOSTNAME captured on landing — the
       // only attribution trace AI-assistant referrals (Copilot etc.) leave,

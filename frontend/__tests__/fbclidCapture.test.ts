@@ -6,20 +6,23 @@
  *   - Event Match Quality plateaus around 5-6, because the Conversions API
  *     has only a hashed email and a hashed user id to match on.
  *   - The fbclid -> User -> Stripe join cannot exist — and it is the ONLY
- *     honest Meta payer count, since a 14-day trial puts every first charge
+ *     honest Meta payer count, since a 30-day trial puts every first charge
  *     outside Meta's 7-day click window by construction.
  *
  * Same contract as the gclid / referrer-host / landing-path captures it
  * clones: first-touch, 30-day TTL, storage-failure-tolerant.
  *
  * `readFbpCookie` is separate on purpose: `_fbp` belongs to Meta's pixel, not
- * to us — we read it at submit and never persist it.
+ * to us — we only read it. The backend does store the latest value it is sent
+ * (users.meta_fbp), because the events Stripe webhooks fire days later have no
+ * browser to read a cookie from.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   captureFbclidFromLocation,
   clearStoredFbclid,
   getStoredFbclid,
+  getStoredFbclidCapturedAt,
   metaCheckoutIds,
   readFbcCookie,
   readFbpCookie,
@@ -159,15 +162,45 @@ describe("metaCheckoutIds", () => {
 
   it("sends the pixel's cookies and the click id this browser holds", () => {
     setCookie("_fbp=fb.1.1755900000000.987654321; _fbc=fb.1.1757950000000.IwAR0-Latest");
+    const capturedAt = Date.now() - 3 * 24 * 60 * 60 * 1000;
     window.localStorage.setItem(
       KEY,
-      JSON.stringify({ fbclid: "IwAR0-Stored", captured_at: Date.now() }),
+      JSON.stringify({ fbclid: "IwAR0-Stored", captured_at: capturedAt }),
     );
     expect(metaCheckoutIds()).toEqual({
       fbp: "fb.1.1755900000000.987654321",
       fbc: "fb.1.1757950000000.IwAR0-Latest",
       fbclid: "IwAR0-Stored",
+      fbclid_at: capturedAt,
     });
+  });
+
+  it("says WHEN it saw the click, so a stale one cannot pose as the newest", () => {
+    // This capture is first-touch and can be 30 days old, while the pixel's
+    // _fbc cookie follows the latest click and expires after 7. Without the
+    // capture time the server had to stamp this click with the moment it
+    // arrived, and an old click then outranked the newer one already stored.
+    const threeWeeksAgo = Date.now() - 21 * 24 * 60 * 60 * 1000;
+    window.localStorage.setItem(
+      KEY,
+      JSON.stringify({ fbclid: "IwAR0-Old", captured_at: threeWeeksAgo }),
+    );
+    expect(metaCheckoutIds()).toEqual({
+      fbclid: "IwAR0-Old",
+      fbclid_at: threeWeeksAgo,
+    });
+    expect(getStoredFbclidCapturedAt()).toBe(threeWeeksAgo);
+
+    // Expired, malformed or absent: the click goes without a time rather than
+    // with a made-up one, and an untimed click never displaces a stored one.
+    window.localStorage.setItem(
+      KEY,
+      JSON.stringify({ fbclid: "IwAR0-Old", captured_at: "yesterday" }),
+    );
+    expect(getStoredFbclidCapturedAt()).toBe(0);
+    expect(metaCheckoutIds()).toEqual({});
+    window.localStorage.clear();
+    expect(getStoredFbclidCapturedAt()).toBe(0);
   });
 
   it("sends nothing it does not have (pixel blocked, no click)", () => {
