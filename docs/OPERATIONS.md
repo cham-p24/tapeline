@@ -204,7 +204,7 @@ SMS on a high-frequency rule — every message is billed.
 
 The Quiver subscription was cancelled. `services/quiver_feed.py`, the `_refresh_elite_13f` worker task, the `InstitutionalHolding` model and the `quiver_api_key` setting are all deleted, so setting `QUIVER_API_KEY` activates nothing. The `institutional_holdings` table is left behind as a harmless orphan.
 
-`/app/holdings` is now the **Recent insider buys** surface — SEC Form 4 transactions from Finnhub, refreshed daily. It needs only `FINNHUB_API_KEY`, which is already set. `/api/holdings/funds` is a legacy empty stub kept for frontend compatibility.
+`/app/holdings` is now the **Recent insider buys** surface — SEC Form 4 transactions read from SEC EDGAR (since 14 September 2026, #835/#837), each stock re-read about every two days and ETFs about monthly. It needs no vendor key: EDGAR is public, and the pass identifies itself with a declared User-Agent instead. `/api/holdings/funds` is a legacy empty stub kept for frontend compatibility.
 
 ### Step 7 — Google + Microsoft OAuth (Both free, 30 minutes total)
 
@@ -295,7 +295,7 @@ UPDATE users SET tier = 'free' WHERE email = 'user@example.com';
 Look for these tick lines:
 - `tick.done snapshots=N squeezes=N regime=X trades_added=N elapsed=Ns`
 - `alerts.fired count=N` (when alert rules trigger)
-- `insider.refreshed scored=N score_cache=N feed_size=N` (daily; SEC Form 4 via Finnhub)
+- `insider.refreshed scored=N cleared=N cleared_with_filings=N attempted=N score_cache=N feed_size=N` (daily pass; SEC Form 4 from SEC EDGAR)
 - `trial.downgraded count=N` (hourly check; usually 0)
 - `drip.sent day3=N day7=N day13=N` (daily)
 
