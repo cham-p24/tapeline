@@ -52,6 +52,31 @@ export const VERIFIED_MISSING_SESSIONS: MissingSession[] = [
   },
 ];
 
+/**
+ * The verified missing sessions as one phrase, e.g. "31 August, 2 September,
+ * 4 September and 9 September 2026". For copy outside /scorecard that has to
+ * name the gaps where it describes the daily list (#842 follow-up,
+ * 2026-09-17). Derived from the list above so the two cannot disagree; the
+ * year is printed once when every date shares it.
+ */
+export function verifiedMissingSessionsLabel(
+  sessions: readonly MissingSession[] = VERIFIED_MISSING_SESSIONS,
+): string {
+  const dates = sessions.map((s) => new Date(`${s.date}T00:00:00Z`));
+  const oneYear = new Set(dates.map((d) => d.getUTCFullYear())).size === 1;
+  const parts = dates.map((d) =>
+    d.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      ...(oneYear ? {} : { year: "numeric" }),
+      timeZone: "UTC",
+    }),
+  );
+  const joined =
+    parts.length <= 1 ? parts.join("") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return oneYear && dates.length > 0 ? `${joined} ${dates[0].getUTCFullYear()}` : joined;
+}
+
 export type Correction = {
   /** Date the recorded values were changed (ISO). */
   date: string;

@@ -263,7 +263,7 @@ export function organizationJsonLd() {
     alternateName: "Tapeline.io",
     slogan: "Read the tape",
     description:
-      `Tapeline is a transparent quantitative stock scanner for US equities and ETFs. Every actively-traded ticker gets one 0-100 composite score from six named, publicly-documented factors (trend, relative strength, fundamentals, smart money, macro, momentum). Prices are ${PRICE_DELAY_PHRASE}; during US market hours every covered stock and ETF is re-read ${PASS_CADENCE_PHRASE}, and most score inputs are daily readings, so a score usually changes about once a day. Every top-10 daily pick is logged to a public scorecard and back-checked against SPY the next session.`,
+      `Tapeline is a transparent quantitative stock scanner for US equities and ETFs. Every actively-traded ticker gets one 0-100 composite score from six named, publicly-documented factors (trend, relative strength, fundamentals, smart money, macro, momentum). Prices are ${PRICE_DELAY_PHRASE}; during US market hours every covered stock and ETF is re-read ${PASS_CADENCE_PHRASE}, and most score inputs are daily readings, so a score usually changes about once a day. Each recorded daily top 10 is logged to a public scorecard and back-checked against SPY the next session.`,
     url: "https://tapeline.io",
     logo: "https://tapeline.io/favicon.svg",
     foundingDate: "2026",

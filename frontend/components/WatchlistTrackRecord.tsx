@@ -10,7 +10,7 @@ import { PaywallModal } from "@/components/Paywall";
 /**
  * "Track record" section on /app/watchlist — the Premium blend of the watchlist
  * and the scorecard. For each watched ticker it shows the live score plus the
- * ticker's own next-day-vs-SPY record (frozen daily), reusing the
+ * ticker's own next-day-vs-SPY record (recorded after each US close the job runs), reusing the
  * public scorecard's row shape + colour rules.
  *
  * Gating: a canUse() branch (NOT a <Paywall> blur) — Free/Pro get a real
@@ -208,7 +208,7 @@ export function WatchlistTrackRecord() {
           onClose={() => setPayOpen(false)}
           feature="watchlist.track_record"
           heading="Your watchlist's track record is Premium"
-          description="Each watched ticker frozen daily and back-checked next-day-vs-SPY — your own picks, on the record."
+          description="Each watched ticker recorded after the US close and back-checked next-day-vs-SPY — your own picks, on the record."
         />
       </section>
     );
@@ -225,7 +225,8 @@ export function WatchlistTrackRecord() {
       <h2 className="text-lg font-semibold tracking-tight">Track record</h2>
       <p className="mt-1 text-sm text-muted">
         How each of your watched tickers has done since you added it — next-day
-        move vs SPY, frozen each session. Same method as the public scorecard.
+        move vs SPY, recorded after the US close; a session the recording job missed has no row.
+        Same method as the public scorecard.
       </p>
       {!anyRecord && (
         <p className="mt-2 text-xs text-subtle">

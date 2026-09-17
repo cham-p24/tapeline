@@ -271,8 +271,8 @@ export default async function DailyPicksPage() {
               <p className="mt-1 text-sm text-muted leading-relaxed">
                 Trend, RS, Fundamentals, Smart Money, Macro, Momentum — weighted
                 in a <Link href="/how-it-works" className="text-accent hover:underline">published order</Link>{" "}
-                (most toward Trend and Relative Strength, least toward Momentum) and back-checked
-                vs SPY every day.
+                (most toward Trend and Relative Strength, least toward Momentum). Each recorded
+                daily top 10 is back-checked vs SPY the next session.
               </p>
             </div>
             <div>

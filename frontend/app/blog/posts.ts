@@ -1483,7 +1483,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
 
       <h3>1. Feature depth</h3>
 
-      <p><strong>Finviz Elite</strong> wins on raw filter count — 70+ <!-- copy-compliance-allow false-data-freshness -- describes Finviz Elite's paid plan, not Tapeline's data (Tapeline prices are delayed about 15 minutes) -->
+      <p><strong>Finviz Elite</strong> wins on raw filter count — 70+ ${/* copy-compliance-allow false-data-freshness -- next line describes Finviz Elite's paid plan, not Tapeline's data (Tapeline prices are delayed about 15 minutes). A JS comment in an empty interpolation, so it never reaches the rendered HTML. */ ""}
       screening criteria, real-time data, advanced charting, custom
       groups. If you're the type who wants to express a thesis as a
       seven-condition AND-filter, it's hard to beat.</p>
@@ -1509,9 +1509,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       <p>This one's measurable. We checked the actual delay on each
       product's free tier:</p>
 
-      <ul> <!-- copy-compliance-allow false-data-freshness -- next line describes Finviz Elite's plan, not Tapeline's data -->
+      <ul>${/* copy-compliance-allow false-data-freshness -- next line describes Finviz Elite's plan, not Tapeline's data */ ""}
         <li>Finviz free: 15-minute delay. Elite: real-time.</li>
-        <li>Stock Rover free: end-of-day. Essentials: 15-minute delay.</li> <!-- copy-compliance-allow false-data-freshness -- next line describes Zacks Premium's plan, not Tapeline's data -->
+        <li>Stock Rover free: end-of-day. Essentials: 15-minute delay.</li>${/* copy-compliance-allow false-data-freshness -- next line describes Zacks Premium's plan, not Tapeline's data */ ""}
         <li>Zacks free: 20-minute delay. Premium: real-time on most exchanges.</li>
         <li>Tapeline, every plan: prices delayed about 15 minutes, re-read
         for every covered stock and ETF about every 60 seconds during US

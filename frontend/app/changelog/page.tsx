@@ -41,6 +41,20 @@ type LogEntry = {
 };
 
 const METHODOLOGY_LOG: LogEntry[] = [
+  // Corrects three release notes further down that describe the data as
+  // undelayed or the scores as live. Rule 1: said by a new entry, not an edit;
+  // the old wording stays. Dated to #842's merge (17 September 2026 UTC), the
+  // change that moved the site's freshness wording to the measured figures
+  // (lib/freshness.ts). The quoted phrases sit after "used to say" so the copy
+  // linter reads them as a dated correction, not a fresh claim.
+  {
+    date: "2026-09-17",
+    kind: "correction",
+    title: "Three release notes overstated how fresh the data is",
+    body:
+      "Added on 17 September 2026. Three release notes further down this page describe the data as fresher than it is, and we have left their wording in place. The note dated 30 August 2026, titled \"The card moved off the front door\", used to say, and still says, that the Free plan opens the scanner \"on live data, no delay\". The note dated 27 April 2026, in the words added when it was superseded, used to say, and still says, \"Free is live scores on the top-10 scanner\". The note dated 4 May 2026 used to say, and still says, that the public ticker pages \"render the live score\". None of those was true. Measured on 14 September 2026: prices on every plan, Free included, are delayed about 15 minutes by our price vendor's plan; since a fix that afternoon, every covered stock and ETF is re-read about every 60 seconds during US market hours; a score is recalculated on each pass, but its inputs are daily readings, so a score usually changes about once a day; and the public ticker pages are saved snapshots that can be an hour old or more. What is true of Free is the top ten scored rows of any scan, on the same delayed prices every plan reads. The change merged on 17 September 2026 (#842) moved the rest of the site's freshness wording to these measured figures. No recorded entry was changed.",
+    ref: "#842",
+  },
   // #851 made the correction below out of date four minutes after it merged,
   // and added no entry of its own. Rule 1: said by a new entry, not an edit.
   // Verified 2026-09-17: routers/ticker.py's insider endpoint reads
