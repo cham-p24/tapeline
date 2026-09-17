@@ -39,7 +39,7 @@ import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 export const metadata = pageMeta({
   title: "A Stock Screener You Can Verify — Download the Full Record",
   description:
-    "A transparent stock screener whose record you can download and check yourself — every daily top-10 pick, its score, and how it did the next session. Losing days kept, corrections dated.",
+    "A transparent stock screener whose record you can download and check yourself — each recorded daily top-10 pick, its score, and how it did the next session. Losing days kept, corrections dated.",
   path: "/verify",
 });
 
@@ -138,7 +138,7 @@ export default function VerifyPage() {
             Most screeners hand you a number and ask you to trust it. You cannot
             see the method, and you cannot see how the output has actually done.
             Tapeline publishes both: the six factors behind every score, and a
-            record of every daily top-10 pick, back-checked against SPY the next
+            record of each recorded daily top-10 pick, back-checked against SPY the next
             session — including the days it went nowhere. Entries are not
             re-ranked or deleted, and every correction to a recorded value is dated.
           </p>

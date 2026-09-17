@@ -4,7 +4,7 @@ import { pageMeta } from "@/lib/seo";
 // in this route-segment layout instead of being exported from the page.
 //
 // COMPLIANCE — Rule 3 (the vs-SPY presentation rule). The title and the
-// description describe the MECHANISM (what is recorded, when it is frozen,
+// description describe the MECHANISM (what is recorded, when it is recorded,
 // what it is checked against, that losing days stay) and never the OUTCOME.
 // No hit rate, no alpha figure, no percentage of any kind appears here.
 //
@@ -21,7 +21,7 @@ export const metadata = pageMeta({
   // Front-loaded and tightened to ~155 chars so the differentiator (raw
   // downloadable record) survives SERP truncation. Descriptive only.
   description:
-    "The public record of every daily top-10 Tapeline ranks — recorded at the close, checked against SPY the next session, losing days kept, gaps and corrections dated. Raw CSV and JSON.",
+    "Each daily top 10 on Tapeline's public record — recorded at the close, checked against SPY the next session, losing days kept, days with no list and corrections dated. Raw CSV and JSON.",
   path: "/scorecard",
 });
 

@@ -8,8 +8,17 @@
  *
  * Edge-runtime + ImageResponse keeps the rendered PNG cacheable at the CDN
  * layer so we're not paying compute on every social-card crawl.
+ *
+ * Every number on this card is interpolated (2026-09-17, after #842): the
+ * card used to say "Every US ticker" (we score ~11,500 US stocks and ETFs,
+ * not every ticker) and showed a bare "$8.25 / mo" with no annual-billing
+ * qualifier, which lib/pricing.ts says must never render alone. It also
+ * states the price delay, because a share card travels without the page.
  */
 import { ImageResponse } from "next/og";
+import { PRICE_DELAY_NOTE } from "@/lib/freshness";
+import { PRICING, billedAnnuallyNote, usd } from "@/lib/pricing";
+import { activeScoredLabel } from "@/lib/universe";
 
 export const runtime = "edge";
 export const alt = "Tapeline — Read the tape.";
@@ -62,29 +71,29 @@ export default async function OG() {
         </div>
 
         {/* Hero */}
-        <div style={{ marginTop: "64px", display: "flex", flexDirection: "column", gap: "24px" }}>
+        <div style={{ marginTop: "40px", display: "flex", flexDirection: "column", gap: "18px" }}>
           <div
             style={{
-              fontSize: "84px",
+              fontSize: "68px",
               fontWeight: 700,
               lineHeight: 1.05,
               letterSpacing: "-0.035em",
-              maxWidth: "950px",
+              maxWidth: "1040px",
               display: "flex",
             }}
           >
-            One score. One sentence. Every US ticker.
+            {`One score. One sentence. ${activeScoredLabel} US stocks and ETFs.`}
           </div>
           <div
             style={{
-              fontSize: "30px",
+              fontSize: "26px",
               color: "#a1a1aa",
               lineHeight: 1.4,
-              maxWidth: "900px",
+              maxWidth: "1040px",
               display: "flex",
             }}
           >
-            Quantitative scanner with market regime, SEC Form 4 insider filings, and a public scorecard.
+            {`Quantitative scanner with market regime, SEC Form 4 insider filings, and a public scorecard. ${PRICE_DELAY_NOTE}.`}
           </div>
         </div>
 
@@ -108,13 +117,16 @@ export default async function OG() {
                 display: "flex",
               }}
             >
-              From
+              Free plan · Pro from
             </span>
             <span style={{ fontSize: "44px", fontWeight: 700, letterSpacing: "-0.02em", display: "flex" }}>
-              <span style={{ color: "#22c55e" }}>$8.25</span>
+              <span style={{ color: "#22c55e" }}>{usd(PRICING.pro.annualPerMonth)}</span>
               <span style={{ color: "#a1a1aa", fontWeight: 500, fontSize: "28px", marginLeft: "10px", marginTop: "12px" }}>
                 USD / mo
               </span>
+            </span>
+            <span style={{ fontSize: "20px", color: "#a1a1aa", display: "flex" }}>
+              {`${billedAnnuallyNote(PRICING.pro)}, or ${usd(PRICING.pro.monthly)} monthly`}
             </span>
           </div>
 

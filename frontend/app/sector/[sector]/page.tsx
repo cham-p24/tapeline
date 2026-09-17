@@ -113,7 +113,7 @@ function sectorFaq(display: string) {
     },
     {
       q: `What's the difference between sector ranking and the public scorecard?`,
-      a: `This page ranks ${display} stocks by current Tapeline Score — a snapshot. The /scorecard page back-checks every top-10 daily pick against the next-day return vs SPY — a track record. Use this page to surface candidates; use the scorecard to evaluate the historical hit rate.`,
+      a: `This page ranks ${display} stocks by current Tapeline Score — a snapshot. The /scorecard page back-checks each recorded daily top-10 pick against the next-day return vs SPY — a track record. Use this page to surface candidates; use the scorecard to evaluate the historical hit rate.`,
     },
     {
       q: `How often does the ${display} sector ranking update?`,

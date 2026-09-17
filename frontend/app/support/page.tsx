@@ -138,7 +138,7 @@ export default function SupportPage() {
             a={
               <>
                 <Link href="/scorecard" className="text-accent hover:underline">/scorecard</Link>{" "}
-                — every top-10 we've published, back-checked against the next-day price move alongside SPY.
+                — each recorded daily top 10, back-checked against the next-day price move alongside SPY.
                 No cherry-picking.
               </>
             }

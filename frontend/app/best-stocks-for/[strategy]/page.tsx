@@ -221,7 +221,7 @@ export default async function BestStocksForStrategyPage({
               </p>
               <p className="mt-2 text-xs text-subtle">
                 Scores are a descriptive reading of six weighted factors, not a
-                forecast or a buy call. Every daily top-10 pick is published —
+                forecast or a buy call. Each recorded daily top-10 pick is published —
                 wins and losses — on the{" "}
                 <Link href="/scorecard" className="text-accent hover:underline">
                   public scorecard

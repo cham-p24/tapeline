@@ -61,7 +61,7 @@ export default async function OG() {
             The record. Downloadable.
           </div>
           <div style={{ fontSize: "26px", color: "#a1a1aa", lineHeight: 1.4, display: "flex", maxWidth: "900px" }}>
-            Every daily top-10 pick, its score, and how it did the next session. Losing days kept, corrections dated.
+            Each recorded daily top-10 pick, its score, and how it did the next session. Losing days kept, corrections dated.
           </div>
         </div>
 
