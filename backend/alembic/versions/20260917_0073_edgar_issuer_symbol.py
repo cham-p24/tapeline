@@ -9,8 +9,8 @@ the filing names in issuerTradingSymbol (services/edgar_form4.py,
 
 Additive: one nullable column on a cache table.
 
-Revision ID: 0072_edgar_issuer_symbol
-Revises: 0071_insider_line_seq
+Revision ID: 0073_edgar_issuer_symbol
+Revises: 0072_alert_crossing_state
 """
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0072_edgar_issuer_symbol"
-down_revision = "0071_insider_line_seq"
+revision = "0073_edgar_issuer_symbol"
+down_revision = "0072_alert_crossing_state"
 branch_labels = None
 depends_on = None
 
