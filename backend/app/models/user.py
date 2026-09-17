@@ -317,7 +317,7 @@ class User(Base):
     signup_fbclid: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # Meta Conversions API match keys — the LATEST values, not first-touch
-    # (migration 0073, blueprint P1-P3). Written only while Meta CAPI is
+    # (migration 0074, blueprint P1-P3). Written only while Meta CAPI is
     # configured, by services/meta_capi.remember_browser, from requests the
     # visitor's own browser sends straight to the API: email signup, the OAuth
     # callback, POST /api/billing/checkout. Read back for StartTrial, Purchase
@@ -466,6 +466,15 @@ class AlertRuleState(Base):
     symbol: Mapped[str] = mapped_column(String(20), primary_key=True)
     side: Mapped[str] = mapped_column(String(20), nullable=False)
     value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Consecutive undelivered retries of the crossing this row is holding back.
+    # A crossing whose delivery RAISED (or whose web push reached nobody) does
+    # not advance the side, so the next evaluation re-detects it and tries
+    # again; this counts those attempts so a permanently broken transport
+    # cannot replay one crossing forever. Reset to 0 the moment a fire is
+    # consumed. See services/alerts.MAX_DELIVERY_ATTEMPTS.
+    failures: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0", default=0,
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False,
     )

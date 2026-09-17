@@ -347,9 +347,11 @@ _FLAG_ROWS_SERIALISED_CAP = 60
 # locked visitor is shown is the number of rows the unlocked tab would open on.
 _INSIDER_COUNT_WINDOW_DAYS = 90
 
-# Rows the Insider tab returns. The 90-day window of a heavy filer runs to ~150
-# lines (TSM held 144 on 2026-09-14), so this only bounds a pathological symbol.
-_INSIDER_TAB_ROW_CAP = 500
+# Rows the Insider tab returns. The 90-day window of a heavy filer is far longer
+# than first measured: CRWV held 938 lines, DELL 808 and UTHR 731 on 2026-09-17.
+# Above the cap the response says so (`truncated`, `total`) rather than
+# silently showing a prefix.
+_INSIDER_TAB_ROW_CAP = 2000
 
 
 def _flag_record_payload(
@@ -799,6 +801,8 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
                     select(sa_func.count(InsiderTransaction.id)).where(
                         InsiderTransaction.symbol == symbol,
                         InsiderTransaction.transaction_date >= insider_cutoff,
+                        InsiderTransaction.transaction_date
+                        <= datetime.now(UTC).date().isoformat(),
                     )
                 )
             ).scalar_one()
@@ -1023,11 +1027,14 @@ async def ticker_insider(
     sym = symbol.upper()
     days = max(1, min(days_back, _INSIDER_COUNT_WINDOW_DAYS))
     rows = await get_recent_insider_transactions_db(
-        days=days, limit=_INSIDER_TAB_ROW_CAP, symbol=sym,
+        days=days, limit=_INSIDER_TAB_ROW_CAP + 1, symbol=sym,
     )
+    truncated = len(rows) > _INSIDER_TAB_ROW_CAP
+    rows = rows[:_INSIDER_TAB_ROW_CAP]
     return {
         "symbol": sym,
         "days_back": days,
+        "truncated": truncated,
         "transactions": [
             {
                 "filer_name": r["insider_name"],

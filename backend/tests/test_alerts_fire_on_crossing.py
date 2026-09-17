@@ -40,6 +40,11 @@ from app.services import alerts, dblock
 @pytest.fixture(autouse=True)
 def _no_debounce(monkeypatch):
     monkeypatch.setattr(alerts, "MIN_FIRE_INTERVAL", timedelta(0))
+    # Regime rules carry their own, longer quiet window (6h). Zeroed here for
+    # the same reason: a test that counts repeats must be counting what the
+    # stored side does, not what a timer does. The window itself is covered by
+    # test_regime_rules_are_rate_limited_against_boundary_flapping.
+    monkeypatch.setattr(alerts, "REGIME_MIN_FIRE_INTERVAL", timedelta(0))
 
 
 # ── fixtures ─────────────────────────────────────────────────────────────────
@@ -368,6 +373,13 @@ def _squeeze(symbol: str, spike: float) -> SqueezeSetup:
 async def test_squeeze_fires_once_per_setup_and_again_after_it_ends():
     uid = await _user()
     rid = await _rule(uid, "squeeze", "SQZE", 70.0)
+    # An unrelated publishable setup that stays put for the whole test. Without
+    # it, deleting SQZE would empty the feed, and an EMPTY feed is refused as a
+    # possible ingest gap rather than read as "every setup ended"
+    # (evaluate_squeeze_rules, and the test below).
+    async with session_scope() as s:
+        s.add(_squeeze("SQZOTHER", 10.0))
+        await s.commit()
     assert await _run(alerts.evaluate_squeeze_rules) == 0   # arms, nothing there
 
     async with session_scope() as s:
@@ -488,6 +500,182 @@ async def test_pre_migration_watchlist_item_past_its_delta_is_not_realerted():
     async with session_scope() as s:
         item = await s.get(WatchlistItem, item_id)
     assert item is not None and item.alert_zone == "up"
+
+
+# ── an undelivered crossing is retried, not eaten ────────────────────────────
+
+async def test_a_send_that_raises_keeps_the_side_and_retries():
+    """The failure the first round of this change swallowed.
+
+    With `send_email` raising, the event was written delivered=False, the
+    stored side advanced to "above", and every later evaluation at the same
+    score sent nothing: the user was never told the score had crossed. The
+    side now stays put until a send is either delivered or deliberately
+    withheld.
+    """
+    sends: list[str] = []
+
+    async def _boom(*a, **kw):
+        sends.append("try")
+        raise RuntimeError("resend is down")
+
+    uid = await _user()
+    await _set_score("RETR", 70.0)
+    rid = await _rule(uid, "score", "RETR", 80.0, channel="email")
+    await _run(alerts.evaluate_score_rules)          # arms below
+
+    import app.services.alerts as alerts_mod
+    original = alerts_mod.send_email
+    alerts_mod.send_email = _boom
+    try:
+        await _set_score("RETR", 85.0)
+        await _run(alerts.evaluate_score_rules)
+        async with session_scope() as s:
+            st = await s.get(AlertRuleState, (rid, "RETR"))
+        assert st is not None and st.side == "below", (
+            "an undelivered crossing advanced the side, so it can never be retried"
+        )
+        assert st.failures == 1
+        # Two more attempts, then it gives up rather than replaying forever.
+        await _run(alerts.evaluate_score_rules)
+        await _run(alerts.evaluate_score_rules)
+    finally:
+        alerts_mod.send_email = original
+
+    assert len(sends) == alerts.MAX_DELIVERY_ATTEMPTS
+    async with session_scope() as s:
+        st = await s.get(AlertRuleState, (rid, "RETR"))
+    assert st is not None and (st.side, st.failures) == ("above", 0)
+
+    # And a working transport does not keep retrying.
+    await _run(alerts.evaluate_score_rules)
+    assert len(sends) == alerts.MAX_DELIVERY_ATTEMPTS
+
+
+async def test_a_deliberate_suppression_consumes_the_crossing():
+    """Prefs / tier / cap are decisions, not failures: they do NOT retry."""
+    uid = await _user("pro")
+    async with session_scope() as s:
+        u = await s.get(User, uid)
+        u.email_prefs = 0          # opted out of alert emails
+        await s.commit()
+    await _set_score("SUPP", 70.0)
+    rid = await _rule(uid, "score", "SUPP", 80.0, channel="email")
+    await _run(alerts.evaluate_score_rules)
+    await _set_score("SUPP", 85.0)
+    for _ in range(5):
+        await _run(alerts.evaluate_score_rules)
+
+    events = await _events(rid)
+    assert len(events) == 1, [e.message for e in events]
+    assert events[0].message.startswith("[suppressed: email prefs]")
+    async with session_scope() as s:
+        st = await s.get(AlertRuleState, (rid, "SUPP"))
+    assert st is not None and st.side == "above"
+
+
+async def test_a_push_every_subscription_refuses_is_retried(monkeypatch):
+    async def _refuse(*a, **kw):
+        return False
+
+    import app.services.web_push as web_push_mod
+    monkeypatch.setattr(web_push_mod, "send_web_push", _refuse)
+
+    uid = await _user()
+    async with session_scope() as s:
+        s.add(WebPushSubscription(user_id=uid, endpoint="https://push.example/gone",
+                                  p256dh_key="k", auth_key="a"))
+        await s.commit()
+    await _set_score("PSHF", 70.0)
+    rid = await _rule(uid, "score", "PSHF", 80.0)
+    await _run(alerts.evaluate_score_rules)
+    await _set_score("PSHF", 85.0)
+    await _run(alerts.evaluate_score_rules)
+
+    async with session_scope() as s:
+        st = await s.get(AlertRuleState, (rid, "PSHF"))
+    assert st is not None and st.side == "below", (
+        "an expired subscription that never 410s looks exactly like a "
+        "transient failure; the crossing must be retried, not consumed"
+    )
+
+
+async def test_a_push_with_no_subscription_at_all_is_not_retried():
+    """No transport is not a failed transport.
+
+    A user with no browser subscribed cannot be reached on this channel by any
+    number of retries, so re-detecting the crossing every 15 minutes would
+    only write rows. The event records that the rule fired.
+    """
+    uid = await _user()
+    await _set_score("PSHN", 70.0)
+    rid = await _rule(uid, "score", "PSHN", 80.0)
+    await _run(alerts.evaluate_score_rules)
+    await _set_score("PSHN", 85.0)
+    for _ in range(5):
+        await _run(alerts.evaluate_score_rules)
+
+    assert len(await _events(rid)) == 1
+    async with session_scope() as s:
+        st = await s.get(AlertRuleState, (rid, "PSHN"))
+    assert st is not None and st.side == "above"
+
+
+# ── missing data is not a move ───────────────────────────────────────────────
+
+async def test_an_empty_squeeze_feed_does_not_rearm_every_rule():
+    """A squeeze pipeline gap must not re-arm what is still above.
+
+    A symbol with no publishable setup normally counts as BELOW — a setup is a
+    discrete event, so its absence IS the reading. But an EMPTY feed is what an
+    ingest gap, a staleness window or an outage looks like, and re-arming on it
+    would make every still-above setup fire again the moment it returned.
+    """
+    uid = await _user()
+    rid = await _rule(uid, "squeeze", "SQGAP", 70.0)
+    async with session_scope() as s:
+        s.add(_squeeze("SQGAP", 60.0))
+        await s.commit()
+    await _run(alerts.evaluate_squeeze_rules)          # arms below
+    async with session_scope() as s:
+        (await s.execute(select(SqueezeSetup).where(SqueezeSetup.symbol == "SQGAP"))
+         ).scalar_one().spike_score = 85.0
+        await s.commit()
+    assert await _run(alerts.evaluate_squeeze_rules) == 1
+
+    # The whole feed disappears, then comes back with the same setup.
+    async with session_scope() as s:
+        await s.execute(delete(SqueezeSetup))
+        await s.commit()
+    assert await _run(alerts.evaluate_squeeze_rules) == 0
+    async with session_scope() as s:
+        st = await s.get(AlertRuleState, (rid, "SQGAP"))
+    assert st is not None and st.side == "above", "an empty feed re-armed the rule"
+
+    async with session_scope() as s:
+        s.add(_squeeze("SQGAP", 85.0))
+        await s.commit()
+    assert await _run(alerts.evaluate_squeeze_rules) == 0
+    assert len(await _events(rid)) == 1
+
+
+async def test_regime_rules_are_rate_limited_against_boundary_flapping(monkeypatch):
+    """A regime label has no hysteresis band, so the quiet window is the guard."""
+    monkeypatch.setattr(alerts, "REGIME_MIN_FIRE_INTERVAL", timedelta(hours=6))
+    assert alerts.REGIME_MIN_FIRE_INTERVAL > alerts.MIN_FIRE_INTERVAL
+
+    uid = await _user()
+    await _set_regime("NEUTRAL")
+    rid = await _rule(uid, "regime", "BEAR", None)
+    await _run(alerts.evaluate_regime_rules)           # arms on NEUTRAL
+
+    for label in ("BEAR", "NEUTRAL", "BEAR", "NEUTRAL", "BEAR", "NEUTRAL"):
+        await _set_regime(label)
+        await _run(alerts.evaluate_regime_rules)
+
+    assert len(await _events(rid)) == 1, (
+        "a regime oscillating on its boundary alerted on every flip"
+    )
 
 
 # ── two machines ─────────────────────────────────────────────────────────────

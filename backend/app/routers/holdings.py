@@ -3,9 +3,9 @@
 Replaces the legacy 13F holdings endpoint. The 13F path required a paid Quiver
 key that was never wired in production, so the page sat empty.
 
-Data source: Finnhub `/stock/insider-transactions` (SEC Form 4), already
-fetched daily by `_refresh_insider_cache` in the worker for the active scoring
-universe. The same data powers the Smart Money sub-score, so this endpoint
+Data source: SEC Form 4 filings read directly from SEC EDGAR by the worker's
+insider pass (`_refresh_insider_cache` -> services/edgar_form4.py; Finnhub until
+2026-09-14), each stock re-read about every two days. The same data powers the Smart Money sub-score, so this endpoint
 is the visible "receipt" for the Smart Money pillar of every Tapeline Score.
 
 Response shape (kept stable for the frontend that paginates/filters):
@@ -83,7 +83,9 @@ async def list_insider_buys(
     # symbol's next answer is empty (#824) and kept until then, so a longer
     # lookback would return a different window per symbol.
     days: int = Query(30, ge=1, le=90, description="Lookback window in days"),
-    buys_only: bool = Query(False, description="Only return net positive (buy) transactions"),
+    buys_only: bool = Query(
+        False, description="Only return purchases: Form 4 code P with a positive share change",
+    ),
     limit: int = Query(100, ge=1, le=500),
 ) -> dict:
     """
@@ -113,8 +115,8 @@ async def list_funds_legacy(
 ) -> dict:
     """
     Legacy endpoint kept for frontend compatibility. The "elite funds" concept
-    moved off-roadmap in 2026-05 when we replaced Quiver 13F with Finnhub
-    Form 4 insider data. Returns an empty list — the frontend's fund filter
+    moved off-roadmap in 2026-05 when we replaced Quiver 13F with SEC Form 4
+    insider data (read from Finnhub until 2026-09-14, from SEC EDGAR since). Returns an empty list — the frontend's fund filter
     is hidden when this is empty.
     """
     if not has_feature(Tier(user.tier), "holdings.elite"):

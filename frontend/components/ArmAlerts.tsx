@@ -24,9 +24,30 @@ const DISMISS_KEY = "tapeline_arm_alerts_dismissed";
  * "granted" user has already armed alerts; "denied"/"unsupported" can't be
  * resolved from here.
  */
+/** Points above the current score the one-click rule watches for. */
+const ARM_HEADROOM = 5;
+
+/**
+ * Highest score this card will arm on.
+ *
+ * The threshold used to be `Math.min(100, round(score) + 5)`, which quietly
+ * created a rule at 100 for anything scoring 95 or more — a threshold a
+ * composite realistically never reaches — and then told the user "crosses 100
+ * (it's 96 now)". A rule that cannot fire is worse than no rule: it is the
+ * activation moment reporting success for something that will never arrive.
+ * Above this score there is no honest headroom left, so no rule is created and
+ * the card says what it did instead.
+ */
+const ARM_MAX_SCORE = 100 - ARM_HEADROOM;
+
 /** Alert threshold for the one-click rule: 5 points above the current score, on the 0-100 scale. */
 function armThreshold(score: number): number {
-  return Math.min(100, Math.round(score) + 5);
+  return Math.round(score) + ARM_HEADROOM;
+}
+
+/** Whether a ticker at `score` leaves room for a threshold that can be crossed. */
+function canArm(score: number): boolean {
+  return Math.round(score) <= ARM_MAX_SCORE;
 }
 
 export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watchlist" } = {}) {
@@ -92,7 +113,13 @@ export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watc
       // Create a real score alert on a watched ticker so a LIVE alert follows the
       // sample. Best-effort: a duplicate or a cap-hit must not block the aha.
       let ruleCreated = false;
-      if (ticker && tickerScore !== null) {
+      if (ticker && tickerScore !== null && !canArm(tickerScore)) {
+        // Already within ARM_HEADROOM of the top of the scale. Creating a rule
+        // here would arm a threshold of 100 that never fires; the push
+        // subscription is still live, so the user keeps every alert they set
+        // by hand.
+        trackEvent("alert_arm_failed", { surface, reason: "score_at_ceiling" });
+      } else if (ticker && tickerScore !== null) {
         // This used to send threshold: 5, while the card promised an alert when
         // the score "moves 5+ points". A score rule fires when the score CROSSES
         // its threshold, and every score is above 5, so that rule never
@@ -158,10 +185,16 @@ export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watc
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
         <span className="text-fg">
           <strong className="font-medium">Alerts are on.</strong>{" "}
-          {ticker && tickerScore !== null ? (
+          {ticker && tickerScore !== null && canArm(tickerScore) ? (
             <>
               That sample is exactly what you&rsquo;ll get when <strong>{ticker}</strong>&rsquo;s score
               crosses {armThreshold(tickerScore)} (it&rsquo;s {Math.round(tickerScore)} now).
+            </>
+          ) : ticker && tickerScore !== null ? (
+            <>
+              That sample is exactly what an alert looks like. <strong>{ticker}</strong> already
+              scores {Math.round(tickerScore)}, so there is no sensible threshold left above it
+              &mdash; set one on another ticker from the alerts page.
             </>
           ) : (
             <>Add a ticker to your watchlist and we&rsquo;ll ping you when its score moves.</>

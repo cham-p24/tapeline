@@ -39,7 +39,7 @@ async def export_my_data(
         "exported_at": user.updated_at.isoformat(),
         "user": {"id": user.id, "email": user.email, "name": user.name, "tier": user.tier, "created_at": user.created_at.isoformat()},
         # The browser identifiers kept for Meta's Conversions API (migration
-        # 0073). An IP address and a user agent are personal data under GDPR
+        # 0074). An IP address and a user agent are personal data under GDPR
         # Art. 4, so an Art. 15 request has to be able to see them — and a
         # subject who asks what we hold about them should get the same answer
         # whether or not META_CAPI_SEND_IP_UA happens to be on, so these are

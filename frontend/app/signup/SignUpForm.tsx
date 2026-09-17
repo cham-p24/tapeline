@@ -9,7 +9,7 @@ import { authApi } from "@/lib/auth";
 import { PRECHARGE_NOTICE_DAYS, PRECHARGE_NOTICE_PHRASE, TRIAL_DAYS, TRIAL_LENGTH_LABEL } from "@/lib/trial";
 import { userLocale } from "@/lib/datetime";
 import { trackMetaCompleteRegistration } from "@/lib/metaConversions";
-import { FREE_LIMITS, PRICING, REFUND, usd, usdCompact } from "@/lib/pricing";
+import { ALERT_DAILY_CEILING, FREE_LIMITS, PRICING, REFUND, usd, usdCompact } from "@/lib/pricing";
 import { activeScoredLabel } from "@/lib/universe";
 import { safeNext } from "@/lib/safeNext";
 import {
@@ -685,7 +685,7 @@ function SignUpForm() {
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-              <span><span className="text-fg">Watchlist of 200, unlimited alerts</span> — email, browser push</span>
+              <span><span className="text-fg">Watchlist of 200, alerts on both channels</span> — email and browser push, up to {ALERT_DAILY_CEILING} a day each</span>
             </li>
           </ul>
 

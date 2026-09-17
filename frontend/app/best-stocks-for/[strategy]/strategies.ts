@@ -93,7 +93,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What's the public scorecard?",
-        a: "Each day's top-10 picks are published at /scorecard with their rank, composite score and the price they were flagged at. One session later, the next-session realised return vs SPY is appended. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. It's the public track record so you can see whether the model's high-conviction calls are actually delivering positive alpha over time.",
+        a: "Each recorded daily top 10 is published at /scorecard with their rank, composite score and the price they were flagged at. One session later, the next-session realised return vs SPY is appended. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. It's the public track record so you can see whether the model's high-conviction calls are actually delivering positive alpha over time.",
       },
     ],
   },
@@ -381,7 +381,7 @@ export const STRATEGIES: StrategyConfig[] = [
       },
       {
         q: "What's the scorecard performance of HIGH CONVICTION picks?",
-        a: "Every daily top-10 pick is back-checked against next-day SPY return. The full record — winners and losers — is at /scorecard, including the days the model called HIGH CONVICTION on names that then underperformed. Losing days stay on the record, corrections to recorded values are dated there, and it currently trails SPY. The scorecard is a descriptive track record, not a performance target or a forecast.",
+        a: "Each recorded daily top-10 pick is back-checked against next-day SPY return. The full record — winners and losers — is at /scorecard, including the days the model called HIGH CONVICTION on names that then underperformed. Losing days stay on the record, corrections to recorded values are dated there, and it currently trails SPY. The scorecard is a descriptive track record, not a performance target or a forecast.",
       },
       {
         q: "Is HIGH CONVICTION a buy recommendation?",

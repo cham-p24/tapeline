@@ -23,7 +23,7 @@ import { TrialOfferPanel } from "@/components/TrialOfferPanel";
 import { rememberTrialCheckout, takeTrialCheckoutIntent } from "@/lib/trialCheckout";
 import { handle401, errorMessage } from "@/lib/api";
 import { metaCheckoutIds } from "@/lib/utm";
-import { PRICING, FREE_LIMITS, REFUND, usd, usdCompact, annualSaving, DEFAULT_BILLING_PERIOD, freeHasWatchlist, freeScannerRows } from "@/lib/pricing";
+import { ALERT_DAILY_CEILING, PRICING, FREE_LIMITS, REFUND, usd, usdCompact, annualSaving, DEFAULT_BILLING_PERIOD, freeHasWatchlist, freeScannerRows } from "@/lib/pricing";
 // The ONE source of truth for the trial length. This page used to carry its
 // own `const TRIAL_DAYS = 14` — the backend moved to 30 (routers/billing.py)
 // and lib/trial.ts followed, but this local copy did not, so the page that
@@ -911,9 +911,12 @@ export default function BillingPage() {
           />
           <UsageTile
             label="Email alerts / day"
-            limit={tier === "free" ? 0 : tier === "pro" ? 10 : 10000}
-            unit={tier === "premium" ? "unlimited" : "per day"}
-            unlimited={tier === "premium"}
+            // Premium showed "∞" against tier.py's plan figure of 10,000.
+            // Neither number is what the sender enforces: services/alerts caps
+            // every plan at ALERT_DAILY_CEILING deliveries a day, so a Premium
+            // account's 51st alert is withheld. State the enforced number.
+            limit={tier === "free" ? 0 : tier === "pro" ? 10 : ALERT_DAILY_CEILING}
+            unit="per day"
           />
           <UsageTile
             label="Saved scans"
@@ -1015,7 +1018,7 @@ export default function BillingPage() {
               proPlus
               items={[
                 `Recent insider buys — SEC Form 4 filings across ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} tickers`,
-                "Email alerts · unlimited (Pro: 10/day)",
+                `Email alerts · up to ${ALERT_DAILY_CEILING}/day (Pro: 10/day)`,
                 "Watchlist 200 · saved scans 100 (Pro: 50 · 10)",
                 "Priority support · same-day reply",
               ]}
@@ -1199,18 +1202,19 @@ export default function BillingPage() {
  * surface live "used" counts yet (would need a per-user usage endpoint); the
  * limit alone is the most-asked-about question on the billing page anyway.
  */
+// The `unlimited` prop (rendered as "∞") was dropped on 2026-09-18: its only
+// caller was the Email-alerts tile on Premium, and no cap on this page is
+// unlimited any more. Every alert channel stops at ALERT_DAILY_CEILING.
 function UsageTile({
   label,
   limit,
   unit,
-  unlimited = false,
 }: {
   label: string;
   limit: number;
   unit: string;
-  unlimited?: boolean;
 }) {
-  const display = unlimited ? "∞" : limit === 0 ? "—" : limit.toLocaleString();
+  const display = limit === 0 ? "—" : limit.toLocaleString();
   return (
     <div>
       <div className="text-[11px] uppercase tracking-wider text-subtle">{label}</div>

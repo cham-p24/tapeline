@@ -154,6 +154,8 @@ def _no_dated_backlog_rule(monkeypatch: pytest.MonkeyPatch) -> None:
     phase spends time, not what one call costs."""
     monkeypatch.setattr(sp, "_FUNDAMENTALS_UNSAVED_BEFORE", datetime(1970, 1, 1, tzinfo=UTC))
     monkeypatch.setattr(sp, "_SMART_MONEY_EDGAR_SINCE", datetime(1970, 1, 1, tzinfo=UTC))
+    # Same kind of instant: the 2026-09-17 Form 4 attribution re-read.
+    monkeypatch.setattr(sp, "_SMART_MONEY_REREAD_BEFORE", datetime(1970, 1, 1, tzinfo=UTC))
     monkeypatch.setattr(sp, "_INSIDER_PACE_SECONDS", 1.1)
 
 

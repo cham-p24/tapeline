@@ -60,7 +60,7 @@ const ABOUT_FAQ = [
   },
   {
     q: "Why publish the scorecard?",
-    a: "Newsletter shops have known for 30 years that hiding losers is the easiest way to look better than you are. Mark Hulbert built a career being the only neutral grader of newsletter performance because everyone else hid the data. Tapeline auto-publishes every top-10 daily pick with the realized next-day return vs SPY at /scorecard. If the model stops working, you should know.",
+    a: "Newsletter shops have known for 30 years that hiding losers is the easiest way to look better than you are. Mark Hulbert built a career being the only neutral grader of newsletter performance because everyone else hid the data. Tapeline auto-publishes each recorded daily top-10 pick with the realized next-day return vs SPY at /scorecard, open to everyone 7 days after the session. If the model stops working, you should know.",
   },
   {
     q: "Is Tapeline a registered investment adviser?",
@@ -102,7 +102,7 @@ export default function AboutPage() {
         </h1>
         <p className="mt-4 text-lg text-muted">
           Tapeline is a quantitative stock scanner that names the six factors
-          behind its score and back-checks every top-10 daily pick against the
+          behind its score and back-checks each recorded daily top-10 pick against the
           next-day SPY-relative move. The point isn't a secret formula — anyone can
           blend a few factors. The point is that you can{" "}
           <em>audit</em> it.
@@ -124,12 +124,12 @@ export default function AboutPage() {
             <Link href="/how-it-works" className="text-accent hover:underline">
               six named factors
             </Link>{" "}
-            and the ordering of their weights are on the methodology page, and every top-10
-            daily pick auto-publishes to{" "}
+            and the ordering of their weights are on the methodology page, and each recorded
+            daily top-10 pick auto-publishes to{" "}
             <Link href="/scorecard" className="text-accent hover:underline">
               the public scorecard
             </Link>{" "}
-            with the realized next-day return vs SPY. Whether you stay or
+            with the realized next-day return vs SPY (open to everyone 7 days after the session). Whether you stay or
             leave, you make that call from the data — not from a marketing
             page.
           </p>
@@ -169,7 +169,7 @@ export default function AboutPage() {
               <h3 className="mt-1 font-semibold">Public methodology + public scorecard from day one</h3>
               <p className="mt-1 text-sm text-muted">
                 Tapeline launches with all six scoring factors named and
-                every top-10 pick auto-back-checked vs SPY the following day.
+                each recorded daily top-10 pick auto-back-checked vs SPY the following session.
               </p>
             </li>
             <li>

@@ -38,6 +38,10 @@ class EdgarForm4Filing(Base):
     #: 4s it filed as an OWNER of another issuer, so rows are only ever served
     #: for the issuer named here.
     issuer_cik: Mapped[str] = mapped_column(String(10), nullable=False, default="")
+    #: issuerTradingSymbol as the filing names it, in SEC's spelling (BRK-B).
+    #: Decides which of a multi-ticker CIK's tickers the lines belong to; NULL
+    #: on rows parsed before version 2 (see edgar_form4.PARSE_VERSION).
+    issuer_symbol: Mapped[str | None] = mapped_column(String(20), nullable=True)
     owner_cik: Mapped[str] = mapped_column(String(10), nullable=False, default="")
     owner_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     #: A 4/A's dateOfOriginalSubmission; the amendment replaces the owner's
