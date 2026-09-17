@@ -335,11 +335,12 @@ async def test_a_crypto_pair_is_stamped_not_written(monkeypatch: pytest.MonkeyPa
 #
 # Rows stamped before the fix may have lost their reading, and cannot be told
 # apart from rows Finnhub does not cover. On 2026-09-14 the rule matched 3,358
-# equities (2,006 with Finnhub key statistics), stamped 09-07..09-13.
+# equities (2,006 with Finnhub key statistics), stamped 09-07..09-13, and they
+# drained that day. On 2026-09-17 it was widened to ETFs and futures: 5,141 rows.
 #
-# Every instant here is fixed relative to the cutoff, never the wall clock:
-# after 2026-09-21 those stamps are past their horizon anyway, and a test that
-# read the clock would silently stop testing the rule.
+# Every instant here is fixed relative to the cutoff, never the wall clock: once
+# those stamps are past their horizon a test that read the clock would silently
+# stop testing the rule.
 
 CUT = sp._FUNDAMENTALS_UNSAVED_BEFORE
 AT = CUT + timedelta(days=1)
@@ -405,10 +406,21 @@ async def test_a_stamp_from_the_fixed_code_waits_for_its_horizon() -> None:
     assert (await sp._factor_due_counts(now=AT))[0] == 0
 
 
-async def test_non_equities_keep_their_monthly_horizon() -> None:
-    """About 1 ETF in 7 has fundamentals. Mutation: drop the equity condition -
-    ~5,000 uncovered ETFs are re-asked."""
-    await _seed("ETFY", asset_class="etf", last_fundamentals_at=CUT - 2 * H)
+@pytest.mark.parametrize("asset_class", ["etf", "future_commodity"])
+async def test_a_non_equity_that_lost_its_reading_is_due_now_too(asset_class: str) -> None:
+    """Sheet-owned ETFs held fundamentals at 2.2% against the tick's 14.5%. The
+    30-day horizon would have hidden the lost ones until 2026-10-13.
+
+    Mutation: restrict the clause to equities (as #828 shipped it) - not due."""
+    await _seed("NONEQ", asset_class=asset_class, last_fundamentals_at=CUT - 2 * H)
+    assert (await sp._factor_due_counts(now=AT))[0] == 1
+    assert await sp._select_factor_symbols(Ticker.last_fundamentals_at, 5, now=AT) == ["NONEQ"]
+
+
+async def test_a_crypto_pair_is_not_asked_again() -> None:
+    """No pair has ever answered /stock/metric. Mutation: drop the crypto
+    exclusion - 106 pairs are re-asked for nothing."""
+    await _seed("X:ETHUSD", asset_class="crypto", last_fundamentals_at=CUT - 2 * H)
     assert (await sp._factor_due_counts(now=AT))[0] == 0
 
 

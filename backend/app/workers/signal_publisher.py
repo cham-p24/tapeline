@@ -2754,8 +2754,8 @@ _EQUITY_FACTOR_DUE_AFTER: dict[str, timedelta] = {
 #: symbol that does gain coverage is still picked up within a month.
 _NON_EQUITY_FACTOR_DUE_AFTER = timedelta(days=30)
 
-#: Equity fundamentals stamped before this instant, with no reading on the row,
-#: are due NOW instead of when their 8-day horizon passes.
+#: Fundamentals stamped before this instant, with no reading on the row, are due
+#: NOW instead of when their horizon passes. Every asset class but crypto.
 #:
 #: Until #825 (worker restarted on it at 22:58 UTC on 2026-09-13) a stamp could
 #: land without its reading: the pass cached the value and a deploy took it
@@ -2766,14 +2766,20 @@ _NON_EQUITY_FACTOR_DUE_AFTER = timedelta(days=30)
 #: owned by the tick from the 09-06..09-11 outage. Stamps ran 09-07..09-13, so
 #: the horizon alone would have taken until 09-21.
 #:
-#: So every such equity is asked once more: about 3,400 calls, roughly 40% of
-#: them to symbols Finnhub genuinely does not cover. A re-read stamps the row
-#: after this instant, so the rule retires row by row and needs no clean-up; by
-#: 2026-09-22 every row it could match is past its horizon anyway.
+#: So every such row is asked once more. A re-read stamps the row after this
+#: instant, so the rule retires row by row. Once it matches nothing it is dead
+#: code: remove it then, with the fixture that disables it in
+#: tests/test_factor_refresh_what_is_due.py.
 #:
-#: Equities only. Sheet-owned ETFs lost readings too, but only about 1 ETF in 7
-#: has fundamentals at all, so re-asking ~5,000 of them would recover ~150;
-#: those come due on the 30-day horizon by 2026-10-13.
+#: #828 asked equities only; the equities drained 2026-09-14 (3,134 of 3,358
+#: re-reads came back with a reading). ETFs and futures were added on 2026-09-17.
+#: Their 30-day horizon would have hidden the lost ones until 2026-10-13, and
+#: sheet-owned ETFs held fundamentals at 2.2% against 14.5% for the tick's own:
+#: about 150 lost readings. That costs ~5,100 re-reads, once, served after every
+#: due equity. The run it lands in had no smart money due, so it fits the phase
+#: budget.
+#:
+#: Crypto is never asked: no pair has ever answered /stock/metric.
 _FUNDAMENTALS_UNSAVED_BEFORE = datetime(2026, 9, 13, 23, 0, tzinfo=UTC)
 
 #: Smart money stamped before this instant came from Finnhub, and is due NOW.
@@ -2870,7 +2876,7 @@ def _factor_due_clause(stamp_col: Any, now: datetime) -> Any:
     )
     if stamp_col.key == "last_fundamentals_at":
         due = due | (
-            (Ticker.asset_class == "equity")
+            (Ticker.asset_class != "crypto")
             & Ticker.sub_fundamentals.is_(None)
             & (stamp_col < _FUNDAMENTALS_UNSAVED_BEFORE)
         )
