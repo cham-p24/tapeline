@@ -53,9 +53,10 @@ call — see docs/TODO.md.
 WHEN A REAL FEED ARRIVES
 ------------------------
 `settings.smart_money_congress_csv_url` already points at the signal-system
-workbook's SMART MONEY & CONGRESS tab, and `sheet_feed` already parses it — but
-it only increments `sub_smart_money` by per-ticker appearance count and never
-stores the individual trades as `CongressTrade` rows. Wiring that is what makes
+workbook's SMART MONEY & CONGRESS tab (not set on Fly), and `sheet_feed` can
+parse it — but it only ever overwrote `sub_smart_money` with a per-ticker
+appearance count (retired 2026-09-17) and never stored the individual trades as
+`CongressTrade` rows. Wiring that is what makes
 the Premium claim true again. Until then the feed is honestly empty, and the
 marketing says so.
 """

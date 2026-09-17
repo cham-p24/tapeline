@@ -203,8 +203,8 @@ Seven exposures found independently across four sessions. The Massive vendor key
   founder) said the sheet already carries the real trades and only needs
   "wiring up". It does not. `parse_smart_money_csv`'s own docstring is explicit:
   the `SMART MONEY & CONGRESS` tab is free text, not structured rows, which is
-  precisely why it boosts `sub_smart_money` by per-ticker appearance count
-  instead of building `CongressTrade` rows. A real feed therefore needs a real
+  precisely why it boosted `sub_smart_money` by per-ticker appearance count
+  (retired 2026-09-17) instead of building `CongressTrade` rows. A real feed therefore needs a real
   SOURCE — House/Senate disclosure filings, or a licensed vendor — not a
   parser change. That is a build, not a repair, and it is what the Premium
   claim would cost to bring back. Until then Premium is one bullet shorter,

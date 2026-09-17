@@ -44,7 +44,7 @@ Every data source used in production must be documented here with license terms,
 - **Status:** Not a production source. `polygon_feed.fetch_congress_trades()` returns an empty list, and `mock_feed`'s generator (which invents trades attributed to real, named politicians) is only persisted outside production — see `signal_publisher._mock_writes_enabled()`. The `congress_trades` table therefore stops accruing rows in prod.
 - **Would-be source:** official House/Senate STOCK Act disclosures are public record, but nothing reads them — there is no `congress_ingestor.py`. Wiring one is unstarted work, not a documented feed.
 - **Note:** QuiverQuant was **removed** (subscription cancelled). Its Trader tier carried "No Commercial Use Rights"; the adapter, worker task, model and config key are deleted, and the feed only ever served mock data.
-- **Caveat:** the SMART MONEY & CONGRESS sheet tab is ingested, but it only boosts each ticker's `sub_smart_money` by appearance count — it does not store individual trades.
+- **Caveat:** the SMART MONEY & CONGRESS sheet tab is **not** a factor source. It used to overwrite each ticker's `sub_smart_money` with an appearance count and never stored individual trades; it was retired on 2026-09-17 (smart money is SEC Form 4 from EDGAR), and its `SMART_MONEY_CONGRESS_CSV_URL` secret is not set on Fly.
 
 ### Clerk — Authentication (env-gated, not the live path)
 - **Tier:** Free up to 10k MAU; paid tiers from $25/mo

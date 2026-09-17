@@ -2009,10 +2009,13 @@ async def _refresh_workbook_tabs() -> None:
                 logger.exception("asset_class.repair_failed")
 
             if settings.signal_sheet_csv_url:
-                counts = await refresh_from_workbook(sheet_session)
                 # Which symbols the sheet owns — consumed by the snapshot
                 # upsert so the market feed can't clobber their composite.
+                # BEFORE the ingest, which takes minutes: a symbol the sheet
+                # just added must not be written as the tick's own row by the
+                # ticks that run while its sheet row is being ingested.
                 await _refresh_sheet_governed_symbols()
+                counts = await refresh_from_workbook(sheet_session)
                 if counts.get("total"):
                     logger.info(
                         "sheet_feed.tick rows=%d ins=%d upd=%d",
@@ -3223,9 +3226,14 @@ async def _save_factor_readings(
     owner to write.
 
     What remains: a tick that read a row before this commit can put the old
-    factor back, and restores the reading on its next write, from the cache.
-    Only a restart inside that one tick loses it. A sheet upsert already in
-    flight when this commits can do the same, until the sheet next changes.
+    factor back, with the composite of the old set, and restores the reading on
+    its next write of that row, from the cache. A restart before that write
+    loses the reading until the row next comes due (36h for an equity's smart
+    money, 8 days for its fundamentals): the stamp has already landed, and the
+    boot rebuild repairs only NULL rows. A sheet upsert already in flight when
+    this commits no longer does the same: it writes each row's factor set with
+    a compare-and-set of its own and keeps the newer reading (see
+    `sheet_feed._write_factor_sets`).
 
     `updated_at` is held still: a factor reading is not proof the row's price is
     live, and a delisted symbol that still answers /stock/metric must not stay
@@ -3748,6 +3756,17 @@ _INSIDER_WINDOW_DAYS = 90
 #: add ~1.8 hours a day across ~6,000 equities for nothing.
 _INSIDER_PACE_SECONDS = 0.0
 
+#: Longest an insider batch waits for its stamp, in seconds.
+#:
+#: The boot rebuild trusts a symbol's stored Form 4 rows only when they were
+#: written within INSIDER_STAMP_LAG (15 min) before its stamp. Twenty symbols
+#: used to span ~22s at a fixed 1.1s a call. Since EDGAR (#835) a call costs
+#: what the filer's filings cost - TSM's 144 uncached filings took 18s - so
+#: twenty heavy filers could run past the window, and a row stamped without
+#: its reading (a contended save) would then never be rebuilt. Flushing on
+#: age as well as count keeps the lag under this plus one symbol's fetch.
+_INSIDER_BATCH_MAX_SECONDS = 300.0
+
 #: An empty answer is not believed while we hold a filing dated this recently.
 #:
 #: Clearing deletes data, so it has to survive a vendor that answers `[]` when
@@ -3938,6 +3957,8 @@ async def _refresh_insider_cache(
     pending: list[str] = []
     # This batch's readings, written onto their rows as the batch is stamped.
     readings: dict[str, float] = {}
+    # When the batch's first symbol was answered; see _INSIDER_BATCH_MAX_SECONDS.
+    batch_started = 0.0
     i = 0
     while i < len(symbols):
         if deadline is not None and monotonic() >= deadline:
@@ -4003,6 +4024,8 @@ async def _refresh_insider_cache(
         # Stamped on ATTEMPT - a company with no Form 4 filings in the last 90
         # days is a real answer, not an outstanding request - and written onto
         # the row when there was a reading (see _save_factor_readings).
+        if not pending:
+            batch_started = monotonic()
         pending.append(sym)
         attempted += 1
         i += 1
@@ -4027,7 +4050,10 @@ async def _refresh_insider_cache(
             break
         if _INSIDER_PACE_SECONDS:
             await asyncio.sleep(_INSIDER_PACE_SECONDS)
-        if len(pending) >= _FACTOR_STAMP_BATCH:
+        if (
+            len(pending) >= _FACTOR_STAMP_BATCH
+            or monotonic() - batch_started >= _INSIDER_BATCH_MAX_SECONDS
+        ):
             await _flush_insider_attempts(pending, readings)
             pending, readings = [], {}
     await _flush_insider_attempts(pending, readings)
@@ -4779,6 +4805,20 @@ async def main() -> None:
     # Before the first tick rather than lazily, because the first tick is
     # where both of those writes happen.
     await warm_factor_caches_from_db()
+
+    # Which symbols the sheet owns, BEFORE the first tick writes.
+    #
+    # The set is process-local and was first filled by the workbook refresh,
+    # which the tick dispatches after its own score upsert and which takes
+    # minutes. Until then every tick treated each of the ~4,900 sheet-owned
+    # rows as its own and wrote its composite, factors, reason and coverage
+    # over the sheet's. The sheet writes neither reason nor, without a
+    # conviction grade, coverage, so those stayed as the tick left them. Seen
+    # in production 2026-09-14 as every sheet-owned row's
+    # `reason` re-rendering for the first minutes after each deploy. One CSV
+    # fetch (15s timeout); on failure the set stays empty, as it always was
+    # at boot.
+    await _refresh_sheet_governed_symbols()
 
     # Load the active universe BEFORE the first tick, for the same reason.
     #
