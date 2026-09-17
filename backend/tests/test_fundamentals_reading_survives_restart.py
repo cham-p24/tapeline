@@ -437,6 +437,7 @@ async def test_the_smart_money_rotation_is_untouched(monkeypatch: pytest.MonkeyP
     signal_publisher._UNBACKED_SMART_MONEY_RECHECK_AFTER), which this test is
     not about."""
     monkeypatch.setattr(sp, "_SMART_MONEY_EDGAR_SINCE", datetime(1970, 1, 1, tzinfo=UTC))
+    monkeypatch.setattr(sp, "_SMART_MONEY_REREAD_BEFORE", datetime(1970, 1, 1, tzinfo=UTC))
     await _seed("META", last_fundamentals_at=AT, last_smart_money_at=CUT - 2 * H)
     async with session_scope() as s:
         s.add(InsiderTransaction(
