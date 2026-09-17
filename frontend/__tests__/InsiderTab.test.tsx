@@ -45,6 +45,19 @@ describe("InsiderTab", () => {
     expect(screen.queryByTestId("insider-truncated")).toBeNull();
   });
 
+  it("says where a second share class files, rather than calling empty normal", async () => {
+    // #862 attributes a filing to the ticker it names, so GOOG can be empty
+    // while GOOGL has filings. "Empty here is normal" would be misleading.
+    mocked.mockResolvedValue({
+      symbol: "GOOG", days_back: 90, truncated: false, transactions: [],
+    });
+    render(<InsiderTab symbol="GOOG" />);
+    const note = await waitFor(() => screen.getByText(/No Form 4 filings for GOOG/));
+    expect(note.textContent).toMatch(/A filing is listed under the ticker it names/);
+    expect(note.textContent).toMatch(/more than one listed share class/);
+    expect(note.textContent).not.toMatch(/Empty here is normal/);
+  });
+
   it("does not call a code it has no label for a buy or a sale", async () => {
     mocked.mockResolvedValue({
       symbol: "AAPL", days_back: 90, truncated: false,

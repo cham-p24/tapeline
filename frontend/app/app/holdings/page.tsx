@@ -243,11 +243,11 @@ export default function HoldingsPage() {
           </div>
           <h2 className="mt-3 text-lg font-bold tracking-tight">
             {feedSize > rows.length
-              ? `Showing ${rows.length} of ${feedSize.toLocaleString()} tracked Form 4 transactions — full feed on Premium`
+              ? `Showing ${rows.length} of ${feedSize.toLocaleString()} tracked Form 4 transactions — Premium opens the feed`
               : `Free shows the ${FREE_INSIDER_PREVIEW_LIMIT} most recent transactions`}
           </h2>
           <p className="mt-2 text-sm text-muted">
-            The full insider feed — up to 200 of the newest Form 4 transactions, filterable by
+            The insider feed — up to 200 of the newest Form 4 transactions, filterable by
             symbol, by a lookback of up to 90 days and to purchases only — is part of the ${PRICING.premium.monthly}/mo (Premium)
             plan (USD), or ${PRICING.premium.annualPerMonth}/mo billed annually
             (${PRICING.premium.annual}/yr).

@@ -179,7 +179,7 @@ export default async function InsiderBuyingPage() {
               The date in each row is the trade date reported on the filing.
               The rows behind this page do not carry the filing date, so it
               cannot show the gap between the two. Each row links to the
-              ticker&rsquo;s page. The full Form 4 list on Premium, at{" "}
+              ticker&rsquo;s page. The Form 4 list on Premium, at{" "}
               <Link href="/app/holdings" className="link">
                 /app/holdings
               </Link>
@@ -199,7 +199,7 @@ export default async function InsiderBuyingPage() {
         },
         {
           q: "What's the difference between this and OpenInsider / Insider Monkey?",
-          a: "Those sites are built around the filings themselves. This page is a short preview: the ten most recent code-P purchases in Tapeline's data, newest trade first, each linked to that ticker's Tapeline page. The full Form 4 list on Premium, at /app/holdings, shows up to 200 of the newest Form 4 transactions in our data (all transaction codes), filterable by ticker, by a lookback of up to 90 days and to purchases only, also newest trade first.",
+          a: "Those sites are built around the filings themselves. This page is a short preview: the ten most recent code-P purchases in Tapeline's data, newest trade first, each linked to that ticker's Tapeline page. The Form 4 list on Premium, at /app/holdings, shows up to 200 of the newest Form 4 transactions in our data (all transaction codes), filterable by ticker, by a lookback of up to 90 days and to purchases only, also newest trade first.",
         },
         {
           q: "Is there an alert for new insider buys?",
@@ -211,7 +211,7 @@ export default async function InsiderBuyingPage() {
         },
         {
           q: "What tier do I need?",
-          a: `This preview page is free and needs no account. The full Form 4 list at /app/holdings is a Premium feature: ${usd(PRICING.premium.monthly)} a month, or ${usd(PRICING.premium.annualPerMonth)} a month ${billedAnnuallyNote(PRICING.premium)}. The 30-day Premium trial includes it.`,
+          a: `This preview page is free and needs no account. The Form 4 list at /app/holdings is a Premium feature: ${usd(PRICING.premium.monthly)} a month, or ${usd(PRICING.premium.annualPerMonth)} a month ${billedAnnuallyNote(PRICING.premium)}. The 30-day Premium trial includes it.`,
         },
       ]}
       tier="premium"
@@ -317,7 +317,7 @@ export default async function InsiderBuyingPage() {
             : "This snapshot is empty because the feed was unreachable at render time. It is not a sample."}{" "}
         The{" "}
         <Link href="/app/holdings" className="text-accent hover:underline">
-          full Form 4 list
+          Form 4 list
         </Link>{" "}
         on Premium shows up to 200 of the newest transactions (all transaction
         codes), filterable to purchases only, also newest trade first.

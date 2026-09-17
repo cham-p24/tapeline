@@ -302,7 +302,13 @@ function buildEditorialCommentary(d: TickerData): string {
       case "fundamentals":
         return `${sym}'s strongest factor is Fundamentals at ${v.toFixed(0)}/100 — a ${tier} read on reported margin, return on equity, EPS and revenue growth, and the earnings multiple. High Fundamentals doesn't guarantee a near-term move, but every input is a figure the company has already published in a filing.`;
       case "smart_money":
-        return `${sym}'s strongest factor is Smart Money at ${v.toFixed(0)}/100 — a ${tier} read on disclosed corporate-insider transactions from SEC Form 4, netted over a recent window. High Smart Money means those disclosed filings currently net toward buying on this name — a descriptive read of public filings, not a signal to follow.`;
+        return `${sym}'s strongest factor is Smart Money at ${v.toFixed(0)}/100 — a ${tier} read on disclosed corporate-insider transactions from SEC Form 4, netted over a recent window. ${
+          v > 50
+            ? `It means those disclosed filings currently net toward buying on this name`
+            : v < 50
+              ? `It is still the highest of the six, but the disclosed filings net toward selling`
+              : `The disclosed filings net to nothing — either the buying and selling cancel, or none of the lines carried a disclosed dollar value`
+        } — a descriptive read of public filings, not a signal to follow.`;
       case "macro":
         return `${sym}'s strongest factor is Macro at ${v.toFixed(0)}/100 — meaning the market-wide regime classification is ${tier} supportive. Macro is the same reading for every ticker on the board at a given moment, so it says nothing about ${sym} specifically.`;
       case "momentum":
@@ -328,7 +334,7 @@ function buildEditorialCommentary(d: TickerData): string {
             ? `The insider transactions disclosed for ${sym} in the window net toward selling`
             : v > 50
               ? `The insider transactions disclosed for ${sym} in the window net toward buying, but less strongly than the other factors read`
-              : `The insider transactions disclosed for ${sym} in the window balance out, or none were disclosed`
+              : `The insider transactions disclosed for ${sym} in the window net to nothing — either the buying and selling cancel, or none of the lines carried a disclosed dollar value`
         }; on a thinly filed name a few filings can set this reading.`;
       case "macro":
         return `The weakest factor is Macro at ${v.toFixed(0)}/100 — ${tier} backdrop. A macro headwind drags every name in the cohort; if ${sym} is still scoring well on the composite despite this, the company-specific factors must be doing heavy lifting.`;

@@ -102,7 +102,7 @@ describe("HoldingsPage", () => {
     expect(screen.getByText("AMD")).toBeInTheDocument();
     // Locked section states the real backend count…
     expect(
-      screen.getByText("Showing 3 of 1,842 tracked Form 4 transactions — full feed on Premium"),
+      screen.getByText("Showing 3 of 1,842 tracked Form 4 transactions — Premium opens the feed"),
     ).toBeInTheDocument();
     // …and deep-links to billing with the premium intent pre-selected.
     expect(screen.getByRole("link", { name: /Upgrade to Premium/ }))

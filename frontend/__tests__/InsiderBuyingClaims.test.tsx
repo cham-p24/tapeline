@@ -145,6 +145,8 @@ describe("/insider-buying — labels and claims", () => {
       "shows up to 200 of the newest Form 4 transactions in our data (all transaction codes), filterable by ticker, by a lookback of up to 90 days and to purchases only",
     );
     expect(text).not.toMatch(/buys-only filter/);
+    // 200 rows of 52,897 is not "the full list".
+    expect(text).not.toMatch(/full Form 4 list|full insider feed|full list of/i);
     // Code P is a purchase on the open market OR in a private sale.
     expect(text).not.toMatch(/open-market buys/i);
     // Tier FAQ price reads as a sentence, in the visible FAQ and the JSON-LD.

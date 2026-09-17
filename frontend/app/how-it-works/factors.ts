@@ -250,7 +250,7 @@ export const FACTORS: Factor[] = [
     computed: [
       "Every disclosed transaction in the window is converted to a signed dollar value, and the net is taken against the gross. The result is a ratio running from all-selling to all-buying.",
       "That ratio is mapped onto a 0–100 scale around a midpoint, so the reading reflects the balance of disclosed activity rather than its raw size. One large disclosed purchase can outweigh several small disclosed sales, but only on a net basis.",
-      "A ticker with no disclosed filings in the window has no reading at all, and the composite substitutes a mid-range value. An absence of filings is treated as an absence of information, not as a negative signal.",
+      "A ticker for which we hold no disclosed filings in the window has no reading at all, and the composite substitutes a mid-range value. An absence of filings is treated as an absence of information, not as a negative signal.",
       "When a ticker's filings have all left the window, its reading is removed at the ticker's next re-check, not at once: within about two days for a stock, and up to about a month for an ETF or futures contract. Until 14 September 2026 such a reading was not removed when its filings left the window. On 14 September 2026 some tickers held a value with no filing on file at all; from that date such a value is removed when the ticker is next re-checked. The changelog entry for that date has the details.",
     ],
     feeds: [
@@ -265,7 +265,7 @@ export const FACTORS: Factor[] = [
       "Many disclosed transactions carry no view at all. Sales scheduled months in advance under a 10b5-1 plan, option exercises, vesting events and share sales made purely to cover tax withholding all arrive as Form 4 filings and are netted like any other.",
       "Smaller and less-covered companies file rarely, so the window is frequently empty and the factor is unavailable for long stretches.",
       "The factor reads corporate-insider Form 4 filings only. It has no congressional-trade input.",
-      "A company can have several listed securities under one SEC identifier — share classes, preferred shares, notes. Since 17 September 2026 a filing's transactions count only for the ticker the filing itself names, so the other securities have no reading rather than a borrowed one: Alphabet's insiders file under GOOGL, News Corp's under NWS. Before that date every ticker of the issuer received all of them.",
+      "A company can have several listed securities under one SEC identifier — share classes, preferred shares, notes. From 17 September 2026 a filing's transactions count only for the ticker the filing itself names, so the other securities have no reading rather than a borrowed one: Alphabet's insiders file under GOOGL, News Corp's under NWS. Before that date every ticker of the issuer received all of them, and a reading borrowed that way is removed at that ticker's next re-check — about two days for a stock, up to about a month for an ETF, ETN or futures contract.",
       "Netting by dollar value means one large filer can dominate a company with many reporting insiders.",
       "Insiders are not a uniformly informed group, and this factor makes no claim that they are. The name of the factor is conventional industry shorthand, not an assessment of anyone's judgement.",
     ],
@@ -276,7 +276,7 @@ export const FACTORS: Factor[] = [
       },
       {
         q: "What happens if a ticker has no insider filings?",
-        a: "The factor is unavailable and the composite substitutes a mid-range value. No filings means no information, which is not the same as a negative reading.",
+        a: "The factor is unavailable and the composite substitutes a mid-range value. No filings on file for that ticker means no information, which is not the same as a negative reading — and where a company has several listed securities, the filings are on file under the one the filer names.",
       },
     ],
   },

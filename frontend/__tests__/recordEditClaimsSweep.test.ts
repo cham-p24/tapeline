@@ -289,7 +289,7 @@ describe("insider posts say what the Smart Money factor and /app/holdings do", (
 
   /** The post without its 18 September notes, which quote the old claims. */
   function claims(slug: string): string {
-    return post(slug).replace(/<em>Corrected 18 September 2026:[\s\S]*?<\/em>/g, "");
+    return post(slug).replace(/<em>Corrected 17 September 2026:[\s\S]*?<\/em>/g, "");
   }
 
   it("how-to-read-sec-form-4: no automatic filtering, no 'filtered' feed, no 48-hour ceiling", () => {
@@ -303,20 +303,25 @@ describe("insider posts say what the Smart Money factor and /app/holdings do", (
     expect(body).not.toMatch(/The cluster filter/);
     expect(body).not.toMatch(/up to 48 hours|48 hours older/);
     expect(body).not.toMatch(/reliably predicts|one of the few real edges/);
+    // P and S each cover a private transaction, so neither is "open-market".
+    // The CODE definitions: P and S each cover a private transaction too.
+    expect(body).not.toMatch(/\(open-market (buy|sale|purchase)\)/);
     expect(body).toMatch(/does not apply these filters: it nets every disclosed transaction in its window/);
-    expect(post("how-to-read-sec-form-4")).toMatch(/Corrected 18 September 2026: an earlier version of this post said the Smart Money sub-score does this filtering automatically/);
+    expect(post("how-to-read-sec-form-4")).toMatch(/Corrected 17 September 2026: an earlier version of this post said the Smart Money sub-score does this filtering automatically/);
   });
 
   it("what-smart-money-actually-means: insiders, not institutions; context, not certainty", () => {
     const body = claims("what-smart-money-actually-means");
     expect(body).not.toMatch(/institutions are positioning|institutions and insiders/);
     expect(body).not.toMatch(/directional certainty/);
-    expect(post("what-smart-money-actually-means")).toMatch(/Corrected 18 September 2026: the examples below said a high reading means "institutions are positioning"/);
+    // Descriptive only: no forecast, no call to act, on an indexed page.
+    expect(body).not.toMatch(/Worth a watchlist add|before the market has rerated/);
+    expect(post("what-smart-money-actually-means")).toMatch(/Corrected 17 September 2026: the examples below said a high reading means "institutions are positioning"/);
   });
 
   it("reading-a-tapeline-score: the Smart Money reading is insider buying, with a dated note", () => {
     const body = claims("reading-a-tapeline-score");
     expect(body).not.toMatch(/institutional buying may be early|reading strong accumulation|Smart money is in\./);
-    expect(post("reading-a-tapeline-score")).toMatch(/Corrected 18 September 2026: this walkthrough described the Smart Money reading as accumulation and institutional buying/);
+    expect(post("reading-a-tapeline-score")).toMatch(/Corrected 17 September 2026: this walkthrough described the Smart Money reading as accumulation and institutional buying/);
   });
 });

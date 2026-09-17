@@ -379,7 +379,7 @@ export const POSTS: BlogPost[] = [
       Tapeline has no current source of congressional disclosures, no plan
       includes a congressional trades feed, and the factor reads SEC Form 4
       filings.</em></p>
-      <p><em>Corrected 18 September 2026: the examples below said a high
+      <p><em>Corrected 17 September 2026: the examples below said a high
       reading means "institutions are positioning", and that the factor
       combined with others "becomes directional certainty". The factor reads
       corporate insiders' SEC Form 4 filings only, not institutional
@@ -455,8 +455,8 @@ export const POSTS: BlogPost[] = [
       a confluence multiplier:</p>
       <ul>
         <li>A 90 Smart Money sub-score on a 40 composite is a value
-        signal — disclosed insider transactions net toward buying before
-        the market has rerated it. Worth a watchlist add.</li>
+        divergence — disclosed insider transactions net toward buying
+        while the composite is low.</li>
         <li>A 90 Smart Money sub-score on a 75 composite is confirmation
         — disclosed insider buying lines up with a setup that's already showing up in
         Trend, RS, and Momentum. Standard signal-of-signals.</li>
@@ -678,11 +678,11 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
   Macro                65
   Momentum             87</pre>
 
-      <p><em>Corrected 18 September 2026: this walkthrough described the
+      <p><em>Corrected 17 September 2026: this walkthrough described the
       Smart Money reading as accumulation and institutional buying. The factor
       reads corporate insiders' SEC Form 4 transactions, not institutional
-      buying, and its Form 4 calculation today gives values from 10 to
-      90.</em></p>
+      buying, and its Form 4 calculation today gives values from 10 to 90, so
+      the 97 shown here is outside the range that calculation can produce.</em></p>
 
       <p>That's where the actual signal lives. Now we read it.</p>
 
@@ -692,7 +692,7 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       out. NVDA doesn't do that. Look at the spread:</p>
 
       <ul>
-        <li><strong>Smart Money 97</strong> (top 3%) — the factor was
+        <li><strong>Smart Money 97</strong> — the factor was
         reading strong net insider buying.</li>
         <li><strong>Momentum 87</strong> (top 13%) — short-term price action
         is accelerating, volume is confirming, breakouts are recent.</li>
@@ -1657,7 +1657,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       The logic below is for reading the filings yourself, whatever tool you
       use.</p>
 
-      <p><em>Corrected 18 September 2026: an earlier version of this post
+      <p><em>Corrected 17 September 2026: an earlier version of this post
       said the Smart Money sub-score does this filtering automatically, that
       Tapeline Premium shows "filtered" Form 4 activity across the full
       universe, that a trade is at most 48 hours old when its Form 4 reaches
@@ -1666,8 +1666,9 @@ RSI = 100 - (100 / (1 + RS))</pre>
       dollar value, without filtering out 10b5-1 plan sales, option exercises
       or small trades; /app/holdings lists the newest Form 4 transactions for
       the stocks we score, with a purchases-only filter; a filing can reach
-      Tapeline a few days after the trade; and we have no evidence that Form 4
-      filings predict price moves.</em></p>
+      Tapeline a few days after the trade; we have no evidence that Form 4
+      filings predict price moves; and it called codes P and S "open-market"
+      purchases and sales, when each covers a private transaction too.</em></p>
 
       <h2>What Form 4 actually is</h2>
 
@@ -1678,8 +1679,8 @@ RSI = 100 - (100 / (1 + RS))</pre>
         director, 10%+ owner. Role matters; we'll get to why.</li>
         <li><strong>Transaction code</strong> — a one-letter code from
         a fixed table. The ones that matter for "is this a signal":
-        <code>P</code> (open-market purchase), <code>S</code>
-        (open-market sale), <code>A</code> (grant — almost never
+        <code>P</code> (a purchase on the open market or in a private
+        sale), <code>S</code> (a sale of either kind), <code>A</code> (grant — almost never
         meaningful), <code>F</code> (tax-withholding sale — almost
         never meaningful).</li>
         <li><strong>Number of shares</strong> — raw count, not dollar
@@ -1703,8 +1704,8 @@ RSI = 100 - (100 / (1 + RS))</pre>
       market activity. An insider getting shares via an automatic
       restricted-stock vesting tells you nothing about their view of
       the company's valuation. They didn't choose to acquire the
-      shares; the comp plan did. Filter to code P (open-market buy)
-      and code S (open-market sale) only. Everything else is HR
+      shares; the comp plan did. Filter to code P (a purchase)
+      and code S (a sale) only. Everything else is HR
       paperwork dressed as a filing.</p>
 
       <h3>2. 10b5-1 sales</h3>

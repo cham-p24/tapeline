@@ -197,6 +197,34 @@ describe("the weakest-factor sentence when Smart Money is weakest", () => {
     expect(text).not.toMatch(/nobody with edge/);
   });
 
+  it("exactly 50 is not described as no filings at all", async () => {
+    // 50.0 also comes from finnhub_feed's `total_value == 0` branch: lines that
+    // carry no dollar value, e.g. grants and gifts. Read-only 2026-09-17, 378
+    // of the 389 tickers sitting at exactly 50 are that case, not an empty one.
+    const { container } = await renderTicker(tickerPayload({ breakdown: factors(50) }));
+    const text = container.textContent ?? "";
+    expect(text).toMatch(/net to nothing/);
+    expect(text).toMatch(/none of the lines carried a disclosed dollar value/);
+    expect(text).not.toMatch(/none were disclosed/);
+  });
+
+  it("the strongest-factor sentence does not claim buying at 50 either", async () => {
+    const { container } = await renderTicker(tickerPayload({
+      breakdown: {
+        trend: { value: 30, label: "Trend" },
+        rs: { value: 28, label: "Relative strength" },
+        fundamentals: { value: 26, label: "Fundamentals" },
+        smart_money: { value: 50, label: "Smart money" },
+        macro: { value: 24, label: "Macro" },
+        momentum: { value: 22, label: "Momentum" },
+      },
+    }));
+    const text = container.textContent ?? "";
+    expect(text).toMatch(/strongest factor is Smart Money at 50\/100/);
+    expect(text).toMatch(/The disclosed filings net to nothing/);
+    expect(text).not.toMatch(/currently net toward buying/);
+  });
+
   it("a weakest reading above 50 still nets toward buying", async () => {
     const { container } = await renderTicker(tickerPayload({ breakdown: factors(52) }));
     const text = container.textContent ?? "";

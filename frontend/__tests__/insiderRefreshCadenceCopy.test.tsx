@@ -392,8 +392,17 @@ describe("/insider-buying, /how-it-works and the Smart Money factor", () => {
     expect(detail).toMatch(/counts only for the ticker it names/);
     const attribution = factor.limitations.find((l) => /GOOGL/.test(l));
     expect(attribution, "no attribution limitation on the Smart Money page").toBeDefined();
-    expect(attribution).toMatch(/Since 17 September 2026/);
+    expect(attribution).toMatch(/From 17 September 2026/);
     expect(attribution).toMatch(/no reading rather than a borrowed one/);
+    // A borrowed reading survives until that ticker's next re-check, so the
+    // page cannot imply the change is instant everywhere.
+    expect(attribution).toMatch(/removed at that ticker's next re-check/);
+    // "No filings" must mean "none on file for this ticker", now that a
+    // sibling class can hold the filings.
+    const unavailable = factor.computed.find((c) => /no reading at all/.test(c));
+    expect(unavailable).toMatch(/for which we hold no disclosed filings/);
+    const faq = factor.faq.find((f) => /no.*filings/i.test(f.q))!;
+    expect(faq.a).toMatch(/No filings on file for that ticker/);
 
     expectNoStaleClaim(JSON.stringify(factor));
   });
