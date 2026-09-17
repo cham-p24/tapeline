@@ -902,7 +902,8 @@ export const api = {
   presetDelete: (id: number) =>
     del<{ ok: boolean }>(`/api/presets/${id}`, DEV_TOKEN),
   /**
-   * Recent Insider Buys feed. Backed by SEC Form 4 filings via Finnhub.
+   * Recent Insider Buys feed: the stored SEC Form 4 filings the worker reads
+   * from SEC EDGAR (`services/edgar_form4.py`).
    * Replaces the legacy 13F holdings call; URL `/api/holdings` is unchanged
    * for backwards-compat but the response schema is now InsiderTxn[].
    */
