@@ -304,7 +304,7 @@ Tapeline scorecard, current state:
 [X] of [XXX] top-10 picks beat SPY in their next-day back-check ([XX]% hit rate).
 Average alpha: [±X.X]% per pick.
 
-Updates every market close. Misses stay.
+Updated at the close when a top 10 is recorded; days with no list are dated on the page. Misses stay.
 
 https://tapeline.io/scorecard
 ```

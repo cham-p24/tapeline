@@ -130,9 +130,10 @@ TEMPLATES = {
     # documentation. History: corrected 2026-08-22 for the card wall, changed
     # back 2026-08-30 when #683 removed it, and re-synced here 2026-09-15 after
     # the 14 September integrity wave (no congressional trades, ~11,500 not
-    # ~2,500, prices delayed about 15 minutes). The live module still says
-    # "live scanner" / "live, no card" as of 2026-09-15; that wording belongs to
-    # the backend lane to fix. The text below is what it should say.
+    # ~2,500, prices delayed about 15 minutes). Checked 2026-09-18: the
+    # user-facing strings in render_pricing/render_trial no longer say "live";
+    # only a docstring near inbox_templates.py:100 still does. Do not "fix" the
+    # reply strings on this note's account.
     "pricing": lambda: (
         "The published record is free with no account at all: the daily top 10, the public scorecard back-checked vs SPY (per-day entries on a 7-day delay without Pro or Premium), a page per scored ticker, and the raw CSV/JSON. "
         "For the scanner: Pro is $8.25/mo annual ($9.99 monthly) for every row of the scan (about 11,500 US stocks and ETFs) + watchlist alerts. "

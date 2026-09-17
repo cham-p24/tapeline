@@ -167,7 +167,7 @@ Char count: ~900. Add `tapeline.io/how-it-works` in first comment.
 ## Post #7 — What 7 days of live forward-testing actually looks like
 
 ```
-The Tapeline scorecard has been freezing top-10 picks at every market close for a week.
+The Tapeline scorecard has been recording the day's top 10 at the close for a week.
 
 Here's the honest read:
 — 35 clean entries (4 vendor-data outliers excluded; full list on the page)
@@ -233,7 +233,7 @@ A few things I've learned building Tapeline solo from Melbourne over the last fe
 
 1. Australia treats fintech compliance very differently to the US. The Australian publisher exemption from AFSL requirements means I can publish quantitative analysis on US stocks without holding a financial services licence — provided I'm "general information only, not personal advice." That language is now on every scoring page.
 
-2. The time zone is a feature, not a bug. The US market closes at 6 AM AEST. I wake up to a fully back-checked scorecard with overnight data already populated. By the time US-East-Coast traders are at their desks, the next day's picks are already frozen.
+2. The time zone is a feature, not a bug. The US market closes at 6 AM AEST. I wake up to a fully back-checked scorecard with overnight data already populated. By the time US-East-Coast traders are at their desks, the last close's top 10 is recorded and back-checked.
 
 3. The hardest part wasn't the scoring formula — it was the data plumbing. Polygon (now Massive) for prices, Finnhub for fundamentals + insider Form 4 + news, FRED for macro indicators, SEC EDGAR for 8-K filings. Each one has its own auth pattern, rate limits, and failure modes. Half the codebase is reconciling sources.
 

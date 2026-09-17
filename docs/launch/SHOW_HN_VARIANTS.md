@@ -143,7 +143,7 @@ The methodology is on /how-it-works — six factors, listed with the heaviest-we
 - Macro — a single market-wide regime classification; the same reading for every ticker on a tick
 - Momentum — a momentum-quality reading plus a short-horizon return, deliberately the lightest factor
 
-The scoring is version-controlled, so a change is a change on the record. /scorecard is uneditable history. /changelog logs every methodology revision.
+The scoring is version-controlled, so a change is a change on the record. Entries on /scorecard are not re-ranked or deleted; corrections are dated. /changelog logs every methodology revision.
 
 Stack: Next.js 16 + FastAPI + Massive (formerly Polygon) + Finnhub + FRED, deployed on Fly.io. The methodology — the six factors, what each measures, and their weight ordering — is published on /how-it-works; the exact weights and the parameter recipe are not.
 

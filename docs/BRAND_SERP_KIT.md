@@ -363,7 +363,7 @@ HN culture: technical, humble, zero marketing words ("best", "revolutionary",
   I bet a bootstrapped SaaS on radical transparency: public methodology + public scorecard
   ```
 - **Body angle:** solo + bootstrapped + the contrarian bet (name every factor
-  and publish every pick's result). Open with the problem, show the
+  and publish each recorded top 10's result). Open with the problem, show the
   scorecard link as proof, end with a specific ask ("does the
   publish-your-losers angle build trust or scare people off?"). Link
   `tapeline.io` and `/scorecard`.
@@ -417,7 +417,7 @@ time.
 
 1. **Transparency:** "We name the six factors and publish a per-pick scorecard —
    it's not a mystery black box. The moat is the data spine plus that public
-   scorecard back-checking every call we make."
+   scorecard back-checking each recorded top 10."
 2. **Accountability:** "Newsletter shops have hidden their losers for 30 years.
    We publish each recorded top 10 the next day, regardless of how it moved."
 3. **Anti-black-box:** "Six descriptive labels, no buy/sell language. We tell you

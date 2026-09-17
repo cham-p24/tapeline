@@ -1,5 +1,28 @@
 # Tapeline — Podcast Pitch Drafts
 
+> **WHAT CHANGED ON 14 SEPTEMBER 2026 — read before sending anything below.**
+> The founder approved an integrity wave on 14 September 2026 that corrected the
+> product and the site. Pitches below were written before it. False lines found
+> on 15 and 18 September 2026 were corrected in place, but check each one against
+> `docs/COPY_FACTS.md`, which has the measurements and times:
+>
+> - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
+>   covered stock and ETF about every 60 seconds during US market hours (longer
+>   around a deploy), and a score usually changes about once a day. Never call
+>   the data live: not real-time, not sub-60s, not "every minute".
+> - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
+>   updated once a day. Not ~2,500.
+> - **Congressional trades and squeeze detection do not exist today.** Do not
+>   offer either as a feature, a Premium benefit or a score input.
+> - **The record:** the day's top 10 is recorded at the close, public since May
+>   2026. Entries are not re-ranked or deleted. We have corrected recorded values
+>   twice, and said so: prices on 25 August 2026, and scores from 18 May to
+>   12 June capped on 15 June 2026. No top 10 was recorded for 31 August,
+>   2 September, 4 September or 9 September 2026. Non-subscribers see per-day
+>   entries on a 7-day delay.
+> - **No performance claim.** The recorded picks show no edge over SPY. Offer the
+>   record as something to audit, never a hit rate or alpha as a result.
+
 Drafted 2026-05-14, extended 2026-05-15. 11 podcasts where the Tapeline founder fits as a guest. Pitches 1-8 drafted from scratch on 2026-05-14; 7 of those sent that day from cpiyatilaka@gmail.com (all but Flirting With Models, blocked by reCAPTCHA). TTU declined; the other 6 pending reply. Pitches 9-11 drafted 2026-05-15 with verified contact emails and queued as Gmail drafts from `christian@tapeline.io` for founder review + Send.
 
 **Pacing**: send one pitch per week. Two per week reads as bulk outreach; podcasts compare notes. One per week is what real authors / founders do.
@@ -20,19 +43,19 @@ Drafted 2026-05-14, extended 2026-05-15. 11 podcasts where the Tapeline founder 
 ```
 Hi Tessa, hi Ian — long-time CWT listener.
 
-Pitching myself as a guest because Tapeline (tapeline.io) is the only consumer stock-scanning tool I know of that auto-publishes its picks and their next-day returns vs SPY on a public page. Every miss stays on the page; nothing gets curated. The opposite of how every retail-trader-targeted scoring tool runs.
+Pitching myself as a guest because Tapeline (tapeline.io) is the only consumer stock-scanning tool I know of that records its daily top 10 at the close and back-checks each name against SPY the next session on a public scorecard. Misses stay on the page, and corrections and the days with no list are dated. The opposite of how every retail-trader-targeted scoring tool runs.
 
 What I'd bring to a CWT episode:
 
 — A walkthrough of the 6-factor composite — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — and why they sit in the order they do: heaviest Trend and Relative Strength, lightest Momentum.
 
-— The five-month forward-test data — how often the top-10 daily picks beat SPY, where the biggest factor surprises came from, and one weight change I'd argue for (and the reason I haven't made it yet, because two months isn't a long enough sample).
+— The forward-test data since May 2026 — how often the recorded top-10 names beat SPY (so far the record trails it), where the biggest factor surprises came from, and one weight change I'd argue for (and the reason I haven't made it yet: the sample isn't long enough).
 
 — A specific worked example: pull a ticker during the episode, decompose its score, show what the factor breakdown is saying that the composite hides.
 
 — Tooling: how a single worker re-scores about 11,500 US stocks and ETFs about every 60 seconds on 15-minute-delayed prices, on Fly.io + Neon Postgres + Massive (formerly Polygon) data, the cost structure, where the engineering bottlenecks are.
 
-I built this solo over the last six months. Background in trading-system development before this. The whole thing is a single-founder project with a public methodology and a public scorecard.
+I have built this solo, with the record public since May 2026. Background in trading-system development before this. The whole thing is a single-founder project with a public methodology and a public scorecard.
 
 tapeline.io if you want to see what we're talking about. tapeline.io/scorecard is the receipt.
 
@@ -57,7 +80,7 @@ Pitching myself as a guest. Tapeline (tapeline.io) is a 6-factor composite stock
 
 — A published methodology: six named factors and their weight ordering, version-controlled, with a changelog entry and a written rationale the day anything changes. (The exact weights stay private; the ordering, the factor set and the record are all public.)
 
-— A public scorecard that freezes the top-10 daily picks at each market close and back-checks each name against SPY the next session. No survivor bias; misses stay on the page.
+— A public scorecard that records the day's top 10 at the close and back-checks each name against SPY the next session. Misses stay on the page; corrections and days with no list are dated.
 
 — A forward-test running since May 2026. The dataset is small but the methodology is the point — recording every miss, and dating every correction, is what most retail scoring tools refuse to do.
 
@@ -69,7 +92,7 @@ What I'd bring to a TTU episode:
 
 — The walk-forward back-test plan (2024-2025 sample, leave-one-out cross-validation by quarter) and why I'm running it AFTER the public live test, not before. Some discussion of why the live forward-test is more honest than any back-test could be.
 
-Background: developed trading systems before this; built Tapeline solo over the last six months. The whole product is one founder shipping in public.
+Background: developed trading systems before this; built Tapeline solo, with the record public since May 2026. The whole product is one founder shipping in public.
 
 tapeline.io · tapeline.io/scorecard · tapeline.io/how-it-works (the published methodology).
 
@@ -107,9 +130,9 @@ Questions that might make for a good episode arc:
 
 2. **What's the right Bayesian prior on weight changes?** I'm currently planning to require 60 days minimum of live data before adjusting any weight by more than 2 percentage points. That's arbitrary — would value a discussion of how to actually calibrate this.
 
-3. **Does the Macro factor add alpha or is it noise inside the regime distribution?** Five months of data is too small to tell. My instinct is that it works as a confluence multiplier but is noisy in isolation; that's what the per-factor decomposition is showing so far.
+3. **Does the Macro factor add alpha or is it noise inside the regime distribution?** The data since May 2026 is too small to tell. My instinct is that it works as a confluence multiplier but is noisy in isolation; the per-factor decomposition can't settle that yet.
 
-Background: trading-system engineering before this. Tapeline is a solo founder project shipped publicly over six months. /scorecard is the back-check; /how-it-works is the math.
+Background: trading-system engineering before this. Tapeline is a solo founder project, shipped publicly since May 2026. /scorecard is the back-check; /how-it-works is the math.
 
 Happy to record any time.
 
@@ -134,7 +157,7 @@ Most retail scoring tools (Tipranks Smart Score, Zacks Rank, WallStreetZen Zen R
 
 Episode angle suggestions:
 
-— **"The five-month forward-test on a 6-factor model — what worked, what didn't, what I'd change."** Current hit rate vs SPY, factor-level decomposition, which factor's actual alpha exceeds its weight, why I'm not adjusting weights yet despite the data suggesting I could.
+— **"The forward-test since May 2026 on a 6-factor model — what worked, what didn't, what I'd change."** The record so far trails SPY; factor-level decomposition, and why I'm not adjusting weights on a sample this small.
 
 — **"Why publish the methodology?"** Your published-tactical-strategies argument applied to retail-facing scoring tools. Same logic, different audience. The moat isn't the factor list; the moat is the data spine and the accountability layer.
 
@@ -187,7 +210,7 @@ Christian Piyatilaka
 **Why a fit**: Animal Spirits covers tools, methodology critiques, and the gap between "what retail traders think they should do" vs "what the data says." Tapeline's positioning fits.
 **Contact**: animalspiritspod.com → animalspirits [at] ritholtzwealth dot com.
 
-**Pitch** (subject: "Guest idea: a stock scanner with a public scorecard — what the misses look like at 5 months"):
+**Pitch** (subject: "Guest idea: a stock scanner with a public scorecard — what the misses look like since May 2026"):
 
 ```
 Michael + Ben — long-time Animal Spirits listener; have referenced your "things I'm reading" segments in my own daily routine.
@@ -200,13 +223,13 @@ Animal Spirits often covers "this tool says X" without auditing what the tool's 
 
 — What a public scorecard actually looks like (and why almost no commercial tool publishes one).
 
-— The five-month data: hit rate, average alpha per pick, distribution of factor-level outcomes.
+— The data since May 2026: hit rate and average return vs SPY per pick (the record trails SPY), distribution of factor-level outcomes.
 
 — Where the model is weakest by construction, which I can talk about without needing a big sample to justify it: Macro is a single market-wide reading applied identically to every ticker, Fundamentals is five reported numbers on bands that ignore sector, and Momentum's short-horizon input is an approximation rather than a measurement.
 
 — Why methodology transparency matters more than methodology sophistication. Most retail scoring tools are similar inside; the meaningful differentiator is whether the scorecard exists.
 
-Tapeline is a solo-founder project. Trading-system development background. Six months in. /scorecard / /how-it-works / /pricing.
+Tapeline is a solo-founder project. Trading-system development background. Record public since May 2026. /scorecard / /how-it-works / /pricing.
 
 Happy to record.
 
@@ -231,7 +254,7 @@ Episode arc that I think works for your audience:
 
 — **Walk-forward vs back-test: why I started with forward-test.** A back-test on 6 factors with versioned weights is trivially over-fittable. The forward-test commits the weights before any data is in. Cost: small sample, slow signal. Value: no overfit, no survivor bias, no "we removed the underperforming factor mid-test."
 
-— **Five-month decomposition: which factor's alpha actually exceeds its weight.** Both Smart Money and Momentum are hitting above weight; Macro is below weight in isolation but above weight when in confluence with Trend + RS. The question is how to act on that without overfitting.
+— **Factor decomposition since May 2026: does any factor earn its weight?** The sample is too small to say, and the record trails SPY overall. The question is how to read a small sample without overfitting.
 
 — **The Bayesian prior on weight change.** My current rule is no weight change > 2 percentage points without 60 days of supporting data. That's arbitrary; would value a discussion of how Newfound, Two Sigma, etc. actually calibrate model-update cadence.
 
@@ -268,7 +291,7 @@ What I'd bring to a Compounders episode:
 
 — **Why I publish the methodology and not just the score.** The Compounders listener-base is the most likely audience to argue with the six factors and their ordering, which is exactly what naming them enables. Every methodology revision goes in the public /changelog, so a re-weighting is a change on the record rather than a silent one.
 
-Background: solo founder, six months in. Trading-system development before this. /scorecard for the record.
+Background: solo founder, record public since May 2026. Trading-system development before this. /scorecard for the record.
 
 Happy to record.
 
@@ -296,13 +319,13 @@ The angle that's right for RR:
 
 — Factor decomposition done in retail-accessible language. The 6 factors map to academic literature your audience already knows — Asness defensive-quality, Fama-French momentum, regime-aware risk scaling — expressed as a single 0-100 number with a plain-English "why" sentence per row. The transparency of a factor product, without the factor-product framing.
 
-— Why a forward-test is more honest than any back-test. The /scorecard freezes the top-10 daily picks at close and back-checks each against SPY the next session. Running since May 2026. Misses stay on the page, corrections are dated. The sample is small but the methodology stays.
+— Why a forward-test is more honest than any back-test. The /scorecard records the day's top 10 at the close and back-checks each against SPY the next session. Running since May 2026; days with no list are dated. Misses stay on the page, corrections are dated. The sample is small but the methodology stays.
 
 — A specific worked example: take a name, decompose the score, show where the composite agrees and disagrees with the underlying factor signals. The disagreements are usually more interesting than the agreements.
 
 — The evidence-based-software conversation, retail edition. Tapeline is $9.99/mo Pro, $19.99/mo Premium — competing against $500-$5,000/yr scoring tools that don't publish their methodology. What "evidence-based" means for retail-facing software, not just for portfolio construction.
 
-Background: built Tapeline solo over the last six months. Trading-system developer for ~10 years before this. Melbourne-based, time-zone-flexible.
+Background: built Tapeline solo, record public since May 2026. Trading-system developer for ~10 years before this. Melbourne-based, time-zone-flexible.
 
 tapeline.io · tapeline.io/scorecard · tapeline.io/how-it-works
 
@@ -334,7 +357,7 @@ The angle that's right for Acquirers:
 
 — Operating economics. One worker re-scoring about 11,500 US stocks and ETFs about every 60 seconds on Fly.io + Neon Postgres + Massive (formerly Polygon). The cost-per-paid-user math and where the operational moat actually is (transparent forward-test, not the factor list).
 
-Background: trading-system developer for ~10 years; built Tapeline solo over six months. Melbourne-based.
+Background: trading-system developer for ~10 years; built Tapeline solo, record public since May 2026. Melbourne-based.
 
 tapeline.io · tapeline.io/scorecard · tapeline.io/how-it-works
 
@@ -360,13 +383,13 @@ The angle that's right for The Long View:
 
 — What methodology transparency means in retail-facing investing software. Morningstar built a research business on showing the methodology behind every rating; Tapeline applies the same standard to scoring software. The 0-100 composite is decomposed into 6 factor sub-scores on every ticker page with a plain-English "why" sentence.
 
-— A back-checked forward-test, not a back-test. The /scorecard freezes the top-10 daily picks at close and back-checks each against SPY the next session. Five months in. Misses stay on the page. Discussion of why publishing the wins-and-misses log changes the incentives versus a quarterly fund factsheet.
+— A back-checked forward-test, not a back-test. The /scorecard records the day's top 10 at the close and back-checks each against SPY the next session. Public since May 2026; days with no list are dated. Misses stay on the page. Discussion of why publishing the wins-and-misses log changes the incentives versus a quarterly fund factsheet.
 
 — The retail-price conversation. Tapeline is $9.99/mo Pro, $19.99/mo Premium. The competitive set is $500-$5,000/yr scoring tools that don't publish their methodology. Why "evidence-based" software at retail price points is a structurally different conversation than evidence-based portfolio management.
 
 — A specific worked example: take a name your audience knows, decompose the Tapeline score, show what the 6-factor breakdown is communicating that the composite hides.
 
-Background: built Tapeline solo over the last six months. Trading-system developer for ~10 years before this. Melbourne-based, time-zone-flexible.
+Background: built Tapeline solo, record public since May 2026. Trading-system developer for ~10 years before this. Melbourne-based, time-zone-flexible.
 
 tapeline.io · tapeline.io/scorecard · tapeline.io/how-it-works
 

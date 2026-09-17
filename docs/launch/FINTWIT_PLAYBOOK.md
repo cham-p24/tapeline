@@ -105,7 +105,7 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 > tapeline.io/scorecard
 
 > **3.**
-> [TICKER] was a HIGH CONVICTION call on Tapeline at [DATE].
+> [TICKER] was in Tapeline's recorded top 10 on [DATE].
 > Score: [N]/100. Reason at the time: "[paste the score reason]."
 > Next day: [+X% vs SPY's Y%].
 > Receipt: tapeline.io/scorecard/[ticker]
@@ -114,7 +114,7 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 > The screenshot most stock-Twitter accounts don't post:
 > a calendar of every call they made, color-coded by hit/miss.
 > Here's mine. [embed scorecard image]
-> 26 days tracked, [X]% beat SPY. That's the bar.
+> [N] days tracked, [X]% beat SPY. That's the bar.
 
 > **5.**
 > Most "stock scanner" products won't show you their picks from
@@ -152,10 +152,10 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 
 > **10.**
 > Three things I will never do with Tapeline:
-> 1. Edit historical scorecard entries
+> 1. Re-rank or delete a recorded entry
 > 2. Hide picks that didn't work
 > 3. Change the factor weighting without a public changelog
-> If any of those happen, the moat is gone.
+> Corrections to recorded values get a date on the page. There have been two. tapeline.io/scorecard
 
 ### Anti-marketing tweets — work because everyone else is salesy
 
@@ -181,10 +181,10 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 > 10x more useful than a "correct" score with no audit trail.
 
 > **14.**
-> Six months in. One paying customer. Tapeline isn't profitable.
+> [N] months in. [N] paying customers. Tapeline isn't profitable.
 > Posting this because every "I went from 0 to $10K MRR in 30 days"
 > thread you read on here is either lying or the exception.
-> Real number: 80 visitors a week. Building anyway. /1
+> Real number: [N] visitors a week. Building anyway. /1
 
 > **15.**
 > Pricing test: Tapeline Pro is $8.25/mo annual ($99/yr).
@@ -243,7 +243,7 @@ the transparent option in a category where most products name nothing at all.)
 (Founder-vulnerability thread. High engagement format. Make it specific
 to Tapeline so it doesn't read as generic "lessons learned" content.)
 
-> **1/** Six months building Tapeline. Five things I'd do differently.
+> **1/** [N] months building Tapeline. Five things I'd do differently.
 > Posting these because there are 50 people out there about to make the
 > same mistakes — and one of you is going to actually ship.
 
@@ -303,8 +303,8 @@ to Tapeline so it doesn't read as generic "lessons learned" content.)
 > faster long-term.
 
 > **5/** If you find a flaw in the methodology, tell me and I'll fix it. If
-> the fix changes the score, the scorecard's prior entries stay frozen
-> with the old version noted. Methodology changes are themselves logged
+> the fix changes the score, entries already recorded are not re-ranked or
+> deleted, and any correction to a recorded value is dated on /scorecard. Methodology changes are themselves logged
 > publicly. Reputational integrity > looking smart on any single update.
 
 ---

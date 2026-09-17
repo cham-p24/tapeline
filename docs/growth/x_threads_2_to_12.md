@@ -215,7 +215,7 @@ Target: Mon 2026-05-26, 8 AM ET. Refresh the numbers from /api/scorecard at post
 
 **Tweet 1** (~270 chars):
 ```
-The Tapeline scorecard has been freezing top-10 picks at every US market close for a week.
+The Tapeline scorecard has been recording the day's top 10 at the US close for a week.
 
 I'm posting the current numbers because the point of /scorecard is that it's auditable. Even when the early weeks look mediocre.
 ```
@@ -324,7 +324,7 @@ Wins stay. Losses stay.
 ```
 What the back-check explicitly DOESN'T do:
 
-– No retroactive picking (the top-10 at close is locked once recorded)
+– No retroactive picking (recorded entries are not re-ranked or deleted; corrections are dated)
 – No survivor bias filter (delisted tickers stay on the historical page)
 – No methodology adjustment after the fact (changelog tracks every change in markdown)
 ```
@@ -423,7 +423,7 @@ I can publish quantitative analysis on US stocks without a financial services li
 ```
 2. The time zone is a feature.
 
-US markets close 6 AM AEST. I wake up to a fully back-checked scorecard with overnight data already populated. By the time East Coast traders are at their desks, the next picks are frozen.
+US markets close 6 AM AEST. I wake up to a fully back-checked scorecard with overnight data already populated. By the time East Coast traders are at their desks, the last close's top 10 is recorded and back-checked.
 
 This isn't a bug to work around — it's literally why it works.
 ```

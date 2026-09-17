@@ -166,7 +166,9 @@ quote the steady-state Free caps, never the promo numbers — see
   tally only; per-firm rating events and price targets are not on the current
   data plan and must not be advertised
 - **Personal watchlist track record** (`watchlist.track_record`) — each
-  watchlist ticker frozen daily and back-checked vs SPY
+  watchlist ticker frozen daily and back-checked vs SPY. **Held dark, not
+  sold:** it is in `DISABLED_FEATURES` in `backend/app/services/tier.py`
+  pending the lawyer's answer, so do not list it as a Premium benefit.
 - **API access**: 1,000 requests/day (throttled to 100/day while on trial —
   `_TRIAL_PREMIUM_REDUCTIONS`)
 - Email alerts: unlimited · watchlist 200 tickers / 20 lists · 100 saved scans
