@@ -388,6 +388,60 @@ async def test_scanner_rows_cap_hit_persists(client, monkeypatch):
         await _delete_scanner_universe()
 
 
+@pytest.mark.asyncio
+async def test_scanner_background_refetch_writes_no_cap_event_and_no_scan_run(
+    client, monkeypatch
+):
+    """src=stream is the in-app scanner refetching after a live-bridge update.
+
+    Each refetch fills a free user's capped page again. Before this guard every
+    one of them wrote a cap_events row and emailed the founder, about every
+    72 seconds for as long as the tab stayed open. The row cap is still
+    enforced: the refetch returns the same capped page.
+    """
+    if free_open_access():
+        pytest.skip("scanner row cap is lifted during open-access month")
+    from app.models.funnel_events import FunnelEvent
+
+    sent: list[tuple] = []
+
+    async def _no_mail(*args, **kwargs):
+        sent.append(args)
+
+    monkeypatch.setattr(cap_events_module, "_notify_founder_of_cap_hit", _no_mail)
+    try:
+        async with client:
+            await _seed_scanner_universe()
+            cookies, uid = await _free(client, monkeypatch)
+
+            for _ in range(3):
+                r = await client.get("/api/scanner?limit=100&src=stream", cookies=cookies)
+                assert r.status_code == 200, r.text
+                body = r.json()
+                assert body["tier"] == "free"
+                assert body["count"] == FREE_SCANNER_ROWS  # the limit still holds
+
+            assert await _cap_rows(uid, "scanner_rows") == 0
+            assert sent == []
+            async with session_scope() as s:
+                scan_runs = (
+                    await s.execute(
+                        select(func.count())
+                        .select_from(FunnelEvent)
+                        .where(FunnelEvent.user_id == uid, FunnelEvent.event == "scan_run")
+                    )
+                ).scalar_one()
+            assert scan_runs == 0
+
+            # The same request made by a person (src=app) is still a cap hit.
+            r = await client.get("/api/scanner?limit=100&src=app", cookies=cookies)
+            assert r.status_code == 200, r.text
+        assert await _cap_rows(uid, "scanner_rows") == 1
+        assert len(sent) == 1
+    finally:
+        await _delete_scanner_universe()
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # 3. Paid users write NOTHING
 # ════════════════════════════════════════════════════════════════════════════

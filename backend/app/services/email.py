@@ -1393,13 +1393,31 @@ def render_subscription_started_email(
     user_name: str,
     tier: str,
     billing_period: str = "monthly",
-    amount_cents: int | None = None,
+    plan_price_cents: int | None = None,
     currency: str = "usd",
     next_charge_iso: str | None = None,
+    *,
+    charged_today_cents: int | None = None,
 ) -> str:
-    """Welcome-to-paid. Fires once on the FIRST `customer.subscription.created`
-    Stripe webhook for a user (replay-safe via stripe_webhook_events dedup +
-    the "no prior Subscription row" check at the webhook site).
+    """Welcome-to-paid. Fires once per subscription, when its FIRST invoice
+    with `amount_paid > 0` succeeds (`invoice.payment_succeeded`, latched on
+    `paid_start:{subscription}` in stripe_webhook_events — see
+    routers/webhooks.py:_welcome_on_first_paid_invoice). Never on a status
+    change: a trial's subscription goes active before its first charge.
+
+    TWO AMOUNTS, AND THEY ARE NOT THE SAME THING.
+      - `charged_today_cents` is what the invoice actually took (amount_paid).
+        It is rendered as "Charged today", never with "per month/year": a
+        discounted, credited or prorated first charge is a one-off figure.
+      - `plan_price_cents` is the plan's price per billing period (the paid
+        line's unit amount), rendered "per month/year". When the two differ
+        it is labelled "before any discount or credit".
+    Rendering the invoice amount as the recurring price told a customer on a
+    50%-off coupon "$10.00 USD per month · Next charge: …" when month four
+    would be $19.99 — a price promise the next invoice breaks. Either amount
+    may be None; an unknown amount is left out rather than guessed. There is
+    deliberately no sticker-price fallback: a hand-sold or grandfathered plan
+    is not on the public price table, so a fallback would state a wrong price.
 
     Tone:
       - Receipt-clean (acknowledge what they just paid for)
@@ -1408,32 +1426,43 @@ def render_subscription_started_email(
         welcome which is for trial users with no commitment yet)
       - Acknowledges the 30-day refund window without leading with it
 
-    Arguments map directly to fields available on the Stripe subscription
-    object in the webhook handler — see routers/webhooks.py.
+    Arguments are resolved from the paid invoice (and the subscription
+    metadata it carries) in the webhook handler — see routers/webhooks.py.
     """
     tier_label = tier.capitalize()
     period_label = "year" if billing_period == "annual" else "month"
-    if amount_cents is not None and amount_cents > 0:
-        dollars = amount_cents / 100
-        price_line = f"${dollars:.2f} {currency.upper()} per {period_label}"
-    else:
-        # Fallback to the canonical sticker prices if the webhook didn't carry
-        # an amount (shouldn't happen but better than printing nothing).
-        sticker = {
-            ("pro", "monthly"): "$9.99/mo",
-            ("pro", "annual"): "$99/yr",
-            ("premium", "monthly"): "$19.99/mo",
-            ("premium", "annual"): "$199/yr",
-        }.get((tier.lower(), billing_period), "")
-        price_line = sticker
-    next_charge_line = ""
+    cur = currency.upper()
+    plan = (
+        plan_price_cents
+        if isinstance(plan_price_cents, int) and plan_price_cents > 0
+        else None
+    )
+    charged = (
+        charged_today_cents
+        if isinstance(charged_today_cents, int) and charged_today_cents > 0
+        else None
+    )
+    discounted = plan is not None and charged is not None and charged != plan
+
+    headline = f"Tapeline {tier_label}"
+    if plan is not None and not discounted:
+        headline += f" · ${plan / 100:.2f} {cur} per {period_label}"
+    detail_lines: list[str] = []
+    if charged is not None:
+        detail_lines.append(f"Charged today: ${charged / 100:.2f} {cur}.")
+    if discounted and plan is not None:
+        detail_lines.append(
+            f"Plan price: ${plan / 100:.2f} {cur} per {period_label}, before "
+            f"any discount or credit."
+        )
     if next_charge_iso:
         try:
             from datetime import datetime
             dt = datetime.fromisoformat(next_charge_iso.replace("Z", "+00:00"))
-            next_charge_line = f"Next charge: {dt.strftime('%b %d, %Y')}."
+            detail_lines.append(f"Next charge: {dt.strftime('%b %d, %Y')}.")
         except Exception:
-            next_charge_line = ""
+            pass
+    next_charge_line = "<br>".join(detail_lines)
     # The guarantee is not the same on both plans and this renderer fires for
     # both: monthly refunds in full inside the window, annual refunds the
     # remainder prorated with one month at the monthly rate retained. Canonical
@@ -1447,14 +1476,18 @@ def render_subscription_started_email(
         refund_clause = "just reply to this email and we'll refund in full."
     return shell(
         h1(f"You're in, {user_name}.")
+        # No freshness or coverage claims here. "Every score live-updating,
+        # every alert channel on, the full universe scanner unlocked" was not
+        # true (prices are delayed, push is opt-in, paid plans list up to
+        # 1,000 scanner rows), and this email now goes out at the moment of a
+        # real charge. State what the charge did and stop.
         + lead(
-            f"Welcome to Tapeline <strong>{tier_label}</strong>. Your full data "
-            f"feed is live — every score live-updating, every alert channel on, "
-            f"the full universe scanner unlocked."
+            f"Welcome to Tapeline <strong>{tier_label}</strong>. Your first "
+            f"payment went through and your {tier_label} plan is active."
         )
         + card(
             f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Your subscription</div>'
-            f'<div class="tl-fg" style="margin-top:6px;font-size:18px;font-weight:700;color:{LIGHT_FG};font-family:{FONT_SANS};">Tapeline {tier_label} · {price_line}</div>'
+            f'<div class="tl-fg" style="margin-top:6px;font-size:18px;font-weight:700;color:{LIGHT_FG};font-family:{FONT_SANS};">{headline}</div>'
             f'<div class="tl-muted" style="margin-top:4px;font-size:13px;color:{LIGHT_MUTED};font-family:{FONT_SANS};">{next_charge_line}</div>',
             accent=True,
         )
@@ -1465,7 +1498,7 @@ def render_subscription_started_email(
             f"""
             <ol style="margin:0;padding-left:20px;color:{LIGHT_FG};font-family:{FONT_SANS};font-size:14px;line-height:1.7;">
               <li><strong>Build your watchlist</strong> — add the names you actually
-                  trade. Alerts fire the moment any score crosses your threshold.</li>
+                  trade. Alerts go out when a score crosses the threshold you set.</li>
               <li><strong>Pick a notification channel</strong> — email's on by default,
                   but {tier_label} can also fire browser push and
                   the daily briefing. <a href="https://tapeline.io/app/settings/email"
@@ -1482,7 +1515,7 @@ def render_subscription_started_email(
             f"style=\"color:{LIGHT_MUTED};text-decoration:underline;\">30-day money "
             f"back</a> — {refund_clause}"
         ),
-        preheader=f"Welcome to Tapeline {tier_label} — your full data feed is live.",
+        preheader=f"Welcome to Tapeline {tier_label} — your first payment went through.",
     )
 
 
@@ -6112,24 +6145,62 @@ _PRODUCT_UPDATE_OPENER = (
 )
 
 #: (heading, body). Bold in the HTML part; own line in the text part.
+#:
+#: REWORDED 2026-09-14 after the founder's "go on 1-5, reword the email" (13:24
+#: UTC), once the stall, universe and score-change sentences were checked
+#: against the PRs and production and found false or misleading. That reply
+#: asked for a rewording; it did not approve this text. What each withdrawn
+#: sentence said and why is in test_update_send.py, which fails if any returns.
+#:
+#: FOUNDER APPROVAL OF THIS EXACT TEXT — APPROVED.
+#: The founder was shown the complete rendered text for both audiences (account
+#: holder and newsletter: subject, body and footer, rendered from commit 53ca5df
+#: with the send replaced by a capture) and asked to reply "yes, send this" or
+#: "hold". At about 21:53 UTC on 14 September 2026 he replied, verbatim: "YES".
+#: That reply was to that rendered text. Any change to this copy after 53ca5df
+#: is not covered by it. Keep this record identical to the one above
+#: APPROVED_COPY in backend/tests/test_update_send.py.
 PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
     (
-        "Scores and prices stopped updating for about a day.",
-        "From 15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner "
-        "kept showing numbers that were not being refreshed. Over the following "
-        "day it stalled several more times before recovering on its own. The "
+        "Scores were not kept up to date for most of 6 to 11 September.",
+        "From 6 September our scoring kept failing to finish its work. Three of "
+        "the six factors — trend, relative strength and momentum — kept using "
+        "price data fetched on 6 September until fixes on 10 and 11 September, "
+        "and nothing on the site said those three factors were out of date. From "
+        "15:36 UTC on 9 September to 16:18 UTC on 10 September, the scanner "
+        "showed numbers that were not being refreshed at all. Our monitoring "
+        "restarted the machines that run "
+        "scoring many times over those days. That did not fix it, and it made "
+        "things worse: each restart threw away work in progress, and the "
+        "restarts also started a second copy of scoring alongside the first. The "
         "cause was our own code plus a server that could not keep up with the "
-        "larger universe described below. Both are fixed: scoring now runs on a "
-        "dedicated machine, and it has not stalled since 11 September.",
+        "larger universe described below. We fixed the problems we had found in "
+        "our code on 10 September, but scoring fell behind again, and on 11 "
+        "September we moved it to a dedicated machine. Since then, up to 14 "
+        "September, when we wrote this, our monitoring has found scoring "
+        "finishing on time at every check.",
+    ),
+    (
+        "Two other factors fell behind as well.",
+        "Company fundamentals and insider buying are refreshed by a separate job. "
+        "It was still stalled on 13 September, two days after scoring moved to "
+        "its new machine, and some readings it did fetch were lost when we "
+        "released updates to the site. We made fixes on 13 and 14 September and "
+        "began fetching the lost readings again. Insider filings had a second "
+        "problem: they reached us through a data provider whose copies could run "
+        "weeks behind the SEC's own. On 14 September we began reading them from "
+        "the SEC directly, and as each stock is re-read, its insider-buying "
+        "reading, and the score that uses it, can change.",
     ),
     (
         "The scanner now covers about 11,500 stocks and ETFs.",
-        "At the start of the month it was about 2,000. That is not new data we "
-        "bought. It is data we already had and were not refreshing. Search for "
-        "TSM, Sony or Toyota and they are there.",
+        "Until 6 September, thousands of stocks and ETFs we had already scored "
+        "could not appear in a scan. That is not new data we bought. It is data "
+        "we already had and were not refreshing. Search for TSM, Sony or Toyota "
+        "and they are there.",
     ),
     (
-        "Crypto is in: 100 pairs, updated once a day.",
+        "Crypto is in: more than 100 pairs, updated once a day.",
         "Coins sit in their own list and are never ranked against stocks, because "
         "two of our six factors — company fundamentals and insider buying — "
         "cannot exist for a coin. Prices update daily, not live. Our data plan "
@@ -6138,11 +6209,14 @@ PRODUCT_UPDATE_SECTIONS: tuple[tuple[str, str], ...] = (
     ),
     (
         "Scores moved on 7 September, mostly down.",
-        "A renamed column in one of our data sources meant some inputs went "
-        "missing, and a missing input was being scored as neutral, which "
-        "flattered most stocks. We recalculated 4,112 scores and 3,233 of them "
-        "went down. If a score you watch dropped that week, the lower number is "
-        "the accurate one.",
+        "Three columns in one of our data sources were renamed, and we read them "
+        "as missing. We scored those missing values as neutral, which made most "
+        "of the affected scores too high. When we fixed it, a test run against "
+        "that source changed 4,088 of its 4,112 scores, and 3,233 of them went down. "
+        "Scores moved again once the stale price data described above was "
+        "replaced, and they can still move as the factor readings described "
+        "above are fetched again, so a change in a score you watch may have more "
+        "than one cause.",
     ),
 )
 
@@ -6197,8 +6271,8 @@ def render_product_update_email(
     one, because a broadcast with no working opt-out is the thing the Spam Act
     is about.
 
-    NO PREHEADER. Every other line of this email was approved word for word; a
-    preheader would be the one sentence nobody approved.
+    NO PREHEADER. Every other line of this email goes to the founder word for
+    word; a preheader would be the one sentence nobody approved.
     """
     from html import escape as _html_escape
 

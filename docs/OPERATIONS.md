@@ -86,7 +86,7 @@ Annual rows are intentional "charm" prices — `$99/yr` displays in-app as `$8.2
 - `customer.subscription.created` — initial paid subscription; also where the referral-credit consumer fires (see `backend/app/routers/webhooks.py:111`)
 - `customer.subscription.updated` — tier changes, cancellation flags
 - `customer.subscription.deleted` — drops the user back to Free
-- `invoice.payment_succeeded` — optional, useful for renewal alerts later
+- `invoice.payment_succeeded` — **required**. A subscription's first invoice with `amount_paid > 0` sends the "You're in" welcome and the founder's new-subscription alert (once per subscription), and a charge clearing mid-dunning sends the all-clear. Without it no paying customer is ever welcomed. (`invoice.paid` is not needed and not subscribed.)
 
 The webhook handler is idempotent (logs every processed event_id in `stripe_webhook_events`), so Stripe's automatic redeliveries are safe.
 

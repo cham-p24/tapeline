@@ -6,8 +6,10 @@ import { TableSkeleton } from "@/components/Skeleton";
 
 /**
  * Insider transactions tab — Premium-only (gating at the Paywall wrapper
- * in TickerPage). Pulls last 90 days of Form 4 filings for this ticker
- * from Finnhub.
+ * in TickerPage). Shows the last 90 days of Form 4 filings for this ticker:
+ * the rows the worker reads from SEC EDGAR into insider_transactions, the same
+ * data as /app/holdings and the Smart Money factor (live Finnhub until
+ * 2026-09-15; see backend/app/routers/ticker.py ticker_insider).
  *
  * The Paywall wraps THIS component on the ticker page, but the endpoint
  * also enforces the gate server-side so the data can't be sniffed via
@@ -65,7 +67,7 @@ export function InsiderTab({ symbol }: { symbol: string }) {
         </tbody>
       </table>
       <p className="mt-3 text-xs text-muted">
-        Source: SEC Form 4 filings. Codes: P = open-market purchase, S = sale,
+        Source: SEC Form 4 filings, read from SEC EDGAR. Codes: P = open-market purchase, S = sale,
         A = grant/award, M = option exercise, G = gift, F = tax withholding.
       </p>
     </div>

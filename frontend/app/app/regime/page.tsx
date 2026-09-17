@@ -149,20 +149,26 @@ export default function RegimePage() {
     try {
       setR(await api.regime());
       setLoadError(null);
+      return true;
     } catch (e) {
       // 403 (Free tier) → the <Paywall> wrapper below owns the presentation.
       // Rendering the error card here was a dead end: "Try again" can never
       // succeed for the tier, and the copy never mentioned upgrading.
       if (e instanceof TierGateError) {
         setLoadError(null);
-        return;
+        return false;
       }
       console.error(e);
       setLoadError(e instanceof Error ? e.message : "Failed to load regime");
+      return false;
     }
   }, []);
-  useEffect(() => { load(); }, [load]);
-  const { status, lastUpdate } = useLiveStream(load);
+  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived.
+  const { status, lastUpdate, markLoaded } = useLiveStream(load);
+  useEffect(() => {
+    void load().then((ok) => { if (ok) markLoaded(); });
+  }, [load, markLoaded]);
 
   const toneBg =
     r?.regime === "BULL" ? "bg-up/15 text-up"

@@ -25,6 +25,9 @@ durable in Postgres and is therefore correct across restarts and machines.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
+import logging
 from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import case, select, update
@@ -38,6 +41,8 @@ from app.services.tier import (
     is_on_trial,
     limit,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _utc_today() -> date:
@@ -146,6 +151,102 @@ async def consume_ticker_lookup(session: AsyncSession, user: User) -> dict:
         "limit": cap,
         "remaining": max(0, cap - used),
     }
+
+
+# ── Stream refetches: served, never metered ──────────────────────────────────
+#
+# The in-app ticker page refetches GET /api/ticker/{symbol} each time the API's
+# live bridge announces a worker pass (services/live_bridge.py, about every
+# 70-80s in the US session). That is the SAME page the user already paid a
+# look-up for, so it must not spend another, and at the cap it must not be a
+# 402, a cap_events row or a founder email either.
+#
+# WHY A RECEIPT AND NOT A BARE MARKER. `?src=stream` on its own is a free pass
+# anyone can type: a Free user could read every ticker in the universe without
+# spending a look-up. The refetch therefore also carries the receipt the API
+# handed back with the look-up it IS refreshing: an HMAC over
+# (user id, symbol, UTC day) under the session secret. It proves "this user was
+# served this symbol today" without any storage, so it holds across API
+# machines and restarts, cannot be moved to another user or symbol, and expires
+# at the same UTC midnight the counter resets on.
+#
+# WHY NOT DEDUPE EVERY LOOK-UP PER USER+SYMBOL+DAY. That would also stop a
+# person's own reload from counting, which changes what the published
+# allowance means ("12 detailed look-ups a day"). That is a pricing decision,
+# not a bug fix; this only takes the page's background refresh off the meter.
+
+_RECEIPT_PURPOSE = "ticker-lookup-refetch"
+
+
+def _receipt_signature(user_id: str, symbol: str, day: date) -> str:
+    from app.services.session import _session_secret
+
+    msg = f"{_RECEIPT_PURPOSE}|{user_id}|{symbol.upper()}|{day.isoformat()}".encode()
+    return hmac.new(_session_secret().encode(), msg, hashlib.sha256).hexdigest()
+
+
+def lookup_receipt(user_id: str, symbol: str, day: date | None = None) -> str | None:
+    """Proof that `user_id` was served `symbol` on `day` (default: today, UTC).
+
+    Returned with every allowed GET /api/ticker/{symbol} for a signed-in user;
+    the page echoes it on its stream refetches. Format "YYYY-MM-DD.<hex>".
+    None if the signing secret is unavailable: the page then does not
+    auto-refresh for a metered user, which is the safe direction.
+    """
+    day = day or _utc_today()
+    try:
+        return f"{day.isoformat()}.{_receipt_signature(user_id, symbol, day)}"
+    except Exception:
+        logger.exception("usage.receipt_secret_unavailable")
+        return None
+
+
+def verify_lookup_receipt(receipt: str | None, user_id: str, symbol: str) -> bool:
+    """True only for a receipt minted TODAY (UTC) for this user and symbol.
+
+    Never raises: any malformed input, or a missing signing secret, is False,
+    and the caller then refuses the refetch (it does not fall back to metering
+    it, because a background request must never spend a look-up).
+    """
+    if not receipt or not isinstance(receipt, str):
+        return False
+    day_part, sep, sig = receipt.partition(".")
+    if not sep or not sig:
+        return False
+    today = _utc_today()
+    if day_part != today.isoformat():
+        return False
+    try:
+        expected = _receipt_signature(user_id, symbol, today)
+    except Exception:
+        logger.exception("usage.receipt_secret_unavailable")
+        return False
+    return hmac.compare_digest(sig, expected)
+
+
+def is_metered(user: User) -> bool:
+    """True when GET /api/ticker/{symbol} counts against this user's day."""
+    if _is_unmetered(user):
+        return False
+    return limit(user.tier, "daily_lookups") is not None
+
+
+async def peek_ticker_lookup(session: AsyncSession, user: User) -> dict:
+    """The meter as consume_ticker_lookup would report it, WITHOUT consuming.
+
+    Same dict shape (allowed is always True: nothing is being charged). Used for
+    a stream refetch, so the page's "Look-up N of 12 today" stays truthful.
+    """
+    cap = limit(user.tier, "daily_lookups")
+    if _is_unmetered(user) or cap is None:
+        return {"allowed": True, "used": 0, "limit": None, "remaining": None}
+    row = (
+        await session.execute(
+            select(User.lookups_today, User.lookups_reset_on).where(User.id == user.id)
+        )
+    ).one()
+    used = (row.lookups_today or 0) if row.lookups_reset_on == _utc_today() else 0
+    return {"allowed": True, "used": used, "limit": cap, "remaining": max(0, cap - used)}
 
 
 # ── Anonymous (no account) per-IP daily lookup meter ─────────────────────────

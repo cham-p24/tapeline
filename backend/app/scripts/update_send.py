@@ -56,9 +56,9 @@ Five layers, because each one covers a failure the others do not.
      has no per-row marker (`last_sent_at` belongs to the daily digest, which
      would stop sending if this job wrote it). So accounts always go first, and
      the newsletter phase runs only when no account carried the token before
-     this run AND this run stamped at least one. The second condition closes a
-     hole the survey reminder's guard has: a run that stamps no account leaves
-     no trace, so without it a re-run would mail the list a second time. A crash
+     this run AND this run stamped at least one. The second condition matters:
+     a run that stamps no account leaves no trace, so without it a re-run would
+     mail the list a second time. A crash
      therefore under-sends rather than double-sends. `--force-newsletter` is
      for a human who has checked Resend's log first.
   4. AN ERROR AFTER THE REQUEST LEFT IS STAMPED, NOT RETRIED. `send_email`
@@ -102,6 +102,21 @@ SAFETY
     .github/workflows/product-update-send.yml, and the test that reads the
     worker's send hours from its source.
 
+AN OUTAGE STOPS THE RUN; A RUN THAT FELL SHORT EXITS NON-ZERO
+-------------------------------------------------------------
+Layer 4 stamps every unknown outcome, so if Resend answered 5xx or timed out on
+every call, the run would stamp the whole audience and mail nobody. So
+UNKNOWN_OUTCOME_LIMIT unknown outcomes in a row (no delivery between them) stop
+the account phase: the accounts after them are not attempted, carry no stamp,
+and are counted as `accounts_held` for a re-run. On a first run the newsletter
+half is HELD too, even under --force-newsletter. On a re-run it is left alone
+without an instruction to force it, because the earlier run may already have
+mailed the list. Ported from the survey reminder (#831), with its review's fix.
+
+Nobody watches the 17:07 run, so `main` exits 1 — printing `refused:` or a
+`FELL SHORT:` line, counts only — when the lock was refused or any FELL_SHORT
+count is non-zero. A dry run, and a re-run that finds everyone stamped, exit 0.
+
 Usage:
     python -m app.scripts.update_send                   # dry run
     python -m app.scripts.update_send --send --quiet    # what the workflow runs
@@ -111,7 +126,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
-import re
 import sys
 
 from sqlalchemy import select
@@ -123,6 +137,12 @@ from app.scripts.survey_send import (
     collect_newsletter,
     first_name,
 )
+from app.services.broadcast_safety import (  # noqa: F401 — RedactAddresses is re-exported
+    RedactAddresses,
+    configure_quiet_logging,
+    outcome_unknown,
+    room_for_token,
+)
 from app.services.dblock import LOCK_PRODUCT_UPDATE, one_machine_at_a_time
 
 logger = logging.getLogger(__name__)
@@ -132,6 +152,14 @@ UPDATE_TOKEN = "product_update_2026_09"
 #: Invisible on the page — the link text is derived without the query string —
 #: and lets the scorecard's traffic from this one email be told apart.
 SCORECARD_UTM = "utm_source=email&utm_medium=email&utm_campaign=product_update_2026_09"
+
+#: Unknown outcomes in a row that stop the account phase. See "AN OUTAGE STOPS
+#: THE RUN" in the module docstring.
+UNKNOWN_OUTCOME_LIMIT = 2
+
+#: Counts meaning an eligible person was not knowably reached by this run. Any
+#: of them non-zero makes `main` exit 1.
+FELL_SHORT = ("failed", "unknown", "not_sent", "accounts_held", "newsletter_held")
 
 
 def _state_tokens(drip_state: str | None) -> set[str]:
@@ -177,29 +205,11 @@ async def collect_accounts(session) -> tuple[list, list]:
 def _room_for_token(drip_state: str | None) -> bool:
     """Whether appending UPDATE_TOKEN still fits `users.drip_state`.
 
-    The column is VARCHAR(255) and this has already bitten once: weekly tokens
-    overran it and Postgres raised StringDataRightTruncation on commit (see
-    email.run_weekly_newsletter). Here the stamp is written AFTER the email is
-    delivered and outside the send's try, so an overflow would abort the run
-    with that person mailed but unstamped — and every retry would mail them
-    again. Skipping them, counted, is the only order that cannot double-send.
-    SQLite does not enforce the length, so the test suite could never see the
-    failure; the capacity is read from the model rather than restated here.
+    Here the stamp is written AFTER the email is delivered and outside the
+    send's try, so an overflow would leave that person mailed but unstamped.
+    Shared with the survey reminder; see `broadcast_safety.room_for_token`.
     """
-    from sqlalchemy import String
-
-    from app.models import User
-
-    # Narrowed with isinstance so mypy knows `.length` exists (a bare
-    # TypeEngine does not declare it). Text subclasses String with
-    # length=None, i.e. no limit, so a future Text column never blocks a send.
-    col_type = User.__table__.c.drip_state.type
-    capacity = col_type.length if isinstance(col_type, String) else None
-    if capacity is None:
-        return True
-    current = drip_state or ""
-    needed = len(current) + (1 if current else 0) + len(UPDATE_TOKEN)
-    return needed <= capacity
+    return room_for_token(drip_state, UPDATE_TOKEN)
 
 
 async def collect_newsletter_only(session) -> tuple[list, list]:
@@ -214,26 +224,9 @@ async def collect_newsletter_only(session) -> tuple[list, list]:
     return recipients, skipped
 
 
-def _outcome_unknown(exc: BaseException) -> bool:
-    """Whether Resend may have accepted the email even though the send raised.
-
-    True only for errors that can happen AFTER the request reached Resend: a
-    timeout or broken connection while writing the request or reading the
-    response, a malformed response, or a 5xx (a gateway can answer 502/504
-    after the upstream queued the email). False for anything that proves
-    Resend never took it: a connect or pool timeout, a refused connection, a
-    4xx rejection, or an error raised before the POST, such as a render bug.
-    See layer 4 in the module docstring for why the distinction matters.
-    """
-    import httpx
-
-    if isinstance(exc, httpx.HTTPStatusError):
-        return exc.response.status_code >= 500
-    return isinstance(exc, (
-        httpx.ReadTimeout, httpx.WriteTimeout,
-        httpx.ReadError, httpx.WriteError, httpx.CloseError,
-        httpx.RemoteProtocolError, httpx.DecodingError,
-    ))
+#: Whether Resend may have accepted an email whose send raised — layer 4. Shared
+#: with the survey reminder; see `services/broadcast_safety.outcome_unknown`.
+_outcome_unknown = outcome_unknown
 
 
 async def _stamp(session, user_id: str) -> None:
@@ -297,11 +290,15 @@ async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False
     counts = {
         "accounts_sent": 0, "newsletter_sent": 0, "would_send": 0,
         "governed": 0, "not_sent": 0, "failed": 0, "unknown": 0,
+        "accounts_held": 0, "newsletter_held": 0,
     }
     # Accounts this run stamped, whether delivered or outcome-unknown. Layer 3
     # asks whether a re-run could tell this run happened, and either kind of
     # stamp answers yes; `accounts_sent` alone would not count the second.
     stamped = 0
+    # Unknown outcomes since the last delivery, and whether they stopped the run.
+    unknown_streak = 0
+    stopped = False
 
     async with session_scope() as session:
         # Decided BEFORE anything is sent, and parsed in Python — see layer 2.
@@ -317,7 +314,7 @@ async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False
         print(f"newsletter: {len(news)} eligible; skipped: {_tally(n_skipped)}")
 
         governor = worker_governor()
-        for u in accounts:
+        for position, u in enumerate(accounts, start=1):
             greeting = first_name(u.name)
             if not send:
                 counts["would_send"] += 1
@@ -366,22 +363,51 @@ async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False
             governor.record(u)
             stamped += 1
             if outcome == "sent":
+                unknown_streak = 0
                 counts["accounts_sent"] += 1
                 show(f"  SENT        {u.email}")
-            else:
-                counts["unknown"] += 1
-                show(f"  UNKNOWN     {u.email} (stamped; check Resend's log)")
+                continue
+            unknown_streak += 1
+            counts["unknown"] += 1
+            show(f"  UNKNOWN     {u.email} (stamped; check Resend's log)")
+            if unknown_streak >= UNKNOWN_OUTCOME_LIMIT:
+                stopped = True
+                counts["accounts_held"] = len(accounts) - position
+                print(
+                    f"STOPPED: {unknown_streak} sends in a row had an unknown outcome, "
+                    f"so Resend looks unhealthy. {counts['accounts_held']} account(s) "
+                    "after them were not attempted and carry no stamp: re-run once "
+                    "Resend is healthy."
+                )
+                break
 
-        # Layer 3. Dry runs report what the first real run would do.
-        if force_newsletter:
+        # Layer 3 and the outage stop. Dry runs report what the first real run would do.
+        if stopped and first_run:
+            run_news, why = False, (
+                "HELD: the account phase stopped on unknown outcomes. Check Resend's "
+                "log, then run with --force-newsletter over flyctl ssh"
+            )
+            counts["newsletter_held"] = len(news)
+        elif stopped:
+            run_news, why = False, (
+                "SKIPPED: the account phase stopped, and an earlier run already stamped "
+                "accounts. Whether the list was mailed is in that run's log "
+                "('newsletter phase: running' means it was); do not force it blind"
+            )
+        elif force_newsletter:
             run_news, why = True, "FORCED by --force-newsletter"
         elif not first_run:
-            run_news, why = False, "SKIPPED: an earlier run already stamped accounts"
+            run_news, why = False, (
+                "SKIPPED: an earlier run already stamped accounts. If that run printed "
+                "'newsletter phase: HELD' or never reached this line, the list was never "
+                "mailed: check Resend's log, then run with --force-newsletter once"
+            )
         elif send and stamped == 0:
             run_news, why = False, (
                 "SKIPPED: this run stamped no account, so a re-run could not tell "
                 "the list had been mailed"
             )
+            counts["newsletter_held"] = len(news)
         else:
             run_news, why = True, "running"
         print(f"newsletter phase: {why}")
@@ -435,29 +461,6 @@ async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False
     return counts
 
 
-#: Anything shaped like local@domain. Deliberately loose: redacting a
-#: non-address that happens to contain "@" costs nothing in a count-only log,
-#: and missing a real address costs a customer's privacy.
-_ADDRESS_SHAPED = re.compile(r"[^\s<>\"'(),;:\[\]]+@[^\s<>\"'(),;:\[\]]+")
-
-
-class RedactAddresses(logging.Formatter):
-    """Formats a record — traceback included — then removes address-shaped text."""
-
-    def format(self, record: logging.LogRecord) -> str:
-        return _ADDRESS_SHAPED.sub("<address>", super().format(record))
-
-
-def configure_quiet_logging() -> logging.Handler:
-    """Route every log line through RedactAddresses. See SAFETY in the docstring."""
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(RedactAddresses("%(levelname)s %(name)s %(message)s"))
-    root = logging.getLogger()
-    root.handlers[:] = [handler]
-    root.setLevel(logging.WARNING)
-    return handler
-
-
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--send", action="store_true", help="actually transmit")
@@ -479,9 +482,19 @@ def main(argv: list[str] | None = None) -> None:
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-    asyncio.run(run(
+    counts = asyncio.run(run(
         send=args.send, quiet=args.quiet, force_newsletter=args.force_newsletter,
     ))
+    if counts == {}:
+        # The lock's loss value; without this line a refused run's log is silent.
+        print("\nrefused: another product update run holds the lock; this run sent nothing.\n")
+        sys.exit(1)
+    short = {k: counts[k] for k in FELL_SHORT if counts.get(k)}
+    if short:
+        # Counts only, never an address: this log is public.
+        print(f"FELL SHORT: {short} — exiting 1 so this run shows red. Read the "
+              "result line before re-running.\n")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

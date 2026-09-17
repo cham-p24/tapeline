@@ -499,7 +499,7 @@ export type CongressTrade = {
 };
 
 /**
- * One row of the Recent Insider Buys feed (SEC Form 4 via Finnhub).
+ * One row of the Recent Insider Buys feed (SEC Form 4, read from SEC EDGAR).
  * Replaces the legacy 13F HoldingItem shape — see /api/holdings router
  * for the schema change rationale.
  */
@@ -902,7 +902,8 @@ export const api = {
   presetDelete: (id: number) =>
     del<{ ok: boolean }>(`/api/presets/${id}`, DEV_TOKEN),
   /**
-   * Recent Insider Buys feed. Backed by SEC Form 4 filings via Finnhub.
+   * Recent Insider Buys feed: the stored SEC Form 4 filings the worker reads
+   * from SEC EDGAR (`services/edgar_form4.py`).
    * Replaces the legacy 13F holdings call; URL `/api/holdings` is unchanged
    * for backwards-compat but the response schema is now InsiderTxn[].
    */

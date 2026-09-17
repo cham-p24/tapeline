@@ -290,6 +290,26 @@ async def test_the_window_applies_to_filing_date_and_trade_date(sec: FakeSec) ->
     assert not any("000114036126000001" in p for p in sec.paths()), "an out-of-window filing was downloaded"
 
 
+async def test_a_share_count_the_column_cannot_hold_is_dropped_not_fatal(sec: FakeSec) -> None:
+    """SVRE, production 2026-09-14: a filing reported one line of 16,608,240,000
+    shares. `insider_transactions.share_change` is a 32-bit INTEGER on Postgres,
+    so the write raised on every re-read and the symbol failed forever. SQLite
+    does not enforce the width, so this pins the filter, not the database error.
+    Mutation: drop the filter - the unstorable line is handed to the writer."""
+    sec.add(AAPL_CIK, "0001140361-26-000001", _d(1), form4_xml(lines=[
+        (_d(2), "16608240000", "A", "6.93", "J"),
+        (_d(2), "2147483647", "A", "6.93", "J"),   # the largest that fits
+        (_d(2), "500", "A", "6.93", "P"),
+    ]))
+    txns = await fetch_insider_transactions("AAPL", raise_failures=True)
+    assert sorted(t["share_change"] for t in txns) == [500, 2_147_483_647]
+    assert edgar_form4.MAX_STORABLE_SHARES == 2**31 - 1
+    # The cache keeps what the document says; only the write-bound output is filtered.
+    async with session_scope() as s:
+        cached = json.loads((await s.execute(select(EdgarForm4Filing.rows_json))).scalar_one() or "[]")
+    assert 16_608_240_000 in [line["share_change"] for line in cached]
+
+
 async def test_filings_about_another_issuer_are_not_this_symbols(sec: FakeSec) -> None:
     """Apple's submission list can carry a Form 4 Apple filed as a 10% OWNER of
     another company. Mutation: drop the issuer check - that company's trade is

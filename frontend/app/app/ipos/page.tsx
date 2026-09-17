@@ -27,12 +27,20 @@ export default function IPOPage() {
 
   const load = useCallback(async () => {
     const r = await fetch(`${API_BASE}/api/ipos?days=180`, { credentials: "include", cache: "no-store" });
-    if (r.ok) setIpos((await r.json()).items);
-    else handle401(r.status);
+    if (r.ok) {
+      setIpos((await r.json()).items);
+      return true;
+    }
+    handle401(r.status);
+    return false;
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-  const { status, lastUpdate } = useLiveStream(load);
+  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived.
+  const { status, lastUpdate, markLoaded } = useLiveStream(load);
+  useEffect(() => {
+    void load().then((ok) => { if (ok) markLoaded(); });
+  }, [load, markLoaded]);
 
   // Sector dropdown derived from the loaded listings (sectors vary by source
   // and the IPO set is small), so we never show a sector with zero rows.
