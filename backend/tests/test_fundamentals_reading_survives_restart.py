@@ -114,6 +114,7 @@ async def _row(symbol: str) -> Ticker:
 def _restart(monkeypatch: pytest.MonkeyPatch) -> None:
     """Process memory is gone; only what reached the database survives."""
     monkeypatch.setattr(finnhub_feed, "_FUND_SCORE_CACHE", {})
+    monkeypatch.setattr(finnhub_feed, "_PASS_READINGS", {})
 
 
 def _composite(row: Ticker) -> float | None:

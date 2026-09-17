@@ -231,6 +231,17 @@ async def _drain_background_tasks(_isolated_test_db, ticker_update_log):
 
 
 @pytest.fixture(autouse=True)
+def _fresh_factor_pass_readings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`finnhub_feed._PASS_READINGS` records what the factor passes learned in
+    this process, and the sheet ingest trusts it over the row. Any test that
+    calls a cache setter records into it, so a value left by one test would be
+    written onto another test's row."""
+    from app.services import finnhub_feed
+
+    monkeypatch.setattr(finnhub_feed, "_PASS_READINGS", {})
+
+
+@pytest.fixture(autouse=True)
 def _reset_rate_limiter() -> None:
     """Reset every process-global rate-limit / abuse log before EVERY test.
 

@@ -42,7 +42,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 import httpx
-from sqlalchemy import func, select
+from sqlalchemy import Table, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -966,27 +966,47 @@ def _set_factor_set_on(t: Ticker, r: Mapping[str, Any]) -> None:
 
 
 def _row_owned_values(
-    symbol: str, held: Mapping[str, float | None],
-) -> dict[str, float | None]:
-    """The row's fundamentals and smart money, or where the row holds none, this
-    process's cache AS IT IS NOW.
+    symbol: str, held: Mapping[str, float | None], *, cache_for_null: bool = True,
+) -> tuple[dict[str, float | None], bool]:
+    """Fundamentals and smart money to write beside the workbook's four, and
+    whether smart money came from the cache for a NULL row.
 
-    The cache is the only place a reading can be that no writer has put on the
-    row yet: one the boot rebuild restored, or one the pass stamped without
-    writing because the row kept changing. For a sheet-owned row this ingest is
-    the writer that puts it there. Read now, not at parse time: the insider pass
-    drops the cache entry when it retires a reading, so a value retired since
-    the parse is not written back."""
-    from app.services.finnhub_feed import get_cached_score, get_cached_smart_money_score
+    In order, for each of the two:
+
+    1. What THIS process's factor passes last learned
+       (`finnhub_feed._PASS_READINGS`). It is never older than the row, and it
+       is how a reading or a retirement whose own write lost its compare-and-set
+       reaches a sheet-owned row: the pass leaves it for the row's owner.
+    2. The row's value. Otherwise the caches only repeat the rows - the warm
+       fills them from the rows - and in the API process they are a snapshot
+       taken before this multi-minute ingest began.
+    3. Only for a NULL row, the cache as it is now: a reading the boot rebuild
+       restored from stored Form 4 rows. The caller writes such a smart-money
+       value only while the symbol still HAS Form 4 rows, because a reading
+       retired in another process leaves this process's cache holding it.
+    """
+    from app.services.finnhub_feed import (
+        get_cached_score,
+        get_cached_smart_money_score,
+        pass_reading,
+    )
 
     lookups = {
         "sub_fundamentals": get_cached_score,
         "sub_smart_money": get_cached_smart_money_score,
     }
-    return {
-        c: held[c] if held[c] is not None else lookups[c](symbol)
-        for c in _ROW_OWNED_FACTORS
-    }
+    values: dict[str, float | None] = {}
+    smart_money_from_cache = False
+    for c in _ROW_OWNED_FACTORS:
+        produced, reading = pass_reading(c, symbol)
+        if produced:
+            values[c] = reading
+        elif held[c] is not None or not cache_for_null:
+            values[c] = held[c]
+        else:
+            values[c] = lookups[c](symbol)
+            smart_money_from_cache |= c == "sub_smart_money" and values[c] is not None
+    return values, smart_money_from_cache
 
 
 def _factor_set(
@@ -1013,7 +1033,7 @@ async def _write_factor_sets(
     writes: Mapping[str, tuple[Mapping[str, Any], Mapping[str, float | None]]],
 ) -> None:
     """Write each existing row's six factors, score and signal as ONE set, with
-    the row's own fundamentals and smart money.
+    fundamentals and smart money chosen by `_row_owned_values`.
 
     FOUND IN REVIEW, 2026-09-17: two races with the worker's factor passes
     ----------------------------------------------------------------------
@@ -1033,26 +1053,30 @@ async def _write_factor_sets(
       restart before the next ingest lost the reading until the row came due
       again (36h for smart money), because the boot rebuild repairs only NULLs.
 
-    WHAT HAPPENS NOW. The two row-owned factors are the row's, as this call
-    loaded them, never the parse-time cache's; only where the row holds none is
-    the cache consulted, as it is at write time (`_row_owned_values`). That
-    also retires the old cold-cache hazard: a process with empty caches no
-    longer blanks them (see `finnhub_feed.warm_factor_caches_from_db`). Each
-    chunk is one statement
-    that writes the whole set only where those two still hold what was loaded
-    (a compare-and-set). A row another writer changed in between is missed,
-    re-read and written with ITS two beside the workbook's four and the
-    composite of all six. After `_FACTOR_WRITE_ATTEMPTS` misses the row keeps
-    the set the other writer left, which is consistent, and the workbook's four
+    WHAT HAPPENS NOW. Each chunk is one statement that writes the whole set
+    only where the two row-owned factors still hold what this call loaded (a
+    compare-and-set). A row another writer changed in between is missed; it is
+    re-read and written again, with the two chosen afresh beside the workbook's
+    four and the composite of all six. So the ingest neither tears the row nor
+    reverts the reading. After `_FACTOR_WRITE_ATTEMPTS` misses the row keeps the
+    set the other writer left, which is consistent, and the workbook's four
     factors wait for the next ingest.
+
+    A NULL row taking smart money from the cache is written on its own, in a
+    statement that also requires the symbol's Form 4 rows to exist. A reading
+    retired in the worker (#824: row NULL, Form 4 rows deleted) while the API
+    process's webhook ingest runs is otherwise written back from the API's
+    cache, which was warmed before the retirement.
 
     `updated_at` is held still: a factor set is not live data (see the comment
     on Ticker.updated_at). The price this ingest writes moves it, through the
     ORM, in the commit before this runs.
     """
-    from sqlalchemy import bindparam, update
+    from sqlalchemy import bindparam, exists, update
 
-    table = Ticker.__table__
+    from app.models import InsiderTransaction
+
+    table: Table = Ticker.__table__  # type: ignore[assignment]
     chunk_stmt = (
         update(table)
         .where(
@@ -1069,37 +1093,44 @@ async def _write_factor_sets(
     )
 
     symbols = list(writes)
-    intended: dict[str, dict[str, Any]] = {}
-    missed: list[str] = []
+    one_by_one: list[str] = []
     for start in range(0, len(symbols), _FACTOR_WRITE_CHUNK):
         chunk = symbols[start:start + _FACTOR_WRITE_CHUNK]
+        intended: dict[str, dict[str, Any]] = {}
         params = []
         for sym in chunk:
             r, held = writes[sym]
-            intended[sym] = _factor_set(r, _row_owned_values(sym, held))
+            values, smart_money_from_cache = _row_owned_values(sym, held)
+            if smart_money_from_cache:
+                one_by_one.append(sym)
+                continue
+            intended[sym] = _factor_set(r, values)
             params.append({
                 "b_symbol": sym,
                 **{f"b_{c}": held[c] for c in _ROW_OWNED_FACTORS},
                 **{f"v_{c}": v for c, v in intended[sym].items()},
             })
-        await session.execute(chunk_stmt, params)
-        await session.commit()
-        # An executemany reports no per-row count. A row whose statement missed
-        # still holds factors the workbook did not send.
-        stored = (await session.execute(
-            select(table.c.symbol, *(table.c[c] for c in _SHEET_OWNED_FACTORS))
-            .where(table.c.symbol.in_(chunk))
-        )).all()
-        for row in stored:
-            if any(
-                getattr(row, c) != intended[row.symbol][c] for c in _SHEET_OWNED_FACTORS
-            ):
-                missed.append(row.symbol)
+        if params:
+            await session.execute(chunk_stmt, params)
+            await session.commit()
+            # An executemany reports no per-row count. A row whose statement
+            # missed still holds factors the workbook did not send.
+            stored = (await session.execute(
+                select(table.c.symbol, *(table.c[c] for c in _SHEET_OWNED_FACTORS))
+                .where(table.c.symbol.in_(list(intended)))
+            )).all()
+            one_by_one.extend(
+                row.symbol for row in stored
+                if any(getattr(row, c) != intended[row.symbol][c] for c in _SHEET_OWNED_FACTORS)
+            )
 
-    unwritten = 0
-    for sym in missed:
+    missed = unwritten = 0
+    for sym in one_by_one:
         r = writes[sym][0]
-        for _attempt in range(_FACTOR_WRITE_ATTEMPTS):
+        cache_for_null = True
+        for attempt in range(_FACTOR_WRITE_ATTEMPTS):
+            if attempt:
+                missed += 1
             current = (await session.execute(
                 select(*(table.c[c] for c in _ROW_OWNED_FACTORS))
                 .where(table.c.symbol == sym)
@@ -1107,20 +1138,26 @@ async def _write_factor_sets(
             if current is None:
                 break
             held = dict(zip(_ROW_OWNED_FACTORS, current, strict=True))
+            values, smart_money_from_cache = _row_owned_values(
+                sym, held, cache_for_null=cache_for_null,
+            )
+            where = [
+                table.c.symbol == sym,
+                *(table.c[c].is_not_distinct_from(v) for c, v in held.items()),
+            ]
+            if smart_money_from_cache:
+                where.append(exists().where(InsiderTransaction.symbol == sym))
             result = await session.execute(
                 update(table)
-                .where(
-                    table.c.symbol == sym,
-                    *(table.c[c].is_not_distinct_from(v) for c, v in held.items()),
-                )
-                .values({
-                    **_factor_set(r, _row_owned_values(sym, held)),
-                    "updated_at": table.c.updated_at,
-                })
+                .where(*where)
+                .values({**_factor_set(r, values), "updated_at": table.c.updated_at})
             )
             await session.commit()
             if result.rowcount == 1:  # type: ignore[attr-defined]
                 break
+            # Either the row moved again or its Form 4 rows are gone. In the
+            # second case the cache's reading is retired, so do not offer it.
+            cache_for_null = not smart_money_from_cache
         else:
             unwritten += 1
     if writes:
@@ -1129,10 +1166,10 @@ async def _write_factor_sets(
         # them so a later query in the same session reads the committed row
         # instead of a stale identity-map copy.
         session.expire_all()
-    if missed:
+    if missed or unwritten:
         logger.info(
-            "sheet_feed.factor_set_contended rows=%d kept_other_writer=%d",
-            len(missed), unwritten,
+            "sheet_feed.factor_set_contended retries=%d kept_other_writer=%d",
+            missed, unwritten,
         )
 
 
@@ -1483,9 +1520,14 @@ async def upsert_etfs(
         # owns the flag. See services/leverage.py.
         t.is_leveraged = is_leveraged_fund(t.name, t.asset_class)
 
-        # Same 0-100 column-boundary clamp as the equity upsert above.
-        t.score = None if r["score"] is None else max(0.0, min(100.0, r["score"]))
-        t.signal = r["signal"]
+        # Score and signal are NOT written. The tab's Score column is the
+        # signal-system's own number, and Ticker.score is Tapeline's
+        # six-factor composite (fix 2, docs/SCORING_AUDIT_2026-06-01.md).
+        # Writing it published a label beside factors that did not make it:
+        # on a sheet-owned ETF such as SPY, a clamped 131 as 100 HIGH
+        # CONVICTION beside factors whose composite was 41.6 NEUTRAL, until
+        # the ALL SIGNALS tab next changed. Found in review 2026-09-17; the
+        # tab parsed to 0 rows in production at the time.
         # 1M proxy from 3M / 3 (ETFs barely move intraday; coarser is fine)
         if r["change_pct_3m"] is not None:
             t.change_pct_1m = r["change_pct_3m"] / 3.0

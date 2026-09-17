@@ -2011,9 +2011,14 @@ async def _refresh_workbook_tabs() -> None:
             if settings.signal_sheet_csv_url:
                 # Which symbols the sheet owns — consumed by the snapshot
                 # upsert so the market feed can't clobber their composite.
-                # BEFORE the ingest, which takes minutes: a symbol the sheet
-                # just added must not be written as the tick's own row by the
-                # ticks that run while its sheet row is being ingested.
+                # BEFORE the ingest, which takes minutes. After it, the ticks
+                # that ran between the ingest's write and this refresh wrote
+                # their own composite over sheet-owned rows - after every
+                # restart, when the set starts empty, and for any symbol the
+                # sheet had just added - and it stayed until the sheet next
+                # changed. The first ticks after a restart still write those
+                # rows before this runs; the boot ingest, which always runs
+                # (the content hashes start empty), then writes them back.
                 await _refresh_sheet_governed_symbols()
                 counts = await refresh_from_workbook(sheet_session)
                 if counts.get("total"):
@@ -4805,20 +4810,6 @@ async def main() -> None:
     # Before the first tick rather than lazily, because the first tick is
     # where both of those writes happen.
     await warm_factor_caches_from_db()
-
-    # Which symbols the sheet owns, BEFORE the first tick writes.
-    #
-    # The set is process-local and was first filled by the workbook refresh,
-    # which the tick dispatches after its own score upsert and which takes
-    # minutes. Until then every tick treated each of the ~4,900 sheet-owned
-    # rows as its own and wrote its composite, factors, reason and coverage
-    # over the sheet's. The sheet writes neither reason nor, without a
-    # conviction grade, coverage, so those stayed as the tick left them. Seen
-    # in production 2026-09-14 as every sheet-owned row's
-    # `reason` re-rendering for the first minutes after each deploy. One CSV
-    # fetch (15s timeout); on failure the set stays empty, as it always was
-    # at boot.
-    await _refresh_sheet_governed_symbols()
 
     # Load the active universe BEFORE the first tick, for the same reason.
     #

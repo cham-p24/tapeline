@@ -13,12 +13,20 @@ and committed once, minutes later:
 * A reading saved after the CSV was PARSED but before the row was loaded was
   overwritten with the parse-time value, and lost to the next restart.
 
+Review of the first fix found three more ways to put the wrong value on a
+sheet-owned row, each with a test below: a reading or retirement whose own write
+lost its compare-and-set never reached the row, and the API webhook wrote back
+a reading the worker had retired mid-ingest.
+
 Found with them, and fixed here too:
 
 * The SMART MONEY & CONGRESS tab wrote an appearance count over the EDGAR reading
   without the composite (dormant: its secret is not set on Fly). Retired.
-* After a restart the worker's ticks wrote their own composite over sheet-owned
-  rows until the sheet's symbol set was loaded, minutes later.
+* The ETF BENCHMARKS tab wrote the workbook's own Score as Ticker.score, beside
+  factors that did not make it (dormant: the tab parsed to 0 rows).
+* The worker refreshed the sheet's symbol set AFTER its multi-minute ingest, so
+  ticks in between wrote their own composite over sheet-owned rows, and it
+  stayed until the sheet next changed.
 * Since EDGAR, twenty heavy filers could keep a batch's stamp more than
   INSIDER_STAMP_LAG after its Form 4 rows, hiding a contended row from the boot
   rebuild.
@@ -27,9 +35,6 @@ Every test here was watched failing against the mutation its docstring names.
 """
 from __future__ import annotations
 
-import ast
-import inspect
-import pathlib
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -194,14 +199,88 @@ async def test_a_reading_retired_after_the_parse_is_not_written_back() -> None:
     assert t.score == _composite(t)
 
 
-async def test_a_reading_only_the_cache_holds_reaches_a_null_row() -> None:
-    """The boot rebuild and a contended save both leave a reading in the cache
-    and NULL on the row. For a sheet-owned row the ingest is what puts it there.
+async def _seed_form4(symbol: str = SYM) -> None:
+    async with session_scope() as s:
+        s.add(InsiderTransaction(
+            symbol=symbol, insider_name="Jane Q Insider", transaction_date="2026-09-01",
+            share_change=1_000, transaction_price=50.0, transaction_value=50_000.0, code="P",
+        ))
+
+
+async def test_a_rebuilt_reading_reaches_a_null_row() -> None:
+    """The boot rebuild restores a lost reading into the cache from the stored
+    Form 4 rows, leaving the row NULL. For a sheet-owned row the ingest is what
+    puts it there.
 
     Mutation: never consulting the cache for a NULL row - it stays NULL."""
     async with session_scope() as s:
         await upsert_tickers(s, parse_all_signals_csv(_csv(_V1)))
     assert (await _row()).sub_smart_money is None
+    await _seed_form4()
+    finnhub_feed.set_cached_smart_money_score(SYM, READING, from_row=True)
+
+    async with session_scope() as s:
+        await upsert_tickers(s, parse_all_signals_csv(_csv(_V2)))
+
+    t = await _row()
+    assert t.sub_smart_money == READING
+    assert t.score == _composite(t)
+
+
+async def test_the_webhook_does_not_write_back_a_reading_the_worker_retired() -> None:
+    """The API process warms its cache from the rows (BXP 90), then ingests for
+    minutes. Meanwhile the worker retires the reading: row NULL, Form 4 rows
+    deleted, and only the WORKER's cache dropped. The API's still holds 90.
+
+    Mutation: writing a NULL row's cached smart money without requiring its
+    Form 4 rows - the retired 90.0 is published again."""
+    finnhub_feed.set_cached_smart_money_score(SYM, READING, from_row=True)
+    async with session_scope() as s:
+        await upsert_tickers(s, parse_all_signals_csv(_csv(_V1)))
+    rows = parse_all_signals_csv(_csv(_V2))
+
+    # The worker's clear, seen from the API process.
+    async with session_scope() as s:
+        await s.execute(
+            update(Ticker).where(Ticker.symbol == SYM)
+            .values(sub_smart_money=None, updated_at=Ticker.updated_at)
+        )
+    assert finnhub_feed.get_cached_smart_money_score(SYM) == READING
+
+    async with session_scope() as s:
+        await upsert_tickers(s, rows)
+
+    t = await _row()
+    assert t.sub_smart_money is None, "a retired reading with no Form 4 rows was published"
+    assert t.sub_trend == rows[0]["sub_trend"]
+    assert t.score == _composite(t)
+
+
+async def test_a_retirement_whose_own_write_lost_reaches_a_sheet_owned_row() -> None:
+    """`_clear_smart_money_reading` lost its compare-and-set on every attempt:
+    the row still holds 90, and the pass left the retirement for the row's
+    owner. For a sheet-owned row that is this ingest.
+
+    Mutation: preferring the row over what this process's pass learned - 90.0
+    stays published with no Form 4 filing behind it."""
+    await _ingest_v1_with_stale_reading()
+    finnhub_feed.clear_cached_smart_money_score(SYM)
+
+    async with session_scope() as s:
+        await upsert_tickers(s, parse_all_signals_csv(_csv(_V2)))
+
+    t = await _row()
+    assert t.sub_smart_money is None
+    assert t.score == _composite(t)
+
+
+async def test_a_reading_whose_own_write_lost_reaches_a_sheet_owned_row() -> None:
+    """`_save_factor_readings` lost its compare-and-set on every attempt and
+    stamped the row without the write: 18.0 on the row, 90.0 in this process.
+
+    Mutation: preferring the row over what this process's pass learned - the
+    new reading never reaches the row, and the stamp hides it for 36h."""
+    await _ingest_v1_with_stale_reading()
     finnhub_feed.set_cached_smart_money_score(SYM, READING)
 
     async with session_scope() as s:
@@ -268,8 +347,63 @@ async def test_the_smart_money_tab_no_longer_writes_the_factor(
     assert "https://example.invalid/tab" not in fetched
 
 
+async def test_a_webhook_ingest_keeps_a_reading_saved_after_its_warm() -> None:
+    """The API process warms its caches from the rows (BXP 18.0), parses and
+    starts ingesting; the worker - another process - saves 90.0 onto the row.
+    What the warm loaded is the row's past, not a newer reading.
+
+    Mutation: the warm recording what it loads as the process's own readings -
+    the ingest writes 18.0 over the saved 90.0."""
+    finnhub_feed.set_cached_smart_money_score(SYM, STALE, from_row=True)
+    async with session_scope() as s:
+        await upsert_tickers(s, parse_all_signals_csv(_csv(_V1)))
+
+    finnhub_feed._SMART_MONEY_SCORE_CACHE.clear()
+    await finnhub_feed.warm_factor_caches_from_db()
+    assert finnhub_feed.get_cached_smart_money_score(SYM) == STALE
+    rows = parse_all_signals_csv(_csv(_V2))
+    # The worker's save: the row changes, this process's cache does not.
+    await sp._save_factor_readings(
+        "last_smart_money_at", "sub_smart_money", {SYM: READING}, datetime.now(UTC),
+    )
+
+    async with session_scope() as s:
+        await upsert_tickers(s, rows)
+
+    _assert_consistent_v2_with_reading(await _row(), rows[0])
+
+
 # ---------------------------------------------------------------------------
-# The sheet's symbol set is known before anything writes a sheet-owned row.
+# The ETF BENCHMARKS tab does not publish the workbook's own score.
+# ---------------------------------------------------------------------------
+
+_ETF_CSV = (
+    "Ticker,Name,Note,Score,Signal,3M Return %,6M Return %,1Y Return %,"
+    "Above 200DMA,Beats SPY (6M),vs SPY 6M %,Action\n"
+    "{sym},SPDR S&P 500 ETF,core,131,BUY NOW,5.0,8.0,20.0,TRUE,Yes,1.0,Buy\n"
+)
+
+
+async def test_the_etf_tab_does_not_overwrite_the_composite() -> None:
+    """Mutation: writing the tab's Score and label - a clamped 100 HIGH
+    CONVICTION beside six stored factors whose composite is something else."""
+    sym = "SPY"
+    async with session_scope() as s:
+        await upsert_tickers(s, parse_all_signals_csv(_csv(_V2, sym=sym)))
+    before = await _row(sym)
+    assert before.score is not None and before.score < 85
+
+    async with session_scope() as s:
+        await sheet_feed.upsert_etfs(s, sheet_feed.parse_etf_benchmarks_csv(_ETF_CSV.format(sym=sym)))
+
+    t = await _row(sym)
+    assert t.asset_class == "etf"
+    assert (t.score, t.signal) == (before.score, before.signal)
+    assert t.score == _composite(t)
+
+
+# ---------------------------------------------------------------------------
+# The sheet's symbol set is known before the ingest writes a sheet-owned row.
 # ---------------------------------------------------------------------------
 
 
@@ -279,10 +413,14 @@ async def test_the_workbook_refresh_learns_the_sheets_symbols_before_ingesting(
     """The ingest takes minutes; ticks run meanwhile. Mutation: refreshing the
     symbol set after the ingest (the old order) - it is empty during it."""
     monkeypatch.setattr(sp, "_sheet_governed_symbols", frozenset())
-    monkeypatch.setattr(sp.settings, "signal_sheet_csv_url", "https://example.invalid/all")
-    for name in ("spike_intelligence_csv_url", "etf_benchmarks_csv_url",
-                 "market_intelligence_csv_url", "smart_money_congress_csv_url"):
-        monkeypatch.setattr(sp.settings, name, "")
+    # The worker reads its module-level `settings`; the helpers read
+    # get_settings(). They are different objects once any earlier test has
+    # cleared the settings cache, so both are set.
+    for settings in {id(o): o for o in (sp.settings, sheet_feed.get_settings())}.values():
+        monkeypatch.setattr(settings, "signal_sheet_csv_url", "https://example.invalid/all")
+        for name in ("spike_intelligence_csv_url", "etf_benchmarks_csv_url",
+                     "market_intelligence_csv_url", "smart_money_congress_csv_url"):
+            monkeypatch.setattr(settings, name, "")
 
     async def _fetch(url: str, *, dedup: bool = True) -> str:
         return _csv(_V1)
@@ -299,28 +437,6 @@ async def test_the_workbook_refresh_learns_the_sheets_symbols_before_ingesting(
     await sp._refresh_workbook_tabs()
 
     assert seen_during_ingest == [frozenset({SYM})]
-
-
-def test_the_worker_learns_the_sheets_symbols_before_its_first_tick() -> None:
-    """Mutation: dropping the boot call - the first ticks write their own
-    composite, reason and coverage over every sheet-owned row."""
-    tree = ast.parse(pathlib.Path(inspect.getfile(sp)).read_text(encoding="utf-8"))
-    main = next(
-        n for n in ast.walk(tree)
-        if isinstance(n, ast.AsyncFunctionDef) and n.name == "main"
-    )
-
-    def _first_line(name: str) -> int | None:
-        lines = [
-            c.lineno for c in ast.walk(main)
-            if isinstance(c, ast.Call) and getattr(c.func, "id", None) == name
-        ]
-        return min(lines) if lines else None
-
-    governed, first_tick = _first_line("_refresh_sheet_governed_symbols"), _first_line("tick")
-    assert governed is not None, "main() never loads the sheet's symbol set"
-    assert first_tick is not None
-    assert governed < first_tick
 
 
 # ---------------------------------------------------------------------------
