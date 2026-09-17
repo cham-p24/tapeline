@@ -311,7 +311,7 @@ Target: Wed 2026-06-11, 8 AM ET.
 
 **Tweet 1** (~270 chars):
 ```
-Every market day, Tapeline freezes the top-10 composite scores at close.
+At the close, Tapeline freezes the day's top-10 composite scores.
 
 The next session's close gets recorded the next day, alongside the SPY close for the same dates.
 

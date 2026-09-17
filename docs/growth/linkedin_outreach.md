@@ -262,7 +262,7 @@ For the names you've written up recently, the composite read is at:
 worked.)
 
 Not asking for anything — just a heads-up that the scorecard
-(tapeline.io/scorecard) is back-checked against SPY each session, every
+(tapeline.io/scorecard) back-checks each recorded list against SPY, every
 miss still on the page, corrections and missing days dated. Happy to send the methodology doc if you'd
 find it useful for a future write-up.
 

@@ -98,7 +98,7 @@ for 60 min answering every comment).
 ```
 I built Tapeline (https://tapeline.io) because every stock scanner I'd ever paid for had the same dishonest pattern: they show you a leaderboard of picks but never show you what happened next.
 
-So Tapeline does the opposite. Each trading day at close, we freeze the top 10 ranked tickers. Next day at close, we record each name's actual return vs SPY and the result goes on /scorecard. Wins stay. Losses stay. Entries are not re-ranked or deleted, and the two corrections we made to recorded values are dated on the page.
+So Tapeline does the opposite. At the close, we freeze the day's top 10 ranked tickers. Next day at close, we record each name's actual return vs SPY and the result goes on /scorecard. Wins stay. Losses stay. Entries are not re-ranked or deleted, and the two corrections we made to recorded values are dated on the page.
 
 The score itself is a 6-factor composite — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — weighted most toward Trend and Relative Strength and least toward Momentum. The factor set and ordering are on /how-it-works and don't change without a changelog entry. Every score comes with one plain-English sentence explaining what's driving it (the "Why" column).
 

@@ -96,7 +96,7 @@ Hey HN — I built Tapeline because I was tired of stock screeners that ask you 
 
 So Tapeline scores about 11,500 US stocks and ETFs with a 0–100 composite from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — weighted most toward Trend and Relative Strength and least toward Momentum. The factor set and that ordering are public on /how-it-works and can't change without a changelog entry. Every score comes with one plain-English sentence explaining what's driving it.
 
-The thing I care most about: a public scorecard. Each trading day I log the top 10 names. Next day I compute their actual return vs SPY and the result goes on a public page anyone can audit. Entries are not re-ranked or deleted; we have corrected recorded values twice and dated both (prices on 25 August 2026; scores from 18 May to 12 June capped on 15 June 2026), and the four days with no list (31 August, 2, 4 and 9 September 2026) are listed on the page. It's at https://tapeline.io/scorecard, and it does not beat SPY today.
+The thing I care most about: a public scorecard. At the close I log the day's top 10 names. Next day I compute their actual return vs SPY and the result goes on a public page anyone can audit. Entries are not re-ranked or deleted; we have corrected recorded values twice and dated both (prices on 25 August 2026; scores from 18 May to 12 June capped on 15 June 2026), and the four days with no list (31 August, 2, 4 and 9 September 2026) are listed on the page. It's at https://tapeline.io/scorecard, and it does not beat SPY today.
 
 Free tier: top-10 rows, 12 ticker look-ups a day, 5-name watchlist. No card.
 Pro $9.99/mo: every row of the scan (about 11,500 US stocks and ETFs) + watchlist alerts.
@@ -148,7 +148,7 @@ Here's what I shipped:
 
 **The accountability layer**
 
-Each trading day I freeze the top 10 composite scores. The next day I log each name's actual return vs SPY. The history lives at /scorecard (per-day entries on a 7-day delay without a paid plan) with no survivor bias filtering — losers stay on the page, the two corrections to recorded values are dated, and the four days with no list are listed. Win-rate / avg alpha / beat-SPY rate columns fill in after each session resolves.
+At the close I freeze the day's top 10 composite scores. The next day I log each name's actual return vs SPY. The history lives at /scorecard (per-day entries on a 7-day delay without a paid plan) with no survivor bias filtering — losers stay on the page, the two corrections to recorded values are dated, and the four days with no list are listed. Win-rate / avg alpha / beat-SPY rate columns fill in after each session resolves.
 
 **What I'd like feedback on**
 
@@ -259,7 +259,7 @@ Trend and Relative Strength carry the most, then Fundamentals / Smart Money / Ma
 
 https://tapeline.io/how-it-works
 
-3/ Every market day, I freeze the top 10 composite scores. Next day I log each name's actual return vs SPY.
+3/ At the close, I freeze the day's top 10 composite scores. Next day I log each name's actual return vs SPY.
 
 The record — winners and losers — lives at https://tapeline.io/scorecard
 

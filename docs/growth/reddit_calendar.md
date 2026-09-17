@@ -145,7 +145,7 @@ What signals or factors would you want me to add weight to? The weighting is ver
 **Body**:
 
 ```
-Update from the r/algotrading post two weeks ago. Brief recap: Tapeline is a 6-factor composite stock score, six named factors with a published weight ordering (heaviest Trend + RS, lightest Momentum), top-10 picks frozen at each close and back-checked vs SPY at next close on a public /scorecard.
+Update from the r/algotrading post two weeks ago. Brief recap: Tapeline is a 6-factor composite stock score, six named factors with a published weight ordering (heaviest Trend + RS, lightest Momentum), top-10 picks frozen at the close and back-checked vs SPY at next close on a public /scorecard.
 
 [X] picks logged. Here's what factor-decomposition on the picks that beat SPY says:
 

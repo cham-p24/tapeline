@@ -94,7 +94,7 @@ Copy-paste, fill in the bracketed scorecard data when you post.
 > Here's how they did Monday:
 > [paste 1d performance + alpha vs SPY]
 > Hit rate beating SPY: [X]/10.
-> Same back-check each trading day → tapeline.io/scorecard
+> Same back-check on every recorded list → tapeline.io/scorecard
 
 > **2.**
 > 30-day Tapeline scorecard:

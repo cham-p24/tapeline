@@ -151,7 +151,7 @@ Here's what I shipped:
 
 **The accountability layer**
 
-Each trading day I freeze the top 10 composite scores. The next day I log each name's actual return vs SPY. The history lives at /scorecard (per-day entries on a 7-day delay without a paid plan) with no survivor bias filtering — losers stay on the page, and corrections and days with no list are dated. Win-rate / avg alpha / beat-SPY rate columns fill in after each session resolves.
+At the close I freeze the day's top 10 composite scores. The next day I log each name's actual return vs SPY. The history lives at /scorecard (per-day entries on a 7-day delay without a paid plan) with no survivor bias filtering — losers stay on the page, and corrections and days with no list are dated. Win-rate / avg alpha / beat-SPY rate columns fill in after each session resolves.
 
 **What I'd like feedback on**
 
