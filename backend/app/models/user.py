@@ -411,7 +411,7 @@ class AlertRule(Base):
     # means the rule has never been evaluated, and its next evaluation records
     # sides WITHOUT firing: a rule only alerts on a crossing it watched happen,
     # never on a condition that was already true when the rule was created (or
-    # when edge-triggering shipped). See services/alerts and migration 0070.
+    # when edge-triggering shipped). See services/alerts and migration 0072.
     armed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
@@ -422,7 +422,7 @@ class AlertRuleState(Base):
     """Which side of its trigger a rule last saw one symbol on.
 
     Alerts are EDGE-triggered: a rule fires when this side changes, not while a
-    condition merely stays true. Before migration 0070 a score rule fired on
+    condition merely stays true. Before migration 0072 a score rule fired on
     every evaluation where `score >= threshold`, limited only by a 15-minute
     debounce, so a ticker parked above its threshold re-sent the same "crossed"
     alert about 96 times a day. Persisting the side here (not in process memory)

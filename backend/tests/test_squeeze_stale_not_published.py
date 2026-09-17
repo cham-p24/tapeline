@@ -204,7 +204,7 @@ async def _premium_user_with_rule(rule_type: str, symbol: str | None, threshold:
     uid = f"u_{uuid.uuid4().hex}"
     async with session_scope() as s:
         s.add(User(id=uid, email=f"{uid}@example.com", tier="premium", password_hash="x"))
-        # Alerts are edge-triggered (migration 0070): a rule's FIRST evaluation
+        # Alerts are edge-triggered (migration 0072): a rule's FIRST evaluation
         # records where things stand and fires nothing. These tests are about
         # which rows may reach a user, so the rule is one that has already
         # been evaluated (armed) and, for a targeted score rule, last saw its

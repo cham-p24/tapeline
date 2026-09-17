@@ -6,7 +6,7 @@ Runs after each worker tick and fires matching alerts via the rule's channel
 
 EDGE-TRIGGERED, NOT LEVEL-TRIGGERED
 -----------------------------------
-An alert reports that something CHANGED. Until migration 0070 the score
+An alert reports that something CHANGED. Until migration 0072 the score
 evaluator fired on every evaluation where `score >= threshold`, held back only
 by a 15-minute debounce, and called each one "crossed". Measured in production
 on 18 Sep 2026: consecutive events for the same rule and ticker carried the
@@ -370,7 +370,7 @@ async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
             continue  # no change: the common case, and it writes nothing
         item.alert_zone = zone
         if previous is None or zone == ZONE_INSIDE:
-            # First sight of a pre-0070 row, or re-arming after coming back
+            # First sight of a pre-0072 row, or re-arming after coming back
             # inside the band. Nothing to tell anyone; the commit after the
             # loop persists the zone.
             continue

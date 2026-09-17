@@ -14,7 +14,9 @@ the standby worker machine. So it lives here:
 
 * `alert_rule_states` — one row per (rule, symbol): the side ("above"/"below",
   or the regime label for regime rules) and the reading that put it there.
-  ON DELETE CASCADE from alert_rules.
+  ON DELETE CASCADE from alert_rules. `failures` counts consecutive
+  undelivered retries of one crossing, so a broken transport cannot
+  replay it forever.
 * `alert_rules.armed_at` — NULL until the rule's first evaluation, which
   records sides and fires nothing.
 * `watchlist_items.alert_zone` — "inside" / "up" / "down" for the watchlist
@@ -27,8 +29,8 @@ rule currently above its threshold has already alerted hundreds of times.
 
 Additive only: one new table, two nullable columns.
 
-Revision ID: 0070_alert_crossing_state
-Revises: 0069_edgar_form4
+Revision ID: 0072_alert_crossing_state
+Revises: 0071_insider_line_seq
 """
 from __future__ import annotations
 
@@ -36,8 +38,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0070_alert_crossing_state"
-down_revision = "0069_edgar_form4"
+revision = "0072_alert_crossing_state"
+down_revision = "0071_insider_line_seq"
 branch_labels = None
 depends_on = None
 
@@ -53,6 +55,13 @@ def upgrade() -> None:
         sa.Column("symbol", sa.String(length=20), primary_key=True),
         sa.Column("side", sa.String(length=20), nullable=False),
         sa.Column("value", sa.Float(), nullable=True),
+        # Consecutive failed DELIVERIES of the crossing this row is holding
+        # back. A crossing whose send raised (or whose web push reached
+        # nobody) leaves the side where it was, so the next evaluation
+        # re-detects it; this counts those retries so a permanently broken
+        # transport — an expired push subscription that never 410s, say —
+        # cannot re-fire the same crossing forever.
+        sa.Column("failures", sa.Integer(), nullable=False, server_default="0"),
         sa.Column(
             "updated_at", sa.DateTime(timezone=True),
             server_default=sa.func.now(), nullable=False,

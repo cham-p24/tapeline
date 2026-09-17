@@ -213,7 +213,7 @@ async def test_restart_does_not_refire():
     """The side lives in alert_rule_states, not in the process.
 
     Everything above already uses a fresh session per tick; this pins the row a
-    new process would read, and that deleting it (the pre-0070 world, where
+    new process would read, and that deleting it (the pre-0072 world, where
     nothing was stored) is what would make the rule treat the ticker as unseen.
     """
     uid = await _user()
@@ -437,7 +437,7 @@ async def _watch(uid: str, symbol: str, baseline: float, *, pre_migration: bool 
         await s.refresh(item)
         assert item.alert_zone == "inside", "a new item starts inside its band"
         if pre_migration:
-            # Rows that existed before 0070 have NULL (the column had no default).
+            # Rows that existed before 0072 have NULL (the column had no default).
             await s.execute(
                 update(WatchlistItem).where(WatchlistItem.id == item.id).values(alert_zone=None)
             )
