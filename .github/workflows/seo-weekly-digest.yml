@@ -16,9 +16,21 @@ name: Weekly SEO digest (founder Telegram)
 #   * a run killed mid-crawl, which is what a deploy does to an ssh session,
 #     is retried by the next day's run;
 #   * a manual re-run cannot send the week twice.
-# Nothing is sent before Monday 09:00 UTC. Actions starts scheduled runs late
-# (the 08:23 audit has started between 11:52 and 15:05 UTC), so expect the
-# digest on Monday afternoon UTC.
+# Nothing is sent before Monday 09:00 UTC, so expect the digest on Monday
+# afternoon UTC.
+#
+# SCHEDULE IS BEST-EFFORT: GitHub Actions starts scheduled runs late, often by 1
+# to 7 hours (this repo's 08:23 audit has started between 11:52 and 15:05 UTC),
+# and can skip one under load. Never read the cron line as the time it runs.
+#
+# ON THE WORKER: `-g worker` pins the ssh session to the worker process group.
+# Unpinned, `flyctl ssh console` may land on an api machine, which serves every
+# page this crawl requests. On the worker it is a separate process from the
+# tick (4 concurrent fetches, mostly waiting on the network), not tick work.
+#
+# A red run says what to do in its ::error annotation. SEND_UNKNOWN in
+# particular means Telegram may already have the digest: check before
+# re-dispatching (the week is kept as sent, so a re-dispatch sends nothing).
 
 on:
   schedule:
@@ -53,5 +65,5 @@ jobs:
             echo "::error title=No token::FLY_API_TOKEN secret is not set."
             exit 1
           fi
-          flyctl ssh console -a tapeline-backend \
+          flyctl ssh console -a tapeline-backend -g worker \
             -C "python -m app.scripts.seo_weekly_digest"
