@@ -1010,3 +1010,31 @@ async def subscription_has_other_paid_invoice(
         if isinstance(paid, int) and not isinstance(paid, bool) and paid > 0:
             return True
     return False
+
+
+async def subscription_started_with_trial(subscription_id: str) -> bool | None:
+    """Did `subscription_id` begin with a trial? True / False, or None when
+    Stripe could not be asked.
+
+    The Meta `Subscribe` event (routers/webhooks.py,
+    `_send_first_charge_conversion`) is for a trial's first real charge only.
+    The invoice cannot tell: a trial converting and a 100%-off referral month
+    turning into its first charge both arrive as a `subscription_cycle`
+    invoice after a $0 one. The subscription's own `trial_start` can — Stripe
+    sets it when a trial is created and never clears it once the trial ends.
+    One read, only for a paid, non-create invoice on a subscription whose
+    first-charge latch is not yet claimed.
+
+    Never raises. None (no key, or the call failed) lets the caller send
+    nothing rather than guess.
+    """
+    if not settings.stripe_secret_key or not subscription_id:
+        return None
+    from app.services.stripe_compat import stripe_field
+
+    try:
+        sub = await asyncio.to_thread(stripe.Subscription.retrieve, subscription_id)
+    except Exception:
+        logger.exception("stripe.subscription_trial_lookup_failed sub=%s", subscription_id)
+        return None
+    return stripe_field(sub, "trial_start") is not None

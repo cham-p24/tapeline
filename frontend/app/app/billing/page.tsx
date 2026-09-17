@@ -22,6 +22,7 @@ import { userLocale, longDate } from "@/lib/datetime";
 import { TrialOfferPanel } from "@/components/TrialOfferPanel";
 import { rememberTrialCheckout, takeTrialCheckoutIntent } from "@/lib/trialCheckout";
 import { handle401, errorMessage } from "@/lib/api";
+import { metaCheckoutIds } from "@/lib/utm";
 import { PRICING, FREE_LIMITS, REFUND, usd, usdCompact, annualSaving, DEFAULT_BILLING_PERIOD, freeHasWatchlist, freeScannerRows } from "@/lib/pricing";
 // The ONE source of truth for the trial length. This page used to carry its
 // own `const TRIAL_DAYS = 14` — the backend moved to 30 (routers/billing.py)
@@ -489,6 +490,9 @@ export default function BillingPage() {
           // the success_url so the return handler above reports a trial
           // start rather than a purchase.
           start_trial: startTrial,
+          // Meta's browser keys for the server-side events this checkout
+          // produces later, from Stripe webhooks (lib/utm.ts).
+          ...metaCheckoutIds(),
         }),
       });
       const body = await res.json();

@@ -47,6 +47,7 @@ import { TRIAL_DAYS } from "@/lib/trial";
 import { rememberTrialCheckout } from "@/lib/trialCheckout";
 import { trackEvent } from "@/lib/gtag";
 import { handle401, errorMessage } from "@/lib/api";
+import { metaCheckoutIds } from "@/lib/utm";
 import { errorText } from "@/lib/errorText";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -111,6 +112,9 @@ export function ScannerTrialOffer() {
           tier: "premium",
           billing_period: billingPeriod,
           start_trial: true,
+          // Meta's browser keys for StartTrial, which a Stripe webhook fires
+          // later with no browser present (lib/utm.ts).
+          ...metaCheckoutIds(),
         }),
       });
       const body = await res.json();

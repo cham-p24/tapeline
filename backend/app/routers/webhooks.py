@@ -21,6 +21,7 @@ from app.services.billing import (
     parse_webhook,
     subscription_has_other_paid_invoice,
     subscription_payload,
+    subscription_started_with_trial,
     tier_from_price,
 )
 from app.services.stripe_compat import stripe_field
@@ -151,6 +152,12 @@ async def _send_purchase_conversion(
     events sharing a transaction_id, so server and client can both report the
     same sale without double-counting.
 
+    A TRIAL checkout sends nothing (blueprint P4). It charges $0 today — every
+    trial checkout completed on the live account had amount_total 0 and
+    amount_subtotal 0 (read-only, 2026-09-17) — so reporting it made a $0
+    Purchase: a day-0 duplicate of StartTrial that also misstated value. The
+    trial's first real charge is reported by `_send_first_charge_conversion`.
+
     Entirely best-effort: never raises, and a no-op unless GA4_MEASUREMENT_ID
     + GA4_API_SECRET are set.
     """
@@ -175,6 +182,11 @@ async def _send_purchase_conversion(
         if isinstance(sub_raw, dict):
             sub_raw = sub_raw.get("id")
         subscription_id = sub_raw or checkout_session_id
+
+        if _checkout_is_trial(obj):
+            # Checked before the latch: nothing is sent, so nothing is claimed.
+            logger.info("stripe.purchase_skipped_trial_checkout sub=%s", subscription_id)
+            return
 
         # Claim the conversion. If the row already exists this subscription
         # has already been reported — bail without sending.
@@ -217,33 +229,199 @@ async def _send_purchase_conversion(
             # through every call site. Hashing happens inside meta_capi — the
             # raw address never leaves this process.
             #
-            # The stored Meta click id comes along in the same read. A purchase
-            # lands ~30 days after the click with no browser present, so `fbc`
-            # can only be rebuilt server-side from the persisted fbclid — and
-            # without it the fbclid → User → Stripe join that is the only
-            # honest Meta payer count has nothing to key on.
-            row = (
-                await session.execute(
-                    select(User.email, User.signup_fbclid, User.created_at)
-                    .where(User.id == user_id)
-                )
-            ).one_or_none()
-            email = row[0] if row else None
-            purchase_fbc = meta_capi.fbc_value(row[1], row[2]) if row else None
+            # The browser keys come along in the same read. This webhook
+            # request is Stripe's, so the IP address and user agent are the
+            # ones stored from the buyer's own checkout request, and `fbc` is
+            # the latest click id stored then (else the first-touch fbclid)
+            # — see meta_capi.stored_match_keys. Without a click id the
+            # fbclid → User → Stripe join has nothing to key on.
+            buyer = (
+                await session.execute(select(User).where(User.id == user_id))
+            ).scalar_one_or_none()
             await meta_capi.track_purchase(
                 user_id=user_id,
                 transaction_id=str(checkout_session_id),
-                email=email,
+                email=buyer.email if buyer is not None else None,
                 value=value,
                 currency=currency,
                 event_source_url=meta_capi.source_url("/app/billing"),
                 tier=tier,
                 billing_period=billing_period,
-                fbc=purchase_fbc,
+                **(meta_capi.stored_match_keys(buyer) if buyer is not None else {}),
             )
     except Exception:
         # Analytics must never fail a money-path webhook.
         logger.exception("stripe.ga4_purchase_failed user=%s", user_id)
+
+
+def _minor_units(raw: Any) -> int | None:
+    return raw if isinstance(raw, int) and not isinstance(raw, bool) else None
+
+
+def _checkout_is_trial(obj: dict) -> bool:
+    """A completed checkout that charged $0 because a trial deferred the charge.
+
+    Both amounts are zero: nothing was due before discounts either. That
+    separates a trial from a 100%-off referral month, whose checkout also
+    totals $0 but has a positive `amount_subtotal` (the discount takes it to
+    zero) — a direct checkout, which keeps its Purchase. Read-only check of
+    the live account on 2026-09-17: all 4 completed trial checkouts had
+    subtotal 0, total 0, discount 0; the 1 direct paid checkout had 999/999.
+    """
+    total = _minor_units(obj.get("amount_total"))
+    subtotal = _minor_units(obj.get("amount_subtotal"))
+    return total == 0 and not (subtotal is not None and subtotal > 0)
+
+
+_FIRST_CHARGE_LATCH = "first_charge_conversion"
+
+
+async def _send_first_charge_conversion(session: AsyncSession, inv: dict) -> None:
+    """Meta `Subscribe` + GA4 `purchase` for the FIRST real charge of a
+    subscription that started as a trial (blueprint P5).
+
+    A trial checkout is not reported as a purchase (P4), so without this the
+    money a trial eventually brings in would never reach either platform. The
+    first-charge test is the one `_welcome_on_first_paid_invoice` uses (#834),
+    run on its own terms:
+
+    * Only an invoice with `amount_paid > 0`. A trial start and a 100%-off
+      month produce $0 paid invoices; neither is money, neither claims.
+    * A `subscription_create` invoice that took money is a DIRECT paid
+      checkout — no trial came before it — and `_send_purchase_conversion`
+      already reported it with its value. Claimed silently, never sent again.
+    * Otherwise Stripe is asked whether the subscription began with a trial
+      (`subscription_started_with_trial`); a referral month that turned into
+      a first charge did not, and its checkout kept its Purchase. Then Stripe's
+      paid-invoice history, so a trial that converted before this shipped is
+      not reported at its renewal. If Stripe cannot answer either, nothing is
+      sent and nothing is claimed.
+    * Its OWN latch, `first_charge_conversion:{subscription}`. Not
+      `ga4_purchase:` — every trial checkout before this change claimed that
+      one with a $0 Purchase — and not `paid_start:` — trials welcomed under
+      the old status trigger (before #834) hold that one without having been
+      charged, and their first real charge must still be reported.
+    * The account resolves as the welcome's does: customer id, then the
+      `user_id` in subscription metadata, then the Subscription row — so a
+      duplicate-checkout subscription whose customer is no longer the linked
+      one still finds its owner.
+
+    The Meta event carries the browser keys stored from the buyer's own
+    requests (`meta_capi.stored_match_keys`), never this webhook request's.
+    Env-gated on either destination and never raises.
+    """
+    try:
+        from app.services import meta_capi
+        from app.services.analytics import is_configured as ga4_is_configured
+        from app.services.analytics import track_purchase as ga4_track_purchase
+
+        ga4_on = ga4_is_configured()
+        meta_on = meta_capi.is_configured()
+        if not ga4_on and not meta_on:
+            return
+        amount_paid = _minor_units(inv.get("amount_paid"))
+        if amount_paid is None or amount_paid <= 0:
+            return
+        sub_id = _invoice_subscription_id(inv)
+        if not sub_id:
+            return
+        latch_id = f"{_FIRST_CHARGE_LATCH}:{sub_id}"[:80]
+        if (
+            await session.execute(
+                select(StripeWebhookEvent).where(StripeWebhookEvent.id == latch_id)
+            )
+        ).scalar_one_or_none() is not None:
+            return
+
+        async def _claim() -> bool:
+            try:
+                session.add(StripeWebhookEvent(id=latch_id, event_type=_FIRST_CHARGE_LATCH))
+                await session.commit()
+                return True
+            except Exception:
+                await session.rollback()
+                return False
+
+        if (inv.get("billing_reason") or "") == "subscription_create":
+            await _claim()
+            logger.info("stripe.first_charge_conversion_direct_checkout sub=%s", sub_id)
+            return
+        started_with_trial = await subscription_started_with_trial(sub_id)
+        if started_with_trial is None:
+            logger.warning(
+                "stripe.first_charge_conversion_undecided sub=%s — Stripe could not "
+                "say whether this subscription began with a trial; nothing sent",
+                sub_id,
+            )
+            return
+        if not started_with_trial:
+            await _claim()
+            logger.info("stripe.first_charge_conversion_not_a_trial sub=%s", sub_id)
+            return
+        prior_paid = await subscription_has_other_paid_invoice(sub_id, inv.get("id"))
+        if prior_paid is None:
+            logger.warning(
+                "stripe.first_charge_conversion_undecided sub=%s — paid-invoice "
+                "history unavailable; nothing sent",
+                sub_id,
+            )
+            return
+        if prior_paid:
+            await _claim()
+            logger.info("stripe.first_charge_conversion_established sub=%s", sub_id)
+            return
+
+        user, sub_row = await _resolve_invoice_account(session, inv, sub_id)
+        if user is None:
+            logger.warning("stripe.first_charge_conversion_without_user sub=%s", sub_id)
+            return
+        if not await _claim():
+            logger.info("stripe.first_charge_conversion_claim_lost sub=%s", sub_id)
+            return
+
+        value = round(amount_paid / 100, 2)
+        currency = str(inv.get("currency") or "usd").upper()
+        meta = _invoice_subscription_metadata(inv)
+        plan_line = _plan_line(_invoice_lines(inv))
+        price_id = _line_price_id(plan_line) if plan_line is not None else None
+        tier = tier_from_price(price_id) if price_id else None
+        if tier is None and sub_row is not None and sub_row.tier in _PAID_TIERS:
+            tier = sub_row.tier
+        if tier is None and meta.get("tier") in _PAID_TIERS:
+            tier = meta["tier"]
+        billing_period = _billing_period_from_price(price_id)
+        if billing_period is None and sub_row is not None and sub_row.billing_period in _BILLING_PERIODS:
+            billing_period = sub_row.billing_period
+        if billing_period is None and meta.get("billing_period") in _BILLING_PERIODS:
+            billing_period = meta["billing_period"]
+
+        if ga4_on:
+            try:
+                # No browser beacon exists for this charge, so there is nothing
+                # to de-duplicate against; the id is the hashed subscription
+                # id, stable across redeliveries and free of raw Stripe ids.
+                await ga4_track_purchase(
+                    user_id=user.id,
+                    transaction_id=meta_capi.event_id_for("subscribe", sub_id),
+                    value=value,
+                    currency=currency,
+                    tier=tier,
+                    billing_period=billing_period,
+                )
+            except Exception:
+                logger.exception("stripe.first_charge_ga4_failed sub=%s", sub_id)
+        if meta_on:
+            await meta_capi.track_subscribe(
+                user_id=user.id,
+                subscription_id=sub_id,
+                email=user.email,
+                value=value,
+                currency=currency,
+                **meta_capi.stored_match_keys(user),
+            )
+    except Exception:
+        # Analytics must never fail a money-path webhook.
+        logger.exception("stripe.first_charge_conversion_failed invoice=%s", inv.get("id"))
 
 
 _PAID_TIERS = ("pro", "premium")
@@ -1014,20 +1192,17 @@ async def stripe_webhook(
                     try:
                         from app.services import meta_capi
 
-                        # fbc carries the Meta click id captured at signup.
-                        # This event fires from a Stripe webhook days after
-                        # the click with no browser present, so the value is
-                        # rebuilt server-side from the stored fbclid — that is
-                        # the whole reason meta_capi.fbc_value() exists.
-                        # Unhashed by contract; hashing it zeroes its value.
+                        # No browser is present on a Stripe webhook, and this
+                        # request's IP address and user agent are Stripe's.
+                        # The browser keys (IP, user agent, fbp, and the most
+                        # recent fbc, else the first-touch fbclid) are the
+                        # ones stored from the buyer's own checkout request —
+                        # meta_capi.stored_match_keys. Unhashed by contract.
                         await meta_capi.track_start_trial(
                             user_id=user.id, email=user.email,
-                            fbc=meta_capi.fbc_value(
-                                user.signup_fbclid, user.created_at,
-                            ),
-                            # No browser on a Stripe webhook. The checkout was
-                            # started from the billing page, which is the
-                            # closest true source URL available.
+                            **meta_capi.stored_match_keys(user),
+                            # The checkout was started from the billing page,
+                            # the closest true source URL available.
                             event_source_url=meta_capi.source_url("/app/billing"),
                         )
                     except Exception:
@@ -1730,6 +1905,11 @@ async def stripe_webhook(
                         logger.exception(
                             "stripe.payment_recovered_email_error user=%s", user.id,
                         )
+
+        # Meta Subscribe + GA4 purchase for a trial's first real charge. Its
+        # own first-charge decision and latch; runs whether or not dunning
+        # applied, since a first charge recovered from dunning still counts.
+        await _send_first_charge_conversion(session, obj)
 
     # Mark event as processed so the next delivery is treated as a replay
     if event_id:

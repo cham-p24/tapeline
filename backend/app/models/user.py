@@ -316,6 +316,24 @@ class User(Base):
     # Nullable: only paid Meta traffic carries it.
     signup_fbclid: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
+    # Meta Conversions API match keys — the LATEST values, not first-touch
+    # (migration 0072, blueprint P1-P3). Written only while Meta CAPI is
+    # configured, by services/meta_capi.remember_browser, from requests the
+    # visitor's own browser sends straight to the API: email signup, the OAuth
+    # callback, POST /api/billing/checkout. Read back for StartTrial, Purchase
+    # and Subscribe, which fire from Stripe webhooks where the request is
+    # Stripe's, not the buyer's. All sent to Meta UNHASHED, as Meta requires;
+    # disclosed in the privacy policy (app/legal/privacy/page.tsx).
+    #   meta_client_ip / meta_client_user_agent — replaced together, so the
+    #     pair always describes one browser.
+    #   meta_fbp — the `_fbp` cookie Meta's pixel wrote.
+    #   meta_fbc — `fb.1.<ms>.<fbclid>`: an `_fbc` cookie, or a click newer
+    #     than signup_fbclid (which stays untouched as first-touch).
+    meta_client_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    meta_client_user_agent: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    meta_fbp: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    meta_fbc: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     # First-touch EXTERNAL referrer HOSTNAME captured at landing (frontend
     # lib/utm.ts, same localStorage 30-day-TTL mechanism as signup_utm_*,
     # forwarded on the signup POST; written once at signup, never updated).

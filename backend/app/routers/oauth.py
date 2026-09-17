@@ -129,6 +129,12 @@ ATTRIBUTION_FIELDS: dict[str, int] = {
     # is precisely what the 2026-08-20 audit found for the other two. Raw
     # fbclid; the `fb.1.<ts>.<fbclid>` wire value is derived at send time.
     "fbclid": 200,
+    # Meta's `_fbp` browser cookie (blueprint P2). OAuthButtons reads it on
+    # our page before the provider redirect, because the callback is the
+    # provider sending the browser back and cannot read a tapeline.io page
+    # cookie itself. Not an attribution column: it is validated and stored as
+    # users.meta_fbp by meta_capi.remember_browser, and sent to Meta.
+    "fbp": 200,
     # First-touch referrer host (#444) and landing path (#458). The email path
     # has written these since they shipped; OAuth never did — and because every
     # real signup to date arrived via Google OAuth, both columns were NULL for
@@ -680,6 +686,15 @@ async def oauth_callback(
             # "verify your email" banner.
             email_verified_at=datetime.now(UTC),
         )
+        # Meta match keys (blueprint P1/P2). This callback is a top-level
+        # navigation from the provider straight to api.tapeline.io (the
+        # registered redirect_uri, verified in production 2026-09-17), so the
+        # request's IP address and user agent are the visitor's own. `_fbp`
+        # came through /start in the attribution cookie. Stored only while
+        # Meta CAPI is configured; never raises.
+        from app.services import meta_capi
+
+        meta_capi.remember_browser(user, request, fbp=attr.get("fbp"))
         session.add(user)
         await session.commit()
         await session.refresh(user)
@@ -773,13 +788,12 @@ async def oauth_callback(
         try:
             from app.services import meta_capi
 
-            # fbc rides along UNHASHED — see services/meta_capi. `fbp` is not
-            # available on this path: it lives in a browser cookie and this
-            # request is the provider's redirect back to us, not the visitor's
-            # own page. The click ID is the half that survives the round-trip.
+            # fbc, fbp, IP address and user agent ride along UNHASHED — see
+            # services/meta_capi. They are the values just stored for this
+            # new account from this request and the /start cookie.
             await meta_capi.track_complete_registration(
                 user_id=user.id, email=user.email, method=provider,
-                fbc=meta_capi.fbc_value(user.signup_fbclid, user.created_at),
+                **meta_capi.stored_match_keys(user),
                 event_source_url=meta_capi.source_url(user.signup_landing_path),
             )
         except Exception:

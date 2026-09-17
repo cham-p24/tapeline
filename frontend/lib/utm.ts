@@ -388,28 +388,65 @@ export function clearStoredFbclid(): void {
   }
 }
 
-/**
- * Read Meta's `_fbp` first-party browser cookie, if the pixel has written
- * one. Unlike the captures above this is NOT ours to persist: the pixel owns
- * the cookie, its own TTL and its own value, and there is no column for it —
- * it is read at submit time and forwarded straight onto the server-side
- * CompleteRegistration event as the second unhashed identifier Meta matches
- * on. Returns "" whenever the pixel was blocked or never ran, which is
- * common in this audience and must degrade silently.
- */
-export function readFbpCookie(): string {
+function readMetaCookie(name: "_fbp" | "_fbc", maxLength: number): string {
   if (typeof document === "undefined") return "";
   try {
     for (const part of document.cookie.split(";")) {
       const [rawName, ...rest] = part.split("=");
-      if (rawName.trim() !== "_fbp") continue;
+      if (rawName.trim() !== name) continue;
       const value = decodeURIComponent(rest.join("=").trim());
-      return value.slice(0, 200);
+      return value.slice(0, maxLength);
     }
   } catch {
     /* cookies unavailable — the event just goes without it */
   }
   return "";
+}
+
+/**
+ * Read Meta's `_fbp` first-party browser cookie, if the pixel has written
+ * one. The pixel owns the cookie, its TTL and its value; we only read it and
+ * send it to our own API — on the signup POST, the OAuth start link and the
+ * checkout request — where the backend stores the latest value on the
+ * account (users.meta_fbp) for the server-side Meta events, including the
+ * ones Stripe webhooks fire days later with no browser present. Returns ""
+ * whenever the pixel was blocked or never ran, which is common in this
+ * audience and must degrade silently.
+ */
+export function readFbpCookie(): string {
+  return readMetaCookie("_fbp", 200);
+}
+
+/**
+ * Read Meta's `_fbc` cookie: `fb.1.<ms>.<fbclid>`, which the pixel rewrites
+ * whenever the visitor arrives on a new Meta click — so it is the MOST RECENT
+ * click, where our own fbclid capture above is first-touch. Meta asks for the
+ * latest one (blueprint P3). The pixel runs on public pages only, but the
+ * cookie lives on tapeline.io, so the signed-in checkout page can still read
+ * it. The backend rejects anything not shaped like the pixel's value.
+ */
+export function readFbcCookie(): string {
+  return readMetaCookie("_fbc", 500);
+}
+
+/**
+ * Meta's browser keys for the checkout request body (blueprint P2/P3):
+ * `fbp`, `fbc` (the latest click, from the pixel's cookie) and `fbclid` (the
+ * click id this browser still holds — the backend uses it only when it is not
+ * the account's first-touch click and no `fbc` cookie came). StartTrial,
+ * Purchase and Subscribe fire later from Stripe webhooks with no browser
+ * present, so the page that starts the checkout is the last place these can
+ * be read. Keys are omitted, not sent empty, when absent.
+ */
+export function metaCheckoutIds(): { fbp?: string; fbc?: string; fbclid?: string } {
+  const out: { fbp?: string; fbc?: string; fbclid?: string } = {};
+  const fbp = readFbpCookie();
+  if (fbp) out.fbp = fbp;
+  const fbc = readFbcCookie();
+  if (fbc) out.fbc = fbc;
+  const { fbclid } = getStoredFbclid();
+  if (fbclid) out.fbclid = fbclid;
+  return out;
 }
 
 /**

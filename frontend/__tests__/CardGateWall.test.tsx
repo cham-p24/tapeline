@@ -458,6 +458,25 @@ describe("card gate — no dark patterns", () => {
 });
 
 describe("card gate — the mechanism", () => {
+  it("sends Meta's browser cookies with the checkout (StartTrial fires later with no browser)", async () => {
+    Object.defineProperty(document, "cookie", {
+      value: "_fbp=fb.1.1755900000000.987654321; _fbc=fb.1.1757950000000.IwAR0-Latest",
+      configurable: true,
+      writable: true,
+    });
+    try {
+      await renderWall();
+      fireEvent.click(screen.getByTestId("card-gate-cta"));
+      await waitFor(() => expect(checkoutBodies).toHaveLength(1));
+      expect(checkoutBodies[0]).toMatchObject({
+        fbp: "fb.1.1755900000000.987654321",
+        fbc: "fb.1.1757950000000.IwAR0-Latest",
+      });
+    } finally {
+      delete (document as unknown as { cookie?: string }).cookie;
+    }
+  });
+
   it("POSTs start_trial to the existing checkout endpoint, and only on click", async () => {
     await renderWall();
     fireEvent.click(screen.getByTestId("card-gate-cta"));

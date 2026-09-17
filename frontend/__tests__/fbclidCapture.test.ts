@@ -20,6 +20,8 @@ import {
   captureFbclidFromLocation,
   clearStoredFbclid,
   getStoredFbclid,
+  metaCheckoutIds,
+  readFbcCookie,
   readFbpCookie,
 } from "@/lib/utm";
 
@@ -133,5 +135,42 @@ describe("readFbpCookie", () => {
   it("does not match a cookie that merely ends in _fbp", () => {
     setCookie("not_fbp=nope");
     expect(readFbpCookie()).toBe("");
+  });
+});
+
+/**
+ * The checkout request carries Meta's browser keys (blueprint P2/P3,
+ * backend/tests/test_meta_capi_money_events.py). StartTrial, Purchase and
+ * Subscribe fire later from Stripe webhooks with no browser present, so the
+ * page that starts the checkout is the last place these can be read.
+ */
+describe("metaCheckoutIds", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    setCookie("");
+  });
+
+  it("reads Meta's _fbc cookie, the most recent click the pixel saw", () => {
+    setCookie("_fbp=fb.1.1755900000000.987654321; _fbc=fb.1.1757950000000.IwAR0-Latest");
+    expect(readFbcCookie()).toBe("fb.1.1757950000000.IwAR0-Latest");
+    setCookie("x_fbc=nope");
+    expect(readFbcCookie()).toBe("");
+  });
+
+  it("sends the pixel's cookies and the click id this browser holds", () => {
+    setCookie("_fbp=fb.1.1755900000000.987654321; _fbc=fb.1.1757950000000.IwAR0-Latest");
+    window.localStorage.setItem(
+      KEY,
+      JSON.stringify({ fbclid: "IwAR0-Stored", captured_at: Date.now() }),
+    );
+    expect(metaCheckoutIds()).toEqual({
+      fbp: "fb.1.1755900000000.987654321",
+      fbc: "fb.1.1757950000000.IwAR0-Latest",
+      fbclid: "IwAR0-Stored",
+    });
+  });
+
+  it("sends nothing it does not have (pixel blocked, no click)", () => {
+    expect(metaCheckoutIds()).toEqual({});
   });
 });

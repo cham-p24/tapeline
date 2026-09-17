@@ -41,9 +41,9 @@ export default function PrivacyPage() {
         <div className="prose prose-invert mt-8 max-w-none text-sm leading-relaxed text-muted">
           <h2 className="mt-8 text-lg font-semibold text-fg">Summary in one paragraph</h2>
           <p>
-            We collect the minimum personal data needed to run the product: your email and password for the account; your name, watchlist, alerts and subscription state for the features that need them. We do not store IP addresses or browser fingerprints to the database, and do not see your payment-card details (Stripe handles them). For product analytics and advertising measurement we use Google Analytics 4 and Google Ads, which set cookies and receive limited usage and conversion data. {trackerEnabled.meta
-              ? " Our servers also send Meta a hashed version of your email address when you sign up, start a trial, or are charged"
-              : " If we enable Meta advertising, our servers would additionally send Meta a hashed version of your email address when you sign up, start a trial, or are charged"}{" "}
+            We collect the minimum personal data needed to run the product: your email and password for the account; your name, watchlist, alerts and subscription state for the features that need them. We do not store browser fingerprints, the only IP address we may keep on your account is the one described under <em>What we store</em>, and we do not see your payment-card details (Stripe handles them). For product analytics and advertising measurement we use Google Analytics 4 and Google Ads, which set cookies and receive limited usage and conversion data. {trackerEnabled.meta
+              ? " Our servers also send Meta a hashed version of your email address, and can send the IP address and browser user agent of your most recent signup or checkout, when you sign up, start a trial, or are charged"
+              : " If we enable Meta advertising, our servers would additionally send Meta a hashed version of your email address, and could send the IP address and browser user agent of your most recent signup or checkout, when you sign up, start a trial, or are charged"}{" "}
             — hashing is not anonymisation, since Meta matches those hashes against its own records. All of it is detailed in the Cookies and Sub-processors sections below. We do not sell your personal data, and we do share limited advertising-measurement data as described there.
           </p>
 
@@ -57,7 +57,7 @@ export default function PrivacyPage() {
             <li><strong>Name</strong> — optional. Used only to personalise the welcome email and the dashboard greeting.</li>
             <li><strong>Referral code</strong> — optional. If you signed up via someone else's referral link, we record which user referred you so we can credit them the referral bonus.</li>
             <li><strong>Cloudflare Turnstile token</strong> — bot-challenge response. Verified server-side and immediately discarded after the check.</li>
-            <li><strong>Device fingerprint &amp; IP address</strong> — used <em>only</em> to rate-limit signups against trial-farming bots. Held in volatile worker memory, never written to the database, and evicted on every backend restart.</li>
+            <li><strong>Device fingerprint &amp; IP address</strong> — used to rate-limit signups against trial-farming bots, held for that in volatile worker memory and evicted on every backend restart. The fingerprint is never written to the database. For the IP address, see the one exception under <em>What we store</em>.</li>
           </ul>
 
           <h2 className="mt-8 text-lg font-semibold text-fg">What we store while you use the product</h2>
@@ -68,6 +68,8 @@ export default function PrivacyPage() {
             <li>Your <strong>referral code</strong> (your own shareable code) and the count of unused referral credits you've earned.</li>
             <li>An internal <strong>drip-email state token list</strong> — a comma-separated string like <code>"3,7,end"</code> that records which lifecycle emails we've already sent so we don't double-send.</li>
             <li>Account <code>created_at</code> and <code>updated_at</code> timestamps for audit.</li>
+            <li>{trackerEnabled.meta ? "For" : "If we enable Meta advertising, for"}{" "}
+              the Meta events described under <em>Sub-processors</em> only: the <strong>most recent IP address and browser user agent</strong> from your signup or checkout request, when we record them, and the latest <code>_fbp</code> value and Meta click identifier (<code>_fbc</code>) your browser sent with those requests. Each is replaced by a newer one and used for nothing else.</li>
           </ul>
 
           <h2 className="mt-8 text-lg font-semibold text-fg">What we explicitly do <em>not</em> collect or store</h2>
@@ -75,8 +77,8 @@ export default function PrivacyPage() {
             <li><strong>Payment card numbers</strong> — Stripe handles these directly. We only see a <code>stripe_customer_id</code>.</li>
             <li><strong>Bank account details</strong>, SSN, passport, or other government IDs.</li>
             <li><strong>Your brokerage credentials</strong> or actual portfolio holdings. Tapeline scans the public market — it does not connect to your broker.</li>
-            <li><strong>IP addresses in the database</strong>. We use them transiently in memory for rate limiting, but we don't persist them.</li>
-            <li><strong>Browser fingerprints in the database</strong>. Same as IPs — used for in-memory anti-abuse checks, never written down.</li>
+            <li><strong>IP addresses in the database</strong>, with the one exception under <em>What we store</em>. For rate limiting we use them in memory only.</li>
+            <li><strong>Browser fingerprints in the database</strong>. Used for in-memory anti-abuse checks, never written down.</li>
             <li><strong>Location or geolocation data.</strong></li>
             <li>We have <strong>never sold your personal data</strong> and have no arrangement to. Separately — this is its own disclosure, not a footnote to that sentence — we do <strong>share</strong> limited advertising-measurement data with Google, and would with Meta if we enable it. Some privacy laws, California's among them, treat that kind of ad-measurement sharing as a regulated disclosure distinct from a &ldquo;sale&rdquo;, so we name it here rather than leave it to be inferred. What each company receives is itemised under <em>Sub-processors</em>, and the cookies involved are under <em>Cookies</em>.</li>
           </ul>
@@ -92,7 +94,7 @@ export default function PrivacyPage() {
               <strong>Meta (Facebook &amp; Instagram)</strong> — advertising measurement.{" "}
               <Status on={trackerEnabled.meta} offNote="no Meta code runs on this site today and nothing has ever been sent to Meta" />{" "}
               Meta is not a vendor acting only on our instructions: it decides its own advertising purposes and may combine what it receives with data it already holds about you. There are two separate flows.{" "}
-              <strong>From our servers:</strong> when you create an account, when a trial starts, and when a subscription is charged, we send one event containing a SHA-256 hash of your email address, a hash of our internal account ID, the event name, a timestamp, a de-duplication ID, a currency, and — depending on the event — the amount charged, the plan, or how you signed up. We do <em>not</em> send your raw email address, your name, your IP address, your browser user-agent, or which page you were on. Hashing is not anonymisation: the whole point of sending a hash is that Meta matches it against its own records, so treat this as a disclosure of personal data.{" "}
+              <strong>From our servers:</strong> when you create an account, when a trial starts, when a purchase is paid at checkout, and when a trial&rsquo;s first payment is charged, we send one event containing a SHA-256 hash of your email address, a hash of our internal account ID, the event name, a timestamp, a de-duplication ID, and — depending on the event — the amount charged, a currency, the plan, how you signed up, or the address of the page the event is attributed to (the page you signed up on, or our billing page). When your browser had them, the event also carries the <code>_fbp</code> and <code>_fbc</code> values described under <em>Cookies</em> (Meta&rsquo;s own browser and click identifiers, read when you sign up or start a checkout), and it can carry the IP address and browser user agent of your most recent signup or checkout request. Those are sent unhashed, as Meta requires, and only the most recent of each is kept on your account. We do <em>not</em> send your raw email address or your name. Hashing is not anonymisation: the whole point of sending a hash is that Meta matches it against its own records, so treat this as a disclosure of personal data.{" "}
               <strong>From your browser:</strong> Meta&rsquo;s script runs on our public marketing pages only — deliberately never on the signed-in app, so it cannot see which tickers you look at — sets the cookies described under <em>Cookies</em>, and reports each page view. Loading that script tells Meta your IP address, browser and language, and because the request goes to facebook.com your browser may attach Facebook cookies it already holds, which can let Meta link the visit to your logged-in Facebook or Instagram account. That happens between your browser and Meta; we neither see nor store it, and a tracker-blocking extension prevents it.
             </li>
             <li>
