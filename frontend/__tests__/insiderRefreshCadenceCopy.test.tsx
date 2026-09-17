@@ -387,6 +387,14 @@ describe("/insider-buying, /how-it-works and the Smart Money factor", () => {
     expect(factor.caveat).toMatch(FROM_EDGAR);
     expectNoPresentVendor(factor.caveat);
 
+    // Changelog rule 4: the factor page states the attribution rule the code
+    // applies, including that a sibling share class gets no reading.
+    expect(detail).toMatch(/counts only for the ticker it names/);
+    const attribution = factor.limitations.find((l) => /GOOGL/.test(l));
+    expect(attribution, "no attribution limitation on the Smart Money page").toBeDefined();
+    expect(attribution).toMatch(/Since 17 September 2026/);
+    expect(attribution).toMatch(/no reading rather than a borrowed one/);
+
     expectNoStaleClaim(JSON.stringify(factor));
   });
 });

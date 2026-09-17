@@ -256,7 +256,7 @@ export const FACTORS: Factor[] = [
     feeds: [
       {
         name: "SEC filings",
-        detail: "Form 4 insider transactions read directly from SEC EDGAR, re-checked about every two days per stock (about monthly for ETFs). Only non-derivative transactions (shares, not options) count, and an amended filing (4/A) replaces the original filing it restates. Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR.",
+        detail: "Form 4 insider transactions read directly from SEC EDGAR, re-checked about every two days per stock (about monthly for ETFs). Only non-derivative transactions (shares, not options) count, and an amended filing (4/A) replaces the original filing it restates. A filing counts only for the ticker it names, so a company with more than one listed security has a reading on the one its insiders file under. Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR.",
       },
     ],
     caveat:
@@ -265,6 +265,7 @@ export const FACTORS: Factor[] = [
       "Many disclosed transactions carry no view at all. Sales scheduled months in advance under a 10b5-1 plan, option exercises, vesting events and share sales made purely to cover tax withholding all arrive as Form 4 filings and are netted like any other.",
       "Smaller and less-covered companies file rarely, so the window is frequently empty and the factor is unavailable for long stretches.",
       "The factor reads corporate-insider Form 4 filings only. It has no congressional-trade input.",
+      "A company can have several listed securities under one SEC identifier — share classes, preferred shares, notes. Since 17 September 2026 a filing's transactions count only for the ticker the filing itself names, so the other securities have no reading rather than a borrowed one: Alphabet's insiders file under GOOGL, News Corp's under NWS. Before that date every ticker of the issuer received all of them.",
       "Netting by dollar value means one large filer can dominate a company with many reporting insiders.",
       "Insiders are not a uniformly informed group, and this factor makes no claim that they are. The name of the factor is conventional industry shorthand, not an assessment of anyone's judgement.",
     ],
