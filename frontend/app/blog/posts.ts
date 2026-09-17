@@ -389,26 +389,30 @@ export const POSTS: BlogPost[] = [
       <ol>
         <li><strong>Insider Form 4 filings</strong> — required by the
         SEC within 2 business days of any insider transaction
-        (executives, directors, 10%+ owners). The signal: insiders are
-        the only buyers who know more about the company than the
-        market, by definition. Clusters of buying — multiple insiders
-        in the same window — are a stronger signal than single-buyer
-        events.</li>
+        (executives, directors, 10%+ owners). Insiders are the one group
+        the law treats as knowing more about the company than the
+        market does, which is why the filings exist at all. Clusters of
+        buying — multiple insiders in the same window — are what
+        readers tend to weigh most heavily; the factor itself simply
+        nets the disclosed dollar value.</li>
       </ol>
 
-      <h2>What "smart money buying" actually predicts</h2>
-      <p>Each data source has a different predictive horizon. Let me
-      walk through the cases that matter:</p>
+      <h2>What a Form 4 filing does and does not tell you</h2>
+      <p>A filing is a disclosure, not a forecast. What it carries, and
+      what it leaves out:</p>
 
-      <p><strong>Insider Form 4 filings</strong> have the shortest lag
-      (1–3 business days) and the highest signal-to-noise for cluster
-      events. Single-insider buys are weak — executives buy for
-      compensation reasons, exercising options is mechanical, charity
-      donations get filed too. Multi-insider buys in the same window,
-      where the executives have no scheduled compensation event, are the
-      higher-signal case. Selling clusters are harder to read (they
-      can mean tax planning, diversification, or genuine signal — hard
-      to disambiguate).</p>
+      <p><strong>Insider Form 4 filings</strong> are disclosed quickly
+      — generally within two business days of the trade — so they
+      describe something recent. What they do not carry is a reason. A
+      single purchase can be compensation-driven, an option exercise is
+      mechanical, and charity donations are filed the same way. Several
+      insiders buying in the same window, none of them on a scheduled
+      compensation event, is the case readers usually treat as more
+      meaningful, though nothing in the filing says so. Selling is
+      harder to read again: tax planning, diversification and a view on
+      the company all look identical on the form. We have no evidence
+      that any of these patterns predicts a price move, and the factor
+      makes no such claim — it nets what was disclosed.</p>
 
       <h2>Why Smart Money isn't one of the biggest factors</h2>
       <p>A natural retail-trader question: if Smart Money is so
