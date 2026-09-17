@@ -64,6 +64,8 @@ LOCK_EOD_DIGEST = 4
 LOCK_WEEKLY_NEWSLETTER = 5
 LOCK_CHECKOUT_RECOVERY = 6
 LOCK_ACTIVATION_NUDGE = 7
+# Retired, not reused. The SEO digest crawls for longer than Postgres lets a
+# lock session sit idle (5 min), so it holds a job_period_claims claim instead.
 LOCK_SEO_DIGEST = 8
 LOCK_SURVEY_REMINDER = 9
 LOCK_PRODUCT_UPDATE = 10

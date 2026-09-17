@@ -328,7 +328,6 @@ _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run 
 _last_weekly_newsletter_token: str | None = None  # "weekly_YYYYWww" of last newsletter run
 _last_daily_newsletter_date: str | None = None  # "YYYY-MM-DD" of last Daily Top 10 digest run (UTC)
 _last_indexnow_date: str | None = None  # "YYYY-MM-DD" of last IndexNow batch submit (UTC)
-_last_seo_digest_token: str | None = None  # "seo_YYYYWww" of last weekly SEO digest run
 _last_growth_tick_date: str | None = None  # "YYYY-MM-DD" of last growth-bot tick (UTC)
 _last_fundamentals_refresh: datetime | None = None
 _last_insider_refresh: datetime | None = None
@@ -1467,37 +1466,16 @@ async def tick() -> None:
     # wrong place to crawl a website from. GitHub Actions is the right place,
     # is free, and cannot take production scoring down when it runs long.
 
-    # Weekly SEO digest — Monday at/after 09:00 UTC (~7pm Sydney
-    # post-Monday-close, ~5am ET pre-market). Sends a Markdown summary
-    # to the founder's Telegram: sitemap size, broken-URL count,
-    # ticker-universe stats, and suggested next steps. Process-level
-    # token + Telegram-side dedupe make double-fires harmless.
-    _set_stage("seo_digest_token")
-    global _last_seo_digest_token
-    seo_digest_token = f"seo_{iso_year}W{iso_week:02d}"
-    if (
-        iso_dow == 1                                    # Monday
-        and started.hour >= 9                           # 09:00 UTC onward
-        and _last_seo_digest_token != seo_digest_token
-    ):
-        # Slot claimed BEFORE the work and rolled back only on a CAUGHT
-        # failure — the pattern already applied to the calendar seed and
-        # the trial check in #797. Latch-on-success protects against a
-        # transient error; it does NOT protect against a hang, because a
-        # cycle killed by the tick watchdog never reaches the except
-        # clause either. The stale value then survives, the next tick
-        # restarts the same job, and the worker wedges until something
-        # restarts it.
-        _seo_prev = _last_seo_digest_token
-        _last_seo_digest_token = seo_digest_token
-        try:
-            from app.services.seo_health import run_weekly_digest
-            async with session_scope() as seo_session:
-                sent = await run_weekly_digest(seo_session)
-            logger.info("seo_digest.weekly.ran sent=%s token=%s", sent, seo_digest_token)
-        except Exception:
-            _last_seo_digest_token = _seo_prev
-            logger.exception("seo_digest.weekly.failed")
+    # The weekly SEO digest USED TO RUN HERE, and does not any more: it runs
+    # from .github/workflows/seo-weekly-digest.yml (seo_health.run_weekly_digest).
+    #
+    # It crawls the whole sitemap (11,982 URLs, 2026-09-14), which is the job
+    # the paragraph above moved out of this process. It stayed behind a
+    # process-memory token, so on a Monday the first tick after every deploy
+    # ran it again, inline, until the watchdog killed the tick: measured
+    # 2026-09-14 18:45Z, `tick.timeout elapsed=240.1s stage=seo_digest_token`
+    # and four minutes with no price pass. Its once-a-week guarantee now lives
+    # in the database (job_period_claims), not in this process.
 
     # Daily growth-bot tick. Fires once per UTC day at/after 22:00 UTC
     # — ~8am Melbourne the next morning AEST, ~6pm ET the prior evening.
