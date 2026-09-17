@@ -157,7 +157,7 @@ export default async function MarketRegimePage() {
         },
         {
           q: "How often does the regime update?",
-          a: "It is recalculated on each worker pass, about every 70-80 seconds during US market hours. The underlying FRED series (VIX, 10Y) update once a day at end-of-day, so the regime label only moves when that daily VIX close crosses a threshold. The advancer count and SPY momentum are re-read each pass from prices delayed about 15 minutes, and the Fear & Greed composite recomputes on each pass. This public page is a saved snapshot that can be an hour old or more.",
+          a: "It is recalculated on each worker pass, about every 60 seconds during US market hours. The underlying FRED series (VIX, 10Y) update once a day at end-of-day, so the regime label only moves when that daily VIX close crosses a threshold. The advancer count and SPY momentum are re-read each pass from prices delayed about 15 minutes, and the Fear & Greed composite recomputes on each pass. This public page is a saved snapshot that can be an hour old or more.",
         },
         {
           q: "Does the regime change scoring weights?",

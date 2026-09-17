@@ -227,7 +227,7 @@ export default function VerifyPage() {
                 Open the frozen record for any symbol — for example{" "}
                 <Link href="/scorecard/AAPL" className="link">/scorecard/AAPL</Link>{" "}
                 — and confirm the row on the page matches the row in your download.
-                Cross-reference the live factor readings on its{" "}
+                Cross-reference the current factor readings on its{" "}
                 <Link href="/t/AAPL" className="link">ticker page</Link> and the
                 weighting on{" "}
                 <Link href="/how-it-works" className="link">how it works</Link>.

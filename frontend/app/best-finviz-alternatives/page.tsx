@@ -79,9 +79,9 @@ const TOOLS: Tool[] = [
     capability: {
       composite: "yes",
       scorecard: "yes",
-      // "limited", not "yes" (integrity fix 2026-09-14): prices are delayed
-      // about 15 minutes on every plan and re-read about every 70-80 seconds.
-      intraday: "limited",
+      // "no" (integrity fix 2026-09-14/15): the column means undelayed intraday
+      // prices, and Tapeline's prices are delayed about 15 minutes on every plan.
+      intraday: "no",
       charting: "limited",
       fundamentals: "yes",
       aiSignals: "limited",
@@ -99,7 +99,7 @@ const TOOLS: Tool[] = [
       "Six named scoring factors, published methodology — no black-box",
       "Public scorecard back-checking every top-10 pick vs SPY",
       "Plain-English Why on every row — no upgrade gates the reasoning",
-      "Prices delayed about 15 minutes, re-read about every 70-80 seconds during US market hours",
+      "Prices delayed about 15 minutes, re-read about every 60 seconds during US market hours",
       "A free plan runs the scanner — ten scored rows per scan",
       "Daily picks, full scorecard and raw CSV/JSON readable with no account",
     ],
@@ -381,7 +381,7 @@ const WHY_LOOK_BEYOND = [
   },
   {
     title: "You want intraday speed without paying Trade Ideas pricing",
-    body: "Finviz Elite refreshes most fields every 1 minute, which is fine for swing trading but a beat slower than dedicated intraday tools. Trade Ideas runs sub-second but costs $120-240/mo. Tapeline is not an intraday speed tool: its prices are delayed about 15 minutes and re-read about every 70-80 seconds, at $8.25/mo annual. It fits screening for swing and position ideas, not timing entries.",
+    body: "Finviz Elite refreshes most fields every 1 minute, which is fine for swing trading but a beat slower than dedicated intraday tools. Trade Ideas runs sub-second but costs $120-240/mo. Tapeline is not an intraday speed tool: its prices are delayed about 15 minutes and re-read about every 60 seconds, at $8.25/mo annual. It fits screening for swing and position ideas, not timing entries.",
   },
 ];
 
@@ -732,7 +732,7 @@ export default function BestFinvizAlternativesPage() {
                 <tr>
                   <th className="px-3 py-3 text-left font-medium sticky left-0 bg-background">Tool</th>
                   <th className="px-3 py-3 text-center font-medium" title="Single 0-100 score per ticker">Composite score</th>
-                  <th className="px-3 py-3 text-center font-medium" title="Per-pick public track record">Scorecard</th>
+                  <th className="px-3 py-3 text-center font-medium" title="Per-pick public track record">Scorecard</th> {/* copy-compliance-allow false-data-freshness -- the next column header defines undelayed intraday data for the competitors compared; Tapeline's own cell is "no" */}
                   <th className="px-3 py-3 text-center font-medium" title="Undelayed intraday prices during market hours">Intraday</th>
                   <th className="px-3 py-3 text-center font-medium">Charting</th>
                   <th className="px-3 py-3 text-center font-medium">Fundamentals</th>

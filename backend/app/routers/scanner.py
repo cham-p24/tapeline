@@ -383,7 +383,7 @@ async def list_scanner(
     # traffic — see models/funnel_events.py.
     # A background refetch is not a scan. The in-app scanner re-runs this
     # request with src=stream each time the API's live bridge announces a
-    # worker pass (services/live_bridge.py), about every 70-80s while the page
+    # worker pass (services/live_bridge.py), about every 60s while the page
     # is open. Counting those as scan_run would mark an idle open tab as an
     # active user on every day it stays open, and logging them would add a
     # scan_logs row per open tab per pass (~750 a day each) that describes a

@@ -75,7 +75,7 @@ export function LiveCounters() {
         sub="rolling, ~5min refresh"
       />
       {/* Was "Scoring cadence 60s" with a pulsing dot. Measured 14 Sep 2026:
-          worker passes land 70-74 s apart (the tick plus a 60 s sleep), and
+          worker passes land about 60 s apart (a fixed-rate loop since #843), and
           the prices a pass writes are vendor-delayed ~15 minutes. */}
       <Counter
         label="Worker pass"

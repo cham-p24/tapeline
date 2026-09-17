@@ -718,7 +718,7 @@ export default function ScannerPage() {
           <p className="text-sm text-muted">Every liquid US stock &amp; ETF, scored on 6 factors.</p>
           {/* Delay disclosure (integrity wave 2026-09-14): measured vendor
               delay ~15 min; the worker re-reads every row about every
-              70-80 s. This page does not update itself. */}
+              60 s. This page does not update itself. */}
           <p className="text-xs text-subtle" data-testid="price-delay-note">
             {priceDelayNote(meta?.delayMinutes)}, re-read {PASS_CADENCE_PHRASE} during
             US market hours (crypto: once a day). Reload or change a filter for newer

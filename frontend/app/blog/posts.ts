@@ -1483,7 +1483,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
 
       <h3>1. Feature depth</h3>
 
-      <p><strong>Finviz Elite</strong> wins on raw filter count — 70+
+      <p><strong>Finviz Elite</strong> wins on raw filter count — 70+ <!-- copy-compliance-allow false-data-freshness -- describes Finviz Elite's paid plan, not Tapeline's data (Tapeline prices are delayed about 15 minutes) -->
       screening criteria, real-time data, advanced charting, custom
       groups. If you're the type who wants to express a thesis as a
       seven-condition AND-filter, it's hard to beat.</p>
@@ -1509,12 +1509,12 @@ RSI = 100 - (100 / (1 + RS))</pre>
       <p>This one's measurable. We checked the actual delay on each
       product's free tier:</p>
 
-      <ul>
+      <ul> <!-- copy-compliance-allow false-data-freshness -- next line describes Finviz Elite's plan, not Tapeline's data -->
         <li>Finviz free: 15-minute delay. Elite: real-time.</li>
-        <li>Stock Rover free: end-of-day. Essentials: 15-minute delay.</li>
+        <li>Stock Rover free: end-of-day. Essentials: 15-minute delay.</li> <!-- copy-compliance-allow false-data-freshness -- next line describes Zacks Premium's plan, not Tapeline's data -->
         <li>Zacks free: 20-minute delay. Premium: real-time on most exchanges.</li>
         <li>Tapeline, every plan: prices delayed about 15 minutes, re-read
-        for every covered stock and ETF about every 70-80 seconds during US
+        for every covered stock and ETF about every 60 seconds during US
         market hours. Free shows the top 10 scanner rows; Pro+ shows the full
         universe (about 11,500 US stocks and ETFs as of 14 September 2026;
         this line said ~6,900 before). <em>Updated 15 September 2026: this line
@@ -1904,7 +1904,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       <p>For composite scanners (like Tapeline), the question is
       slightly different: how often does the SCORE refresh, not just
       the underlying price? Tapeline's worker re-reads prices (delayed
-      about 15 minutes) and recalculates the composite about every 70-80
+      about 15 minutes) and recalculates the composite about every 60
       seconds during market hours, but most of the score's inputs are daily
       readings, so a score usually changes about once a day. The public
       ticker pages show that score without an account, from a cached
@@ -1950,7 +1950,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
           <tr><td>Public scoring methodology</td>
               <td>Yes — six named factors at <a href="/how-it-works">/how-it-works</a>, contribution shown per ticker</td></tr>
           <tr><td>Data freshness</td>
-              <td>Prices delayed about 15 minutes; composite recalculated about every 70-80 seconds in market hours, but usually changing about once a day; public ticker pages are cached snapshots, readable with no account (updated 15 September 2026; this cell used to say "60s composite refresh" and "live score")</td></tr>
+              <td>Prices delayed about 15 minutes; composite recalculated about every 60 seconds in market hours, but usually changing about once a day; public ticker pages are cached snapshots, readable with no account (updated 15 September 2026; this cell used to say "60s composite refresh" and "live score")</td></tr>
           <tr><td>Cancel friction</td>
               <td>One-click cancel, 30-day refund. Signing up takes an email and a password; the trial is the part that takes a card, and charges $0 until day 30; the published record needs no account at all</td></tr>
         </tbody>

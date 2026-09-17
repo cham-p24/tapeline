@@ -101,7 +101,7 @@ if (typeof window !== "undefined") {
 //
 //   #683 (2026-08-30) removed the wall. Signing up is an email and a password
 //   and lands on a FREE PLAN that runs the scanner — top ten scored rows
-//   of any scan, live, one saved screen, a five-symbol watchlist, twelve
+//   of any scan, one saved screen, a five-symbol watchlist, twelve
 //   ticker pages a day. So the #536 wording is true again and the #548 wording
 //   is now the false one. There is no bait-and-switch left to warn about here.
 //

@@ -207,7 +207,7 @@ export function expandKnownConstants(text) {
  * 2026:
  *   - the price vendor's data was ~15 minutes behind (AAPL snapshot 899 s
  *     old at 13:59 UTC; SPY/AAPL/NVDA/MSFT 15.0 min at 13:41 UTC);
- *   - worker passes landed 69.7-74.3 s apart (the tick plus a 60 s sleep);
+ *   - worker passes landed about 60 s apart since #843 (fixed-rate loop; 22 gaps of 59.99-60.02 s measured 14 Sep 18:45-19:12 UTC);
  *   - scores barely move intraday (38 of ~11,546 changed in 2.5 minutes);
  *   - the public heatmap was served ~60 minutes old under "Live".
  * The true wording lives in frontend/lib/freshness.ts and
@@ -218,21 +218,23 @@ export function expandKnownConstants(text) {
  * ---------------------------------------------------------
  *   - A negated claim ("not a real-time record", "no live data source") —
  *     the shared negation guard.
- *   - A dated correction that quotes the old claim ("Updated 15 September
- *     2026: this line used to say ... 'live scores (no delay)'") — see
- *     `isDatedCorrection`. Dated history is corrected with a dated note, not
- *     silently rewritten, and the note has to be able to name what changed.
- *   - A term being MENTIONED in quotes rather than used ('"Real-time" means
- *     different things at different price tiers').
- *   - A competitor's plan described by name in the same sentence ("Finviz
- *     Elite: real-time"). The rule polices what Tapeline says about its OWN
- *     data.
+ *   - A dated correction that quotes the old claim ("this line used to say
+ *     ... 'live scores (no delay)'") — see `isDatedCorrection`. Dated history is
+ *     corrected with a dated note, not silently rewritten, and the note has
+ *     to be able to name what changed. A bare "Updated <date>" is NOT enough.
+ *   - A term MENTIONED as a quoted term on its own ('"Real-time" means
+ *     different things at different price tiers'): the quote must close right
+ *     after the matched term.
+ *   - Competitor descriptions are NOT suppressed by the rule (review of #842):
+ *     each one is a file+rule+phrase `allow` entry with a reason in
+ *     scripts/copy-compliance.allow.json, so a Tapeline claim next to a
+ *     competitor's name cannot slip through.
  * "live" on its own is NOT matched: "your account is live", "a live
  * scorecard", "Live checks" on /status are ordinary English. Only the data
  * phrasings the measurements made false are.
  * ------------------------------------------------------------------ */
 const DATED_CORRECTION =
-  /\b(?:used\s+to\s+(?:say|said|call|read|claim)|updated\s+\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+20\d\d|measured\s+false)\b/i;
+  /\b(?:used\s+to\s+(?:say|said|call|read|claim)|measured\s+false)\b/i;
 
 function isDatedCorrection(text, matchIndex) {
   // Same paragraph only: a blank line (or a closing paragraph tag) resets it.
@@ -242,30 +244,15 @@ function isDatedCorrection(text, matchIndex) {
   return DATED_CORRECTION.test(scope);
 }
 
-const QUOTE_OPEN = /["“'‘]$|&quot;$|&ldquo;$|\\"$/;
-function isQuotedMention(text, matchIndex) {
-  return QUOTE_OPEN.test(text.slice(Math.max(0, matchIndex - 7), matchIndex));
-}
-
-const COMPETITOR =
-  /\b(?:finviz|elite\s+tier|zacks|trade\s+ideas|tradingview|stock\s+rover|koyfin|danelfin|tipranks|seeking\s+alpha|morningstar|simply\s+wall\s+st|benzinga|thinkorswim|webull|robinhood|bloomberg|iex|broker)\b/gi;
-function isCompetitorSubject(text, matchIndex) {
-  // Same list item / paragraph, within ~160 characters. A sentence boundary
-  // does NOT reset it ("Zacks free: 20-minute delay. Premium: real-time"),
-  // but Tapeline being named AFTER the competitor does, because the claim is
-  // then about Tapeline again ("Finviz costs more. Tapeline is real-time.").
-  const before = text.slice(Math.max(0, matchIndex - 160), matchIndex);
-  const cut = Math.max(
-    before.lastIndexOf("\n\n"),
-    before.lastIndexOf("<li>"),
-    before.lastIndexOf("<p>"),
-    before.lastIndexOf("</p>"),
-  );
-  const scope = cut === -1 ? before : before.slice(cut);
-  let last = -1;
-  for (const m of scope.matchAll(COMPETITOR)) last = m.index;
-  if (last === -1) return false;
-  return !/\btapeline\b/i.test(scope.slice(last));
+const QUOTE_OPEN = /(?:["“'‘]|&quot;|&ldquo;|\\")$/;
+const QUOTE_CLOSE = /^(?:["”'’]|&quot;|&rdquo;|\\")/;
+function isQuotedMention(text, matchIndex, matchText) {
+  // The quoted string must be just the term: an opening quote right before it
+  // AND a closing quote right after it. `"Sub-60-second refresh during market
+  // hours",` is a claim in a string literal, not a mention.
+  const before = text.slice(Math.max(0, matchIndex - 7), matchIndex);
+  const after = text.slice(matchIndex + matchText.length, matchIndex + matchText.length + 8);
+  return QUOTE_OPEN.test(before) && QUOTE_CLOSE.test(after);
 }
 
 export const FALSE_FRESHNESS_RULE = {
@@ -274,12 +261,12 @@ export const FALSE_FRESHNESS_RULE = {
     "Integrity 2026-09-14 — never claim data is real-time, undelayed, sub-60s or refreshed every minute",
   message:
     "Measured 14 Sep 2026: prices are delayed about 15 minutes (vendor plan), a " +
-    "worker pass takes about 70-80 seconds, scores usually change about once a " +
+    "worker pass runs about every 60 seconds, scores usually change about once a " +
     "day, and public pages are cached snapshots that can be an hour old or more. " +
     "Interpolate the true wording from frontend/lib/freshness.ts (PRICE_DELAY_NOTE, " +
     "PASS_CADENCE_PHRASE, SCORE_CADENCE_SENTENCE) or backend services/freshness.py. " +
     "No \"Live\" badge on data. A dated correction quoting the old claim is fine " +
-    "(\"Updated <date>: this used to say ...\"). Do not assume a real-time vendor " +
+    "(\"this line used to say ...\"). Do not assume a real-time vendor " +
     "upgrade: that is a founder decision.",
   suppress(text, index, matchText = "") {
     // The two badge patterns start AT the ">" or the quote, so the character
@@ -287,8 +274,7 @@ export const FALSE_FRESHNESS_RULE = {
     const isBadge = /^[>"'`]/.test(matchText);
     return (
       isDatedCorrection(text, index) ||
-      (!isBadge && isQuotedMention(text, index)) ||
-      isCompetitorSubject(text, index)
+      (!isBadge && isQuotedMention(text, index, matchText))
     );
   },
   patterns: [

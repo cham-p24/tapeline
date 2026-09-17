@@ -6,7 +6,7 @@ Browser opens an EventSource to this endpoint. Events:
 * ``hello`` once on connect.
 * ``update`` when this API process's broker receives a publish. In production
   those come from services/live_bridge.py, which publishes once per settled
-  database write: about once per worker pass (~70-80s apart), 10-30s after the
+  database write: about once per worker pass (~60s apart), 10-30s after the
   pass finishes. The worker writes around the clock (it does not pause when the
   market is closed), but the bridge forwards writes only during the US extended
   session (04:00-20:00 ET on trading days), because off-hours passes carry no

@@ -5,7 +5,8 @@ Measured during the US session on Mon 14 Sep 2026:
 * The vendor's price data was ~15 minutes behind (AAPL snapshot `updated`
   899 s old at 13:59 UTC; SPY/AAPL/NVDA/MSFT 15.0 min at 13:41 UTC), and
   `/api/scanner` returned `data_delayed_minutes: 0` for every tier.
-* Worker passes landed 69.7 to 74.3 s apart in steady state.
+* Worker passes landed 69.7 to 74.3 s apart in steady state before #843, and
+  59.99 to 60.02 s apart after it (22 gaps, 18:45-19:12 UTC).
 * Copy on ~170 surfaces said "sub-60s", "real-time", "live, not delayed".
 
 The fix is one constant per codebase side — services/freshness.py and
@@ -36,8 +37,7 @@ from app.services import email as email_mod
 from app.services import newsletter as newsletter_mod
 from app.services.freshness import (
     PASS_CADENCE_PHRASE,
-    PASS_INTERVAL_SECONDS_HIGH,
-    PASS_INTERVAL_SECONDS_LOW,
+    PASS_INTERVAL_SECONDS,
     PRICE_DELAY_MINUTES,
     PRICE_DELAY_PHRASE,
     data_delayed_minutes,
@@ -70,21 +70,18 @@ def test_the_delay_is_the_measured_vendor_delay():
 
 
 def test_the_pass_interval_holds_at_the_measured_gaps():
-    # Steady-state gaps measured on 14 Sep 2026: 69.7, 71, 71.1, 71.6, 72.2,
-    # 73, 74.3 s. The phrase must cover every one of them.
-    measured = [69.7, 71.0, 71.1, 71.6, 72.2, 73.0, 74.3]
-    assert round(min(measured)) >= PASS_INTERVAL_SECONDS_LOW
-    assert max(measured) <= PASS_INTERVAL_SECONDS_HIGH
-    assert PASS_INTERVAL_SECONDS_LOW >= 60, "a pass is the tick plus a 60 s sleep"
-    assert PASS_CADENCE_PHRASE == "about every 70-80 seconds"
+    # Steady-state gaps measured after #843 (fixed-rate loop), 14 Sep 2026
+    # 18:45-19:12 UTC: 22 gaps, min 59.99 s, median 60.00 s, max 60.02 s.
+    measured_min, measured_max = 59.99, 60.02
+    assert round(measured_min) == PASS_INTERVAL_SECONDS == round(measured_max)
+    assert PASS_CADENCE_PHRASE == "about every 60 seconds"
 
 
 def test_the_frontend_constants_match_the_backend():
     assert _frontend_int("PRICE_DELAY_MINUTES") == PRICE_DELAY_MINUTES, (
         "the site states one price delay while the API reports another"
     )
-    assert _frontend_int("PASS_INTERVAL_SECONDS_LOW") == PASS_INTERVAL_SECONDS_LOW
-    assert _frontend_int("PASS_INTERVAL_SECONDS_HIGH") == PASS_INTERVAL_SECONDS_HIGH
+    assert _frontend_int("PASS_INTERVAL_SECONDS") == PASS_INTERVAL_SECONDS
 
 
 def test_data_delayed_minutes_adds_the_tier_delay_to_the_vendor_delay():
@@ -162,8 +159,10 @@ def test_trial_ended_and_cancel_emails_state_the_delay():
 
 
 def test_paid_welcome_email_claims_no_live_feed():
+    # #834 removed every freshness and coverage claim from this email (it now
+    # goes out at the moment of a real charge and states only what the charge
+    # did), so it must not claim live data and need not state the delay.
     html = email_mod.render_subscription_started_email("Sam", "pro")
-    assert PRICE_DELAY_PHRASE in html
     assert not _FALSE_FRESHNESS.search(html)
     assert "data feed is live" not in html
 

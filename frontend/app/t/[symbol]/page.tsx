@@ -166,8 +166,8 @@ async function fetchTicker(symbol: string): Promise<TickerFetch> {
   for (let attempt = 1; attempt <= TICKER_FETCH_ATTEMPTS; attempt++) {
     try {
       const res = await fetch(url, {
-        // Cache for 60s — matches the worker tick cadence so the page is fresh
-        // without hammering the API on every social-card crawl.
+        // Cached server-side (see the revalidate below) so a social-card crawl
+        // doesn't hammer the API; the page can be up to an hour old or more.
         next: { revalidate: 1800 },
         // Identify this as our own SSR so the backend skips the per-IP limit
         // that all server rendering would otherwise share (see lib/ssrHeaders).
@@ -1203,7 +1203,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
               })}
             </ul>
             <p className="mt-3 text-xs text-subtle">
-              News refreshes every 5 minutes during US market hours.
+              Saved snapshot; the news and prices on this page can be an hour old or more.
             </p>
           </section>
         )}
@@ -1263,7 +1263,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
             </div>
             <p className="mt-4 text-xs text-subtle">
               Sorted by closeness to {data.symbol}&rsquo;s composite score within{" "}
-              {data.sector ?? "sector"}. Refreshed every 5 minutes.{" "}
+              {data.sector ?? "sector"}. Saved snapshot; can be an hour old or more.{" "}
               <Link href="/app/scanner" className="text-accent hover:underline">
                 Run the full scanner →
               </Link>

@@ -16,8 +16,8 @@ import { SIGNALS } from "../signals";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 import { PUBLIC_SNAPSHOT_FOOTER } from "@/lib/freshness";
 
-// Render on-demand and cache for 5 minutes (ISR). Matches the per-fetch
-// `revalidate: 3600` below and the "5-minute snapshot" contract, and keeps this
+// Render on-demand and cache for up to an hour (ISR). Matches the per-fetch
+// `revalidate: 3600` below, and keeps this
 // route off the build-time critical path (see generateStaticParams).
 export const revalidate = 3600;
 

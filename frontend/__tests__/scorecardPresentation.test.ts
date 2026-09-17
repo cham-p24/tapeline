@@ -109,7 +109,9 @@ describe("scorecard <title> and meta description (Rule 3)", () => {
   });
 
   it("still describes the mechanism", () => {
-    expect(`${title} ${description}`).toMatch(/frozen/i);
+    // "frozen" was dropped on 2026-09-15 (review of #842): recorded values were
+    // later corrected, so the page says when an entry is recorded instead.
+    expect(`${title} ${description}`).toMatch(/recorded at the close/i);
     // "append-only" was dropped on 2026-09-14: recorded values were changed
     // on 2026-06-15 and 2026-08-25, so the archive is not strictly append-only.
     expect(`${title} ${description}`).not.toMatch(/append-only/i);

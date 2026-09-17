@@ -1057,16 +1057,26 @@ test("false-data-freshness fires on the claims that shipped", () => {
     ['<span className="text-up">\n  Live\n</span>', "frontend/app/stock-market-heatmap/page.tsx"],
     ["Prices streaming straight from the exchange.", "frontend/app/demo/page.tsx"],
     ["Streaming quotes on every ticker.", "frontend/app/demo/page.tsx"],
+    // Review of #842: shapes the old suppress guards swallowed.
+    ['"Sub-60-second refresh during market hours",', "frontend/lib/jsonld.ts"],
+    ['{ label: "News feed", pro: "Real-time news + sentiment" },', "frontend/components/ComparisonTable.tsx"],
+    ['refreshCadence: "Sub-60 seconds during US market hours.",', "frontend/app/data-sources/page.tsx"],
+    ['value: "Sub-60 seconds during US market hours"', "frontend/app/press/page.tsx"],
+    ['tagline: "Real-time scanner. Daily edge.",', "frontend/app/page.tsx"],
+    ["<span>Updated 14 September 2026</span> Prices are real-time.", "frontend/app/page.tsx"],
+    ["<p>Unlike Finviz, our scanner is real-time.</p>", "frontend/app/blog/posts.ts"],
+    ["Compared to TradingView, we refresh sub-60s.", "frontend/app/blog/posts.ts"],
+    ["<li>Finviz free: 15-minute delay. Elite: real-time.</li>", "frontend/app/blog/posts.ts"],
   ];
   for (const [src, file] of bad) {
     assert.ok(fires(src, "false-data-freshness", file), `missed in ${file}: ${src}`);
   }
 });
 
-test("false-data-freshness leaves true, negated, dated and competitor wording alone", () => {
+test("false-data-freshness leaves true, negated, dated and quoted-term wording alone", () => {
   const fine = [
     // The replacement wording.
-    ["Prices are delayed about 15 minutes. Tapeline re-reads them for every covered stock and ETF about every 70-80 seconds during US market hours.", "frontend/public/llms.txt"],
+    ["Prices are delayed about 15 minutes. Tapeline re-reads them for every covered stock and ETF about every 60 seconds during US market hours.", "frontend/public/llms.txt"],
     ["Scores are recalculated on each pass, but most inputs are daily readings, so a score usually changes about once a day.", "frontend/app/how-it-works/page.tsx"],
     ["{PRICE_DELAY_NOTE} · cached page, can be an hour old or more", "frontend/app/t/[symbol]/page.tsx"],
     // Negated.
@@ -1079,10 +1089,6 @@ test("false-data-freshness leaves true, negated, dated and competitor wording al
     ["this paragraph used to say the worker ticks every minute from fresh data", "frontend/app/blog/posts.ts"],
     // A term mentioned in quotes, not used.
     ['<p>"Real-time" means different things at different price tiers.</p>', "frontend/app/blog/posts.ts"],
-    // A competitor's plan, named.
-    ["<li>Finviz free: 15-minute delay. Elite: real-time.</li>", "frontend/app/blog/posts.ts"],
-    ["<li>Zacks free: 20-minute delay. Premium: real-time on most exchanges.</li>", "frontend/app/blog/posts.ts"],
-    ["The paid Elite tier removes ads and adds real-time data.", "frontend/app/best-free-stock-screener/page.tsx"],
     // Ordinary English and state values.
     ['"Your Tapeline account is live — three scores inside."', "backend/app/services/email.py"],
     ['const status = streamOk ? "live" : "offline";', "frontend/lib/useStatus.ts"],

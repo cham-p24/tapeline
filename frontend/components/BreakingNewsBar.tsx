@@ -98,7 +98,6 @@ export function BreakingNewsBar() {
       <div className="flex items-center gap-2 mb-2">
         <span className="flex flex-shrink-0 items-center gap-1.5 text-[10px] uppercase tracking-wider text-down">
           <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-down opacity-75" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-down" />
           </span>
           News

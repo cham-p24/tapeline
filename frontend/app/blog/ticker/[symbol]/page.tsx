@@ -148,7 +148,7 @@ function signalNarrative(symbol: string, signal: string | null, composite: numbe
     return (
       `${symbol}'s composite is currently pending — the worker may be ` +
       `mid-tick, or vendor data may be transiently incomplete. The page ` +
-      `refreshes every 30 minutes; if this persists more than an hour the ` +
+      `is a saved snapshot rebuilt at most about every 30 minutes; if this persists more than an hour the ` +
       `/status page will report the source-feed gap.`
     );
   }
@@ -223,7 +223,7 @@ function confidenceContext(symbol: string, conf: number | null): string {
   if (conf === null) {
     return (
       `Confidence isn't computed for ${symbol} on this read — the upstream ` +
-      `data-coverage signal is pending. The page refreshes hourly.`
+      `data-coverage signal is pending. The page is a saved snapshot rebuilt at most about every 30 minutes.`
     );
   }
   if (conf >= 85) {
@@ -448,7 +448,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
             Is {t.symbol} a Buy in 2026? The Tapeline Score Breakdown for {t.name}
           </h1>
           <p className="mt-4 text-lg text-muted leading-relaxed">
-            {t.name} — {t.context} — is one of the most-searched tickers on US markets. Most "is {t.symbol} a buy" tools give you a verdict and name nothing that went into it. This page does the opposite: the live Tapeline composite, all six factor sub-scores, the plain-English reason behind today's read, and a link to the public scorecard where every prediction is back-checked vs SPY the next day.
+            {t.name} — {t.context} — is one of the most-searched tickers on US markets. Most "is {t.symbol} a buy" tools give you a verdict and name nothing that went into it. This page does the opposite: the Tapeline composite (from a saved snapshot), all six factor sub-scores, the plain-English reason behind today's read, and a link to the public scorecard where every prediction is back-checked vs SPY the next day.
           </p>
         </header>
 

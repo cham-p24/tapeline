@@ -2,7 +2,8 @@
  * Data-freshness copy reads ONE set of constants (integrity wave, 2026-09-14).
  *
  * Measured during the US session on Mon 14 Sep 2026: vendor prices ~15 minutes
- * behind; worker passes 69.7-74.3 s apart; scores changing about once a day;
+ * behind; worker passes about 60 s apart since #843 (59.99-60.02 s measured);
+ * scores changing about once a day;
  * public pages cached an hour or more. The site said "sub-60s", "real-time" and
  * "live, not delayed". lib/freshness.ts now holds the true wording, pinned to
  * backend/app/services/freshness.py by
@@ -19,8 +20,7 @@ import path from "node:path";
 import { render, screen } from "@testing-library/react";
 import {
   PASS_CADENCE_PHRASE,
-  PASS_INTERVAL_SECONDS_HIGH,
-  PASS_INTERVAL_SECONDS_LOW,
+  PASS_INTERVAL_SECONDS,
   PRICE_DELAY_MINUTES,
   PRICE_DELAY_NOTE,
   PRICE_DELAY_PHRASE,
@@ -42,12 +42,12 @@ describe("lib/freshness constants", () => {
     expect(PRICE_DELAY_MINUTES).toBe(15);
     expect(PRICE_DELAY_PHRASE).toBe("delayed about 15 minutes");
     expect(PRICE_DELAY_NOTE).toBe("Prices delayed about 15 minutes");
-    // Every steady-state gap measured on 14 Sep 2026 sits inside the range.
-    for (const gap of [69.7, 71, 71.1, 71.6, 72.2, 73, 74.3]) {
-      expect(Math.round(gap)).toBeGreaterThanOrEqual(PASS_INTERVAL_SECONDS_LOW);
-      expect(gap).toBeLessThanOrEqual(PASS_INTERVAL_SECONDS_HIGH);
+    // Steady-state gaps measured after #843 (14 Sep 2026, 18:45-19:12 UTC):
+    // 22 gaps, 59.99-60.02 s.
+    for (const gap of [59.99, 60.0, 60.02]) {
+      expect(Math.round(gap)).toBe(PASS_INTERVAL_SECONDS);
     }
-    expect(PASS_CADENCE_PHRASE).toBe("about every 70-80 seconds");
+    expect(PASS_CADENCE_PHRASE).toBe("about every 60 seconds");
   });
 
   it("never carry the false wording themselves", () => {

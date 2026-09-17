@@ -7,7 +7,7 @@
  * so the table is unique per strategy (no duplicate-content risk) and the
  * H1/copy/FAQ are strategy-specific.
  *
- * The five-minute snapshot caches server-side; the scanner is at
+ * The snapshot caches server-side (up to an hour or more); the scanner is at
  * /app/scanner.
  */
 import Link from "next/link";

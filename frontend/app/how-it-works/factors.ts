@@ -111,7 +111,7 @@ export const FACTORS: Factor[] = [
       {
         name: "Market data",
         detail:
-          "Adjusted daily OHLC bars, read about once a day. Intraday prices are delayed about 15 minutes, so the Trend reading usually changes about once a day.",
+          "Adjusted daily OHLC bars, read about once a day, so the Trend reading usually changes about once a day. Intraday prices are delayed about 15 minutes.",
       },
     ],
     caveat:

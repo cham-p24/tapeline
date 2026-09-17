@@ -221,7 +221,7 @@ export default async function SignalsPage() {
             <p className="text-lg">No tickers loaded yet.</p>
             <p className="mt-2 text-sm">
               If you&rsquo;ve just configured the signal-source, give the worker a
-              few minutes to refresh — this page reloads every 5 minutes.
+              few minutes to refresh — this page is rebuilt at most about once an hour.
             </p>
           </div>
         ) : (

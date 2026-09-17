@@ -25,7 +25,7 @@ const HOW_FAQ = [
   },
   {
     q: "How often does the score update?",
-    a: "Scores are recalculated on each worker pass, about every 70-80 seconds during US market hours, and persist between sessions. Prices are delayed about 15 minutes. Most score inputs (daily price bars for trend, relative strength and momentum, fundamentals and the macro regime) are daily readings, so a score usually changes about once a day; fundamentals refresh on company filing cadence. Insider Form 4 filings are re-checked with a data vendor about every two days per stock (about monthly for ETFs), and the vendor's filings can run weeks behind SEC EDGAR.",
+    a: "Scores are recalculated on each worker pass, about every 60 seconds during US market hours, and persist between sessions. Prices are delayed about 15 minutes. Most score inputs are daily readings (daily price bars for trend, relative strength and momentum, and the macro regime), so a score usually changes about once a day; fundamentals refresh on company filing cadence. Insider Form 4 filings are re-checked with a data vendor about every two days per stock (about monthly for ETFs), and the vendor's filings can run weeks behind SEC EDGAR.",
   },
   {
     q: "What is the per-ticker confidence percentage?",

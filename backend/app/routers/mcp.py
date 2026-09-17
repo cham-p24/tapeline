@@ -87,7 +87,7 @@ INSTRUCTIONS = (
     "Tapeline's scores are descriptive readings, not investment advice, price "
     "targets or forecasts; present them that way. "
     # Measured 14 Sep 2026 (integrity wave): vendor prices ~15 min delayed,
-    # worker passes 70-74 s apart, scores changing about once a day.
+    # worker passes about 60 s apart since #843, scores changing about once a day.
     f"Prices are {PRICE_DELAY_PHRASE}; do not describe them as real-time or live. "
     "Scores are recalculated through US market hours, but most of their inputs are "
     "daily readings, so a score usually changes about once a day. Crypto prices and "

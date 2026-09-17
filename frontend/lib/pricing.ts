@@ -73,7 +73,7 @@ export const FREE_LIMITS = {
   firstSessionGraceHours: 24,
   /** Saved watchlist tickers. */
   watchlistTickers: 5,
-  /** Scanner rows visible (top-N, no delay). */
+  /** Scanner rows visible (top-N; prices delayed about 15 minutes on every plan). */
   scannerRows: 10,
   /** Read-only Squeeze Watch preview rows (GET /api/squeeze/preview). */
   squeezePreviewRows: 3,

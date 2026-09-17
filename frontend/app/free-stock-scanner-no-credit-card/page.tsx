@@ -74,7 +74,7 @@ const SCANNERS: Scanner[] = [
     cardNeeded: "None (free tier)",
     publicFormula: "No score",
     trackRecord: "None",
-    summary:
+    summary: // copy-compliance-allow false-data-freshness -- describes Finviz Elite's paid plan, not Tapeline's data (Tapeline prices are delayed about 15 minutes)
       "The free Finviz screener is usable without any signup — deep on raw filter fields so you build your own thesis from the data. No composite score, no published methodology, no track record. The paid Elite tier (which does take a card) removes ads and adds real-time data. For hand-built filtering, the free tier is genuinely useful.",
   },
   {

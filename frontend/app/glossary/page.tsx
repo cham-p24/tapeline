@@ -139,7 +139,7 @@ export default function GlossaryIndexPage() {
             lists what the product does not model at all.
           </p>
           <p className="mt-4 text-sm text-muted leading-relaxed">
-            To see the six factors applied to live tickers, browse the{" "}
+            To see the six factors applied to real tickers, browse the{" "}
             <ContentCtaLink
               href="/stocks"
               className="link"

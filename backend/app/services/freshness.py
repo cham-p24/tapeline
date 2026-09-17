@@ -13,9 +13,10 @@ seconds. Measured during the US session on Mon 14 Sep 2026:
   lastTrade / lastQuote keys (not entitled). A second session measured 15.0
   minutes for SPY, AAPL, NVDA and MSFT at 13:41 UTC. `/api/scanner` returned
   `data_delayed_minutes: 0` for every tier.
-* A worker pass rewrites every covered stock and ETF. Passes landed 69.7 to
-  74.3 s apart in steady state, 98 s across a deploy and ~6 minutes across a
-  restart: the tick's run time plus a 60-second sleep.
+* A worker pass rewrites every covered stock and ETF. Before #843 passes landed
+  69.7 to 74.3 s apart (the tick plus a 60-second sleep). Since #843 (merged
+  14 Sep 18:34 UTC) the loop is fixed-rate: 22 gaps measured 59.99 to 60.02 s
+  during the US session. A deploy or restart still leaves a gap of minutes.
 * Only ~38 of ~11,546 scores changed in 2.5 minutes while ~4,161 prices did.
   Score inputs are daily readings.
 
@@ -33,12 +34,9 @@ PRICE_DELAY_MINUTES = 15
 PRICE_DELAY_PHRASE = f"delayed about {PRICE_DELAY_MINUTES} minutes"
 PRICE_DELAY_NOTE = f"Prices {PRICE_DELAY_PHRASE}"
 
-# Held across every steady-state pass measured on 14 Sep 2026.
-PASS_INTERVAL_SECONDS_LOW = 70
-PASS_INTERVAL_SECONDS_HIGH = 80
-PASS_CADENCE_PHRASE = (
-    f"about every {PASS_INTERVAL_SECONDS_LOW}-{PASS_INTERVAL_SECONDS_HIGH} seconds"
-)
+# Held across every steady-state pass measured after #843 (14 Sep 2026).
+PASS_INTERVAL_SECONDS = 60
+PASS_CADENCE_PHRASE = f"about every {PASS_INTERVAL_SECONDS} seconds"
 
 PRICE_FRESHNESS_SENTENCE = (
     f"Prices are {PRICE_DELAY_PHRASE}. Tapeline re-reads them for every covered "
@@ -47,9 +45,9 @@ PRICE_FRESHNESS_SENTENCE = (
 )
 
 SCORE_CADENCE_SENTENCE = (
-    "Scores are recalculated on each pass, but most of their inputs (daily price "
-    "bars, fundamentals, SEC Form 4 filings and the macro regime) are daily "
-    "readings, so a score usually changes about once a day."
+    "Scores are recalculated on each pass, but their inputs (daily price bars and "
+    "the macro regime, plus fundamentals and SEC Form 4 filings, which update less "
+    "often) change at most about once a day, so a score usually changes about once a day."
 )
 
 
