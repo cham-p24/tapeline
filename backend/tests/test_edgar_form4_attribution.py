@@ -177,6 +177,22 @@ def test_an_amendment_replaces_only_the_same_day_filing_it_restates() -> None:
     assert superseded_accessions(own, parsed) == {"a14"}
 
 
+def test_a_filing_naming_nothing_falls_back_to_the_first_listed_and_says_so(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The fallback is a guess: SEC does not document common stock first, so a
+    preferred can be [0]. Mutation: stay silent - the guess leaves no trace for
+    a post-deploy grep."""
+    with caplog.at_level("WARNING"):
+        assert attributed_ticker({"issuer_symbol": ""}, ["STRK", "MSTR"]) == "STRK"
+    assert "edgar_form4.attribution_fallback" in caplog.text
+    # One ticker is not a guess, so it says nothing.
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        assert attributed_ticker({"issuer_symbol": "ODD"}, ["MSTR"]) == "MSTR"
+    assert "attribution_fallback" not in caplog.text
+
+
 def test_an_amendment_replaces_the_original_it_matches_best_not_every_overlap() -> None:
     """Two same-day filings share a trade date; the 4/A restates one of them.
     Mutation: replace every overlapping candidate - the other filing's lines go

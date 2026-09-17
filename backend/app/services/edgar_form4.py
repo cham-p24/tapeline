@@ -523,9 +523,21 @@ async def _fetch(symbol: str, days_back: int) -> list[dict[str, Any]]:
 
 
 def attributed_ticker(reading: dict[str, Any], cik_tickers: list[str]) -> str:
-    """The one ticker a filing's lines belong to; see "ATTRIBUTION" above."""
+    """The one ticker a filing's lines belong to; see "ATTRIBUTION" above.
+
+    The fallback is the only path that puts a filing on a ticker it does not
+    name, so with more than one ticker to choose from it says so: SEC's list
+    order is not documented to put common stock first, and taking the first is
+    a guess."""
     named = reading.get("issuer_symbol") or ""
-    return named if named in cik_tickers else cik_tickers[0]
+    if named in cik_tickers:
+        return named
+    if len(cik_tickers) > 1:
+        logger.warning(
+            "edgar_form4.attribution_fallback named=%r tickers=%s attributed=%s",
+            named, cik_tickers, cik_tickers[0],
+        )
+    return cik_tickers[0]
 
 
 def _line_dates(reading: dict[str, Any]) -> set[str]:
