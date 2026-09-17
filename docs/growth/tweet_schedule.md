@@ -1,17 +1,40 @@
 # Tapeline — 14-Day Tweet Schedule
 
-> **WHERE THE CARD SITS — updated 2026-09-05. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-09-15. Check every claim below against `docs/COPY_FACTS.md` and `docs/PRICING.md` before posting.**
+>
+> **WHAT CHANGED ON 14 SEPTEMBER 2026 — read before posting anything below.**
+> The founder approved an integrity wave on 14 September 2026 that corrected the
+> product and the site. Drafts below were written before it. False lines found
+> on 15 September 2026 were corrected in place, but check each one against
+> `docs/COPY_FACTS.md`, which has the measurements and times:
+>
+> - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
+>   covered stock and ETF about every 60 seconds during US market hours (longer
+>   around a deploy), and a score usually changes about once a day. Never call
+>   the data live: not real-time, not sub-60s, not "every minute".
+> - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
+>   updated once a day. Not ~2,500.
+> - **Congressional trades and squeeze detection do not exist today.** Do not
+>   offer either as a feature, a Premium benefit or a score input.
+> - **The record:** entries are not re-ranked or deleted. We have corrected
+>   recorded values twice, and said so: prices on 25 August 2026, and scores from
+>   18 May to 12 June capped on 15 June 2026. No top 10 was recorded for
+>   31 August, 2 September, 4 September or 9 September 2026.
+> - **The pre-charge email** goes about 7 days before the first charge.
 >
 > **Signing up takes an email and a password.** The account it makes lands on
-> the Free plan and opens the live scanner — the top ten scored rows of any
+> the Free plan and opens the scanner — the top ten scored rows of any
 > scan, one saved screen. **A card is what starts the 30-day Premium trial**
 > (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
-> than the first ten, plus alerts, CSV export and the Congressional and insider
-> feeds.
+> than the first ten, plus alerts, CSV export and per-ticker SEC Form 4
+> filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -89,7 +112,7 @@ Every tweet is ≤ 280 chars including the URL (Twitter counts every URL as 23 c
 ```
 Tapeline's top 3 scores at today's close: $[AAA] ([XX]) · $[BBB] ([XX]) · $[CCC] ([XX])
 
-Each gets back-checked vs SPY at tomorrow's close. Wins and losses both stay on the page, no quiet edits.
+Each gets back-checked vs SPY at tomorrow's close. Wins and losses both stay on the page; corrections are dated.
 
 https://tapeline.io/scorecard
 ```
@@ -221,7 +244,7 @@ Smart Money 94 = disclosed SEC Form 4 insider transactions, netted over a recent
 https://tapeline.io/t/CRWD
 ```
 
-**Pre-post check**: 5 min before posting, run `curl -s "https://api.tapeline.io/api/ticker/CRWD"` and confirm the breakdown numbers still match. If the composite has crossed a label boundary (STRONG SETUP at 70, HIGH CONVICTION at 85), rewrite the label to fit. If Smart Money drops below 80, drop the insider-filings hook and swap in whichever factor is highest. Do not attribute the Smart Money sub-score to Congressional trades — those are a separate published feed, not an input to it.
+**Pre-post check**: 5 min before posting, run `curl -s "https://api.tapeline.io/api/ticker/CRWD"` and confirm the breakdown numbers still match. If the composite has crossed a label boundary (STRONG SETUP at 70, HIGH CONVICTION at 85), rewrite the label to fit. If Smart Money drops below 80, drop the insider-filings hook and swap in whichever factor is highest. Do not attribute the Smart Money sub-score to congressional trades — Tapeline has no congressional trade data (#820, 14 September 2026).
 
 **Backup ticker** if CRWD's score has materially shifted: use any STRONG SETUP from `curl -s "https://api.tapeline.io/api/scanner?limit=10&sort=score&order=desc"` — preferably one with a recognizable name (CRWD, AMGN, PANW, etc., not an obscure ETF).
 
@@ -232,7 +255,7 @@ https://tapeline.io/t/CRWD
 ```
 Top 3 scores at today's close: $[AAA] · $[BBB] · $[CCC]
 
-Same drill: SPY-relative return at tomorrow's close. Public page. No edits after the fact.
+Same drill: SPY-relative return at tomorrow's close. Public page. Corrections are dated.
 
 https://tapeline.io/scorecard
 ```
@@ -262,7 +285,7 @@ https://tapeline.io/scorecard
 ```
 Two weeks of Tapeline top-10 picks now on the public page.
 
-Some beat SPY. Some lost. None got quietly removed. Every day, every ticker, every back-check.
+Some beat SPY. Some lost. Entries are not re-ranked or deleted, and any correction is dated on the page.
 
 Built that way deliberately. The honesty is the product, not the marketing.
 
@@ -281,7 +304,7 @@ Tapeline scorecard, current state:
 [X] of [XXX] top-10 picks beat SPY in their next-day back-check ([XX]% hit rate).
 Average alpha: [±X.X]% per pick.
 
-Updates every market close. Misses stay.
+Updated at the close when a top 10 is recorded; days with no list are dated on the page. Misses stay.
 
 https://tapeline.io/scorecard
 ```
@@ -301,9 +324,9 @@ Paste the numbers into the bracketed fields. If the command says "Not enough dat
 ```
 Every other stock scanner gives you 47 filters and a blank stare.
 
-Tapeline gives you one number, one plain-English why, and a public track record you can audit before you pay.
+Tapeline gives you one number, one plain-English why, and a public track record.
 
-The full record is free to read with no account. Pro is $9.99/mo for the live full universe. An account takes a card and starts the 30-day Premium trial — $0 today, one click cancels.
+The scorecard needs no account. A card starts the 30-day Premium trial, $0 today.
 
 https://tapeline.io
 ```
@@ -327,9 +350,9 @@ Triggers any tweet posted above hits ≥ 10 likes or ≥ 1,000 impressions in th
 
 1. **Reply to every comment** within 2 hours. The Twitter algorithm cares about conversation depth as much as raw engagement.
 2. **Link to /scorecard in one of your first 3 replies**, not in every reply. Spamming the same URL gets the tweet de-prioritized.
-3. **If someone names a ticker**: reply with that ticker's current score + one-line reason, plus the /t/[symbol] link. Run `curl -s https://api.tapeline.io/api/ticker/[SYMBOL]` to get the live numbers in 2 seconds.
+3. **If someone names a ticker**: reply with that ticker's current score + one-line reason, plus the /t/[symbol] link. Run `curl -s https://api.tapeline.io/api/ticker/[SYMBOL]` to get the current numbers in 2 seconds (prices delayed about 15 minutes).
 4. **If someone challenges the methodology**: don't get defensive. Link to /how-it-works and say "the six factors and how they're ordered are right there — which would you weight differently?" Treat it as user research, not an attack.
-5. **If someone asks "where's the back-test"**: "Walk-forward back-test on 2024-2025 in progress. The /scorecard page is the live forward-test — that's the one that counts for trust. Day-by-day, every ticker, no cherry-picking."
+5. **If someone asks "where's the back-test"**: "Walk-forward back-test on 2024-2025 in progress. The /scorecard page is the forward-test — that's the one that counts for trust. Every logged pick, no cherry-picking, corrections dated."
 
 ## What to do if a tweet flops
 
@@ -343,7 +366,7 @@ Defined as < 3 likes and < 200 impressions in the first 2 hours.
 ## What to do if a tweet pops (> 50 likes in first hour)
 
 - **Pin the tweet**. Replace the prior pinned tweet (currently the launch thread per LAUNCH_PLAYBOOK.md item 3).
-- **Reply with a follow-up tweet** within 4 hours: "Yesterday's $[AAA] back-check vs SPY: $[AAA] +X.X%, SPY +Y.Y%, alpha +Z.Z%. /scorecard has the full history." That turns one viral tweet into a thread, which Twitter's algorithm treats as continued engagement.
+- **Reply with a follow-up tweet** within 4 hours: "Yesterday's $[AAA] back-check vs SPY: $[AAA] +X.X%, SPY +Y.Y%, alpha +Z.Z%. /scorecard has the record." That turns one viral tweet into a thread, which Twitter's algorithm treats as continued engagement.
 - **DM new followers** who follow within 1 hour of the pop with a personal note. NOT a sales pitch — "hey, saw you followed during the $[AAA] tweet, thanks. If you want the breakdown for any ticker, drop one in DMs." Founder-personal voice always.
 
 ## Measurement (lightweight, no dashboards)
@@ -375,4 +398,4 @@ Vercel Analytics already captures UTMs — no extra plumbing needed.
 
 1. **Which handle posts these?** @TapelineHQ (brand) or founder personal? Brand reads more enterprise; founder personal reads more authentic. For a single-founder pre-launch, founder personal usually wins.
 2. **Are the current scorecard tickers recognizable enough?** Today's top 3 (2026-05-12) was $CBXY $XME $BELT. XME (S&P Metals & Mining ETF) is fine. CBXY and BELT are obscure. If the schedule lands on a day with three obscure names, the engagement risk is real — the reader can't anchor on the names. **Mitigation**: on those days, swap in a "mega-cap breakdown" tweet from Day 5 / Day 9 type instead of "top-3 close." The schedule has 5 ticker-specific tweets and 6 top-3 templates — plenty of swap room.
-3. **Should there be a tweet about Congressional trades?** Currently no. Adding one to Day 7 or Day 14 could lift Premium-tier interest. Saved for a v2 schedule once the v1 engagement data is in.
+3. **Should there be a tweet about Congressional trades?** No. Tapeline has no congressional trade data (updated 15 September 2026; see `docs/COPY_FACTS.md`), so there is nothing true to tweet.

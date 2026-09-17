@@ -40,11 +40,12 @@ site permission at all.
 **A Tapeline account is required.** The user connects once from the popup
 (`Get my connect code` → tapeline.io/extension/connect → paste). Without a token
 the content script renders nothing at all, and the popup shows the connect screen.
-An account created on or after 2026-08-22 adds a card at first sign-in, which
-starts a 14-day Premium trial ($0 that day, first charge at the end of the
-trial, one click cancels before then) — see `CARD_GATE_START` /
-`must_add_card` in `backend/app/services/tier.py`. Accounts older than that are
-grandfathered and are never asked for one.
+Signing up is free and needs no card. Adding a card starts a 30-day Premium
+trial ($0 that day, first charge on day 30, an email about 7 days before it, one
+click cancels before then) — see `TRIAL_DAYS` in `backend/app/routers/billing.py`
+and `PRECHARGE_NOTICE_DAYS` in `backend/app/services/precharge_notice.py`. A card
+wall on new accounts ran from 2026-08-22 to 2026-08-30 (`CARD_GATE_START` in
+`backend/app/services/tier.py`); #683 removed it.
 
 Worth stating in the code as well as the copy: the score and record are already
 public (`/daily-picks`, `/t/{symbol}`, `/badge/{symbol}`). The gate exists because
@@ -110,7 +111,8 @@ The extension calls its own `/api/extension/*` namespace, but those requests
 land on the same backend as the public site, so it caches per symbol for 15
 minutes in `chrome.storage.session` and collapses concurrent requests for the
 same symbol into one. Scores move on a daily cadence, so a stale-by-minutes read
-is correct.
+is correct. Prices behind the score are already delayed about 15 minutes by the
+data plan, so what the extension shows is not real-time; see `docs/COPY_FACTS.md`.
 
 Every extension call carries a `tlx_…` bearer token and hits
 `/api/extension/*`, which authenticates the caller but does not run the daily

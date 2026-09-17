@@ -20,7 +20,7 @@ product first. Nobody was persuaded by a feature. They arrived decided.
 | Claim | Verified at |
 |---|---|
 | $0 charged on day one, exact first-charge date shown pre-confirm | Stripe Checkout, PR #548 |
-| Reminder email ~3 days before the first charge | `webhooks.py` `customer.subscription.trial_will_end` -> `render_trial_precharge_reminder_email` |
+| Reminder email about 7 days before the first charge | `backend/app/services/precharge_notice.py` `PRECHARGE_NOTICE_DAYS = 7` (daily drip, trials ending 6 to 8 days out). Corrected 2026-09-15: this row said "~3 days" (the old Stripe `trial_will_end` event); #820 moved the notice and the copy to 7 days on 2026-09-14 |
 | One click cancels from the billing page | `/app/billing` cancel flow |
 | 30-day money back | `lib/pricing.ts` `REFUND` (full on monthly; **prorated on annual**) |
 | Premium $19.99/mo or $199/yr | `lib/pricing.ts` `PRICING.premium` |
@@ -40,7 +40,7 @@ Rule 10 (ad trading vocabulary).
 ## B1 — "We email before we charge."
 
 **Primary text:**
-> The 30-day Premium trial takes a card and charges $0 on the day it starts. About three days before the first charge, we send an email saying so. The date itself is shown before you confirm, and one click on the billing page cancels any time before it.
+> The 30-day Premium trial takes a card and charges $0 on the day it starts. About seven days before the first charge, we send an email saying so. The date itself is shown before you confirm, and one click on the billing page cancels any time before it.
 
 **Headline:** We email before we charge.
 **Description:** Informational only. Descriptive scores, not recommendations.
@@ -67,7 +67,7 @@ B states the date but never the number. This one states both.*
 ## B3 — "Read the record before signing up for anything."
 
 **Primary text:**
-> The track record is public and needs no account, no card and no email: summary stats live, per-day entries on a seven-day delay, raw CSV included. Read it first, and decide afterwards. The 30-day Premium trial takes a card, charges $0 on the day, and names the first-charge date before you confirm.
+> The track record is public and needs no account, no card and no email: summary stats current, per-day entries on a seven-day delay, raw CSV included. Read it first, and decide afterwards. The 30-day Premium trial takes a card, charges $0 on the day, and names the first-charge date before you confirm.
 
 **Headline:** Read the record before signing up for anything.
 **Description:** Informational only. Descriptive scores, not recommendations.
@@ -81,7 +81,7 @@ Leads with the escape hatch B only mentions last.*
 ## B4 — "$0 today, and a 30-day backstop after that."
 
 **Primary text:**
-> Two things sit between a trial and an unwelcome surprise. The first-charge date is shown before you confirm and emailed about three days ahead. And a 30-day money-back window applies after that first charge. The 30-day Premium trial takes a card and charges $0 on the day it starts.
+> Two things sit between a trial and an unwelcome surprise. The first-charge date is shown before you confirm and emailed about seven days ahead. And a 30-day money-back window applies after that first charge. The 30-day Premium trial takes a card and charges $0 on the day it starts.
 
 **Headline:** $0 today, and a 30-day backstop after that.
 **Description:** Informational only. Refund terms at tapeline.io/legal/refund.
@@ -96,7 +96,7 @@ prorated, not full - do not compress that clause into the primary text.*
 ## B5 — "Cancel in one click, from the billing page."
 
 **Primary text:**
-> Cancelling is one click on the billing page. The 30-day Premium trial takes a card, charges $0 the day it starts, shows the first-charge date before you confirm, and emails a reminder about three days out.
+> Cancelling is one click on the billing page. The 30-day Premium trial takes a card, charges $0 the day it starts, shows the first-charge date before you confirm, and emails a reminder about seven days out.
 
 **Headline:** Cancel in one click, from the billing page.
 **Description:** Informational only. Descriptive scores, not recommendations.

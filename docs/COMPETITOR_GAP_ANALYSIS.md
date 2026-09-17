@@ -1,5 +1,15 @@
 # Competitor Gap Analysis
 
+> **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
+>
+> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 60 seconds (gaps of 59.99 to 60.02 seconds measured on 14 September 2026 after #843; longer around a deploy), and most score inputs are daily, so a score usually changes about once a day. The scanner and the other auto-refreshing in-app pages reload about once per pass during the US session (04:00 to 20:00 ET on trading days), and public pages are cached snapshots that can be an hour or more old. It is not real-time, not sub-60s and not "every minute".
+> - **Congressional trades.** There is no real source of congressional trade disclosures. Tapeline shows none, none feeds the score, and they are not a Premium feature (#770, #820).
+> <!-- copy-compliance-allow record-never-edited -- this dated note names the false phrasings in order to retire them -->
+> - **The record.** Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026. "Never edited", "unedited", "append-only" and "immutable" are false.
+> - **Trial and card.** Signing up is free and needs no card (the card wall ran from 22 to 30 August 2026, #548 to #683). A card starts the 30-day Premium trial, and the pre-charge email goes about 7 days before the first charge.
+>
+> Measurements, times and approved wording: `docs/COPY_FACTS.md`.
+
 **Date:** 2026-08-18 · **Scope:** Tapeline vs. the paid scanners the ICP shops (Trade Ideas, TrendSpider, Benzinga Pro) and the free/cheap score-and-signal products it actually gets compared to (Finviz, TradingView, Zacks, TipRanks, WallStreetZen, Simply Wall St, Stock Rover).
 **Method:** public pricing pages, feature pages, third-party reviews, AI-answer-engine result sets, plus a line-by-line read of `C:\Project 1` at `origin/main`. No accounts created, no trials started, no money spent, no forms submitted.
 

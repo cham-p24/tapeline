@@ -12,6 +12,23 @@
 > Change those files first; update this doc in the same PR. There is no build
 > check tying the three together.
 
+> **Updated 15 September 2026 (integrity wave approved by the founder on
+> 14 September 2026).** This doc still described congressional trades and
+> Squeeze Watch as features, the scanner as live (it used to say "sub-60s refresh"), Free as
+> not self-serve, 2 anonymous look-ups a day and 2 free push rules. None of
+> that is true. The sections below were corrected against the code on
+> 15 September 2026. Freshness, record and coverage facts, with measurements:
+> `docs/COPY_FACTS.md`.
+>
+> - **Prices are delayed about 15 minutes on every plan** (Massive Stocks
+>   Starter). The worker re-reads them about every 60 seconds during US
+>   market hours; scores usually change about once a day. `tier.py`'s
+>   `data_delay_minutes = 0` means Tapeline adds nothing to the vendor's delay.
+>   The data is not real-time on any plan.
+> - **No congressional trade data and no working squeeze detection** (#818,
+>   #820). `congress.feed` and `squeeze.full` remain as entitlement keys only;
+>   nothing may be sold on them.
+
 > **2026-07 founding reprice.** Market research put the old prices
 > ($29.99/$49.99) at the ~70th–80th percentile of the market with zero brand
 > assets. Stripe charges the founding prices below (price IDs swapped in
@@ -62,36 +79,43 @@ with per-account overrides for larger seat counts or API caps.
 
 ### Public record — free, no account
 **$0**
-- The daily Top 10 at `/daily-picks`, live
-- The complete scorecard at `/scorecard` — every pick, back-checked vs SPY
+- The daily Top 10 at `/daily-picks` (a cached page; can be an hour or more old)
+- The public scorecard at `/scorecard` — every recorded pick, back-checked vs SPY.
+  Summary figures are current; per-day entries are on a 7-day delay without Pro
+  or Premium (`_FREE_DELAY_DAYS` in `routers/scorecard.py`)
 - A page per scored ticker at `/t/{TICKER}`, all six factor sub-scores
-- The raw record as CSV and JSON
-- Anonymous ticker look-ups: 2 per UTC day per IP (`ANON_DAILY_LOOKUPS`)
+- The raw record as CSV and JSON, up to 7 days before today for every caller
+  (`_export_cutoff` applies the same delay)
+- Anonymous ticker look-ups: **not metered.** `ANON_DAILY_LOOKUPS` is dormant
+  (`routers/ticker.py`); no copy may state a number for use without an account
+  (#820, 2026-09-14)
 - Purpose: the trust asset and the only card-free entry point. Not a trial and
   does not expire.
 
-### Free — $0 (not self-serve)
-The tier for accounts created before the 2026-08-22 card gate, and the tier an
-account lands on after cancelling or lapsing a trial (a card or trial stamp is
-already on record at that point, so `must_add_card` stays false — they are
-never re-walled). A new visitor cannot sign up directly for this tier, and
-marketing surfaces must not advertise it as an available plan.
+### Free — $0, self-serve, no card
+Signing up takes an email and a password and lands here (since #683,
+2026-08-30). It is also where an account lands after cancelling or lapsing a
+trial. (Until 15 September 2026 this heading said "not self-serve" and told
+marketing not to advertise Free; that was true only during the 2026-08-22 to
+2026-08-30 card wall.)
 
 Limits — enforced in `tier.py` and mirrored in `FREE_LIMITS`
 (`frontend/lib/pricing.ts`); every copy surface derives from those constants:
 
-- Scanner: **top 10 rows, live** (`FREE_SCANNER_ROWS = 10`,
-  `FREE_DATA_DELAY_MINUTES = 0` — no stale-data cliff)
+- Scanner: **top 10 rows** (`FREE_SCANNER_ROWS = 10`). Same prices as every
+  plan, delayed about 15 minutes by the data plan (`FREE_DATA_DELAY_MINUTES = 0`
+  only means Free adds no extra delay)
 - Ticker-detail look-ups: **12 per UTC day** (`FREE_DAILY_LOOKUPS`); brand-new
   accounts are never metered for the first **24 h**
   (`FREE_FIRST_SESSION_GRACE_HOURS`)
 - Watchlist: **5 tickers, 1 list** (`FREE_WATCHLIST_TICKERS`; the 2026-08-02
   watchlist→Pro cutover was REVERSED 2026-08-19)
-- Web-push alerts: **up to 2 rules** (`FREE_WEB_PUSH_ALERTS`) — the deliberate
-  free "alert taste"; email alerts 0/day, no API, no saved scans, no CSV export
-- Squeeze Watch preview: **3 rows** (`FREE_SQUEEZE_PREVIEW_LIMIT`,
-  `routers/squeeze.py`); Congress preview: **3 most recent disclosures**
-  (`routers/congress.py`)
+- Alerts: **none** — `FREE_WEB_PUSH_ALERTS = 0` since #683 (2026-08-30);
+  email alerts 0/day, no API, **1 saved scan**, no CSV export
+- No squeeze or congress preview is offered: the squeeze pages show an empty
+  state (no real data source, #818) and there is no congressional trade data
+  (#820). `FREE_SQUEEZE_PREVIEW_LIMIT` survives in `routers/squeeze.py` as
+  plumbing only
 - Market regime: basic view
 
 #### Open-access month — temporary, until 8 September 2026
@@ -112,34 +136,39 @@ quote the steady-state Free caps, never the promo numbers — see
 
 ### Pro — "Scanner"
 **$9.99/mo** or **$8.25/mo · billed annually ($99/yr · save $20)**
-- Scanner: full active-universe scan, **live (sub-60s refresh)**, row cap 1,000
-  (`TIER_LIMITS[PRO]["scanner_rows"]`)
-- Squeeze Watch: full setup list with windows
+- Scanner: the full scan (about 11,500 US stocks and ETFs): 1,000 rows per
+  request (`TIER_LIMITS[PRO]["scanner_rows"]`) and paging reaches every matching
+  row, on prices delayed about 15 minutes.
+  The scanner and the other auto-refreshing in-app pages reload about once per
+  pass during the US session (04:00 to 20:00 ET on trading days); outside it
+  they load the latest data when opened or when a filter changes
+  (`docs/COPY_FACTS.md`)
 - Market regime: full view with VIX/DXY/10Y/sector leaders · heatmap
 - Full ticker detail, news, IPOs, earnings; ticker look-ups unmetered
 - Watchlist: 50 tickers across 5 named lists, with smart alerts
 - Email alerts: up to 10/day · browser push: up to 50/day
 - Daily briefing email · CSV export · 10 saved scans
-- No Congress feed, no API access
+- No API access
 
 ### Premium — "Analyst"
 **$19.99/mo** or **$16.58/mo · billed annually ($199/yr · save $40)**
 - Everything in Pro
-- **Congressional trade feed** (`congress.feed`) at `/app/congress`.
-  **Honest status:** no live disclosure source is wired in production — the
-  fabricated dev generator is gated out of prod
-  (`signal_publisher._mock_writes_enabled`), so the table does not accrue new
-  rows until a real feed is wired. Congressional STOCK Act names DO feed the
-  Smart Money sub-factor via the curated workbook tab
-  (`sheet_feed.parse_smart_money_csv`). Marketing copy must not describe the
-  `/app/congress` feed as live/daily until a real source ships.
-- **Recent insider buys** (`holdings.elite`) — SEC Form 4 transactions,
-  refreshed daily — plus per-ticker Form 4 detail (`insider.form4`)
+- **Not a Premium feature: congressional trades.** The `congress.feed` key
+  still exists, but there is no real source of congressional trade
+  disclosures; `/app/congress` and `/congressional-trades` say the data is not
+  available, and none feeds the score (#820, 2026-09-14; `/data-sources`). Do
+  not list it. (This entry used to describe it as a Premium feed "pending a
+  source" and to say STOCK Act names fed the Smart Money factor.)
+- **Recent insider buys** (`holdings.elite`) — SEC Form 4 transactions — plus
+  per-ticker Form 4 detail (`insider.form4`). For how often it refreshes, use
+  the wording on `/data-sources`; do not state a cadence here.
 - **Analyst ratings widget** (`ratings.analyst`) — Buy/Hold/Sell consensus
   tally only; per-firm rating events and price targets are not on the current
   data plan and must not be advertised
 - **Personal watchlist track record** (`watchlist.track_record`) — each
-  watchlist ticker frozen daily and back-checked vs SPY
+  watchlist ticker frozen daily and back-checked vs SPY. **Held dark, not
+  sold:** it is in `DISABLED_FEATURES` in `backend/app/services/tier.py`
+  pending the lawyer's answer, so do not list it as a Premium benefit.
 - **API access**: 1,000 requests/day (throttled to 100/day while on trial —
   `_TRIAL_PREMIUM_REDUCTIONS`)
 - Email alerts: up to 50/day · browser push: up to 50/day · watchlist 200
@@ -189,6 +218,9 @@ high tier.
   that checkout before it can use the product.
 - Disclosed before the card is entered: $0 charged today, the exact
   first-charge date (day 30), the amount, and one-click cancel before then.
+  The pre-charge email goes about 7 days before the first charge
+  (`PRECHARGE_NOTICE_DAYS = 7`, `backend/app/services/precharge_notice.py`,
+  mirrored in `frontend/lib/trial.ts`).
 - Declining is a normal outcome and must not be punished: the wall carries a
   link to the free public record and a sign-out. No auto-redirect into Stripe,
   nothing pre-ticked.
@@ -198,9 +230,10 @@ high tier.
 - During trial the API cap is throttled 1,000 → 100/day
   (`_TRIAL_PREMIUM_REDUCTIONS`) — full conversion-test value on product
   features, abuse-resistant on data extraction.
-- Email drip: day 0 welcome, day 3 feature tour, day 7 trial reminder (both
-  price cards), day 11 T-3, day 13 trial-ends-tomorrow; trial-ended emails
-  quote BOTH options ("Keep everything — Premium" / "Keep the scanner — Pro").
+- Email drip: see `run_daily_drip` in `backend/app/services/email.py` for the
+  current schedule. (This line used to list an older drip schedule that does
+  not match the 30-day trial; the pre-charge notice is about 7 days out.) Trial-ended emails quote BOTH options ("Keep
+  everything — Premium" / "Keep the scanner — Pro").
 
 ## Refunds
 
@@ -218,7 +251,8 @@ prorated.
 
 Founding pricing puts Tapeline at the bottom of the credible-screener category
 on purpose: an unknown tool with no reviews earns trust with a low ask, a
-fully public and downloadable track record that needs no account, and the
+public, downloadable track record that needs no account (corrections
+dated), and the
 refund guarantee above — not with a mid-pack sticker. Competitor pricing
 verified 2026-08: Pro at $99/yr sits well under Finviz Elite (~$299.50/yr),
 Stock Rover (~$280/yr), Koyfin ($374+/yr) and Danelfin ($228+/yr). Price is

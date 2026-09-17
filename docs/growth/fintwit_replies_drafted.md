@@ -1,9 +1,10 @@
 # Fintwit public replies — drafted 2026-05-17
 
 Round 1 of PR #80's pivot from cold DMs to substantive public replies. Drafted
-against each account's most recent substantive tweet, anchored on live
-Tapeline composite scores from `api.tapeline.io/api/ticker/{symbol}` (live
-free-tier feed — the same data anyone visiting `tapeline.io/t/SYMBOL` would see).
+against each account's most recent substantive tweet, anchored on the
+Tapeline composite scores from `api.tapeline.io/api/ticker/{symbol}` at the time
+(the same data anyone visiting `tapeline.io/t/SYMBOL` would see; prices behind
+them are delayed about 15 minutes — note added 15 September 2026).
 
 Founder reviews each draft, opens the target tweet, hits Reply, posts. Avatar
 + banner are now live on @tapeline_io so this no longer looks like a 0-asset
@@ -58,7 +59,7 @@ on $APP and $SE as concentrated bets.
 
 **Why this works:** Fred's whole brand is "emerging compounders," and the
 smart-money sub-score is exactly the lens he uses (insider + institutional
-flow). Quoting his investment thesis back with live tape data signals we
+flow). Quoting his investment thesis back with current score data signals we
 actually read his stuff.
 
 ---
