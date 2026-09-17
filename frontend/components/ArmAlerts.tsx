@@ -24,12 +24,20 @@ const DISMISS_KEY = "tapeline_arm_alerts_dismissed";
  * "granted" user has already armed alerts; "denied"/"unsupported" can't be
  * resolved from here.
  */
+/** Alert threshold for the one-click rule: 5 points above the current score, on the 0-100 scale. */
+function armThreshold(score: number): number {
+  return Math.min(100, Math.round(score) + 5);
+}
+
 export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watchlist" } = {}) {
   const { user } = useUser();
   const [show, setShow] = useState(false);
   const [phase, setPhase] = useState<"idle" | "working" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [ticker, setTicker] = useState<string | null>(null);
+  // The watched ticker's score when the card loaded. The rule's threshold is
+  // set a few points above it, so the alert that follows is a real crossing.
+  const [tickerScore, setTickerScore] = useState<number | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -53,7 +61,10 @@ export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watc
       }
       try {
         const wl = await api.watchlist(null);
-        if (alive && wl.items.length > 0) setTicker(wl.items[0].symbol);
+        if (alive && wl.items.length > 0) {
+          setTicker(wl.items[0].symbol);
+          setTickerScore(wl.items[0].current_score ?? null);
+        }
       } catch {
         /* no watchlist yet — still offer, with generic copy */
       }
@@ -81,13 +92,18 @@ export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watc
       // Create a real score alert on a watched ticker so a LIVE alert follows the
       // sample. Best-effort: a duplicate or a cap-hit must not block the aha.
       let ruleCreated = false;
-      if (ticker) {
+      if (ticker && tickerScore !== null) {
+        // This used to send threshold: 5, while the card promised an alert when
+        // the score "moves 5+ points". A score rule fires when the score CROSSES
+        // its threshold, and every score is above 5, so that rule never
+        // described a move: it re-sent the same push every 15 minutes, and once
+        // alerts became crossing-only it would never fire at all.
         try {
           await api.alertRuleCreate({
             name: `${ticker} score move`,
             rule_type: "score",
             symbol: ticker,
-            threshold: 5,
+            threshold: armThreshold(tickerScore),
             channel: "web_push",
           });
           ruleCreated = true;
@@ -95,6 +111,10 @@ export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watc
           /* rule already exists or the free web-push cap was reached */
           trackEvent("alert_arm_failed", { surface, reason: "rule_create_failed" });
         }
+      } else if (ticker) {
+        // A watched ticker with no score yet: there is nothing to set a
+        // threshold against, so no rule is attempted.
+        trackEvent("alert_arm_failed", { surface, reason: "no_score" });
       } else {
         // No watched ticker, so no rule was even attempted. The old code still
         // reported `alert_armed` here, which is how an "armed alerts" number
@@ -120,7 +140,7 @@ export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watc
       setError(errorMessage(e));
       trackEvent("alert_arm_failed", { surface, reason: "exception" });
     }
-  }, [ticker, surface]);
+  }, [ticker, tickerScore, surface]);
 
   const dismiss = useCallback(() => {
     try {
@@ -138,10 +158,10 @@ export function ArmAlerts({ surface = "scanner" }: { surface?: "scanner" | "watc
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
         <span className="text-fg">
           <strong className="font-medium">Alerts are on.</strong>{" "}
-          {ticker ? (
+          {ticker && tickerScore !== null ? (
             <>
               That sample is exactly what you&rsquo;ll get when <strong>{ticker}</strong>&rsquo;s score
-              moves 5+ points.
+              crosses {armThreshold(tickerScore)} (it&rsquo;s {Math.round(tickerScore)} now).
             </>
           ) : (
             <>Add a ticker to your watchlist and we&rsquo;ll ping you when its score moves.</>

@@ -25,7 +25,7 @@ from sqlalchemy import delete, select
 
 from app.db import session_scope
 from app.main import app
-from app.models import AlertEvent, AlertRule, SqueezeSetup, Ticker, User
+from app.models import AlertEvent, AlertRule, AlertRuleState, SqueezeSetup, Ticker, User
 from app.services import squeeze_integrity
 from app.services.squeeze_integrity import (
     MAX_AGE,
@@ -204,13 +204,22 @@ async def _premium_user_with_rule(rule_type: str, symbol: str | None, threshold:
     uid = f"u_{uuid.uuid4().hex}"
     async with session_scope() as s:
         s.add(User(id=uid, email=f"{uid}@example.com", tier="premium", password_hash="x"))
+        # Alerts are edge-triggered (migration 0070): a rule's FIRST evaluation
+        # records where things stand and fires nothing. These tests are about
+        # which rows may reach a user, so the rule is one that has already
+        # been evaluated (armed) and, for a targeted score rule, last saw its
+        # ticker below the threshold.
         rule = AlertRule(
             user_id=uid, name=f"{rule_type} rule", rule_type=rule_type,
             symbol=symbol, threshold=threshold, channel="web_push", enabled=True,
+            armed_at=datetime.now(UTC) - timedelta(hours=1),
         )
         s.add(rule)
         await s.commit()
         await s.refresh(rule)
+        if rule_type == "score" and symbol:
+            s.add(AlertRuleState(rule_id=rule.id, symbol=symbol, side="below", value=0.0))
+            await s.commit()
         return uid, rule.id
 
 
