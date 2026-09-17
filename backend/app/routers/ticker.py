@@ -349,8 +349,9 @@ _INSIDER_COUNT_WINDOW_DAYS = 90
 
 # Rows the Insider tab returns. The 90-day window of a heavy filer is far longer
 # than first measured: CRWV held 938 lines, DELL 808 and UTHR 731 on 2026-09-17.
-# Above the cap the response says so (`truncated`, `total`) rather than
-# silently showing a prefix.
+# Above the cap the response says so (`truncated`) rather than silently
+# showing a prefix. There is no `total`: counting a heavy filer's whole window
+# to report a number the tab does not show is not worth the query.
 _INSIDER_TAB_ROW_CAP = 2000
 
 
