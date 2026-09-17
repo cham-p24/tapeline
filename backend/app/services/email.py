@@ -1481,8 +1481,11 @@ def render_subscription_started_email(
         # true (prices are delayed, push is opt-in, paid plans list up to
         # 1,000 scanner rows), and this email now goes out at the moment of a
         # real charge. State what the charge did and stop.
+        # "Your payment", not "your first payment": the latch is per
+        # subscription, so a returning customer's win-back subscription gets
+        # this email too, and they have paid before.
         + lead(
-            f"Welcome to Tapeline <strong>{tier_label}</strong>. Your first "
+            f"Welcome to Tapeline <strong>{tier_label}</strong>. Your "
             f"payment went through and your {tier_label} plan is active."
         )
         + card(
@@ -1491,8 +1494,10 @@ def render_subscription_started_email(
             f'<div class="tl-muted" style="margin-top:4px;font-size:13px;color:{LIGHT_MUTED};font-family:{FONT_SANS};">{next_charge_line}</div>',
             accent=True,
         )
+        # Not "in the first session": a trialist converting has had 30 days
+        # of sessions, and a returning customer had sessions before that.
         + muted_paragraph(
-            "Two things worth doing in the first session:"
+            "Two things worth setting up, if you haven't already:"
         )
         + card(
             f"""
@@ -1515,7 +1520,7 @@ def render_subscription_started_email(
             f"style=\"color:{LIGHT_MUTED};text-decoration:underline;\">30-day money "
             f"back</a> — {refund_clause}"
         ),
-        preheader=f"Welcome to Tapeline {tier_label} — your first payment went through.",
+        preheader=f"Welcome to Tapeline {tier_label} — your payment went through.",
     )
 
 
@@ -1557,9 +1562,14 @@ def render_payment_failed_email(
     elif attempt_count == 1:
         urgency_line = "Stripe will retry automatically over the next few days."
     else:
+        # Not "if it fails again, your account drops to Free": this attempt is
+        # not final, so Stripe has another retry scheduled, and the one after
+        # it may not be the last either. Two trial first charges were told
+        # that at attempt 2 (Sep 2026), failed attempt 3, and did not drop.
         urgency_line = (
-            f"This is the {_ordinal(attempt_count)} attempt — if it fails "
-            f"again, your account drops to Free."
+            f"This was the {_ordinal(attempt_count)} attempt. Stripe will try "
+            f"the card again automatically, and if its last retry fails, your "
+            f"account drops to Free."
         )
     if first_charge:
         headline = f"{user_name}, the first charge didn't go through."
@@ -1600,30 +1610,35 @@ def render_payment_failed_email(
 
 
 def render_payment_recovered_email(user_name: str, *, tier: str) -> str:
-    """Closes the dunning loop: a previously-failed renewal finally cleared
+    """Closes the dunning loop: a previously-declined charge cleared on a retry
     (Stripe `invoice.payment_succeeded` while the account was mid-dunning).
-    Reassures the customer they're square and nothing lapsed. Transactional
-    (account-state), persona billing, no List-Unsubscribe."""
+    Transactional (account-state), persona billing, no List-Unsubscribe.
+
+    The reader may never have paid before. A trial whose first charge was
+    declined and whose subscription was already latched as welcomed (the old
+    status trigger did that to two trials in Sep 2026) gets THIS email when the
+    retry clears, not the welcome. So nothing here may presume an earlier
+    payment or a return: no "current again", no "Nothing lapsed … the whole
+    time", no "Back to it" / "Jump back into". Every sentence must be true for a
+    renewal that recovered AND for a first charge that did."""
     tier_label = (tier or "your plan").capitalize()
     return shell(
         h1(f"You're all set, {user_name}.")
         + lead(
             f"Your Tapeline {tier_label} payment just went through — the card "
-            f"on file was charged successfully and your subscription is fully "
-            f"current again."
+            f"on file was charged successfully."
         )
         + muted_paragraph(
-            f"Nothing lapsed: your {tier_label} access ran uninterrupted the "
-            f"whole time. There's nothing you need to do."
+            f"Your {tier_label} plan is active. There's nothing you need to do."
         )
         + card(
-            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Back to it</div>'
-            f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">Jump back into the scanner — your watchlist, alerts, and saved scans are exactly where you left them.</p>'
+            f'<div class="tl-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:{LIGHT_MUTED};font-weight:600;font-family:{FONT_SANS};">Your account</div>'
+            f'<p class="tl-fg" style="margin:8px 0 12px;color:{LIGHT_FG};font-size:14px;line-height:1.55;font-family:{FONT_SANS};">Your watchlist, alerts and saved scans are unchanged.</p>'
             + button("Open Tapeline", "https://tapeline.io/app"),
             accent=True,
         )
         + footnote("Questions about the charge? Reply here — billing@tapeline.io reads every reply."),
-        preheader=f"Payment received — your {tier_label} subscription is current again.",
+        preheader=f"Payment received — your {tier_label} plan is active.",
     )
 
 
