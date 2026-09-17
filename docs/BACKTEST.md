@@ -92,8 +92,9 @@ the formula.
 3. **Survivor bias.** Today's universe is used across the full historical
    window. Any ticker that delisted mid-window is silently absent. A future
    version will need a delisting-aware universe loader.
-4. **Smart-money factor zeroed.** Insider Form 4 + Congressional disclosures
-   aren't backfilled historically anywhere we own. The composite is effectively
+4. **Smart-money factor zeroed.** Insider Form 4 filings aren't backfilled
+   historically anywhere we own (congressional disclosures are not an input at all;
+   there is no source for them, #820). The composite is effectively
    5-factor for historical periods. Applies to both mock and live modes.
 5. **Fundamentals factor zeroed by default.** Without a populated Finnhub
    cache snapshotted by date, the factor contributes zero. The CSV header

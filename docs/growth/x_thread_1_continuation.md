@@ -1,17 +1,40 @@
 # X thread #1 — tweets 4 + 5 + URL reply
 
-> **WHERE THE CARD SITS — updated 2026-09-05. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-09-15. Check every claim below against `docs/COPY_FACTS.md` and `docs/PRICING.md` before posting.**
+>
+> **WHAT CHANGED ON 14 SEPTEMBER 2026 — read before posting anything below.**
+> The founder approved an integrity wave on 14 September 2026 that corrected the
+> product and the site. Drafts below were written before it. False lines found
+> on 15 September 2026 were corrected in place, but check each one against
+> `docs/COPY_FACTS.md`, which has the measurements and times:
+>
+> - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
+>   covered stock and ETF about every 60 seconds during US market hours (longer
+>   around a deploy), and a score usually changes about once a day. Never call
+>   the data live: not real-time, not sub-60s, not "every minute".
+> - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
+>   updated once a day. Not ~2,500.
+> - **Congressional trades and squeeze detection do not exist today.** Do not
+>   offer either as a feature, a Premium benefit or a score input.
+> - **The record:** entries are not re-ranked or deleted. We have corrected
+>   recorded values twice, and said so: prices on 25 August 2026, and scores from
+>   18 May to 12 June capped on 15 June 2026. No top 10 was recorded for
+>   31 August, 2 September, 4 September or 9 September 2026.
+> - **The pre-charge email** goes about 7 days before the first charge.
 >
 > **Signing up takes an email and a password.** The account it makes lands on
-> the Free plan and opens the live scanner — the top ten scored rows of any
+> the Free plan and opens the scanner — the top ten scored rows of any
 > scan, one saved screen. **A card is what starts the 30-day Premium trial**
 > (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
-> than the first ten, plus alerts, CSV export and the Congressional and insider
-> feeds.
+> than the first ten, plus alerts, CSV export and per-ticker SEC Form 4
+> filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -64,11 +87,13 @@ All tweets verified ≤ 280 chars (Twitter counts URLs as 23 chars regardless).
 ## Tweet 4 (~190 chars)
 
 ```
-And every top-10 pick gets back-checked vs SPY the next day. Wins AND losses both stay on the page — no quiet edits, no survivor bias. 5 sessions in, median 1D alpha is -0.73% on 35 clean entries (4 outliers flagged + excluded).
+And each recorded top 10 gets back-checked vs SPY the next day. Wins AND losses both stay on the page, corrections dated, no survivor bias. The current median alpha and its sample size are on tapeline.io/scorecard.
 ```
 
-**Why this works:** the median alpha figure is live and defensible (came
-straight from `/api/scorecard` after the PR #97 outlier filter shipped).
+**Why this works:** it points at the live figure instead of baking in a
+number that goes stale (the original draft quoted a 5-session median alpha).
+Corrections to recorded values are dated on /scorecard and /changelog (updated
+15 September 2026).
 The "wins AND losses both stay on the page" line is the trust-builder.
 Self-skeptical tone matches the rest of the thread.
 
@@ -77,7 +102,7 @@ Self-skeptical tone matches the rest of the thread.
 ## Tweet 5 (~275 chars)
 
 ```
-The full record is free to read, no account. Pro $8.25/mo billed annually = full live universe + smart alerts. Premium $19.99 adds Congress trades + SEC Form 4. An account takes a card: 30-day Premium trial, $0 today, one click cancels. Built solo from Melbourne.
+The public scorecard is free to read, no account. Pro $8.25/mo billed annually = the full ~11,500 stocks & ETFs + alerts. Premium $19.99 adds SEC Form 4 filings. Sign-up is email + password; a card starts the 30-day trial, $0 today. Built solo from Melbourne.
 ```
 
 **Why this works:** transparent pricing with the genuinely card-free surface as
@@ -123,7 +148,7 @@ Heaviest Trend and RS, lightest Momentum. The ordering is fixed and public, and 
 
 **Tweet 5:**
 ```
-The published record shows the real product, live and complete, with no account. Free accounts get top-10 rows and 12 look-ups a day. Pro $8.25/mo annual = full ~2,500-ticker live scan + smart alerts. Premium $19.99/mo adds Congress trades + SEC Form 4.
+The public scorecard needs no account (per-day entries on a 7-day delay). Free accounts get top-10 rows and 12 look-ups a day, no card. Pro $8.25/mo annual = all ~11,500 stocks & ETFs + alerts. Premium $19.99/mo adds SEC Form 4 filings. Prices delayed ~15 min.
 ```
 
 **URL reply:** `https://tapeline.io`

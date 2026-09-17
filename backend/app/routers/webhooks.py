@@ -451,9 +451,8 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> bo
 
     Returns True when THIS invoice was taken as the subscription's first
     payment (the latch was claimed here for it), whether or not the email was
-    then delivered. The caller uses that to hold back the dunning all-clear
-    ("Payment received … your subscription is fully current again … Nothing
-    lapsed"), which is false for someone paying for the first time.
+    then delivered. The caller uses that to hold back the dunning all-clear,
+    so a first charge that clears on a retry gets one billing email, not two.
 
     WHY HERE AND NOT ON `status == "active"`. At the end of a card-required
     trial Stripe flips the subscription to active roughly an hour before it
@@ -1683,10 +1682,11 @@ async def stripe_webhook(
         #
         # Both can be true of one invoice — a trial whose first charge was
         # declined and then clears on a retry. The welcome is decided FIRST so
-        # that case gets one email, not two: the all-clear says the
-        # subscription is "fully current again" and "Nothing lapsed", which is
-        # false for someone paying for the first time. The dunning tokens are
-        # still cleared either way.
+        # that case gets one email, not two. The dunning tokens are still
+        # cleared either way. A trial already latched as welcomed (by the old
+        # status trigger) gets the all-clear instead, so the all-clear must be
+        # true for someone who has never paid before — see
+        # render_payment_recovered_email.
         welcomed = await _welcome_on_first_paid_invoice(session, obj)
 
         customer_id = obj.get("customer")

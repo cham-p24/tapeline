@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import AlertEvent, User, WatchlistItem
+from app.services.alerts import ALERT_DAILY_CEILING, daily_alert_cap
 from app.services.auth import current_user_required
 from app.services.freshness import data_delayed_minutes
 from app.services.tier import TIER_LIMITS, Tier, effective_limit, is_on_trial, limit
@@ -38,7 +39,15 @@ async def my_usage(
     on_trial = is_on_trial(user.tier, user.trial_ends_at, user.stripe_customer_id)
     caps = {
         "watchlist_tickers":     effective_limit(user, "watchlist_tickers"),
-        "email_alerts_per_day":  effective_limit(user, "email_alerts_per_day"),
+        # The cap that is actually ENFORCED at send time, not the plan number.
+        # services.alerts.daily_alert_cap is the lower of the plan's own
+        # `email_alerts_per_day` and the cross-plan flood ceiling
+        # (ALERT_DAILY_CEILING). Reading `effective_limit` here reported
+        # Premium's plan figure of 10,000 while 50 was the number that stopped
+        # the send, so the meter could show 12/10,000 on the day an alert was
+        # actually withheld. Whatever this says is what the sender does.
+        "email_alerts_per_day":  daily_alert_cap(user, "email"),
+        "web_push_alerts_per_day": daily_alert_cap(user, "web_push"),
         "api_requests_per_day":  effective_limit(user, "api_requests_per_day"),
         # Vendor delay + any tier delay: the true age of the prices this user
         # sees (services/freshness). It read 0 while prices were 15 min delayed.
@@ -50,13 +59,21 @@ async def my_usage(
         select(func.count()).select_from(WatchlistItem).where(WatchlistItem.user_id == user.id)
     )).scalar() or 0
 
-    # Alerts fired today
+    # Alerts DELIVERED today, per channel — the same rows and the same
+    # delivered-only filter services.alerts._delivery_cap_reached counts
+    # against, so the meter and the cap can never disagree. The unqualified
+    # total used to be compared against the EMAIL cap, so a user's web pushes
+    # inflated their email meter.
     today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    alerts_today = (await session.execute(
-        select(func.count()).select_from(AlertEvent)
+    per_channel = (await session.execute(
+        select(AlertEvent.channel, func.count())
         .where(AlertEvent.user_id == user.id, AlertEvent.created_at >= today_start,
                AlertEvent.delivered.is_(True))
-    )).scalar() or 0
+        .group_by(AlertEvent.channel)
+    )).all()
+    delivered_today = {str(channel): int(n) for channel, n in per_channel}
+    alerts_today = delivered_today.get("email", 0)
+    pushes_today = delivered_today.get("web_push", 0)
 
     # ── Daily ticker look-ups ────────────────────────────────────────────────
     # Read-only view of the SAME durable counter services.usage writes on every
@@ -79,8 +96,8 @@ async def my_usage(
     today = datetime.now(UTC).date()
     lookups_used = (user.lookups_today or 0) if user.lookups_reset_on == today else 0
 
-    def pct(used: int, cap: int) -> float:
-        return round(100 * used / cap, 1) if cap > 0 else 0.0
+    def pct(used: int, cap: int | None) -> float:
+        return round(100 * used / cap, 1) if cap else 0.0
 
     return {
         "tier": tier.value,
@@ -95,6 +112,14 @@ async def my_usage(
                 "used": alerts_today,
                 "cap": caps["email_alerts_per_day"],
                 "pct": pct(alerts_today, caps["email_alerts_per_day"]),
+            },
+            # Web push had no cap at all and no meter. Both exist now, so the
+            # surface that tells a user where they stand covers every channel
+            # that can withhold an alert.
+            "web_push_alerts_today": {
+                "used": pushes_today,
+                "cap": caps["web_push_alerts_per_day"],
+                "pct": pct(pushes_today, caps["web_push_alerts_per_day"]),
             },
             "ticker_lookups_today": {
                 "used": lookups_used,
@@ -135,11 +160,19 @@ def _suggest_upgrade(tier: Tier, wl: int, alerts: int, caps: dict) -> dict | Non
             "target_cap": next_cap,
             "target_tier": "pro" if tier == Tier.FREE else "premium",
         }
-    if caps["email_alerts_per_day"] > 0 and alerts >= caps["email_alerts_per_day"] * 0.8:
-        next_cap = TIER_LIMITS[Tier.PREMIUM]["email_alerts_per_day"]
+    email_cap = caps["email_alerts_per_day"]
+    if email_cap and alerts >= email_cap * 0.8:
+        # What Premium would actually deliver, which is the flood ceiling
+        # (ALERT_DAILY_CEILING["email"] = 50), NOT tier.py's plan figure of
+        # 10,000. The nudge used to promise "10,000/day" for a plan whose
+        # sender stops at 50 — an upsell to a number that does not exist.
+        next_cap = ALERT_DAILY_CEILING["email"]
+        plan_cap = TIER_LIMITS[Tier.PREMIUM]["email_alerts_per_day"]
+        if plan_cap is not None:
+            next_cap = min(next_cap, plan_cap)
         return {
             "reason": "alerts",
-            "message": f"{alerts}/{caps['email_alerts_per_day']} daily alerts used.",
+            "message": f"{alerts}/{email_cap} daily alerts used.",
             "target_cap": next_cap,
             "target_tier": "premium",
         }

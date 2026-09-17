@@ -205,52 +205,22 @@
       "reason": "Quotes the phrase in order to criticise it ('the \"back-tested results\" in marketing ... don't actually track it'). Tapeline publishes no backtest; the post argues against relying on them."
     },
     {
-      "file": "docs/BRAND_SERP_KIT.md",
-      "rule": "false-data-freshness",
-      "phrase": "sub-60",
-      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
-    },
-    {
-      "file": "docs/BRAND_SERP_KIT.md",
-      "rule": "false-data-freshness",
-      "phrase": "under 60 seconds",
-      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
-    },
-    {
-      "file": "docs/launch/LAUNCH_PLAYBOOK.md",
-      "rule": "false-data-freshness",
-      "phrase": "sub-60",
-      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
-    },
-    {
-      "file": "docs/launch/LAUNCH_PLAYBOOK.md",
-      "rule": "false-data-freshness",
-      "phrase": "live data",
-      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
-    },
-    {
-      "file": "docs/launch/LAUNCH_PLAYBOOK.md",
-      "rule": "false-data-freshness",
-      "phrase": "real-time",
-      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
-    },
-    {
       "file": "frontend/app/changelog/page.tsx",
       "rule": "false-data-freshness",
       "phrase": "live data",
-      "reason": "Dated changelog entry (Free plan, 30 Aug 2026) saying the free plan runs \"on live data, no delay\". False as measured on 14 Sep 2026 (vendor prices ~15 minutes delayed on every plan). Dated history is not rewritten: the fix is a new dated note beside the entry, and changelog/page.tsx is owned by another session in this wave (do-not-edit list), so it is carried here as visible debt. Delete this entry when that note lands and the phrase is gone or quoted inside it."
+      "reason": "Dated changelog release note (30 Aug 2026, Free plan) saying the free plan runs \"on live data, no delay\". False as measured on 14 Sep 2026 (prices ~15 minutes delayed on every plan). The correction has landed: the 2026-09-17 METHODOLOGY_LOG entry (ref #842) quotes this line, names its date and states the measured wording, and the linter reads that quote as a dated correction. The original line cannot be removed or reworded because /changelog is append-only (its rule 1), and file+rule+phrase cannot tell a corrected history line from a new claim, so it stays in this ledger rather than in 'allow': a NEW \"live data\" claim in this file still prints here on every run. Keep until the lint can pin a finding to a line."
     },
     {
       "file": "frontend/app/changelog/page.tsx",
       "rule": "false-data-freshness",
       "phrase": "no delay",
-      "reason": "Two hits. (1) The same dated 30 Aug 2026 Free-plan entry as the \"live data\" entry above: debt, same fix, same owner. (2) The scorecard-delay entry describing a bug (\"served the same rows with no delay at all\") - not a freshness claim, but the phrase cannot be told apart by file+rule+phrase. Delete this entry once (1) is corrected by a dated note."
+      "reason": "Two hits, both kept after the 2026-09-17 correction entry (ref #842). (1) The same dated 30 Aug 2026 Free-plan release note as the \"live data\" entry: corrected by that new dated entry, left in place because /changelog is append-only. (2) The scorecard-delay methodology entry describing a bug (\"served the same rows with no delay at all\") - not a freshness claim. file+rule+phrase cannot tell either apart from a new claim, so this stays in the ledger (visible on every run) rather than in 'allow'."
     },
     {
       "file": "frontend/app/changelog/page.tsx",
       "rule": "false-data-freshness",
       "phrase": "live score",
-      "reason": "Dated changelog entries calling ticker-page and Free-tier scores \"live\" (share pages; the superseded Free-tier note). Measured 14 Sep 2026: prices ~15 minutes delayed, scores usually change about once a day, and /t pages are cached snapshots. Dated history gets a dated note, not a rewrite, and changelog/page.tsx is owned by another session in this wave; carried as visible debt. Delete when the notes land."
+      "reason": "Two dated changelog release notes calling scores \"live\": the 2026-05-04 note (public ticker pages \"render the live score\") and the superseded-Free-tier note in the 2026-04-27 entry (\"Free is live scores\"). Both are quoted and corrected by the 2026-09-17 METHODOLOGY_LOG entry (ref #842): prices ~15 minutes delayed, scores usually change about once a day, public ticker pages are cached snapshots. The lines stay because /changelog is append-only, and file+rule+phrase cannot tell a corrected history line from a new claim, so this stays in the ledger (visible on every run) rather than in 'allow'."
     }
   ]
 }

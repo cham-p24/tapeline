@@ -113,7 +113,7 @@ function signalFaq(display: string, range: string, blurb: string) {
     },
     {
       q: `Where can I see the ${display} historical track record?`,
-      a: `The /scorecard page back-checks every top-10 daily pick against the next-day return vs SPY. Many of those picks come from the STRONG SETUP and HIGH CONVICTION tiers; the scorecard preserves every individual call for accountability.`,
+      a: `The /scorecard page back-checks each recorded daily top-10 pick against the next-day return vs SPY. Many of those picks come from the STRONG SETUP and HIGH CONVICTION tiers; the scorecard preserves every individual call for accountability.`,
     },
   ];
 }

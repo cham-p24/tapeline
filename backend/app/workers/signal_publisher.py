@@ -822,7 +822,9 @@ async def tick() -> None:
         await broker.publish("squeeze_updated", {"count": len(squeezes)})
 
     # Evaluate alert rules against the freshly-updated state.
-    # Each evaluator is debounced internally (15min), safe to run every tick.
+    # Safe to run every tick: alerts fire on a CROSSING, remembered in
+    # alert_rule_states, not while a condition stays true (services/alerts),
+    # and one machine evaluates at a time (dblock.LOCK_ALERT_RULES).
     _set_stage("alerts")
     async with session_scope() as alert_session:
         try:
@@ -2762,34 +2764,6 @@ _EQUITY_FACTOR_DUE_AFTER: dict[str, timedelta] = {
 #: symbol that does gain coverage is still picked up within a month.
 _NON_EQUITY_FACTOR_DUE_AFTER = timedelta(days=30)
 
-#: Fundamentals stamped before this instant, with no reading on the row, are due
-#: NOW instead of when their horizon passes. Every asset class but crypto.
-#:
-#: Until #825 (worker restarted on it at 22:58 UTC on 2026-09-13) a stamp could
-#: land without its reading: the pass cached the value and a deploy took it
-#: before the row's owner saved it. See `_save_factor_readings`. Those rows
-#: cannot be told apart from rows Finnhub does not cover, and they were hidden
-#: until their stamp aged out: 1,548 sheet-owned equities with Finnhub key
-#: statistics sat at NEUTRAL 50 (ADBE, JPM, COST, V, CAT among them), plus 457
-#: owned by the tick from the 09-06..09-11 outage. Stamps ran 09-07..09-13, so
-#: the horizon alone would have taken until 09-21.
-#:
-#: So every such row is asked once more. A re-read stamps the row after this
-#: instant, so the rule retires row by row. Once it matches nothing it is dead
-#: code: remove it then, with the fixture that disables it in
-#: tests/test_factor_refresh_what_is_due.py.
-#:
-#: #828 asked equities only; the equities drained 2026-09-14 (3,134 of 3,358
-#: re-reads came back with a reading). ETFs and futures were added on 2026-09-17.
-#: Their 30-day horizon would have hidden the lost ones until 2026-10-13, and
-#: sheet-owned ETFs held fundamentals at 2.2% against 14.5% for the tick's own:
-#: about 150 lost readings. That costs ~5,100 re-reads, once, served after every
-#: due equity. The run it lands in had no smart money due, so it fits the phase
-#: budget.
-#:
-#: Crypto is never asked: no pair has ever answered /stock/metric.
-_FUNDAMENTALS_UNSAVED_BEFORE = datetime(2026, 9, 13, 23, 0, tzinfo=UTC)
-
 #: Smart money stamped before this instant came from Finnhub, and is due NOW.
 #:
 #: The insider pass switched to SEC EDGAR here (`services/edgar_form4.py`),
@@ -2803,6 +2777,30 @@ _FUNDAMENTALS_UNSAVED_BEFORE = datetime(2026, 9, 13, 23, 0, tzinfo=UTC)
 #: row; rows the old worker stamped between this instant and the deploy are
 #: re-read on their horizon.
 _SMART_MONEY_EDGAR_SINCE = datetime(2026, 9, 14, 14, 10, tzinfo=UTC)
+
+#: Smart money stamped before this instant is due NOW, and an EDGAR Form 4 row
+#: fetched before it is not evidence against an empty answer.
+#:
+#: The EDGAR reader changed how a filing becomes rows (services/edgar_form4.py,
+#: points 5-7), and every stored row predates it:
+#:
+#: * ATTRIBUTION. A filing used to be written under EVERY ticker SEC lists for
+#:   its CIK. On 2026-09-17, 70 CIKs spread 2,609 rows over 173 symbols:
+#:   Strategy's STRC/STRF/STRK/STRD preferreds carried MSTR's insider sales,
+#:   JPM's VYLD/AMJB ETNs carried JPM's, notes like GREEL and TMUSZ their
+#:   issuer's. Now only the ticker the filing names gets the lines.
+#: * AMENDMENTS. A 4/A dropped every Form 4 its owner filed that day, e.g. 51 of
+#:   Magnetar's CRWV sale lines. Now only the original it restates.
+#: * FUTURE DATES. A GIC filing's 2027-09-03 typo sat at the top of the Holdings
+#:   feed. Now a trade dated after its filing date is dropped.
+#:
+#: So every row is re-read once. Most filings come from the parse cache, so a
+#: re-read costs one submissions request; only multi-ticker CIKs download
+#: their filings again. The guard half matters as much: a preferred's CORRECT
+#: empty answer would otherwise be "contradicted" by the issuer rows it wrongly
+#: held, counted as a failure, and never cleared - and ten such symbols in forty
+#: would stop the pass. Rows fetched from here on are trusted as before.
+_SMART_MONEY_REREAD_BEFORE = datetime(2026, 9, 17, 17, 30, tzinfo=UTC)
 
 #: A row holding a smart-money value with NO Form 4 row on file is due again
 #: once its stamp is this old, whatever its asset class's horizon says.
@@ -2882,14 +2880,9 @@ def _factor_due_clause(stamp_col: Any, now: datetime) -> Any:
         | ((Ticker.asset_class == "equity") & (stamp_col < equity_cutoff))
         | ((Ticker.asset_class != "equity") & (stamp_col < other_cutoff))
     )
-    if stamp_col.key == "last_fundamentals_at":
-        due = due | (
-            (Ticker.asset_class != "crypto")
-            & Ticker.sub_fundamentals.is_(None)
-            & (stamp_col < _FUNDAMENTALS_UNSAVED_BEFORE)
-        )
     if stamp_col.key == "last_smart_money_at":
         due = due | (stamp_col < _SMART_MONEY_EDGAR_SINCE)
+        due = due | (stamp_col < _SMART_MONEY_REREAD_BEFORE)
         due = due | (
             _unbacked_smart_money()
             & (stamp_col < now - _UNBACKED_SMART_MONEY_RECHECK_AFTER)
@@ -3861,9 +3854,21 @@ async def _clear_smart_money_reading(symbol: str) -> tuple[bool, bool]:
     )
     cleared = False
     async with session_scope() as session:
+        # Evidence against the empty answer: EDGAR rows fetched under the
+        # current attribution and amendment rules (_SMART_MONEY_REREAD_BEFORE),
+        # never a future trade date (a filer's year typo would contradict every
+        # empty answer for a year). The count is every EDGAR row, for the
+        # return value.
+        trusted = (
+            (InsiderTransaction.fetched_at >= _SMART_MONEY_REREAD_BEFORE)
+            & (InsiderTransaction.transaction_date <= date.today().isoformat())
+        )
         newest, edgar_rows = (await session.execute(
             select(
-                func.max(func.nullif(InsiderTransaction.transaction_date, "")),
+                func.max(case(
+                    (trusted, func.nullif(InsiderTransaction.transaction_date, "")),
+                    else_=None,
+                )),
                 func.count(),
             )
             .where(InsiderTransaction.symbol == sym, InsiderTransaction.source == "edgar")

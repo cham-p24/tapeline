@@ -66,13 +66,21 @@ SAFETY
   value and never nulls a row it failed to fetch: a partial vendor outage
   degrades to "fewer rows repaired", never to a damaged record.
 * Idempotent — a second pass over repaired rows finds nothing to change.
+* NO SILENT REWRITE. `--apply` refuses to run unless `--restatement DATE`
+  names an entry already in `scorecard_export.RESTATEMENTS` (the dated list
+  that ships inside the downloadable record), dated no later than today, whose
+  `fields_changed` names every column this script writes. And it only touches
+  rows recorded BEFORE that date: a restatement cannot cover entries that did
+  not exist when it was written. So the disclosure has to be merged and
+  deployed first, and a new correction cannot borrow an old one's date to
+  rewrite rows recorded since.
 
 USAGE
 -----
     python -m app.scripts.rederive_scorecard --estimate     # cost only, no calls
     python -m app.scripts.rederive_scorecard                # dry run
     python -m app.scripts.rederive_scorecard --since 2026-08-01
-    python -m app.scripts.rederive_scorecard --apply        # writes
+    python -m app.scripts.rederive_scorecard --apply --restatement 2026-08-25
 
 Run against production only deliberately: it rewrites the public track record.
 """
@@ -82,7 +90,7 @@ import argparse
 import asyncio
 import logging
 from collections import defaultdict
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from statistics import median
 
 from sqlalchemy import select
@@ -96,6 +104,7 @@ from app.services.scorecard_backcheck import (
     _session_is_complete,
     is_trading_day,
 )
+from app.services.scorecard_export import RESTATEMENTS
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("rederive")
@@ -119,6 +128,64 @@ _FLAG_DRIFT_TOLERANCE = 0.02
 
 #: Alpha corrections at least this large are listed individually.
 _LOUD_DELTA_PCT = 1.0
+
+
+#: Every column an --apply run writes. The named restatement must list each one
+#: in its `fields_changed`, or the disclosure does not describe the rewrite.
+WRITTEN_FIELDS: tuple[str, ...] = (
+    "price_at_flag",
+    "price_next_day",
+    "change_pct_1d_after",
+    "spy_change_pct_1d",
+    "alpha_vs_spy",
+)
+
+
+class RestatementRequiredError(ValueError):
+    """An --apply run was not backed by a published, dated restatement."""
+
+
+def apply_window_until(
+    restatement: str | None, until: date | None, today: date
+) -> date:
+    """The last as_of an --apply run may write, or raise RestatementRequiredError.
+
+    Writing to the public record is only allowed as a DISCLOSED restatement:
+    `restatement` must be the date of an entry already in
+    scorecard_export.RESTATEMENTS (so it ships in the downloadable record before
+    any row moves), not in the future, and listing every column this script
+    writes. Rows recorded on or after that date are out of reach, whatever
+    `until` says, because the restatement could not have described them.
+    """
+    if not restatement:
+        raise RestatementRequiredError(
+            "--apply rewrites published rows; name the dated restatement that "
+            "discloses it with --restatement YYYY-MM-DD"
+        )
+    try:
+        stated = date.fromisoformat(restatement)
+    except ValueError as exc:
+        raise RestatementRequiredError(f"--restatement {restatement!r} is not YYYY-MM-DD") from exc
+    entry = next((r for r in RESTATEMENTS if r.get("date") == restatement), None)
+    if entry is None:
+        raise RestatementRequiredError(
+            f"no restatement dated {restatement} in scorecard_export.RESTATEMENTS; "
+            "add and deploy the disclosure before rewriting any row"
+        )
+    if stated > today:
+        raise RestatementRequiredError(
+            f"restatement {restatement} is dated in the future; it cannot "
+            "disclose a rewrite made today"
+        )
+    listed = entry.get("fields_changed", "")
+    missing = [f for f in WRITTEN_FIELDS if f not in listed]
+    if missing:
+        raise RestatementRequiredError(
+            f"restatement {restatement} does not list {missing} in fields_changed, "
+            "so it does not disclose what this run would change"
+        )
+    cap = stated - timedelta(days=1)
+    return cap if until is None or until > cap else until
 
 
 def _pct(new: float, old: float) -> float:
@@ -209,7 +276,20 @@ async def _rederive(
     pace: float,
     estimate: bool,
     until: date | None = None,
+    restatement: str | None = None,
 ) -> int:
+    if apply and not estimate:
+        try:
+            capped = apply_window_until(restatement, until, datetime.now(UTC).date())
+        except RestatementRequiredError as exc:
+            logger.error("REFUSING TO WRITE: %s", exc)
+            return 0
+        if capped != until:
+            logger.info(
+                "--apply limited to rows recorded before restatement %s (until %s)",
+                restatement, capped,
+            )
+        until = capped
     rows = await _load(since, until)
     if not rows:
         logger.info("no scored entries found — nothing to do")
@@ -416,7 +496,14 @@ def main() -> None:
     )
     p.add_argument(
         "--apply", action="store_true",
-        help="actually write (default is a dry run that reports only)",
+        help="actually write (default is a dry run that reports only). "
+             "Requires --restatement.",
+    )
+    p.add_argument(
+        "--restatement", type=str, default=None,
+        help="YYYY-MM-DD of the entry in scorecard_export.RESTATEMENTS that "
+             "discloses this rewrite. Required with --apply; only rows recorded "
+             "before that date are written.",
     )
     p.add_argument(
         "--pace", type=float, default=_DEFAULT_PACE_SECONDS,
@@ -432,7 +519,14 @@ def main() -> None:
     until = datetime.strptime(args.until, "%Y-%m-%d").date() if args.until else None
     if since and until and until < since:
         p.error(f"--until {until} is before --since {since}")
-    asyncio.run(_rederive(since, args.apply, args.pace, args.estimate, until))
+    if args.apply and not args.estimate:
+        try:
+            apply_window_until(args.restatement, until, datetime.now(UTC).date())
+        except RestatementRequiredError as exc:
+            p.error(str(exc))
+    asyncio.run(
+        _rederive(since, args.apply, args.pace, args.estimate, until, args.restatement)
+    )
 
 
 if __name__ == "__main__":

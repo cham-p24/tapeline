@@ -407,8 +407,58 @@ class AlertRule(Base):
     channel: Mapped[str] = mapped_column(String(20), default="email", nullable=False)  # email|web_push (the only channels routers/alerts.py accepts)
     enabled: Mapped[bool] = mapped_column(default=True, nullable=False)
     last_fired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # When the evaluator first recorded where this rule's symbols stood. NULL
+    # means the rule has never been evaluated, and its next evaluation records
+    # sides WITHOUT firing: a rule only alerts on a crossing it watched happen,
+    # never on a condition that was already true when the rule was created (or
+    # when edge-triggering shipped). See services/alerts and migration 0072.
+    armed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
+    )
+
+
+class AlertRuleState(Base):
+    """Which side of its trigger a rule last saw one symbol on.
+
+    Alerts are EDGE-triggered: a rule fires when this side changes, not while a
+    condition merely stays true. Before migration 0072 a score rule fired on
+    every evaluation where `score >= threshold`, limited only by a 15-minute
+    debounce, so a ticker parked above its threshold re-sent the same "crossed"
+    alert about 96 times a day. Persisting the side here (not in process memory)
+    is what stops a worker restart, a deploy or the standby machine from
+    re-firing everything that is already above its threshold.
+
+    `side` is "above" / "below" for score and squeeze rules, and the last seen
+    regime label (e.g. "CAUTIOUS") for regime rules. `value` is the reading that
+    put the symbol on this side, kept for the alert text and for debugging; it
+    is deliberately NOT rewritten on every tick, so an unchanged side costs no
+    write.
+
+    ON DELETE CASCADE from alert_rules; routers/alerts.delete_rule and
+    services/account_purge also delete these rows explicitly, because SQLite
+    (dev + tests) does not enforce foreign keys.
+    """
+
+    __tablename__ = "alert_rule_states"
+
+    rule_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("alert_rules.id", ondelete="CASCADE"), primary_key=True,
+    )
+    symbol: Mapped[str] = mapped_column(String(20), primary_key=True)
+    side: Mapped[str] = mapped_column(String(20), nullable=False)
+    value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Consecutive undelivered retries of the crossing this row is holding back.
+    # A crossing whose delivery RAISED (or whose web push reached nobody) does
+    # not advance the side, so the next evaluation re-detects it and tries
+    # again; this counts those attempts so a permanently broken transport
+    # cannot replay one crossing forever. Reset to 0 the moment a fire is
+    # consumed. See services/alerts.MAX_DELIVERY_ATTEMPTS.
+    failures: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0", default=0,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False,
     )
 
 

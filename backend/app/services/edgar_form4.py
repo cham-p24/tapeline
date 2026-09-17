@@ -23,9 +23,30 @@ Finnhub function it replaces)
     4. Only filings whose XML names THIS issuer are used: a company's
        submission list also carries Form 4s it filed as a 10% owner of some
        other company.
-    5. A 4/A replaces the same owner's Form 4 filed on its
-       dateOfOriginalSubmission, so an amended filing is not counted twice.
-    6. Non-derivative transactions only (the common-stock table). Derivative
+    5. ATTRIBUTION. SEC lists several tickers under one CIK for many issuers:
+       preferred depositary shares, notes, warrants, ETNs and sibling share
+       classes. A filing's lines go to ONE of them - the ticker the filing
+       itself names in issuerTradingSymbol, or the CIK's first-listed SEC
+       ticker when the named symbol is not one SEC lists for the CIK. Until
+       2026-09-17 every ticker of the CIK received the issuer's whole Form 4
+       set: 70 CIKs, e.g. Strategy's STRC/STRF/STRK/STRD preferreds carried
+       MSTR's insider sales, JPM's VYLD/AMJB ETNs carried JPM's, and notes like
+       GREEL and TMUSZ carried their issuer's.
+    6. A 4/A replaces ONE original of the same owner: among the originals filed
+       on its dateOfOriginalSubmission (or up to 4 days later, since EDGAR's
+       filing date can move past the filer's submission date), the one whose
+       trade dates it matches best; failing any overlap, the single original
+       filed on that exact date. An amendment with no non-derivative lines
+       replaces nothing. Until 2026-09-17 a 4/A dropped EVERY Form 4 its owner
+       filed that day: CRWV lost 51 sale lines Magnetar filed separately on
+       14 Aug, because one of three same-day filings was amended.
+    6a. A second 4/A of the same original replaces the first: amendments are
+       read newest first, and an older one restating an original already
+       claimed is dropped, so an amended trade is not counted twice.
+    7. A line whose trade date is later than the filing's own filing date is a
+       typo (a 2026-09-03 GIC filing reported a trade on 2027-09-03) and is
+       dropped: a future date sorted to the top of every "most recent" list.
+    8. Non-derivative transactions only (the common-stock table). Derivative
        lines are option grants and exercises priced at strike, which would
        swamp the dollar netting in `compute_smart_money_score` and double-count
        every exercise. Share change is signed by the acquired/disposed code.
@@ -88,9 +109,25 @@ THROTTLED_STATUSES = frozenset({403, 429})
 
 FORM4_TYPES = frozenset({"4", "4/A"})
 
-#: Bump when `parse_form4_xml`'s output changes; cached filings at an older
-#: version are fetched and parsed again.
-PARSE_VERSION = 1
+#: The version `parse_form4_xml`'s output is written at. Bump it when that
+#: output changes.
+PARSE_VERSION = 2
+
+#: The oldest cached version still valid for ANY filing. Raise it to
+#: PARSE_VERSION when a parse change makes every older row wrong; cached
+#: filings below it are fetched and parsed again.
+MIN_PARSE_VERSION = 1
+
+#: The first version that records `issuer_symbol` (2026-09-17). Only a CIK with
+#: more than one SEC ticker needs it for attribution, so a single-ticker CIK
+#: keeps serving version-1 rows and only ~70 issuers' filings are downloaded
+#: again (see `_fetch`).
+ISSUER_SYMBOL_PARSE_VERSION = 2
+
+#: How far past a 4/A's dateOfOriginalSubmission the original's EDGAR filing
+#: date may fall and still be the filing it amends. EDGAR dates a submission
+#: accepted after 17:30 ET to the next business day, which crosses a weekend.
+AMENDMENT_FILING_DATE_SLACK_DAYS = 4
 
 #: The largest share change `insider_transactions.share_change` can hold: it is
 #: a 32-bit INTEGER on Postgres (SQLite, which the tests run on, does not
@@ -173,6 +210,9 @@ async def _get(
 
 _TICKER_CIK: dict[str, str] = {}
 _TICKER_CIK_LOADED_AT = 0.0
+#: CIK -> its tickers in company_tickers.json order. The first entry is the one
+#: a filing is attributed to when it names no ticker SEC lists for the CIK.
+_CIK_TICKERS: dict[str, list[str]] = {}
 
 
 def sec_ticker(symbol: str) -> str:
@@ -186,7 +226,7 @@ async def _ticker_cik_map(client: httpx.AsyncClient) -> dict[str, str]:
     A refresh that fails falls back to the map already held. With no map at all
     the failure is raised: "SEC lists no such ticker" must never be concluded
     from a download that did not happen."""
-    global _TICKER_CIK, _TICKER_CIK_LOADED_AT
+    global _TICKER_CIK, _TICKER_CIK_LOADED_AT, _CIK_TICKERS
     if _TICKER_CIK and time.time() - _TICKER_CIK_LOADED_AT < _TICKER_MAP_TTL_SECONDS:
         return _TICKER_CIK
     try:
@@ -197,13 +237,18 @@ async def _ticker_cik_map(client: httpx.AsyncClient) -> dict[str, str]:
         if not isinstance(data, dict):
             raise EdgarUnavailableError("company_tickers", "not a JSON object")
         fresh: dict[str, str] = {}
-        for row in data.values():
+        by_cik: dict[str, list[str]] = {}
+        # Keys are row numbers; SEC's order is what "first-listed" means.
+        for key in sorted(data, key=lambda k: int(k) if str(k).isdigit() else 0):
+            row = data[key]
             if not isinstance(row, dict):
                 continue
             ticker = str(row.get("ticker") or "").strip().upper()
             cik = str(row.get("cik_str") or "").strip()
-            if ticker and cik.isdigit():
-                fresh.setdefault(ticker, cik.zfill(10))
+            if ticker and cik.isdigit() and ticker not in fresh:
+                padded = cik.zfill(10)
+                fresh[ticker] = padded
+                by_cik.setdefault(padded, []).append(ticker)
         if not fresh:
             raise EdgarUnavailableError("company_tickers", "empty map")
     except (EdgarUnavailableError, ValueError) as exc:
@@ -214,6 +259,7 @@ async def _ticker_cik_map(client: httpx.AsyncClient) -> dict[str, str]:
             raise
         raise EdgarUnavailableError("company_tickers", type(exc).__name__) from exc
     _TICKER_CIK = fresh
+    _CIK_TICKERS = by_cik
     _TICKER_CIK_LOADED_AT = time.time()
     logger.info("edgar_form4.ticker_map_loaded tickers=%d", len(fresh))
     return _TICKER_CIK
@@ -277,6 +323,7 @@ def parse_form4_xml(document: bytes | str) -> dict[str, Any]:
         })
     return {
         "issuer_cik": _cik(_text(root, "issuer/issuerCik")),
+        "issuer_symbol": sec_ticker(_text(root, "issuer/issuerTradingSymbol"))[:20],
         "owner_cik": _cik(_text(owner, "reportingOwnerId/rptOwnerCik")),
         "owner_name": _text(owner, "reportingOwnerId/rptOwnerName")[:120],
         "original_filing_date": _text(root, "dateOfOriginalSubmission")[:10] or None,
@@ -306,7 +353,9 @@ def _form4_filings_in_window(submissions: Any, cutoff: str) -> list[dict[str, st
 # ---- the cache ------------------------------------------------------------------
 
 
-async def _cached_filings(accessions: list[str]) -> dict[str, dict[str, Any]]:
+async def _cached_filings(
+    accessions: list[str], min_version: int = MIN_PARSE_VERSION,
+) -> dict[str, dict[str, Any]]:
     from sqlalchemy import select
 
     from app.db import session_scope
@@ -318,12 +367,14 @@ async def _cached_filings(accessions: list[str]) -> dict[str, dict[str, Any]]:
         rows = (await session.execute(
             select(EdgarForm4Filing).where(
                 EdgarForm4Filing.accession.in_(accessions),
-                EdgarForm4Filing.parse_version == PARSE_VERSION,
+                EdgarForm4Filing.parse_version >= min_version,
+                EdgarForm4Filing.parse_version <= PARSE_VERSION,
             )
         )).scalars().all()
     return {
         row.accession: {
             "issuer_cik": row.issuer_cik,
+            "issuer_symbol": row.issuer_symbol or "",
             "owner_cik": row.owner_cik,
             "owner_name": row.owner_name,
             "original_filing_date": row.original_filing_date,
@@ -346,6 +397,7 @@ async def _store_filings(filings: list[tuple[dict[str, str], dict[str, Any]]]) -
                 form=meta["form"],
                 filing_date=meta["filing_date"],
                 issuer_cik=parsed["issuer_cik"],
+                issuer_symbol=parsed.get("issuer_symbol") or None,
                 owner_cik=parsed["owner_cik"],
                 owner_name=parsed["owner_name"],
                 original_filing_date=parsed["original_filing_date"],
@@ -355,7 +407,7 @@ async def _store_filings(filings: list[tuple[dict[str, str], dict[str, Any]]]) -
 
 
 _UNREADABLE: dict[str, Any] = {
-    "issuer_cik": "", "owner_cik": "", "owner_name": "",
+    "issuer_cik": "", "issuer_symbol": "", "owner_cik": "", "owner_name": "",
     "original_filing_date": None, "lines": None,
 }
 
@@ -403,7 +455,15 @@ async def _fetch(symbol: str, days_back: int) -> list[dict[str, Any]]:
         if not filings:
             return []
 
-        parsed = await _cached_filings([f["accession"] for f in filings])
+        cik_tickers = _CIK_TICKERS.get(cik) or [sec_ticker(symbol)]
+        # A single-ticker CIK needs no issuer symbol, so older rows serve.
+        parsed = await _cached_filings(
+            [f["accession"] for f in filings],
+            min_version=(
+                max(MIN_PARSE_VERSION, ISSUER_SYMBOL_PARSE_VERSION)
+                if len(cik_tickers) > 1 else MIN_PARSE_VERSION
+            ),
+        )
         missing = [f for f in filings if f["accession"] not in parsed]
         fresh: list[tuple[dict[str, str], dict[str, Any]]] = []
         pacing = asyncio.Lock()
@@ -431,19 +491,26 @@ async def _fetch(symbol: str, days_back: int) -> list[dict[str, Any]]:
         if failure is not None:
             raise failure
 
-    own = [f for f in filings if parsed[f["accession"]]["issuer_cik"] == cik]
-    amended = {
-        (parsed[f["accession"]]["owner_cik"], parsed[f["accession"]]["original_filing_date"])
-        for f in own
-        if f["form"] == "4/A" and parsed[f["accession"]]["original_filing_date"]
-    }
+    wanted = sec_ticker(symbol)
+    own = [
+        f for f in filings
+        if parsed[f["accession"]]["issuer_cik"] == cik
+        and attributed_ticker(parsed[f["accession"]], cik_tickers) == wanted
+    ]
+    replaced = superseded_accessions(own, parsed)
     transactions: list[dict[str, Any]] = []
     for meta in own:
-        reading = parsed[meta["accession"]]
-        if meta["form"] == "4" and (reading["owner_cik"], meta["filing_date"]) in amended:
+        if meta["accession"] in replaced:
             continue
+        reading = parsed[meta["accession"]]
         for line in reading["lines"] or []:
             if line["transaction_date"] < cutoff:
+                continue
+            if line["transaction_date"] > meta["filing_date"]:
+                logger.warning(
+                    "edgar_form4.trade_after_filing symbol=%s accession=%s traded=%s filed=%s",
+                    symbol, meta["accession"], line["transaction_date"], meta["filing_date"],
+                )
                 continue
             if abs(line["share_change"]) > MAX_STORABLE_SHARES:
                 logger.warning(
@@ -453,6 +520,132 @@ async def _fetch(symbol: str, days_back: int) -> list[dict[str, Any]]:
                 continue
             transactions.append({"filer_name": reading["owner_name"], **line})
     return transactions
+
+
+def attributed_ticker(reading: dict[str, Any], cik_tickers: list[str]) -> str:
+    """The one ticker a filing's lines belong to; see "ATTRIBUTION" above.
+
+    The fallback is the only path that puts a filing on a ticker it does not
+    name, so with more than one ticker to choose from it says so: SEC's list
+    order is not documented to put common stock first, and taking the first is
+    a guess."""
+    named = reading.get("issuer_symbol") or ""
+    if named in cik_tickers:
+        return named
+    if len(cik_tickers) > 1:
+        logger.warning(
+            "edgar_form4.attribution_fallback named=%r tickers=%s attributed=%s",
+            named, cik_tickers, cik_tickers[0],
+        )
+    return cik_tickers[0]
+
+
+def _line_dates(reading: dict[str, Any]) -> set[str]:
+    return {line["transaction_date"] for line in reading["lines"] or []}
+
+
+def _line_keys(reading: dict[str, Any]) -> set[tuple[str, int, str]]:
+    """Each line as (trade date, shares, code) — what an amendment restates."""
+    return {
+        (line["transaction_date"], line["share_change"], line["code"])
+        for line in reading["lines"] or []
+    }
+
+
+def _restated_original(
+    reading: dict[str, Any], candidates: list[dict[str, str]],
+    parsed: dict[str, dict[str, Any]], original_date: str,
+) -> dict[str, str] | None:
+    """The ONE original filing this amendment restates, or None.
+
+    A 4/A refiles one Form 4, so it can replace at most one. The best match is
+    the candidate sharing the most trade dates with it, then the most whole
+    lines, then an exact trade-date match; accession order breaks a remaining
+    tie so the choice is deterministic. Matching on dates alone would drop
+    every same-day filing that happens to share a trade date, which is how the
+    old rule lost lines.
+    """
+    amended_dates = _line_dates(reading)
+    amended_keys = _line_keys(reading)
+    best: dict[str, str] | None = None
+    best_rank: tuple[int, int, int] | None = None
+    for f in candidates:
+        other = parsed[f["accession"]]
+        dates = _line_dates(other)
+        overlap = len(amended_dates & dates)
+        if not overlap:
+            continue
+        rank = (overlap, len(amended_keys & _line_keys(other)), int(dates == amended_dates))
+        if (
+            best_rank is None
+            or rank > best_rank
+            or (rank == best_rank and best is not None and f["accession"] < best["accession"])
+        ):
+            best, best_rank = f, rank
+    if best is not None:
+        return best
+    # No trade date in common: the amendment may be correcting the date itself.
+    # Only an unambiguous same-day original can be the one it restates.
+    same_day = [f for f in candidates if f["filing_date"] == original_date]
+    return same_day[0] if len(same_day) == 1 else None
+
+
+def superseded_accessions(
+    own: list[dict[str, str]], parsed: dict[str, dict[str, Any]],
+) -> set[str]:
+    """Accessions in `own` that a 4/A restates: the original it amends, and any
+    earlier 4/A of the same original.
+
+    See points 6 and 6a of the module docstring for the rule, and for why it is
+    not "every Form 4 the owner filed that day"."""
+    replaced: set[str] = set()
+    originals = [f for f in own if f["form"] == "4"]
+    # Newest amendment first, so when a filer amends the same original twice,
+    # the newest wins and the earlier 4/A is dropped instead of being counted
+    # alongside it.
+    amendments = sorted(
+        (f for f in own if f["form"] == "4/A"),
+        key=lambda f: (f["filing_date"], f["accession"]), reverse=True,
+    )
+    claimed: set[str] = set()
+    for amendment in amendments:
+        reading = parsed[amendment["accession"]]
+        original_date = reading.get("original_filing_date")
+        if not original_date or not _line_dates(reading):
+            continue
+        try:
+            earliest = date.fromisoformat(original_date)
+        except ValueError:
+            continue
+        latest = (earliest + timedelta(days=AMENDMENT_FILING_DATE_SLACK_DAYS)).isoformat()
+        candidates = [
+            f for f in originals
+            if parsed[f["accession"]]["owner_cik"] == reading["owner_cik"]
+            and original_date <= f["filing_date"] <= latest
+        ]
+        restated = _restated_original(reading, candidates, parsed, original_date)
+        if restated is None:
+            continue
+        if restated["accession"] in claimed:
+            # A newer 4/A already restates this original; this one is stale.
+            replaced.add(amendment["accession"])
+            continue
+        # An amendment restates one filing, but a filer can lodge that filing
+        # twice under two accessions: SMWB's 0001976408-26-000849 and -000850,
+        # both filed 2026-09-16 with the same two sales, then amended by
+        # -000852. Picking one twin leaves the other standing beside the
+        # amendment, and since #856 numbered distinct lines an identical row no
+        # longer collides on uq_insider_natural - so the sale would be stored
+        # twice. Only an EXACT re-filing counts as a twin; a filing that
+        # differs by one line is a real filing this amendment does not restate.
+        restated_keys = _line_keys(parsed[restated["accession"]])
+        twins = {
+            f["accession"] for f in candidates
+            if _line_keys(parsed[f["accession"]]) == restated_keys
+        }
+        claimed.update(twins)
+        replaced.update(twins)
+    return replaced
 
 
 async def fetch_insider_transactions(

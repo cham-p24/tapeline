@@ -35,6 +35,46 @@ function humanizeGateError(e: TierGateError, channel: Channel): string {
   return `${CHANNEL_HUMAN[channel]} are a ${tier} feature.`;
 }
 
+/**
+ * What the backend did with one fired alert, in words.
+ *
+ * Every undelivered event rendered as a red "failed", whatever the reason.
+ * An alert withheld because the daily ceiling was spent is not a failure and
+ * not something a user can fix by retrying — it is a limit, and telling
+ * someone "failed" when we chose not to send is the kind of thing this
+ * codebase gets audited for. services/alerts._fire writes the reason into
+ * AlertEvent.message as a "[suppressed: ...]" prefix (the row is kept exactly
+ * so the history shows the rule DID fire), so read it from there rather than
+ * inventing a second status field.
+ */
+const SUPPRESSED_PREFIX = /^\[suppressed:\s*([^\]]+)\]\s*/;
+
+function suppressionReason(message: string): string | null {
+  const m = SUPPRESSED_PREFIX.exec(message);
+  return m ? m[1].trim() : null;
+}
+
+/** The alert text with any "[suppressed: ...]" prefix stripped. */
+function eventBody(message: string): string {
+  return message.replace(SUPPRESSED_PREFIX, "");
+}
+
+function deliveryStatus(e: AlertEvent) {
+  if (e.delivered) return <span className="text-up">✓ sent</span>;
+  const reason = suppressionReason(e.message);
+  if (reason) {
+    return (
+      <span className="text-muted" title={reason}>
+        not sent — {reason}
+      </span>
+    );
+  }
+  // No prefix and not delivered: the send itself failed. It is retried on the
+  // next few evaluations (services/alerts.MAX_DELIVERY_ATTEMPTS) rather than
+  // dropped, so say so instead of leaving a bare red "failed".
+  return <span className="text-down">delivery failed — retrying</span>;
+}
+
 // The rule types a user can CREATE. "squeeze" and "congress" were removed
 // from this list on 2026-09-14 (integrity fix, founder-approved): no real
 // congressional disclosure is being ingested today, and the squeeze rows were
@@ -45,7 +85,12 @@ function humanizeGateError(e: TierGateError, channel: Channel): string {
 const RULE_TYPES: { value: RuleType; label: string; needsSymbol: boolean; needsThreshold: boolean; help: string }[] = [
   { value: "score",    label: "Score crosses threshold", needsSymbol: true,  needsThreshold: true,  help: "Fires when this ticker's composite score crosses your threshold." },
   { value: "news",     label: "News on a ticker",         needsSymbol: true,  needsThreshold: false, help: "Fires on every fresh article tagged to this ticker." },
-  { value: "regime",   label: "Regime change",            needsSymbol: false, needsThreshold: false, help: "Fires on RISK_ON → RISK_OFF or the reverse." },
+  // The labels are BULL / NEUTRAL / CAUTIOUS / BEAR (backend RegimeState);
+  // "RISK_ON → RISK_OFF" named two states that do not exist, and the rule
+  // watches ONE label — it fires when the market enters or leaves it, not on
+  // every change. A change between two labels the rule is not watching is
+  // silent.
+  { value: "regime",   label: "Regime change",            needsSymbol: false, needsThreshold: false, help: "Fires when the market enters or leaves the regime you pick (BULL, NEUTRAL, CAUTIOUS or BEAR). At most one every 6 hours." },
 ];
 
 // Labels for rule types that can no longer be created, so an existing rule
@@ -678,11 +723,9 @@ function AlertsPageInner() {
                       {new Date(e.created_at).toLocaleString()}
                     </td>
                     <td className="px-4 py-2 font-mono">{e.symbol || "—"}</td>
-                    <td className="px-4 py-2">{e.message}</td>
+                    <td className="px-4 py-2">{eventBody(e.message)}</td>
                     <td className="px-4 py-2">{channelLabel(e.channel as Channel)}</td>
-                    <td className={`px-4 py-2 text-xs ${e.delivered ? "text-up" : "text-down"}`}>
-                      {e.delivered ? "✓" : "failed"}
-                    </td>
+                    <td className="px-4 py-2 text-xs">{deliveryStatus(e)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -47,7 +47,7 @@ We score US-listed tickers with a single 0-100 composite from a
 six-factor model whose factor set and weight ORDERING are published
 (trend, relative strength, fundamentals, insider Form 4 activity, macro
 regime, momentum); the exact weights and the parameter recipe are
-deliberately not published. Every daily top-10 is back-checked against
+deliberately not published. Each recorded daily top-10 is back-checked against
 SPY the following day on a public scorecard, with no survivor-bias
 filtering and restatements disclosed. We use descriptive labels
 ("STRONG SETUP", "WEAK") rather than prescriptive ones ("BUY", "SELL"),

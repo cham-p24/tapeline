@@ -7,7 +7,7 @@ from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models import AlertEvent, AlertRule, User
+from app.models import AlertEvent, AlertRule, AlertRuleState, User
 from app.services.auth import current_user_required
 from app.services.cap_events import record_cap_hit
 from app.services.tier import Tier, effective_limit, has_feature
@@ -112,6 +112,27 @@ async def create_rule(
     # label here (e.g. "BEAR"), which the evaluator already uppercases.
     symbol = (body.symbol or "").strip().upper() or None
 
+    # Score and squeeze thresholds are on the 0-100 score scale. A score rule
+    # needs a ticker and a threshold: without a threshold it can never fire,
+    # and without a ticker it watches ~11,700 of them, which is a firehose,
+    # not an alert (the /app/alerts form already requires both).
+    #
+    # A threshold nearly every score clears (the 5.0 the old ArmAlerts card
+    # created) is still ACCEPTED. It no longer spams, because alerts fire on
+    # a crossing and such a score never crosses; rejecting it would only turn
+    # an honest, quiet rule into an error for a user who picked a number.
+    if (
+        body.rule_type in ("score", "squeeze")
+        and body.threshold is not None
+        and not 0 < body.threshold <= 100
+    ):
+        raise HTTPException(422, "Threshold must be between 0 and 100 (the score scale).")
+    if body.rule_type == "score":
+        if body.threshold is None:
+            raise HTTPException(422, "Score alerts need a threshold between 0 and 100.")
+        if symbol is None:
+            raise HTTPException(422, "Score alerts need a ticker.")
+
     rule = AlertRule(
         user_id=user.id,
         name=body.name,
@@ -145,6 +166,9 @@ async def delete_rule(
     # SQLite (FKs off by default in tests) hides this. Mirrors the order in
     # routers/account.py's account-deletion path.
     await session.execute(delete(AlertEvent).where(AlertEvent.rule_id == rule_id))
+    # The rule's stored crossing sides. ON DELETE CASCADE in Postgres; explicit
+    # here because SQLite (dev + tests) does not enforce foreign keys.
+    await session.execute(delete(AlertRuleState).where(AlertRuleState.rule_id == rule_id))
     await session.delete(rule)
     await session.commit()
     return {"ok": True}

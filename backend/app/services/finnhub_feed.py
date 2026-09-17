@@ -641,10 +641,15 @@ async def get_recent_insider_transactions_db(
 ) -> list[dict[str, Any]]:
     """Query the DB-backed feed.
 
-    days        — only entries whose transaction_date is within this many days
+    days        — only entries whose transaction_date is within this many days,
+                  and never later than today (a filer's year typo once put a
+                  2027 trade at the top of every "most recent" list)
     limit       — max rows to return (post-filter)
     symbol      — optional ticker filter (case-insensitive)
-    buys_only   — if True, return only net positive share_change rows
+    buys_only   — if True, return only purchases: code P with a positive share
+                  change. It used to mean any positive share change, which is
+                  mostly option exercises (M) and grants (A): 4,623 of 6,132
+                  such rows in the 30 days to 2026-09-17.
 
     Same shape and ordering as the prior in-memory implementation so the
     router/UI don't see any contract change.
@@ -654,19 +659,23 @@ async def get_recent_insider_transactions_db(
     from app.db import session_scope
     from app.models import InsiderTransaction
 
-    cutoff = (date.today() - timedelta(days=max(1, days))).isoformat()
+    today = date.today()
+    cutoff = (today - timedelta(days=max(1, days))).isoformat()
     sym = symbol.upper() if symbol else None
 
     stmt = (
         select(InsiderTransaction)
         .where(InsiderTransaction.transaction_date >= cutoff)
+        .where(InsiderTransaction.transaction_date <= today.isoformat())
         .order_by(desc(InsiderTransaction.transaction_date))
         .limit(limit)
     )
     if sym:
         stmt = stmt.where(InsiderTransaction.symbol == sym)
     if buys_only:
-        stmt = stmt.where(InsiderTransaction.share_change > 0)
+        stmt = stmt.where(
+            InsiderTransaction.code == "P", InsiderTransaction.share_change > 0,
+        )
 
     async with session_scope() as session:
         result = await session.execute(stmt)

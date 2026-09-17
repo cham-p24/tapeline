@@ -171,7 +171,8 @@ export function countedLocks(counts: GatedCounts): CountedLock[] {
   if (typeof form4 === "number" && form4 > 0 && typeof window === "number" && window > 0) {
     out.push({
       key: "insider_form4",
-      text: `${form4.toLocaleString("en-US")} SEC Form 4 insider filing${form4 === 1 ? "" : "s"} in the last ${window} days`,
+      // Lines, not filings: one filing often reports several transactions.
+      text: `${form4.toLocaleString("en-US")} SEC Form 4 insider transaction${form4 === 1 ? "" : "s"} in the last ${window} days`,
     });
   }
   return out;

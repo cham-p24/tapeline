@@ -1,5 +1,11 @@
 # Meta ads — execution playbook
 
+> **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
+>
+> - **Trial and card.** Signing up is free and needs no card (the card wall ran from 22 to 30 August 2026, #548 to #683). A card starts the 30-day Premium trial, and the pre-charge email goes about 7 days before the first charge.
+>
+> Measurements, times and approved wording: `docs/COPY_FACTS.md`.
+
 *Written 2026-08-22. Extends `META_GO_LIVE.md` (the operator runbook: blockers, geo, event choice, kill criteria — all of which stand unchanged) with the execution depth underneath it: what the paid-course / agency / creative-system corpus actually teaches, verified, and cut down to what survives three filters at once — the FPS Special Ad Category, the AFSL descriptive-only copy posture, and A$10–50/day. Companion to `META_ADS_DECISION.md`, which is the analysis and still recommends **against** running Meta at all; nothing here reopens that verdict. The founder's decision to run it anyway as a bounded message test (2026-08-21) is taken as given, and this document exists so that test is run the way the best available evidence says to run it. Built from an eight-sweep research pass (YouTube practitioners, freed paid-course material, SaaS-specialist agencies, fintech case studies, creative systems, small-budget mechanics, funnel patterns, measurement) fact-checked through three verification lenses; every kill and correction from those lenses is applied below, and claims the lenses killed appear only as explicit warnings. Where this document and the gurus disagree, it is because the gurus assume budgets, targeting levers, or a legal register Tapeline does not have. Nothing here is legal advice. Evidence grades as in `META_ADS_DECISION.md`: A controlled/replicated · B large independent dataset · V vendor telemetry · C practitioner consensus · D single case · E folklore. USD unless marked A$.*
 
 ---

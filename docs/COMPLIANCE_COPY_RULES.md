@@ -4,6 +4,8 @@
 review of Tapeline as a financial product under the ASIC / FTC framing. Breaking
 one is a regulatory problem, not a nit.
 
+**What is true to say (freshness, coverage, the record, features, trial):** `docs/COPY_FACTS.md`, last checked 15 September 2026. These rules govern how a claim may be phrased; that page governs whether it is true.
+
 **Mechanically enforced by:** `scripts/lint-copy-compliance.mjs`, which runs as a
 required CI check (`copy-compliance` job in `.github/workflows/ci.yml`).
 

@@ -68,7 +68,7 @@ Drafted with April Dunford's five components, in her mandatory order (alternativ
 **Market category — recommended: a sub-segment of "stock scanner"**: *the scored, track-recorded stock scanner for part-time swing traders.* Anchors on a term the ICP already searches, then reframes the buying criterion from "how many filters" to "does it publish what its scores did next, and can I read it in five minutes." (New-category positioning is legally risky and unaffordable to educate; head-to-head on "scanner" loses on filter count.)
 
 **Compliant one-liners:**
-- "Tapeline scores every US stock 0–100 on six factors and publishes the record of what those scores did next."
+- "Tapeline scores about 11,500 US stocks and ETFs 0–100 on six factors and publishes the record of what those scores did next."
 - "One number, one sentence, and a public track record — a stock scanner for part-time swing traders who don't have time for 500 filters."
 - Comparison frame: "Trade Ideas is built for intraday scanning with real-time alerts. Tapeline is built for the evening review: a scored daily top 10 with a published back-check. Pick by workflow, not by feature count."
 
@@ -126,28 +126,30 @@ Search Terms report mined weekly; harvest converters into exact, push junk to ne
 
 ### 5.3 Responsive Search Ad copy — compliance-checked
 
+*Corrected 15 September 2026: this section used to say "Scores Refresh Every Minute"; that line is removed (a pass lands about every 60 seconds on prices delayed about 15 minutes, and scores usually change once a day), "live", and congressional trades and squeeze setups (neither exists today). See `docs/COPY_FACTS.md`.*
+
 Every line below was checked against: descriptive-only (no buy/sell/should/recommend), no "beat the market"/outperform/guaranteed, no urgency/countdown, no exact factor weights, no "signal(s)", no vs-SPY figure in a headline, no regulator names or logos, no implied edge ("before it moves"). All headlines ≤30 chars, descriptions ≤90.
 
 **Ad group: Brand**
 Headlines: `Tapeline · Stock Scanner` · `One Score Per US Stock` · `Public Track Record` · `Public Record, No Account` · `Pro From $9.99/mo` · `30-Day Trial, $0 Today` · `Six-Factor Composite Score` · `Read The Tape In Minutes` · `Scores, Not 500 Filters` · `Insider Buys (Form 4)` · `Built For Swing Traders` · `See What Scores Did Next` · `Descriptive, Not Advice` · `Cancel Anytime` · `tapeline.io`
-Descriptions: `A composite 0–100 score for US stocks with one plain sentence each. The record of what those scores did next is public.` · `The daily Top 10 and the full record are public and live, no account. Pro $9.99/mo, Premium $19.99/mo.` · `Recent insider buys, congressional trades and squeeze setups on one screen. Descriptive scores, not personal advice.` · `Every daily top-10 is checked against SPY the next session and published, wins and losses alike.`
+Descriptions: `A 0–100 score for US stocks, one plain sentence each. What the scores did next is public.` · `The daily Top 10 and the scorecard are public, no account. Pro $9.99/mo.` · `SEC Form 4 insider buys and a 0–100 score on one screen. Descriptive, not advice.` · `Each daily top 10 is checked against SPY the next session. Wins and losses stay public.`
 Final URL: `https://tapeline.io/` (exact-match brand is the one case where homepage is acceptable).
 
 **Ad group: Trade Ideas alternative** (GATED)
-Headlines: `Trade Ideas Alternative` · `One Score, Not 500 Filters` · `Trade Ideas Is ~$127/mo` · `Tapeline Pro Is $9.99/mo` · `Built For The Evening Review` · `Not For Intraday Scalping` · `Public Track Record Daily` · `Compare Feature By Feature` · `Six-Factor Composite Score` · `30-Day Trial, $0 Today` · `Public Record, No Account` · `Pick By Workflow` · `Insider Buys + Congress` · `See The Side-By-Side` · `Descriptive, Not Advice`
-Descriptions: `Trade Ideas is built for intraday scanning with real-time alerts. Tapeline is a scored daily top 10 for the evening review.` · `Trade Ideas from ~$127/mo. Tapeline Pro $9.99/mo. Same job: find setups fast. Different workflow. Compare honestly.` · `A composite 0–100 score and one sentence per stock, with the record of what those scores did next published daily.` · `If you need Level 2 and tick-level alerts, Trade Ideas fits. If you review after work, see the comparison.`
+Headlines: `Trade Ideas Alternative` · `One Score, Not 500 Filters` · `Trade Ideas Is ~$127/mo` · `Tapeline Pro Is $9.99/mo` · `Built For The Evening Review` · `Not For Intraday Scalping` · `Losses Stay On The Record` · `Compare Feature By Feature` · `Six-Factor Composite Score` · `30-Day Trial, $0 Today` · `Public Record, No Account` · `Pick By Workflow` · `Insider Buys (Form 4)` · `See The Side-By-Side` · `Descriptive, Not Advice`
+Descriptions: `Trade Ideas is built for intraday scans. Tapeline is a scored top 10 for evening review.` · `Trade Ideas from ~$127/mo. Tapeline Pro $9.99/mo. Different workflows. Compare honestly.` · `A 0–100 score and one sentence per stock, and a public record of what the scores did next.` · `Need Level 2 and tick alerts? Trade Ideas fits. Review after work? See the comparison.`
 Final URL: `https://tapeline.io/compare/trade-ideas`
 
 **Ad group: TrendSpider alternative** (GATED) — same structure; swap price line to `TrendSpider Is ~$107/mo`, URL `/compare/trendspider`.
 
 **Ad group: Swing scanner intent** (GATED)
-Headlines: `Stock Scanner For Swing Trades` · `One Score Per Stock, 0–100` · `Public Track Record` · `Read Six Sentences, Not Filters` · `Public Record, No Account` · `Pro From $9.99/mo` · `30-Day Trial, $0 Today` · `See What Scores Did Next` · `Six-Factor Composite Score` · `Insider Buys (Form 4)` · `Built For Part-Time Traders` · `Descriptive, Not Advice` · `Scores Refresh Every Minute` · `Wins And Losses Published` · `Cancel Anytime`
-Descriptions: `A scored daily top 10 for part-time swing traders. One composite number and one plain sentence per stock.` · `Every daily top-10 is checked against SPY the next session and published, wins and losses alike. Judge the record.` · `The record is public and live — no account needed. Pro $9.99/mo. Premium adds insider buys and congressional trades.` · `Descriptive scores, not personal advice. See how a score is built and what it did next.`
+Headlines: `Stock Scanner For Swing Trades` · `One Score Per Stock, 0–100` · `Public Track Record` · `Read Sentences, Not Filters` · `Public Record, No Account` · `Pro From $9.99/mo` · `30-Day Trial, $0 Today` · `See What Scores Did Next` · `Six-Factor Composite Score` · `Insider Buys (Form 4)` · `Built For Part-Time Traders` · `Descriptive, Not Advice` · `Wins And Losses Published` · `Cancel Anytime`
+Descriptions: `A scored daily top 10 for part-time swing traders. One number, one sentence per stock.` · `Each top 10 is checked against SPY the next session, losses included. Judge the record.` · `The record is public, no account needed. Pro $9.99/mo. Premium adds SEC Form 4 filings.` · `Descriptive scores, not personal advice. See how a score is built and what it did next.`
 Final URL: a dedicated `/lp/swing-scanner` (does not exist yet — build before enabling; homepage is not acceptable for non-brand).
 
 Sitelinks (all campaigns): Scorecard → `/scorecard` · How It Works → `/how-it-works` · Pricing → `/pricing` · Compare → `/compare`. Callouts: `Public track record` · `Record free, no account` · `Cancel anytime` · `Descriptive, not advice`.
 
-**Retargeting creative:** the scorecard with a losing week visible (proof, not promise); a 15-second live-scanner clip; "your trial ends on [date]" stated as a fact, no countdown.
+**Retargeting creative:** the scorecard with a losing week visible (proof, not promise); a 15-second scanner clip; "your trial ends on [date]" stated as a fact, no countdown.
 
 ### 5.4 Conversion wiring
 

@@ -41,6 +41,39 @@ type LogEntry = {
 };
 
 const METHODOLOGY_LOG: LogEntry[] = [
+  // #862 changed what the Smart Money factor reads (attribution, amendments,
+  // future-dated lines); #849 carried the copy, including the attribution rule
+  // on /how-it-works/smart-money that rule 4 requires beside this entry.
+  // Figures measured read-only against production at 21:57 UTC on 2026-09-17:
+  // 2,609 of 52,897 stored filing lines, across 179 symbols in 74 groups of
+  // symbols sharing an identical line. The 13 over-dropped filings, their ~110
+  // lines and their five companies come from the edgar_form4_filings parse
+  // cache. The record statements come from daily_scorecard: no preferred, note
+  // or exchange-traded note has ever appeared in it, and IMPP's filings are for
+  // its common shares (an option exercise at $3.01, against a $25-par
+  // preferred trading at $25.92).
+  {
+    date: "2026-09-17",
+    kind: "correction",
+    title: "Insider filings counted for every security listed under the same SEC filer",
+    body:
+      "Until 17 September 2026 a company's Form 4 filings counted for every security the SEC lists under the same filer. One filer often covers several listed securities: a second share class, preferred or depositary shares, notes, warrants and exchange-traded notes. Measured against our database at 21:57 UTC on 17 September 2026, 2,609 of the 52,897 stored transaction lines were held this way, across 179 of our symbols in 74 groups: Strategy's four preferred listings carried Strategy's insider sales, two notes issued by JPMorgan carried JPMorgan's, and the notes listed as GREEL and TMUSZ carried their issuers'. From 17 September 2026 a filing's transactions count only for the ticker the filing itself names, or, when it names no ticker the SEC lists for that company, the company's first-listed ticker. Every ticker's stored filings are re-read on that rule, and a borrowed reading is removed at that ticker's next successful re-check, which is about two days for a stock and up to about a month for an ETF, exchange-traded note or futures contract. Two consequences are by design. Grouped by name, about 60 of those 179 symbols are preferred or depositary shares, notes, exchange-traded notes or warrants, which should never have carried a company's insider filings: each loses its Smart Money value, and its score is recomputed with that factor counted as neutral. Grouping by name under-claims rather than over-claims, because no data field we hold states what a listing is. The rest are common stock, second share classes of a company whose insiders file under one of them, where only the class the filing names keeps a reading: Alphabet's insiders file under GOOGL, so GOOG has none, and News Corp's file under NWS, so NWSA has none. The methodology page for the factor now states this. The 14 September 2026 entry below titled \"Insider Form 4 filings now come from SEC EDGAR instead of a data vendor\" says that a ticker with no Form 4 filer of its own on EDGAR has no reading; from 17 September 2026 that is not the only case, because a ticker whose company does file has no reading when the filings name another of that company's tickers. Two further problems are corrected in the same change. From 14 September 2026, when a filer amended one Form 4, every other Form 4 its owner filed that day was dropped instead of only the filing the amendment restates, which left out 13 filings carrying about 110 transaction lines for five companies: Microchip Technology, TransDigm, CoreWeave, Kymera Therapeutics and Similarweb. An amendment now replaces the one filing it restates, together with any identical re-filing of that filing lodged under a second accession. The same 14 September entry says an amended filing replaces the filing it amends, which was the intent and not what our code did. And one stored line was dated 3 September 2027, a filer's typo, which sorted it to the top of every most-recent list; from 17 September 2026 a line dated later than the filing that reports it is dropped. Separately, the \"purchases only\" filter on the insider lists now means a Form 4 purchase, code P, where it previously also included share grants and option exercises. None of this reached the published record. No preferred listing, note or exchange-traded note has ever appeared on it. Of the symbols on the record that held shared filing lines, every one is its own company's common stock, and the only one listed since we began reading SEC EDGAR on 14 September 2026 is IMPP, whose filings are for its common shares. None of the five companies whose filings were dropped has ever appeared on the record, and nor has the company whose filing carried the 2027 date. No recorded entry was changed.",
+    ref: "#862, #849, #866",
+  },
+  // Corrects five release notes further down that describe the data as
+  // undelayed or the scores as live. Rule 1: said by a new entry, not an edit;
+  // the old wording stays. Dated to #842's merge (17 September 2026 UTC), the
+  // change that moved the site's freshness wording to the measured figures
+  // (lib/freshness.ts). The quoted phrases sit after "used to say" so the copy
+  // linter reads them as a dated correction, not a fresh claim.
+  {
+    date: "2026-09-17",
+    kind: "correction",
+    title: "Release notes further down overstated how fresh the data is",
+    body:
+      "Added on 17 September 2026. Five release notes further down this page describe the data as fresher than it is, and we have left their wording in place. The note dated 30 August 2026, titled \"The card moved off the front door\", used to say, and still says, that the Free plan \"opens the live scanner\" ... \"on live data, no delay\". The note dated 27 April 2026, in the words added when it was superseded, used to say, and still says, \"Free is live scores on the top-10 scanner\". The note dated 4 May 2026 used to say, and still says, that the public ticker pages \"render the live score\". The note dated 14 May 2026 used to say, and still says, that each /blog/ticker page \"renders the live Tapeline composite\". The methodology entry dated 18 July 2026 used to say, and still says, that Free shows \"the top 10 live scanner rows\". None of those was true. Measured on 14 September 2026: prices on every plan, Free included, are delayed about 15 minutes by our price vendor's plan; since a fix that afternoon, every covered stock and ETF is re-read about every 60 seconds during US market hours; a score is recalculated on each pass, but its inputs are daily readings, so a score usually changes about once a day; and the public ticker pages are saved snapshots that can be an hour old or more. What is true of Free is the top ten scored rows of any scan, on the same delayed prices every plan reads. The change merged on 17 September 2026 (#842) moved the rest of the site's freshness wording to these measured figures. No recorded entry was changed.",
+    ref: "#842",
+  },
   // #851 made the correction below out of date four minutes after it merged,
   // and added no entry of its own. Rule 1: said by a new entry, not an edit.
   // Verified 2026-09-17: routers/ticker.py's insider endpoint reads

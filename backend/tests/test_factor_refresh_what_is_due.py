@@ -138,22 +138,19 @@ def _fresh_caches(monkeypatch: pytest.MonkeyPatch) -> None:
 def _no_dated_backlog_rule(monkeypatch: pytest.MonkeyPatch) -> None:
     """These tests pin the HORIZONS, seeding stamps relative to the wall clock.
 
-    `_FUNDAMENTALS_UNSAVED_BEFORE` is a fixed instant: until it has aged past
-    the 8-day horizon, a seeded equity stamped "a day ago" with no reading also
-    matches it, and a horizon test would be measuring the wrong rule. It is
-    tested on its own, at fixed instants, in
-    tests/test_fundamentals_reading_survives_restart.py.
-
-    `_SMART_MONEY_EDGAR_SINCE` is the same kind of instant for smart money, and
-    is tested in tests/test_edgar_form4.py.
+    `_SMART_MONEY_EDGAR_SINCE` is a fixed instant: until it has aged past the
+    horizons, a seeded row stamped "a day ago" also matches it, and a horizon
+    test would be measuring the wrong rule. It is tested on its own in
+    tests/test_edgar_form4.py.
 
     The insider pass no longer sleeps between symbols (`_INSIDER_PACE_SECONDS`
     is 0 since the switch to EDGAR, which paces per request). These tests move
     their clock only through the passes' own sleeps, so they give the insider
     pass the same 1.1s a call as the fundamentals pass: what they pin is how the
     phase spends time, not what one call costs."""
-    monkeypatch.setattr(sp, "_FUNDAMENTALS_UNSAVED_BEFORE", datetime(1970, 1, 1, tzinfo=UTC))
     monkeypatch.setattr(sp, "_SMART_MONEY_EDGAR_SINCE", datetime(1970, 1, 1, tzinfo=UTC))
+    # Same kind of instant: the 2026-09-17 Form 4 attribution re-read.
+    monkeypatch.setattr(sp, "_SMART_MONEY_REREAD_BEFORE", datetime(1970, 1, 1, tzinfo=UTC))
     monkeypatch.setattr(sp, "_INSIDER_PACE_SECONDS", 1.1)
 
 

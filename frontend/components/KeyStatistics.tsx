@@ -159,8 +159,17 @@ export function KeyStatistics({ stats }: { stats: KeyStats }) {
         <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
           <Quiet label="Open" value={fmtPrice(stats.day_open)} />
           <Quiet label="Previous close" value={fmtPrice(stats.previous_close)} />
-          <Quiet label="Day's range" value={fmtRange(stats.day_low, stats.day_high)} />
+          <Quiet label="Day's range (regular session)" value={fmtRange(stats.day_low, stats.day_high)} />
         </dl>
+
+        {/* The price above is the vendor's last trade, which INCLUDES extended
+            hours, while the vendor's day high/low cover the regular session
+            only. About a quarter of priced tickers therefore show a price
+            outside the range printed beside it (measured 18 Sep 2026). Both
+            numbers are the vendor's; only the labels were wrong. */}
+        <p className="mt-1 text-xs text-subtle">
+          The price is the last trade and includes extended-hours trading, so it can sit outside the regular-session range.
+        </p>
 
         {/* Unjudged group. These render, but they are not presented as
             headline figures, because a multiple with nothing to locate it

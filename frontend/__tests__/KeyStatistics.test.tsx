@@ -38,7 +38,7 @@ const QUIET_LABELS = [
   "Avg. volume (30d)",
   "Open",
   "Previous close",
-  "Day's range",
+  "Day's range (regular session)",
 ];
 
 /** Rendered, but explicitly not presented as judgements. */
@@ -119,7 +119,7 @@ describe("KeyStatistics", () => {
     expect(valueFor("Previous close")).toBe("212.34");
     expect(valueFor("Open")).toBe("213.50");
     // "low – high", low first regardless of prop order.
-    expect(valueFor("Day's range")).toBe("211.87 – 216.02");
+    expect(valueFor("Day's range (regular session)")).toBe("211.87 – 216.02");
     expect(valueFor("52-week range")).toBe("196.21 – 260.10");
     // 2dp, matching the scanner's "Mkt Cap" column exactly so the same
     // company reads identically on both surfaces. (8.485 is not exactly

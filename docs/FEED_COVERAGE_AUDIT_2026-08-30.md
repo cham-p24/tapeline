@@ -1,5 +1,11 @@
 # Feed-coverage audit — 2026-08-30
 
+> **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
+>
+> - **Coverage.** About 11,500 US stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs updated once a day. 2,500 was a snapshot setting, fixed by #763/#765 and corrected in copy by #826.
+>
+> Measurements, times and approved wording: `docs/COPY_FACTS.md`.
+
 *`SAAS_OPTIMISATION_PLAYBOOK.md` §5.1 item 3, and the `OPERATING_RULES.md` §1 gate-jumping
 candidate. Done-when: "a one-paragraph finding in `docs/`; if the cause is licence/vendor it
 joins the lawyer brief; if it is a mapping bug it is the **one** engineering item that jumps

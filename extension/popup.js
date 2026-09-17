@@ -50,7 +50,7 @@ async function lookup(symbol) {
       <a class="btn ghost" href="${esc(d.scorecardUrl)}" target="_blank" rel="noopener">Public record</a>
     </div>
     <div id="rec"></div>
-    <p class="fine">Descriptive six-factor scoring — not investment advice. Every daily top-10 pick is logged publicly, including the ones that lose.</p>`);
+    <p class="fine">Descriptive six-factor scoring — not investment advice. The daily top 10 is recorded publicly, including the ones that lose.</p>`);
 
   // Eager here, unlike the overlay: opening the popup is explicit intent, so
   // there is no wasted fetch to avoid.

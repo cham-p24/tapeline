@@ -67,6 +67,7 @@ def form4_xml(
     owner: str = "Newstead Jennifer",
     doc_type: str = "4",
     original: str | None = None,
+    symbol: str = "AAPL",
     lines: list[tuple[str, str, str, str | None, str]] | None = None,
     derivative: bool = False,
     xmlns: bool = False,
@@ -120,7 +121,7 @@ def form4_xml(
     <issuer>
         <issuerCik>{issuer_cik}</issuerCik>
         <issuerName>Apple Inc.</issuerName>
-        <issuerTradingSymbol>AAPL</issuerTradingSymbol>
+        <issuerTradingSymbol>{symbol}</issuerTradingSymbol>
     </issuer>
     <reportingOwner>
         <reportingOwnerId>
@@ -190,6 +191,7 @@ class FakeSec:
 def sec(monkeypatch: pytest.MonkeyPatch) -> FakeSec:
     fake = FakeSec()
     monkeypatch.setattr(edgar_form4, "_TICKER_CIK", {})
+    monkeypatch.setattr(edgar_form4, "_CIK_TICKERS", {})
     monkeypatch.setattr(edgar_form4, "_TICKER_CIK_LOADED_AT", 0.0)
     monkeypatch.setattr(edgar_form4, "REQUEST_INTERVAL_SECONDS", 0.0)
     real_client = edgar_form4._client
@@ -370,7 +372,9 @@ async def test_a_parse_version_bump_reads_the_filing_again(
 ) -> None:
     sec.add(AAPL_CIK, "0001140361-26-000001", _d(1), form4_xml())
     await fetch_insider_transactions("AAPL", raise_failures=True)
+    # A parse change that invalidates every row raises both constants.
     monkeypatch.setattr(edgar_form4, "PARSE_VERSION", edgar_form4.PARSE_VERSION + 1)
+    monkeypatch.setattr(edgar_form4, "MIN_PARSE_VERSION", edgar_form4.PARSE_VERSION)
     await fetch_insider_transactions("AAPL", raise_failures=True)
     assert await _archive_hits(sec) == 2
 
@@ -518,6 +522,9 @@ def worker(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(finnhub_feed, "_SMART_MONEY_SCORE_CACHE", {})
     monkeypatch.setattr(finnhub_feed, "_SMART_MONEY_CLEARED", set())
     monkeypatch.setattr(sp, "_sheet_is_scoring_source", lambda: False)
+    # Rows these tests seed are fetched "now", before the 2026-09-17 re-read
+    # instant, which would make them untrusted as contradictions.
+    monkeypatch.setattr(sp, "_SMART_MONEY_REREAD_BEFORE", datetime(1970, 1, 1, tzinfo=UTC))
 
 
 async def _seed_ticker(symbol: str, **extra: Any) -> None:
@@ -609,6 +616,7 @@ async def test_finnhub_era_stamps_are_due_at_the_switchover(
     switch waits out 36 hours (equities) or 30 days (everything else)."""
     since = datetime(2026, 9, 14, 14, 0, tzinfo=UTC)
     monkeypatch.setattr(sp, "_SMART_MONEY_EDGAR_SINCE", since)
+    monkeypatch.setattr(sp, "_SMART_MONEY_REREAD_BEFORE", datetime(1970, 1, 1, tzinfo=UTC))
     at = since + timedelta(hours=2)
     await _seed_ticker("PRE", asset_class=asset_class, last_smart_money_at=since - timedelta(hours=1),
                        last_fundamentals_at=at)
