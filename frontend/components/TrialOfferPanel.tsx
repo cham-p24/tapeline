@@ -131,7 +131,7 @@ export function TrialOfferPanel({
         Start your {TRIAL_DAYS}-day Premium trial &mdash; or don&rsquo;t
       </h2>
       <p className="mt-1.5 text-sm text-muted">
-        Every Premium feature for {TRIAL_DAYS} days: the full ~{ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker live
+        Every Premium feature for {TRIAL_DAYS} days: every row of the full ~{ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker
         universe, score breakdowns, recent insider buys (SEC Form 4),
         watchlist of 200 and unlimited email alerts. Starting the trial takes a
         card, because it becomes a paid subscription if you keep it. Here is
@@ -222,7 +222,7 @@ export function TrialOfferPanel({
       </div>
 
       <p className="mt-4 text-xs text-muted leading-relaxed">
-        Declining costs you nothing: you stay on the Free plan &mdash; live scores,
+        Declining costs you nothing: you stay on the Free plan &mdash; scores,
         top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups a day
         {freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}, and
         {" "}{FREE_LIMITS.savedScans}{" "}saved screen &mdash; and no further charge is made. The

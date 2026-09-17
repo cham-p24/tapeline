@@ -144,7 +144,7 @@ async def test_a_high_volume_ticker_is_still_included():
 
 
 @pytest.mark.asyncio
-async def test_bootstrap_intake_rotates_instead_of_re_offering_one_window():
+async def test_bootstrap_intake_rotates_instead_of_re_offering_one_window(monkeypatch):
     """Unscoreable symbols must not block the queue behind them.
 
     Ordered by symbol with a fixed window, an early-alphabet ticker the
@@ -152,10 +152,14 @@ async def test_bootstrap_intake_rotates_instead_of_re_offering_one_window():
     its slot on every refresh. Production had 4,414 unscored rows and was
     re-offering the same ~250 A-names every tick; the rest had never been
     looked at once.
+
+    Only a backlog LARGER than the slots is windowed now (the default admits
+    the whole production backlog), so the slots are made small here.
     """
     tag = uuid.uuid4().hex[:4].upper()
     # More never-scored rows than one bootstrap window, so a fixed window
     # cannot possibly reach the tail.
+    monkeypatch.setattr(universe_mod, "BOOTSTRAP_SLOTS", 5)
     slots = universe_mod.BOOTSTRAP_SLOTS
     made = []
     try:

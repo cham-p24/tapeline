@@ -112,3 +112,38 @@ async def test_subscription_alert_survives_missing_amount():
     body = mail.call_args.kwargs["text"]
     assert "payer@example.com" in body
     assert "premium" in body
+
+
+@pytest.mark.asyncio
+async def test_subscription_alert_labels_the_charge_and_the_plan_price_separately():
+    """The old single line ("tier: premium (monthly) · 10.00 USD") read a
+    discounted first charge as the monthly price. The amount charged and the
+    plan's price are different facts."""
+    with patch.object(telegram, "settings", _TG), \
+         patch.object(telegram, "send_message", new=AsyncMock(return_value=True)) as send:
+        await telegram.notify_founder_new_subscription(
+            email="payer@example.com", tier="premium",
+            billing_period="monthly", amount=10.0, currency="usd", plan_price=19.99,
+        )
+    body = send.call_args.args[1]
+    assert "charged today: 10.00 USD" in body
+    assert "plan price: 19.99 USD per month before any discount or credit" in body
+    assert "(monthly) · 10.00" not in body
+    assert "10.00 USD per" not in body
+
+
+@pytest.mark.asyncio
+async def test_unannounced_paid_invoice_alert_states_the_charge_and_claims_no_sale_type():
+    with patch.object(telegram, "settings", _NO_TG), \
+         patch("app.services.email.send_email", new=AsyncMock()) as mail:
+        await telegram.notify_founder_paid_invoice_unannounced(
+            reason="Stripe's invoice history could not be read",
+            amount=19.99, currency="usd", email=None,
+            customer="cus_test", subscription="sub_test",
+        )
+    kwargs = mail.call_args.kwargs
+    assert kwargs["to"] == "founder@example.com"
+    assert "no welcome sent" in kwargs["subject"]
+    assert "charged: 19.99 USD" in kwargs["text"]
+    assert "not matched to a Tapeline account" in kwargs["text"]
+    assert "New Tapeline subscription" not in kwargs["subject"]

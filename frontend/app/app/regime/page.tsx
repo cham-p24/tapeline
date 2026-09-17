@@ -149,20 +149,26 @@ export default function RegimePage() {
     try {
       setR(await api.regime());
       setLoadError(null);
+      return true;
     } catch (e) {
       // 403 (Free tier) → the <Paywall> wrapper below owns the presentation.
       // Rendering the error card here was a dead end: "Try again" can never
       // succeed for the tier, and the copy never mentioned upgrading.
       if (e instanceof TierGateError) {
         setLoadError(null);
-        return;
+        return false;
       }
       console.error(e);
       setLoadError(e instanceof Error ? e.message : "Failed to load regime");
+      return false;
     }
   }, []);
-  useEffect(() => { load(); }, [load]);
-  const { status, lastUpdate } = useLiveStream(load);
+  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived.
+  const { status, lastUpdate, markLoaded } = useLiveStream(load);
+  useEffect(() => {
+    void load().then((ok) => { if (ok) markLoaded(); });
+  }, [load, markLoaded]);
 
   const toneBg =
     r?.regime === "BULL" ? "bg-up/15 text-up"
@@ -177,8 +183,9 @@ export default function RegimePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Market Regime</h1>
           <p className="mt-1 text-sm text-muted">
-            One macro classification of the US equity market, refreshed each
-            worker tick (~60s). The regime acts as a multiplier on every
+            One macro classification of the US equity market, recalculated on
+            each worker pass. Its VIX, 10-year and dollar inputs are daily
+            readings, so the label usually changes at most once a day. The regime acts as a multiplier on every
             Tapeline score — names that look great in BULL get marked down
             during CAUTIOUS, and vice-versa.
           </p>
@@ -270,7 +277,7 @@ export default function RegimePage() {
               the numbers explaining the regime live" */}
           <div className="mt-8 mb-3 flex items-baseline justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Inputs feeding the regime</h2>
-            <span className="text-[11px] text-subtle">All live, refreshed each tick</span>
+            <span className="text-[11px] text-subtle">Re-read each pass · VIX, 10Y and USD are daily readings</span>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -113,7 +113,7 @@ def _all_html_outputs() -> list[tuple[str, str]]:
         )),
         ("subscription_started_pro", e.render_subscription_started_email(
             "Alex", tier="pro", billing_period="monthly",
-            amount_cents=2999, currency="usd",
+            plan_price_cents=999, charged_today_cents=999, currency="usd",
             next_charge_iso="2026-06-19T00:00:00+00:00",
         )),
         ("signin_code", e.render_signin_code_email("Alex", "048213", 10)),

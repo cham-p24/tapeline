@@ -21,6 +21,15 @@ It was invisible: only `logger.warning("insider.write_race")` fired, the worker
 still counted `refreshed += 1` and logged the run as a success, and
 `compute_smart_money_score` cached the FRESH score — so the transactions shown
 on /app/holdings and the `sub_smart_money` factor disagreed with each other.
+
+Two Form 4 lines sharing the four-value key used to be collapsed to the first
+one to avoid that. That was right for Finnhub's repeated lines, and wrong for
+SEC EDGAR, where they are different transactions. Measured 2026-09-17: GSHD's
+conversion (C -5,000 at $0) and sale (S -5,000 at $65.20) by the same insider on
+the same day collided and the SALE was dropped, and HFWA's equal vesting
+tranches were stored once. The score counted every line, so ~1.4% of equities
+held a sub_smart_money their stored rows could not reproduce. Every line is now
+kept, numbered by `line_seq` (migration 0071).
 """
 from __future__ import annotations
 
@@ -91,7 +100,7 @@ async def test_colliding_natural_keys_do_not_abort_the_refresh():
             "the refresh rolled back — the DELETE was undone and the symbol kept "
             "its stale rows, which is the frozen-for-90-days failure"
         )
-        assert names == ["Bob Filer", "Jane Filer"], names
+        assert names == ["Bob Filer", "Jane Filer", "Jane Filer"], names
     finally:
         await _clear()
 
@@ -114,23 +123,67 @@ async def test_non_colliding_rows_are_all_kept():
 
 
 @pytest.mark.asyncio
-async def test_first_occurrence_wins_deterministically():
-    """Vendor order decides, so two runs over the same payload agree."""
+async def test_lines_sharing_a_natural_key_are_all_kept():
+    """GSHD, 2026-07-28: a conversion and a sale of the same 5,000 shares.
+
+    Mutation: collapse to the first occurrence (the old dedupe) - the $326k sale
+    is dropped and only the $0 conversion is stored."""
     await _clear()
     try:
         payload = [
-            _txn("Jane", "2026-08-20", 0, 12.50, "P"),
-            _txn("Jane", "2026-08-20", 0, 99.99, "S"),
+            _txn("KEBODEAUX ADRIENNE", "2026-07-28", -5000, 0.0, "C"),
+            _txn("KEBODEAUX ADRIENNE", "2026-07-28", -5000, 65.2, "S"),
         ]
         await set_recent_insider_transactions_db(_SYM, payload)
-        rows = await _rows()
-        assert len(rows) == 1
-        assert rows[0].transaction_price == 12.50, "kept the wrong occurrence"
+        rows = sorted(await _rows(), key=lambda r: r.line_seq)
+        assert [(r.code, r.transaction_price, r.line_seq) for r in rows] == [
+            ("C", 0.0, 0), ("S", 65.2, 1),
+        ]
 
-        # Re-running is stable.
+        # Re-running over the same payload is stable.
         await set_recent_insider_transactions_db(_SYM, payload)
-        rows = await _rows()
-        assert len(rows) == 1 and rows[0].transaction_price == 12.50
+        assert len(await _rows()) == 2
+    finally:
+        await _clear()
+
+
+@pytest.mark.asyncio
+async def test_identical_lines_are_separate_transactions():
+    """HFWA, 2026-07-17: vesting tranches with the same share count and price.
+
+    Mutation: number every line 0 - the second row violates the key, the commit
+    rolls back, and nothing is stored."""
+    await _clear()
+    try:
+        payload = [_txn("Glasby William", "2026-07-17", 265, 30.52, "M")] * 2
+        await set_recent_insider_transactions_db(_SYM, payload)
+        assert sorted(r.line_seq for r in await _rows()) == [0, 1]
+    finally:
+        await _clear()
+
+
+@pytest.mark.asyncio
+async def test_the_stored_rows_reproduce_the_score():
+    """The insider pass scores the fetched lines; the Insider tab and the boot
+    rebuild read the stored rows. They must agree.
+
+    Mutation: the old dedupe - HTGC-style repeated award lines are stored once
+    and the stored rows score a different number."""
+    from app.services.finnhub_feed import compute_smart_money_score
+
+    await _clear()
+    try:
+        payload = [
+            *[_txn("BADAVAS ROBERT P", "2026-06-18", 3873, 15.49, "A")] * 4,
+            _txn("Bluestein Scott", "2026-07-09", -9741, 15.69, "F"),
+            _txn("Bluestein Scott", "2026-07-09", -10652, 15.69, "F"),
+        ]
+        await set_recent_insider_transactions_db(_SYM, payload)
+        stored = [
+            {"share_change": r.share_change, "transaction_price": r.transaction_price}
+            for r in await _rows()
+        ]
+        assert compute_smart_money_score(stored) == compute_smart_money_score(payload)
     finally:
         await _clear()
 

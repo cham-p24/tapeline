@@ -468,9 +468,9 @@ export const POSTS: BlogPost[] = [
       you read where the conviction actually lives, and where it's
       conspicuously absent.</p>
 
-      <p>You can see live Smart Money sub-scores on any ticker page —
+      <p>You can see Smart Money sub-scores on any ticker page —
       e.g. <a href="/t/NVDA">/t/NVDA</a>, <a href="/t/AAPL">/t/AAPL</a>
-      — or filter by it on the live scanner. Recent insider buys are a
+      — or filter by it on the scanner. Recent insider buys are a
       Premium feature at /app/holdings; the Smart Money sub-score itself
       is shown on the ticker pages linked above.</p>
     `,
@@ -765,13 +765,16 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       <p>Run the same walkthrough on any ticker you care about at
       <a href="/t/AAPL">/t/&lt;TICKER&gt;</a>. Every page shows the
       composite, the radar, the factor sub-scores, and the why sentence.
-      If you want them all in one view ranked by score, the live
+      If you want them all in one view ranked by score, the
       <a href="/app/scanner">scanner</a> is the home for that — Free
-      gets live scores for the top 10 rows plus 12 look-ups a day
+      gets scores for the top 10 rows plus 12 look-ups a day
       (unmetered for the first 24 hours), and an account is an email and a
       password; the <a href="/signup">30-day Premium trial</a> — that step
-      takes a card, $0 charged that day — opens the full real-time universe
-      with unlimited look-ups.</p>
+      takes a card, $0 charged that day — opens every row of the full universe
+      with unlimited look-ups. <em>Updated 15 September 2026: this paragraph
+      used to call the scores "live" and the paid universe "real-time". On
+      every plan, prices are delayed about 15 minutes (measured 14 September
+      2026).</em></p>
     `,
   },
   {
@@ -821,7 +824,7 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       published record outside the paywall entirely: the daily Top 10, every
       recorded top-10 pick with its next-session result vs SPY, a page per scored
       ticker, and the raw CSV/JSON — no account, no card. A free account is
-      an email and a password, and it opens the live scanner at the top ten
+      an email and a password, and it opens the scanner at the top ten
       scored rows. The card belongs to the 30-day Premium trial, which is a
       step you take on purpose ($0 that day, first charge on day 30, one
       click to cancel). Judge the product on the record before you decide
@@ -1125,7 +1128,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       factors. <a href="/signup">Try the 30-day Premium trial</a> — starting
       it takes a card, $0 is charged that day, and one click cancels before
       the day-30 charge. If you'd rather not put a card down, a free account
-      still gets the top ten scored rows live, and the
+      still gets the top ten scored rows, and the
       <a href="/scorecard">public record</a> and the daily Top 10 stay open
       with no account at all.</p>
     `,
@@ -1480,7 +1483,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
 
       <h3>1. Feature depth</h3>
 
-      <p><strong>Finviz Elite</strong> wins on raw filter count — 70+
+      <p><strong>Finviz Elite</strong> wins on raw filter count — 70+ <!-- copy-compliance-allow false-data-freshness -- describes Finviz Elite's paid plan, not Tapeline's data (Tapeline prices are delayed about 15 minutes) -->
       screening criteria, real-time data, advanced charting, custom
       groups. If you're the type who wants to express a thesis as a
       seven-condition AND-filter, it's hard to beat.</p>
@@ -1506,21 +1509,27 @@ RSI = 100 - (100 / (1 + RS))</pre>
       <p>This one's measurable. We checked the actual delay on each
       product's free tier:</p>
 
-      <ul>
+      <ul> <!-- copy-compliance-allow false-data-freshness -- next line describes Finviz Elite's plan, not Tapeline's data -->
         <li>Finviz free: 15-minute delay. Elite: real-time.</li>
-        <li>Stock Rover free: end-of-day. Essentials: 15-minute delay.</li>
+        <li>Stock Rover free: end-of-day. Essentials: 15-minute delay.</li> <!-- copy-compliance-allow false-data-freshness -- next line describes Zacks Premium's plan, not Tapeline's data -->
         <li>Zacks free: 20-minute delay. Premium: real-time on most exchanges.</li>
-        <li>Tapeline free: live scores (no delay) on the top 10 scanner rows;
-        full universe at ~60-second freshness on Pro+ (about 11,500 US stocks
-        and ETFs as of 14 September 2026; this line said ~6,900 before).</li>
+        <li>Tapeline, every plan: prices delayed about 15 minutes, re-read
+        for every covered stock and ETF about every 60 seconds during US
+        market hours. Free shows the top 10 scanner rows; Pro+ shows the full
+        universe (about 11,500 US stocks and ETFs as of 14 September 2026;
+        this line said ~6,900 before). <em>Updated 15 September 2026: this line
+        used to say Free had "live scores (no delay)" and Pro+ had "~60-second
+        freshness". Measured on 14 September 2026, the price vendor's data was
+        about 15 minutes behind and a worker pass took 70 to 74 seconds (about
+        60 seconds after a fix later that day).</em></li>
       </ul>
 
-      <p>Tapeline gates on breadth rather than freshness — Free is live, just
-      narrower (top 10 rows, 12 look-ups a day, unmetered for the first 24 hours),
-      and Pro opens the full real-time
-      universe. If you're testing the product, the
+      <p>Tapeline gates on breadth rather than freshness — every plan reads
+      the same delayed prices, and Free is just narrower (top 10 rows, 12
+      look-ups a day, unmetered for the first 24 hours), while Pro opens every
+      row of the full universe. If you're testing the product, the
       <a href="/scorecard">public scorecard</a> shows the real
-      composite quality at full freshness.</p>
+      composite quality.</p>
 
       <h3>3. Methodology transparency</h3>
 
@@ -1895,10 +1904,16 @@ RSI = 100 - (100 / (1 + RS))</pre>
 
       <p>For composite scanners (like Tapeline), the question is
       slightly different: how often does the SCORE refresh, not just
-      the underlying price? Tapeline's worker ticks every 60 seconds
-      during market hours, recomputing the composite from fresh
-      snapshot data — and the public ticker pages show that live score
-      without an account.</p>
+      the underlying price? Tapeline's worker re-reads prices (delayed
+      about 15 minutes) and recalculates the composite about every 60
+      seconds during market hours, but most of the score's inputs are daily
+      readings, so a score usually changes about once a day. The public
+      ticker pages show that score without an account, from a cached
+      snapshot that can be an hour old or more. <em>Updated 15 September
+      2026: this paragraph used to say the worker recomputed the composite
+      "from fresh snapshot data" and that the public pages show a "live score";
+      on 14 September 2026 prices measured about 15 minutes delayed and ticker
+      pages were cached snapshots.</em></p>
 
       <h2>Test 5: What's the unsubscribe / cancel friction?</h2>
 
@@ -1917,7 +1932,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       </ul>
 
       <p>Tapeline's policy: signing up is an email and a password, and the
-      account it makes is a working one — the top ten scored rows, live. The
+      account it makes is a working one — the top ten scored rows. The
       trial is the part that takes a card, and it charges $0 until day 30;
       cancel from /app/billing in one click, 30-day refund window on monthly
       subscriptions. The published record — daily Top 10, scorecard,
@@ -1937,7 +1952,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
           <tr><td>Public scoring methodology</td>
               <td>Yes — six named factors at <a href="/how-it-works">/how-it-works</a>, contribution shown per ticker</td></tr>
           <tr><td>Data freshness</td>
-              <td>60s composite refresh; the public ticker pages show the same live score with no account</td></tr>
+              <td>Prices delayed about 15 minutes; composite recalculated about every 60 seconds in market hours, but usually changing about once a day; public ticker pages are cached snapshots, readable with no account (updated 15 September 2026; this cell used to say "60s composite refresh" and "live score")</td></tr>
           <tr><td>Cancel friction</td>
               <td>One-click cancel, 30-day refund. Signing up takes an email and a password; the trial is the part that takes a card, and charges $0 until day 30; the published record needs no account at all</td></tr>
         </tbody>

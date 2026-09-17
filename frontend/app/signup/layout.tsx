@@ -22,7 +22,7 @@ import { TRIAL_LENGTH_LABEL } from "@/lib/trial";
 // __tests__/signupCopyTruth.test.tsx.
 export const metadata = pageMeta({
   title: "Create Your Tapeline Account — Free Plan, No Card",
-  description: `Sign up with an email and a password, no card, and run the live scanner on the free plan. The ${TRIAL_LENGTH_LABEL} Premium trial is a separate step that takes a card.`,
+  description: `Sign up with an email and a password, no card, and run the scanner on the free plan. The ${TRIAL_LENGTH_LABEL} Premium trial is a separate step that takes a card.`,
   path: "/signup",
 });
 

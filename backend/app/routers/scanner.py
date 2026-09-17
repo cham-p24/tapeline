@@ -14,6 +14,7 @@ from app.models import Ticker, User
 from app.services.asset_class import ASSET_CLASS_PATTERN, asset_bucket_clause
 from app.services.auth import current_user_optional
 from app.services.cap_events import record_cap_hit
+from app.services.freshness import data_delayed_minutes
 from app.services.funnel_events import record_funnel_event
 from app.services.scan_log import record_scan_log
 from app.services.ticker_freshness import live_clauses
@@ -380,7 +381,20 @@ async def list_scanner(
     # Each row also carries whether the removed card wall would have blocked
     # this scan, which is how the wall's cost gets counted without splitting
     # traffic — see models/funnel_events.py.
-    if user is not None:
+    # A background refetch is not a scan. The in-app scanner re-runs this
+    # request with src=stream each time the API's live bridge announces a
+    # worker pass (services/live_bridge.py), about every 60s while the page
+    # is open. Counting those as scan_run would mark an idle open tab as an
+    # active user on every day it stays open, and logging them would add a
+    # scan_logs row per open tab per pass (~750 a day each) that describes a
+    # screen nobody asked for. So a refetch records nothing: no scan_run, no
+    # scan_logs row, no cap hit. Honouring the marker unconditionally is safe
+    # because it only silences bookkeeping; the tier clamps above (row cap,
+    # offset pin) apply to every request, so src=stream reads nothing a normal
+    # request by the same user could not.
+    background_refetch = src == "stream"
+
+    if user is not None and not background_refetch:
         await record_funnel_event(user, "scan_run")
 
         # ── WHAT THIS SCAN ACTUALLY WAS ─────────────────────────────────────
@@ -443,14 +457,27 @@ async def list_scanner(
         except Exception:
             logger.exception("scanner.scan_log_failed user=%s", user.id)
 
-    if user is not None and tier is Tier.FREE and row_cap > 0 and len(rows) >= row_cap:
+    # Not for background refetches: record_cap_hit writes a cap_events row AND
+    # emails the founder on every call, and a free user's capped page fills on
+    # every refetch, so one open tab would send ~50 emails an hour. The row cap
+    # itself is still enforced above for every request; a client that sends
+    # src=stream only silences the notification, never the limit.
+    if (
+        user is not None
+        and not background_refetch
+        and tier is Tier.FREE
+        and row_cap > 0
+        and len(rows) >= row_cap
+    ):
         await record_cap_hit(session, user.id, "scanner_rows", tier)
 
-    # Read the delay from tier.py. Post-freemium-retune (2026-06-20) every tier
-    # is LIVE (data_delay_minutes = 0) — the old 24h Free delay cliff is gone;
-    # Free is now gated by row-cap + the daily ticker-lookup meter instead. Kept
-    # config-driven so re-introducing a delay is a one-line tier.py change.
-    delay_minutes = tier_limit(tier, "data_delay_minutes")
+    # The TRUE delay behind these prices: the vendor's ~15-minute delay
+    # (services/freshness.PRICE_DELAY_MINUTES, measured 14 Sep 2026) plus any
+    # tier-imposed delay from tier.py (0 for every tier since the 2026-06-20
+    # retune). This field read 0 for every tier while the vendor plan was
+    # 15-minute delayed, which told every consumer the data was undelayed.
+    tier_delay_minutes = int(tier_limit(tier, "data_delay_minutes") or 0)
+    delay_minutes = data_delayed_minutes(tier_delay_minutes)
     return {
         "count": len(rows),
         "tier": tier.value,
@@ -487,9 +514,14 @@ async def list_scanner(
                 "sub_smart_money": r.sub_smart_money,
                 "confidence_pct": r.confidence_pct,
                 "reason": r.reason,
+                # When Tapeline last wrote the row (the MCP server's `as_of`
+                # says the same), shifted back only by a TIER-imposed delay.
+                # The vendor's ~15-minute delay is reported in
+                # `data_delayed_minutes`, not folded into this timestamp
+                # (review round 2 of #842).
                 "updated_at": (
-                    (r.updated_at - timedelta(minutes=delay_minutes)).isoformat()
-                    if r.updated_at and delay_minutes
+                    (r.updated_at - timedelta(minutes=tier_delay_minutes)).isoformat()
+                    if r.updated_at and tier_delay_minutes
                     else (r.updated_at.isoformat() if r.updated_at else None)
                 ),
             }

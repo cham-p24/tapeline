@@ -78,13 +78,18 @@ async def insider_preview(
 async def list_insider_buys(
     user: User = Depends(current_user_required),
     symbol: str | None = Query(None, description="Filter to one ticker"),
-    days: int = Query(30, ge=1, le=180, description="Lookback window in days"),
+    # At most signal_publisher._INSIDER_WINDOW_DAYS (90), the window the worker
+    # reads from SEC EDGAR. Stored rows older than that are deleted when a
+    # symbol's next answer is empty (#824) and kept until then, so a longer
+    # lookback would return a different window per symbol.
+    days: int = Query(30, ge=1, le=90, description="Lookback window in days"),
     buys_only: bool = Query(False, description="Only return net positive (buy) transactions"),
     limit: int = Query(100, ge=1, le=500),
 ) -> dict:
     """
     Recent insider Form 4 transactions across the active universe.
-    Refreshed daily by the signal-publisher worker. Premium-only.
+    Each stock is re-checked about every two days by the signal-publisher
+    worker. Premium-only.
     """
     if not has_feature(Tier(user.tier), "holdings.elite"):
         raise HTTPException(403, "Recent insider activity is a Premium feature")

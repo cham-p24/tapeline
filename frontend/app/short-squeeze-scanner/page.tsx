@@ -124,7 +124,7 @@ export default async function ShortSqueezeScannerPage() {
         </h1>
         <p className="mt-4 text-lg text-muted leading-relaxed">
           This list is meant to show stocks whose price range has narrowed,
-          ranked by a spike score. It only shows rows from a live data source,
+          ranked by a spike score. It only shows rows from a real data source,
           and right now we don&rsquo;t have one.
         </p>
 

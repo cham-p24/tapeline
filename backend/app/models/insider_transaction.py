@@ -8,12 +8,13 @@ empty regardless of how often the worker refreshes (real bug observed
 2026-05-16: `feed_size=0` on a freshly-deployed app despite the worker
 logging successful Finnhub fetches).
 
-One row per (symbol, transaction_date, insider_name, share_change)
-quad — that's how Finnhub natively de-duplicates so we can safely
-INSERT on every refresh and rely on the unique constraint to absorb
-collisions. We bulk-replace per-symbol on each daily refresh (delete
-this symbol's rows, insert the latest pull) so retraction-of-old-data
-edge cases also work cleanly.
+One row per Form 4 line. The natural key is (symbol, transaction_date,
+insider_name, share_change, line_seq): `line_seq` numbers the lines that share
+the first four values, so two different transactions that happen to match
+there (a conversion and a sale of the same share count, equal vesting tranches)
+are both kept. We bulk-replace per-symbol on each refresh (delete this symbol's
+rows, insert the latest pull) so retraction-of-old-data edge cases also work
+cleanly.
 """
 from __future__ import annotations
 
@@ -42,10 +43,10 @@ class InsiderTransaction(Base):
     """
     __tablename__ = "insider_transactions"
     __table_args__ = (
-        # Natural composite uniqueness — Finnhub returns identical rows
-        # across runs for the same filing, so we de-dupe on this 4-tuple.
+        # One row per line. `line_seq` separates lines that share the other
+        # four values; see `line_seq` below and migration 0071.
         UniqueConstraint(
-            "symbol", "transaction_date", "insider_name", "share_change",
+            "symbol", "transaction_date", "insider_name", "share_change", "line_seq",
             name="uq_insider_natural",
         ),
         # Index for the dominant query: "newest N rows across all symbols".
@@ -69,6 +70,13 @@ class InsiderTransaction(Base):
     # A=grant/award, M=option exercise, G=gift, F=tax via shares, D=disposition,
     # C=conversion of derivative.
     code: Mapped[str] = mapped_column(String(4), nullable=False, default="")
+    #: 0 for the first line with a given (transaction_date, insider_name,
+    #: share_change), 1 for the next, and so on, in the order the source listed
+    #: them. The old four-value key collapsed such lines into one, which dropped
+    #: real transactions from EDGAR (migration 0071).
+    line_seq: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0",
+    )
     #: Where the row came from. "edgar" for every row written since the insider
     #: pass switched to SEC EDGAR (migration 0069); NULL for rows the Finnhub
     #: pass wrote before it, which the switchover re-reads and replaces. The

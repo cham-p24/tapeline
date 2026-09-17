@@ -1,10 +1,12 @@
 """
 Tier gating — three-tier model (Free / Pro / Premium).
 
-- Free: LIVE but limited — top-10 scanner rows (live, no delay), a small
-  daily ticker-lookup budget, and a small saved watchlist. Conversion
-  pressure comes from breadth + the lookup meter, NOT stale data.
-- Pro $9.99/mo ($99/yr): live scanner, full universe, regime + heatmap,
+- Free: limited by breadth — top-10 scanner rows, a small daily
+  ticker-lookup budget, and a small saved watchlist. No tier-imposed delay:
+  every tier reads the same vendor prices, which are themselves ~15 minutes
+  delayed (services/freshness.py). Conversion pressure comes from breadth +
+  the lookup meter, NOT an extra delay.
+- Pro $9.99/mo ($99/yr): full scanner, full universe, regime + heatmap,
   watchlist with smart alerts, email alerts, CSV export
 - Premium $19.99/mo ($199/yr): everything in Pro + SEC Form 4 insider
   filings, unlimited email alerts, public API (1,000/day), priority support
@@ -135,8 +137,9 @@ def has_feature(user_tier: Tier | str, feature: str) -> bool:
 # as "never meter, always allow" for Pro/Premium/active-trial users.
 UNLIMITED: Final[None] = None
 
-# FREE tier (forever; the tier trial users lapse to). LIVE data — no 24h cliff.
-FREE_DATA_DELAY_MINUTES = 0      # live (was 1440 = 24h before the freemium retune)
+# FREE tier (forever; the tier trial users lapse to). No extra tier delay — no 24h cliff.
+# EXTRA delay a tier adds on top of the vendor's ~15 min (services/freshness).
+FREE_DATA_DELAY_MINUTES = 0      # no extra delay (was 1440 = 24h before the freemium retune)
 FREE_SCANNER_ROWS = 10           # top-10 rows (was 20)
 # 5 saved tickers (raised from 3 on 2026-07-12). The 3-cap created an
 # activation DEADLOCK: the day-1 seeder filled the watchlist to its full 3/3,
@@ -284,7 +287,7 @@ TIER_LIMITS: dict[Tier, dict[str, int | None]] = {
         # Single-ticker detailed-score views per UTC day (GET /api/ticker/{sym}).
         # Enforced via app/services/usage.consume_ticker_lookup.
         "daily_lookups": FREE_DAILY_LOOKUPS,
-        "data_delay_minutes": FREE_DATA_DELAY_MINUTES,  # 0 = live
+        "data_delay_minutes": FREE_DATA_DELAY_MINUTES,  # 0 = no tier-added delay
     },
     Tier.PRO: {
         "scanner_rows": 1000,

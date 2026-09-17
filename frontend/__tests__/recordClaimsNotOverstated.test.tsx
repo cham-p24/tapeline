@@ -218,10 +218,70 @@ describe("rendered static pages", () => {
       "The corrected scores took effect on 7 September 2026",
       "Three of the six factors were not refreshed from 6 to 10 September",
       "That was wrong",
+      // #824: Smart Money values with no Form 4 filing on file.
+      "856 tickers held a Smart Money value although no SEC Form 4 filing for them was on file",
+      "16 of the 100 entries recorded from 24 August to 11 September 2026",
+      "BBH on 24, 25, 26 and 28 August and 1, 3 and 8 September",
+      "PLX on 8, 10 and 11 September",
+      "Where the values came from has not been established",
+      "5 commodity futures contracts",
+      "the Form 4 calculation only produces values from 10 to 90",
+      "BIB on 7, 12, 13 and 20 August 2026",
+      // The guard is 80 days on the transaction date, not the 90-day window.
+      "unless a filing we already hold from that source records a transaction in the last 80 days",
+      "becomes due for a re-check at the next daily run, ahead of other Smart Money re-checks",
+      // #835: the Form 4 source switch, dated, with what was read differently.
+      "Insider Form 4 filings now come from SEC EDGAR instead of a data vendor",
+      "Only the common-stock table of each filing is counted",
+      "change over at its next successful re-check",
+      "95 stored filing lines from the vendor remained, for 6 tickers",
+      // Correction to the #835 entry (append-only: the entry itself is unchanged).
+      "Corrections to the entry on the switch to SEC EDGAR",
+      "Added on 15 September 2026, the day after the entry below",
+      // #851: the Insider tab left the vendor four minutes after that correction.
+      "The app's Insider tab now lists the filings we read from SEC EDGAR",
+      "That stopped being true on 15 September 2026 (#851)",
+      "every insider filing line we store came from SEC EDGAR",
+      "the Insider tab on a ticker's page in the app still lists filings from the data vendor",
+      "the whole non-derivative table of each filing is counted",
+      "A ticker whose re-check fails is tried again on its usual schedule",
+      "that wording predates the change",
     ]) {
       expect(text).toContain(needle);
     }
+    for (const stale of [
+      "futures funds",
+      "is re-checked at the next daily run",
+      "is dated inside the window",
+      "the same evening as the entry below",
+      "ahead of other re-checks",
+    ]) {
+      expect(text).not.toContain(stale);
+    }
   });
+});
+
+describe("record copy says recorded, not frozen", () => {
+  // Review round 2 of #842: recorded values were corrected twice (prices on
+  // 25 August 2026, scores capped on 15 June 2026), so no entry is "frozen".
+  // The true wording: entries are recorded, not re-ranked or deleted, and
+  // corrections are dated.
+  const FILES = [
+    "app/scorecard/page.tsx",
+    "app/app/start/page.tsx",
+    "app/do-stock-screeners-work/page.tsx",
+    "app/stock-screener-track-record/page.tsx",
+    "app/transparent-stock-screener/page.tsx",
+    "app/verify/page.tsx",
+    "components/TickerRecord.tsx",
+  ];
+  for (const file of FILES) {
+    it(file, () => {
+      const copy = shippedCopy(readFileSync(join(ROOT, file), "utf8"));
+      const m = copy.match(/\bfrozen\b/i);
+      expect(m, `${file} ships "frozen": …${m ? copy.slice(Math.max(0, m.index! - 60), m.index! + 60) : ""}…`).toBeNull();
+    });
+  }
 });
 
 describe("approved replacement wording is present", () => {

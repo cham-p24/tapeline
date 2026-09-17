@@ -18,6 +18,7 @@ import {
   openAccessJustEnded,
 } from "@/lib/pricing";
 import { SECTOR_SLUG_TO_CANONICAL, TodaysTape } from "@/components/TodaysTape";
+import { IN_APP_REFRESH_SENTENCE, PASS_CADENCE_PHRASE, priceDelayNote } from "@/lib/freshness";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { HoverCard } from "@/components/HoverCard";
@@ -158,9 +159,11 @@ export default function ScannerPage() {
   // render for tiers that can actually paginate.
   const [page, setPage] = useState(0);
   // Server-computed gating facts from /api/scanner. Free users come back
-  // capped to the top rows (row_cap) with live scores (data_delayed_minutes
-  // is 0); Pro/Premium get the full universe. Drives the inline upgrade hint
-  // below the filters.
+  // capped to the top rows (row_cap); Pro/Premium get the full universe.
+  // data_delayed_minutes is the true price delay (vendor ~15 min on every
+  // tier, integrity fix 2026-09-14; it used to read 0) and drives the delay
+  // note in the header. The rest drives the inline upgrade hint below the
+  // filters.
   const [meta, setMeta] = useState<{
     tier: string;
     rowCap: number;
@@ -373,7 +376,8 @@ export default function ScannerPage() {
         totalMatched:
           (r as { total_matched?: number | null }).total_matched ?? null,
       });
-    } catch (e) { console.error(e); setLoadError(true); }
+      return true;
+    } catch (e) { console.error(e); setLoadError(true); return false; }
     finally { setLoading(false); }
   }, [minScore, maxScore, sort, order, sector, signal, assetClass, includeLeveraged, debouncedSearch, page]);
 
@@ -396,12 +400,17 @@ export default function ScannerPage() {
     setPage(0);
   }
 
-  useEffect(() => { load(); }, [load]);
   // Inline arrow rather than passing `load` directly, so the automatic
-  // refetch is labelled as such. Safe: useLiveStream keeps its callback in
-  // a ref refreshed every commit, so a new closure each render does not
-  // churn the EventSource.
-  const { status, lastUpdate } = useLiveStream(() => load("stream"));
+  // refetch is labelled as such (src=stream: the backend records no cap hit
+  // and no scan_run for it). Safe: useLiveStream keeps its callback in a ref
+  // refreshed every commit, so a new closure each render does not churn the
+  // EventSource.
+  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived.
+  const { status, lastUpdate, markLoaded } = useLiveStream(() => load("stream"));
+  useEffect(() => {
+    void load().then((ok) => { if (ok) markLoaded(); });
+  }, [load, markLoaded]);
 
   const canExportCsv = canUse(user, "csv_export");
 
@@ -706,7 +715,16 @@ export default function ScannerPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Scanner</h1>
-          <p className="text-sm text-muted">Every liquid US stock &amp; ETF, scored live on 6 factors.</p>
+          <p className="text-sm text-muted">Every liquid US stock &amp; ETF, scored on 6 factors.</p>
+          {/* Delay disclosure (integrity wave 2026-09-14): measured vendor
+              delay ~15 min; the worker re-reads every row about every
+              60 s, and during the US session (04:00-20:00 ET) the live
+              bridge makes this page refetch about once per pass
+              (useLiveStream below), so no reload is needed. */}
+          <p className="text-xs text-subtle" data-testid="price-delay-note">
+            {priceDelayNote(meta?.delayMinutes)}, re-read {PASS_CADENCE_PHRASE} during
+            US market hours (crypto: once a day). {IN_APP_REFRESH_SENTENCE}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           {/* Market-regime context: every score below is computed under this
@@ -759,8 +777,7 @@ export default function ScannerPage() {
                 the count on its left. */}
             {meta?.totalMatched != null && (
               <> of <strong className="text-fg">{meta.totalMatched.toLocaleString()}</strong></>
-            )}{" "}
-            · updates live
+            )}
           </>
         }
       >
@@ -881,16 +898,17 @@ export default function ScannerPage() {
 
       {/* Inline Free-tier cap hint. Keys off the server-reported tier + row
           cap so the copy can't claim a cap the backend isn't actually applying.
-          Free scores are live now (the gating is breadth, not freshness), so the
-          hint describes the row cap rather than a data delay. The global
+          Every tier reads the same ~15-minute-delayed prices (the gating is
+          breadth, not freshness), so the hint describes the row cap rather than
+          a data delay. The global
           UpgradeNudge banner is suppressed on this route, so this is the only
           upgrade prompt a Free user sees here. */}
       {meta && meta.tier === "free" && meta.rowCap > 0 && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
           <span className="text-muted">
-            Free plan — showing live scores for the top{" "}
+            Free plan — showing scores for the top{" "}
             <strong className="text-fg">{meta.rowCap}</strong> rows.
-            Pro unlocks the full scored universe of about 11,500 US stocks and ETFs, real-time.
+            Pro unlocks every row of the full scored universe of about 11,500 US stocks and ETFs.
             {/* The row cap this line quotes CHANGES ON ITS OWN. Open-access
                 month lifts a signed-in Free account to the Pro cap and reverts
                 with no deploy, so on the revert date this same sentence goes
@@ -986,7 +1004,7 @@ export default function ScannerPage() {
                   </div>
                 ) : (
                   <div className="text-muted">
-                    <p>Scanner is warming up. The worker scores the universe every ~60 seconds.</p>
+                    <p>Scanner is warming up. The worker re-scores the universe {PASS_CADENCE_PHRASE} during US market hours.</p>
                     <p className="mt-2 text-xs text-subtle">If this persists, check <a href="/status" className="text-accent hover:underline">system status</a>.</p>
                   </div>
                 )}
@@ -1181,7 +1199,7 @@ export default function ScannerPage() {
               </p>
               <p className="mt-1 text-xs text-muted">
                 Free shows the top {meta?.rowCap} rows. Pro unlocks every matching
-                row, live — plus pagination, CSV export and saved scans.
+                row — plus pagination, CSV export and saved scans.
               </p>
             </div>
             <Link

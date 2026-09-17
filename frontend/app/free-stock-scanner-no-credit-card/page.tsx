@@ -18,14 +18,14 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 // sell the PUBLIC surface instead — the daily Top 10, the whole scorecard, the
 // per-ticker pages and the raw CSV/JSON, readable by anyone with no account.
 // 2026-08-30 (PR #683) moved the card off the front door: signing up is an
-// email and a password again, onto a free plan that runs the live scanner.
+// email and a password again, onto a free plan that runs the scanner.
 // So there are now TWO true statements to keep straight, and this page is the
 // one place on the site where getting either of them wrong is unforgivable:
 // the SIGN-UP needs no card; the 30-day Premium TRIAL still does.
 export const metadata = pageMeta({
   title: "Free Stock Scanner — No Credit Card, No Signup | Tapeline",
   description:
-    "Stock scanners you can actually use without a card. Tapeline's daily Top 10, full scorecard and raw CSV/JSON need no account at all, and a free plan runs the live scanner on an email and a password.",
+    "Stock scanners you can actually use without a card. Tapeline's daily Top 10, full scorecard and raw CSV/JSON need no account at all, and a free plan runs the scanner on an email and a password.",
   path: "/free-stock-scanner-no-credit-card",
 });
 
@@ -46,7 +46,7 @@ const SCANNERS: Scanner[] = [
   {
     name: "Tapeline",
     access:
-      "Daily Top 10, the full scorecard, every per-ticker page and the raw CSV/JSON record with no account at all — plus a free plan that runs the live scanner on an email and a password",
+      "Daily Top 10, the full scorecard, every per-ticker page and the raw CSV/JSON record with no account at all — plus a free plan that runs the scanner on an email and a password",
     // Honest label. Reading Tapeline's output takes no account. Running the
     // scanner takes an account and still no card — same shape as TradingView's
     // row — which is why this reads "None (free tier)" from 2026-08-30. The
@@ -74,7 +74,7 @@ const SCANNERS: Scanner[] = [
     cardNeeded: "None (free tier)",
     publicFormula: "No score",
     trackRecord: "None",
-    summary:
+    summary: // copy-compliance-allow false-data-freshness -- describes Finviz Elite's paid plan, not Tapeline's data (Tapeline prices are delayed about 15 minutes)
       "The free Finviz screener is usable without any signup — deep on raw filter fields so you build your own thesis from the data. No composite score, no published methodology, no track record. The paid Elite tier (which does take a card) removes ads and adds real-time data. For hand-built filtering, the free tier is genuinely useful.",
   },
   {
@@ -104,12 +104,12 @@ const FAQ = [
   },
   {
     q: "Which stock scanners genuinely need no signup?",
-    a: "StockAnalysis.io and the free Finviz screener both let you screen without creating an account. TradingView needs a free account but never a card. Tapeline needs no account at all to read the daily Top 10, the scorecard, the per-ticker pages or the raw CSV/JSON record, and its free plan — an email and a password — runs the live scanner. If your hard requirement is screening with nothing on file, all four qualify; if it is screening with no login whatsoever, StockAnalysis.io and Finviz are the two.",
+    a: "StockAnalysis.io and the free Finviz screener both let you screen without creating an account. TradingView needs a free account but never a card. Tapeline needs no account at all to read the daily Top 10, the scorecard, the per-ticker pages or the raw CSV/JSON record, and its free plan — an email and a password — runs the scanner. If your hard requirement is screening with nothing on file, all four qualify; if it is screening with no login whatsoever, StockAnalysis.io and Finviz are the two.",
   },
   {
     q: "Does Tapeline still have a free tier?",
     // copy-compliance-allow card-required-signup -- narrates the 22-30 Aug window in the past tense and states the current state first
-    a: "Yes — and since 30 August 2026 it is a logged-in one again, not only a published one. The record stays free and always will be: /daily-picks, /scorecard, a page per ticker, and the raw CSV/JSON export are open to anyone with no account and no card. On top of that, signing up takes an email and a password, and the account lands on a free plan that runs the live scanner: the top ten scored rows of any scan, live data, one saved screen, a five-symbol watchlist, twelve ticker deep-pages a day. (For eight days in August a new account did have to add a card at first sign-in. That requirement was removed on 30 August 2026.) A card is what starts the 30-day Premium trial and turns on every matching row, a second saved screen, alerts, CSV export and SEC Form 4 insider filings — $0 charged that day, the first charge on day 30 at the plan price you pick, and one click cancels before then.",
+    a: "Yes — and since 30 August 2026 it is a logged-in one again, not only a published one. The record stays free and always will be: /daily-picks, /scorecard, a page per ticker, and the raw CSV/JSON export are open to anyone with no account and no card. On top of that, signing up takes an email and a password, and the account lands on a free plan that runs the scanner: the top ten scored rows of any scan (prices delayed about 15 minutes), one saved screen, a five-symbol watchlist, twelve ticker deep-pages a day. (For eight days in August a new account did have to add a card at first sign-in. That requirement was removed on 30 August 2026.) A card is what starts the 30-day Premium trial and turns on every matching row, a second saved screen, alerts, CSV export and SEC Form 4 insider filings — $0 charged that day, the first charge on day 30 at the plan price you pick, and one click cancels before then.",
   },
   {
     q: "Does the no-card record still show real results?",
@@ -174,7 +174,7 @@ export default function FreeStockScannerNoCreditCardPage() {
 
         {/* Above-the-fold CTAs into the genuinely card-free surfaces, in order
             of what this page's visitor asked for. It used to be <LandingCta
-            from="screener" />, whose primary button read "Try the live scanner
+            from="screener" />, whose primary button read "Try the scanner
             free — no card" into /signup; the 2026-08-22 card gate made that
             false and the button was dropped rather than relabelled. As of
             2026-08-30 signup really is an email and a password again, so the
@@ -184,7 +184,7 @@ export default function FreeStockScannerNoCreditCardPage() {
             inspect everything before you hand over anything. */}
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/signup?from=screener" className="btn-primary">
-            Run the live scanner — free account &rarr;
+            Run the scanner — free account &rarr;
           </Link>
           <Link
             href="/daily-picks"
@@ -261,7 +261,7 @@ export default function FreeStockScannerNoCreditCardPage() {
                 The daily Top 10 &rarr;
               </Link>{" "}
               <span className="text-muted">
-                — the ten highest-scoring US tickers, live, with the one-sentence read on each.
+                — the ten highest-scoring US tickers, with the one-sentence read on each.
               </span>
             </li>
             <li>
@@ -313,7 +313,7 @@ export default function FreeStockScannerNoCreditCardPage() {
           <p className="mt-4 text-sm text-muted leading-relaxed">
             And if you would rather run your own scan than read ours, that takes an
             email and a password — still no card. The free plan shows you the top ten
-            scored rows of whatever you build, on live data.
+            scored rows of whatever you build. Prices are delayed about 15 minutes, on every plan.
           </p>
         </section>
 
@@ -357,8 +357,9 @@ export default function FreeStockScannerNoCreditCardPage() {
             The split worth understanding on Tapeline: <strong>reading</strong> costs nothing
             and asks for nothing — the picks, the record, the per-ticker pages and the raw
             CSV/JSON are open to anyone. <strong>Running</strong> the scanner yourself takes
-            an account and nothing more than an email and a password, on a free plan that is
-            live rather than delayed and shows the top ten scored rows of any scan.{" "}
+            an account and nothing more than an email and a password, on a free plan that
+            shows the top ten scored rows of any scan, with prices delayed about 15 minutes
+            (the same delay as every paid plan).{" "}
             <strong>A card</strong> is the third step, and it buys the rest: every matching
             row instead of the first ten, a second saved screen, alerts, CSV export, the
             200-symbol watchlist and SEC Form 4 insider filings. Adding one starts the 30-day Premium
@@ -424,7 +425,7 @@ export default function FreeStockScannerNoCreditCardPage() {
           <p className="mt-3 text-sm text-muted">
             The picks, the scorecard and the raw CSV/JSON stay open to everyone, with
             nothing to sign up for. Running your own scan takes an email and a password
-            and nothing else — the free plan is live, at the top ten scored rows a scan.
+            and nothing else — the free plan shows the top ten scored rows a scan.
             The 30-day Premium trial is the part that takes a card: $0 is charged that
             day, the first charge is on day 30, and one click cancels before then. Pro is{" "}
             {usd(PRICING.pro.annualPerMonth)}/mo ({usd(PRICING.pro.annual)}/yr) with a

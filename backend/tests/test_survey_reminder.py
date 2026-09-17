@@ -10,17 +10,37 @@ normally eyeball in a dry run is pinned here instead:
     who left their email in the form;
   * first names, the original subject, never "Re:";
   * a dropped ssh session cannot cause a double-send (per-recipient commit);
-  * the newsletter half runs on the first run only (that table has no marker);
-  * the workflow passes --quiet, so no address reaches the public log.
+  * a send whose outcome is unknown (Resend may have it) is stamped, so a
+    manual re-dispatch skips that person; one Resend never had is retried;
+  * consecutive unknown outcomes (an outage) stop the run, so it does not
+    stamp the whole audience unreminded;
+  * an account whose `drip_state` cannot hold the stamp is skipped, counted,
+    and warned about on a line of its own; one a mid-run drip fills is not
+    overflowed by the stamp;
+  * the newsletter half runs on the first run only, and only when that run
+    left a trace (that table has no marker); a re-run that stops never tells
+    the operator to force a list an earlier run may have mailed;
+  * the workflow passes --quiet, and under --quiet no address reaches the
+    public log — not from send_email's own `to=` lines, not from an exception
+    message, not from an uncaught traceback;
+  * a second run started while one is going is refused, and says so;
+  * a run that fell short exits non-zero, so the unattended job shows red.
 """
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import json
+import logging
+import os
 import pathlib
 import re
+import subprocess
+import sys
 from datetime import UTC, datetime
 from html import unescape
 
+import httpx
 import pytest
 from sqlalchemy import select
 
@@ -139,6 +159,24 @@ async def test_account_exclusions(email: str, kw: dict, reason: str) -> None:
         recipients, skipped = await ss.collect_reminder_accounts(s)
     assert recipients == []
     assert [r for _u, r in skipped] == [reason]
+
+
+async def test_an_account_whose_drip_state_cannot_take_the_token_is_skipped() -> None:
+    """`users.drip_state` is VARCHAR(255), and the stamp is written AFTER the
+    email has gone, outside the send's try. On Postgres an overflow would abort
+    the run with that person mailed but unstamped, and a re-dispatch would mail
+    them again. SQLite does not enforce the length, so the boundary is pinned
+    here from the model's own capacity: one account that fits exactly, one a
+    character over."""
+    capacity = User.__table__.c.drip_state.type.length
+    assert capacity, "drip_state has no length limit any more; revisit this test"
+    fits = capacity - len(ss.SURVEY_TOKEN) - 1 - 1 - len(ss.REMINDER_TOKEN)
+    async with session_scope() as s:
+        await _user(s, "fits@example.com", extra_tokens=("x" * fits,))
+        await _user(s, "full@example.com", extra_tokens=("x" * (fits + 1),))
+        recipients, skipped = await ss.collect_reminder_accounts(s)
+    assert [u.email for u in recipients] == ["fits@example.com"]
+    assert [(u.email, r) for u, r in skipped] == [("full@example.com", "no_room_for_token")]
 
 
 async def test_the_other_waad_address_is_still_reminded() -> None:
@@ -427,3 +465,717 @@ def test_the_reminder_is_clear_of_the_workers_own_sends() -> None:
             f"reminder fires at {fire_minutes // 60:02d}:{fire_minutes % 60:02d} UTC, "
             f"within two hours of the worker's {stage} send at {gate // 60:02d}:00"
         )
+
+
+# ── Outcome unknown: stamped, so a re-dispatch skips them ───────────────────
+
+_REQ = httpx.Request("POST", "https://api.resend.com/emails")
+
+
+def _status(code: int) -> httpx.HTTPStatusError:
+    """What send_email's resp.raise_for_status() raises for this status."""
+    return httpx.HTTPStatusError(
+        f"HTTP {code}", request=_REQ, response=httpx.Response(code, request=_REQ),
+    )
+
+
+#: Errors that can arrive AFTER Resend queued the email.
+OUTCOME_UNKNOWN = {
+    "read_timeout": lambda: httpx.ReadTimeout("timed out", request=_REQ),
+    "dropped_mid_response": lambda: httpx.RemoteProtocolError("peer closed", request=_REQ),
+    "http_502_gateway": lambda: _status(502),
+    # `send_email` ends `resp.raise_for_status(); return resp.json()`, so this
+    # can only be raised AFTER a 2xx — after Resend accepted the email.
+    "non_json_2xx": lambda: json.JSONDecodeError("Expecting value", "", 0),
+}
+
+#: Errors that prove Resend never had it.
+NEVER_REACHED_RESEND = {
+    "connect_error": lambda: httpx.ConnectError("refused", request=_REQ),
+    "http_422_rejected": lambda: _status(422),
+    "raised_before_the_post": lambda: RuntimeError("render failed"),
+}
+
+
+async def _state(email: str) -> set[str]:
+    async with session_scope() as s:
+        return _toks(await s.scalar(select(User.drip_state).where(User.email == email)))
+
+
+@pytest.mark.parametrize("make_error", OUTCOME_UNKNOWN.values(), ids=OUTCOME_UNKNOWN.keys())
+async def test_an_unknown_outcome_is_stamped_and_a_second_run_skips_it(
+    https, monkeypatch: pytest.MonkeyPatch, make_error,
+) -> None:
+    """The fake DELIVERS, then raises, on the first call — what a read timeout
+    after Resend queued the email looks like from here. Before the fix run 1
+    counted failed=1 and left no stamp, and a manual re-dispatch mailed the
+    same person a second time."""
+    delivered: list[str] = []
+
+    async def _accepts_then_raises(**kw):
+        delivered.append(kw["to"])
+        if len(delivered) == 1:
+            raise make_error()
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _accepts_then_raises)
+    async with session_scope() as s:
+        await _user(s, "slow@example.com")
+
+    first = await ss.run_reminder(send=True, quiet=True)
+    assert (first["unknown"], first["failed"], first["accounts_sent"]) == (1, 0, 0), first
+    assert ss.REMINDER_TOKEN in await _state("slow@example.com")
+
+    await ss.run_reminder(send=True, quiet=True)
+    assert delivered == ["slow@example.com"], f"delivered {delivered}"
+
+
+@pytest.mark.parametrize("make_error", NEVER_REACHED_RESEND.values(), ids=NEVER_REACHED_RESEND.keys())
+async def test_an_error_that_proves_resend_never_had_it_is_retried(
+    https, monkeypatch: pytest.MonkeyPatch, make_error,
+) -> None:
+    """The other side of the line: stamping these would leave someone who was
+    never reminded unreminded, with nothing in the result line saying so."""
+    calls: list[str] = []
+
+    async def _fails_once(**kw):
+        calls.append(kw["to"])
+        if len(calls) == 1:
+            raise make_error()
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _fails_once)
+    async with session_scope() as s:
+        await _user(s, "refused@example.com")
+
+    first = await ss.run_reminder(send=True, quiet=True)
+    assert (first["failed"], first["unknown"]) == (1, 0), first
+    assert ss.REMINDER_TOKEN not in await _state("refused@example.com")
+
+    await ss.run_reminder(send=True, quiet=True)
+    assert calls == ["refused@example.com", "refused@example.com"]
+    assert ss.REMINDER_TOKEN in await _state("refused@example.com")
+
+
+async def test_a_run_that_stamps_no_account_does_not_mail_the_list(
+    https, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A run whose every account send fails leaves no token, so a re-dispatch
+    still looks like a first run. If that run had mailed the newsletter list,
+    the re-dispatch would mail it again."""
+    sent: list[str] = []
+
+    async def _accounts_refused(**kw):
+        if kw["to"] == "down@example.com":
+            raise httpx.ConnectError("refused", request=_REQ)
+        sent.append(kw["to"])
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _accounts_refused)
+    async with session_scope() as s:
+        await _user(s, "down@example.com")
+        await _sub(s, "reader@example.com")
+
+    counts = await ss.run_reminder(send=True, quiet=True)
+    assert (counts["failed"], counts["newsletter_sent"]) == (1, 0), counts
+    assert sent == [], f"the list was mailed by a run that left no trace: {sent}"
+
+    await ss.run_reminder(send=True, quiet=True, force_newsletter=True)
+    assert sent == ["reader@example.com"]
+
+
+async def test_a_run_whose_only_stamp_is_outcome_unknown_still_mails_the_list(
+    https, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An outcome-unknown stamp tells a re-run this run happened, so a re-run
+    skips the list; if this run skipped it too, the list would never be
+    reminded without a human."""
+    sent: list[str] = []
+
+    async def _account_times_out(**kw):
+        sent.append(kw["to"])
+        if kw["to"] == "slow@example.com":
+            raise httpx.ReadTimeout("timed out", request=_REQ)
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _account_times_out)
+    async with session_scope() as s:
+        await _user(s, "slow@example.com")
+        await _sub(s, "reader@example.com")
+    counts = await ss.run_reminder(send=True, quiet=True)
+    assert sent == ["slow@example.com", "reader@example.com"]
+    assert (counts["unknown"], counts["newsletter_sent"]) == (1, 1), counts
+
+
+async def test_consecutive_unknown_outcomes_stop_the_run(
+    https, monkeypatch: pytest.MonkeyPatch, capsys,
+) -> None:
+    """Resend answering 5xx (or timing out) on every request at 17:07 UTC.
+
+    Every unknown outcome is stamped, so without a stop an outage stamps the
+    whole audience and nobody is ever reminded. The run stops after
+    UNKNOWN_OUTCOME_LIMIT in a row, leaves everyone after that unstamped for a
+    re-run, and holds the newsletter half (it has no marker to retry from).
+
+    The re-run is green and does not mail the list either, so its newsletter
+    line must say the list may still be unmailed. Otherwise the only record
+    of that is the earlier red run's log.
+    """
+    attempted: list[str] = []
+
+    async def _resend_down(**kw):
+        attempted.append(kw["to"])
+        raise _status(503)
+
+    monkeypatch.setattr("app.services.email.send_email", _resend_down)
+    everyone = [f"acct{i}@example.com" for i in range(5)]
+    async with session_scope() as s:
+        for email in everyone:
+            await _user(s, email)
+        await _sub(s, "reader@example.com")
+
+    counts = await ss.run_reminder(send=True, quiet=True)
+
+    assert len(attempted) == ss.UNKNOWN_OUTCOME_LIMIT, attempted
+    assert "reader@example.com" not in attempted, "the list was mailed into an outage"
+    assert (counts["unknown"], counts["accounts_held"], counts["newsletter_held"]) == (
+        ss.UNKNOWN_OUTCOME_LIMIT, len(everyone) - ss.UNKNOWN_OUTCOME_LIMIT, 1,
+    ), counts
+    stamped = {e for e in everyone if ss.REMINDER_TOKEN in await _state(e)}
+    assert stamped == set(attempted), f"attempted {attempted}, stamped {sorted(stamped)}"
+    assert "newsletter phase: HELD" in capsys.readouterr().out
+
+    # Resend recovers: a re-run reaches exactly the people never attempted.
+    delivered: list[str] = []
+
+    async def _resend_up(**kw):
+        delivered.append(kw["to"])
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _resend_up)
+    again = await ss.run_reminder(send=True, quiet=True)
+    assert sorted(delivered) == sorted(set(everyone) - set(attempted)), delivered
+    assert not any(again[k] for k in ss.FELL_SHORT), again  # green: nothing flags it
+    out = capsys.readouterr().out
+    assert "newsletter phase: SKIPPED" in out, out  # self-test: the list stayed unmailed
+    assert "the list was NOT mailed" in out, out
+    assert "--force-newsletter once over flyctl ssh" in out, out
+
+
+async def test_an_outage_holds_the_list_even_when_forced(
+    https, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--force-newsletter is for a human who checked Resend's log BEFORE the
+    run. A run that has just watched Resend fail must not mail a list it can
+    never retry."""
+    attempted: list[str] = []
+
+    async def _resend_down(**kw):
+        attempted.append(kw["to"])
+        raise httpx.ReadTimeout("timed out", request=_REQ)
+
+    monkeypatch.setattr("app.services.email.send_email", _resend_down)
+    async with session_scope() as s:
+        for i in range(3):
+            await _user(s, f"acct{i}@example.com")
+        await _sub(s, "reader@example.com")
+
+    counts = await ss.run_reminder(send=True, quiet=True, force_newsletter=True)
+    assert "reader@example.com" not in attempted, attempted
+    assert counts["newsletter_held"] == 1, counts
+
+
+async def test_a_re_run_that_stops_does_not_hold_a_list_an_earlier_run_mailed(
+    https, monkeypatch: pytest.MonkeyPatch, capsys,
+) -> None:
+    """Reproduced in review of 7d1506b: every newsletter subscriber reminded twice.
+
+    Run 1 delivers one account, two more fail before reaching Resend, and the
+    list is mailed; the run exits red. The re-dispatch retries those two, gets
+    a 502 for both and stops. It used to print HELD, count the list as
+    `newsletter_held` (so the job went red on it) and say to run
+    --force-newsletter, which mails the list a second time.
+    """
+    list_sends: list[str] = []
+
+    async def _two_accounts_refused(**kw):
+        if kw["to"] == "reader@example.com":
+            list_sends.append(kw["to"])
+            return {"id": "re_ok"}
+        if kw["to"] == "acct0@example.com":
+            return {"id": "re_ok"}
+        raise httpx.ConnectError("refused", request=_REQ)
+
+    monkeypatch.setattr("app.services.email.send_email", _two_accounts_refused)
+    async with session_scope() as s:
+        for i in range(3):
+            await _user(s, f"acct{i}@example.com")
+        await _sub(s, "reader@example.com")
+
+    first = await ss.run_reminder(send=True, quiet=True)
+    assert (first["accounts_sent"], first["failed"], first["newsletter_sent"]) == (1, 2, 1), first
+    assert "newsletter phase: running" in capsys.readouterr().out
+
+    async def _gateway_502(**kw):
+        if kw["to"] == "reader@example.com":
+            list_sends.append(kw["to"])
+        raise _status(502)
+
+    monkeypatch.setattr("app.services.email.send_email", _gateway_502)
+    second = await ss.run_reminder(send=True, quiet=True)
+    out = capsys.readouterr().out
+
+    assert "STOPPED" in out and second["unknown"] == ss.UNKNOWN_OUTCOME_LIMIT, out  # self-test
+    assert second["newsletter_held"] == 0, second
+    assert "newsletter phase: HELD" not in out, out
+    assert "run with --force-newsletter" not in out, out
+    assert "--force-newsletter once" not in out, out
+    assert "newsletter phase: SKIPPED: the account phase stopped" in out, out
+    assert list_sends == ["reader@example.com"], list_sends
+
+
+async def test_accounts_held_counts_only_the_accounts_never_attempted(
+    https, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The outage starts after a delivery and a failure, so the count is pinned
+    where `len(accounts) - stamped` (3) and `len(accounts) - unknown` (4) would
+    both be wrong. Outcomes follow the call order, not an address, because the
+    collector does not order its rows."""
+    outcomes = iter(["sent", "failed", "unknown", "unknown"])
+    attempted: list[str] = []
+
+    async def _then_an_outage(**kw):
+        attempted.append(kw["to"])
+        outcome = next(outcomes, "sent")
+        if outcome == "failed":
+            raise httpx.ConnectError("refused", request=_REQ)
+        if outcome == "unknown":
+            raise _status(503)
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _then_an_outage)
+    async with session_scope() as s:
+        for i in range(6):
+            await _user(s, f"acct{i}@example.com")
+
+    counts = await ss.run_reminder(send=True, quiet=True)
+    assert len(attempted) == 4, attempted
+    assert (
+        counts["accounts_sent"], counts["failed"], counts["unknown"], counts["accounts_held"],
+    ) == (1, 1, 2, 2), counts
+
+
+def test_a_full_drip_state_gets_its_own_warning_and_the_run_stays_green(
+    https, monkeypatch: pytest.MonkeyPatch, capsys, run_main,
+) -> None:
+    """The product update stamps `drip_state` the day before, using up room, so
+    Wednesday's count can be higher than any dry run showed. A tally entry is
+    easy to miss on a run nobody watches. It is not a shortfall, though: a
+    re-run cannot fix it, and red would stay red on every re-run."""
+    monkeypatch.setattr("app.services.email.send_email", _send_that("sent"))
+    capacity = User.__table__.c.drip_state.type.length
+
+    async def _go() -> None:
+        async with session_scope() as s:
+            await _user(s, "roomy@example.com")
+            await _user(s, "full@example.com", extra_tokens=("x" * capacity,))
+    asyncio.run(_go())
+
+    run_main(["--reminder", "--send", "--quiet"])  # raises SystemExit if red
+
+    out = capsys.readouterr().out
+    assert "no_room_for_token=1" in out, out  # self-test: the account was skipped
+    assert "WARNING: 1 account(s) not reminded: drip_state full" in out, out
+    assert "@" not in out, out
+
+
+async def test_a_drip_recorded_mid_run_cannot_overflow_the_stamp(
+    https, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Room is checked at collection, but the stamp appends to the row as it is
+    when the stamp runs. Here the worker records a drip during the send that
+    leaves one character too few. On Postgres the old UPDATE raised
+    StringDataRightTruncation after the email had gone and aborted the run.
+    SQLite does not enforce VARCHAR(255), so the same bug shows here as a
+    drip_state longer than the column."""
+    from sqlalchemy import update
+
+    capacity = User.__table__.c.drip_state.type.length
+    attempted: list[str] = []
+
+    async def _worker_drips_during_the_send(**kw):
+        attempted.append(kw["to"])
+        if kw["to"] == "tight@example.com":
+            async with session_scope() as s:
+                current = await s.scalar(
+                    select(User.drip_state).where(User.email == "tight@example.com")
+                )
+                filler = "w" * (capacity - len(ss.REMINDER_TOKEN) - len(current) - 1)
+                await s.execute(
+                    update(User).where(User.email == "tight@example.com")
+                    .values(drip_state=current + "," + filler)
+                )
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _worker_drips_during_the_send)
+    async with session_scope() as s:
+        await _user(s, "tight@example.com")
+        await _user(s, "roomy@example.com")
+
+    counts = await ss.run_reminder(send=True, quiet=True)
+    assert sorted(attempted) == ["roomy@example.com", "tight@example.com"], attempted
+    async with session_scope() as s:
+        state = await s.scalar(select(User.drip_state).where(User.email == "tight@example.com"))
+    assert len(state) <= capacity, f"the stamp overflowed drip_state: {len(state)} > {capacity}"
+    assert ss.REMINDER_TOKEN not in _toks(state)
+    assert (counts["accounts_sent"], counts["unknown"]) == (1, 1), counts
+
+    # The row is still too full to take the token, so a re-run skips it.
+    attempted.clear()
+    await ss.run_reminder(send=True, quiet=True)
+    assert attempted == [], f"a re-run mailed {attempted} again"
+
+
+async def test_unknown_outcomes_that_are_not_consecutive_do_not_stop_the_run(
+    https, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One slow response among good ones is not an outage."""
+    calls: list[str] = []
+
+    async def _every_other_times_out(**kw):
+        calls.append(kw["to"])
+        if kw["to"].startswith("acct") and len(calls) % 2 == 1:
+            raise httpx.ReadTimeout("timed out", request=_REQ)
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _every_other_times_out)
+    async with session_scope() as s:
+        for i in range(4):
+            await _user(s, f"acct{i}@example.com")
+        await _sub(s, "reader@example.com")
+
+    counts = await ss.run_reminder(send=True, quiet=True)
+    assert len(calls) == 5, calls
+    assert (
+        counts["unknown"], counts["accounts_sent"], counts["accounts_held"],
+        counts["newsletter_sent"], counts["newsletter_held"],
+    ) == (2, 2, 0, 1, 0), counts
+
+
+@pytest.mark.parametrize(
+    ("make_error", "key"),
+    [(OUTCOME_UNKNOWN["read_timeout"], "unknown"), (NEVER_REACHED_RESEND["connect_error"], "failed")],
+    ids=["unknown", "failed"],
+)
+async def test_a_newsletter_error_is_counted_by_what_it_means(
+    https, monkeypatch: pytest.MonkeyPatch, make_error, key: str,
+) -> None:
+    """No per-subscriber stamp exists, so the count is the only thing that
+    tells the operator whether Resend's log needs checking."""
+    async def _list_send_raises(**kw):
+        if kw["to"] == "reader@example.com":
+            raise make_error()
+        return {"id": "re_ok"}
+
+    monkeypatch.setattr("app.services.email.send_email", _list_send_raises)
+    async with session_scope() as s:
+        await _user(s, "one@example.com")
+        await _sub(s, "reader@example.com")
+    counts = await ss.run_reminder(send=True, quiet=True)
+    other = {"unknown": "failed", "failed": "unknown"}[key]
+    assert (counts[key], counts[other], counts["newsletter_sent"]) == (1, 0, 0), counts
+
+
+# ── --quiet: no address in any line the public log receives ─────────────────
+#
+# These drive `main`, not `run_reminder`, because main is where --quiet has to
+# install redaction — the bug was that it did not. And they run with the ROOT
+# LOGGER BARE, as it is in `python -m app.scripts.survey_send`: pytest attaches
+# its own handlers to the root logger, which would swallow the WARNING lines
+# that a bare interpreter prints to stderr, and make a leak invisible here.
+
+
+@pytest.fixture
+def run_main(monkeypatch: pytest.MonkeyPatch):
+    """Call `ss.main(argv)` with the root logger as a bare interpreter has it.
+
+    The handlers are cleared INSIDE the call, not at fixture setup: pytest adds
+    its capture handlers to the root logger again at the start of each test
+    phase, so clearing them during setup would leave the test body covered.
+    """
+    # main() installs a Windows loop policy on win32; it would outlive the test.
+    monkeypatch.setattr(ss.asyncio, "set_event_loop_policy", lambda _p: None)
+    root = logging.getLogger()
+
+    def _run(argv: list[str]) -> None:
+        handlers, level, hook = list(root.handlers), root.level, sys.excepthook
+        root.handlers[:] = []
+        root.setLevel(logging.WARNING)
+        try:
+            ss.main(argv)
+        finally:
+            root.handlers[:] = handlers
+            root.setLevel(level)
+            sys.excepthook = hook
+
+    return _run
+
+
+def _seed(*people: tuple[str, str]) -> None:
+    """Seed ("account" | "newsletter", address) rows from a sync test."""
+    async def _go() -> None:
+        async with session_scope() as s:
+            for kind, email in people:
+                if kind == "account":
+                    await _user(s, email)
+                else:
+                    await _sub(s, email)
+    asyncio.run(_go())
+
+
+def test_quiet_redacts_the_address_send_email_logs_itself(
+    https, monkeypatch: pytest.MonkeyPatch, capsys, run_main,
+) -> None:
+    """The REAL send_email, with no Resend key: it logs
+    `email.skipped reason=no_api_key ... to=<address>` at WARNING, which a bare
+    interpreter prints to stderr — the workflow's public log."""
+    from app.services import email
+
+    monkeypatch.setattr(email.settings, "resend_api_key", "", raising=False)
+    _seed(("account", "private@example.com"))
+
+    with pytest.raises(SystemExit):  # nobody was reminded, so the run goes red
+        run_main(["--reminder", "--send", "--quiet"])
+
+    captured = capsys.readouterr()
+    assert "email.skipped" in captured.err, captured.err  # self-test: the line was emitted
+    assert "result:" in captured.out
+    assert "@" not in captured.out + captured.err, (
+        f"an address reached output the workflow publishes:\n{captured.out}{captured.err}"
+    )
+
+
+def test_quiet_redacts_addresses_in_http_errors_and_tracebacks(
+    https, monkeypatch: pytest.MonkeyPatch, capsys, run_main,
+) -> None:
+    """The REAL send_email over a fake Resend transport. Every error carries
+    the recipient's address in its message — the worst case for an exception
+    that is logged with its traceback — across all three logged paths: an
+    account whose outcome is unknown, an account that failed, and a newsletter
+    subscriber whose outcome is unknown."""
+    from app.services import email
+
+    monkeypatch.setattr(email.settings, "resend_api_key", "re_test_not_a_real_key", raising=False)
+    real_client = httpx.AsyncClient
+
+    def _resend(request: httpx.Request) -> httpx.Response:
+        to = json.loads(request.content)["to"][0]
+        if to == "slow@example.com":
+            raise httpx.ReadTimeout(f"read timed out sending to {to}", request=request)
+        if to == "refused@example.com":
+            raise httpx.ConnectError(f"connection refused for <{to}>", request=request)
+        raise httpx.RemoteProtocolError(f"peer closed mid-response ({to})", request=request)
+
+    monkeypatch.setattr(
+        email.httpx, "AsyncClient",
+        lambda *a, **kw: real_client(transport=httpx.MockTransport(_resend)),
+    )
+    _seed(
+        ("account", "slow@example.com"),
+        ("account", "refused@example.com"),
+        ("newsletter", "reader@example.com"),
+    )
+
+    with pytest.raises(SystemExit):  # failed and unknown sends: the run goes red
+        run_main(["--reminder", "--send", "--quiet"])
+
+    captured = capsys.readouterr()
+    for event in (
+        "survey_reminder.send_outcome_unknown",
+        "survey_reminder.send_failed",
+        "survey_reminder.newsletter_outcome_unknown",
+    ):
+        assert event in captured.err, f"self-test: {event} was not logged\n{captured.err}"
+    assert "Traceback" in captured.err  # self-test: the exception text was in the log
+    assert "@" not in captured.out + captured.err, (
+        f"an address reached output the workflow publishes:\n{captured.out}{captured.err}"
+    )
+    assert "<address>" in captured.err  # redacted, not merely absent
+
+
+def test_quiet_redacts_an_uncaught_traceback() -> None:
+    """A crash that escapes the run is printed by the interpreter itself, not
+    by logging, so it is run for real in a child process. The child replaces
+    run_reminder with one that raises an address-bearing error; it touches no
+    database and sends nothing."""
+    child = (
+        "from app.scripts import survey_send as ss\n"
+        "async def _boom(**kw):\n"
+        "    raise RuntimeError('Resend rejected leak@example.com')\n"
+        "ss.run_reminder = _boom\n"
+        "ss.main(['--reminder', '--quiet'])\n"
+    )
+    env = {
+        k: v for k, v in os.environ.items()
+        if k not in {"RESEND_API_KEY", "STRIPE_SECRET_KEY", "META_CAPI_ACCESS_TOKEN"}
+    }
+    env["DATABASE_URL"] = "sqlite+aiosqlite:///./_uncaught_child_unused.db"
+    env["APP_ENV"] = "development"
+    proc = subprocess.run(
+        [sys.executable, "-c", child],
+        cwd=pathlib.Path(__file__).resolve().parents[1],
+        env=env, capture_output=True, text=True, timeout=120,
+    )
+    output = proc.stdout + proc.stderr
+    assert proc.returncode != 0, output
+    assert "Resend rejected" in output, output  # self-test: the crash was reported
+    assert "@" not in output, f"an uncaught traceback printed an address:\n{output}"
+
+
+def test_quiet_is_refused_where_it_would_not_be_honoured(
+    https, outbox: list[dict], run_main,
+) -> None:
+    """Only the reminder gates its per-recipient lines. The survey and
+    newsletter runs print every address, so accepting --quiet there would
+    promise a public log something the run does not do."""
+    with pytest.raises(SystemExit) as exc:
+        run_main(["--send", "--quiet"])
+    assert exc.value.code == 2
+    assert outbox == []
+
+
+# ── A concurrent second run is refused ──────────────────────────────────────
+
+async def test_two_runs_at_once_remind_each_person_once(
+    https, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two runs genuinely overlapping. SQLite has no advisory locks, so the
+    lock is given real one-holder semantics at the seam every run goes through;
+    the sends yield, so each run reads "not reminded" before the other stamps.
+    Without the lock both runs mail everyone."""
+    from app.services import dblock
+
+    held: set[int] = set()
+
+    @contextlib.asynccontextmanager
+    async def _one_holder(objid: int):
+        if objid in held:
+            yield False
+            return
+        held.add(objid)
+        try:
+            yield True
+        finally:
+            held.discard(objid)
+
+    monkeypatch.setattr(dblock, "hold_xact_lock", _one_holder)
+
+    delivered: list[str] = []
+
+    async def _slow_send(**kw):
+        for _ in range(5):
+            await asyncio.sleep(0)
+        delivered.append(kw["to"])
+        return {"id": f"re_{len(delivered)}"}
+
+    monkeypatch.setattr("app.services.email.send_email", _slow_send)
+    async with session_scope() as s:
+        await _user(s, "a@example.com")
+        await _user(s, "b@example.com")
+        await _sub(s, "reader@example.com")
+
+    results = await asyncio.gather(
+        ss.run_reminder(send=True, quiet=True),
+        ss.run_reminder(send=True, quiet=True),
+    )
+    assert sorted(delivered) == ["a@example.com", "b@example.com", "reader@example.com"], delivered
+    assert {} in results, f"neither run was refused: {results}"
+
+
+def test_a_refused_run_says_so_in_the_log(
+    https, outbox: list[dict], monkeypatch: pytest.MonkeyPatch, capsys, run_main,
+) -> None:
+    """The lock's loser returns {} and the decorator logs at INFO, which the
+    public log does not show. Without a line of its own, a refused run's log
+    would be empty."""
+    from app.services import dblock
+
+    async def _lost(_session, _objid):
+        return False
+
+    monkeypatch.setattr(dblock, "try_xact_lock", _lost)
+    _seed(("account", "racer@example.com"))
+
+    with pytest.raises(SystemExit):
+        run_main(["--reminder", "--send", "--quiet"])
+
+    out = capsys.readouterr().out
+    assert outbox == []
+    assert "refused: another survey reminder run holds the lock" in out, out
+
+
+# ── An unattended run that fell short goes red ──────────────────────────────
+#
+# Nobody watches the 17:07 UTC run. A green check is the only thing anyone will
+# look at, so a run that left an eligible person unreminded, or could not say
+# whether it reached them, must fail the job — GitHub then notifies the owner.
+
+
+def _lock_lost(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import dblock
+
+    async def _lost(_session, _objid):
+        return False
+
+    monkeypatch.setattr(dblock, "try_xact_lock", _lost)
+
+
+def _send_that(outcome: str):
+    async def _send(**kw):
+        if outcome == "failed":
+            raise httpx.ConnectError("refused", request=_REQ)
+        if outcome == "unknown":
+            raise httpx.ReadTimeout("timed out", request=_REQ)
+        if outcome == "not_sent":
+            return {"skipped": True, "reason": "no_api_key"}
+        return {"id": "re_ok"}
+    return _send
+
+
+@pytest.mark.parametrize(
+    ("case", "people"),
+    [
+        ("failed", [("account", "a@example.com")]),
+        ("unknown", [("account", "a@example.com")]),
+        ("not_sent", [("account", "a@example.com")]),
+        ("refused", [("account", "a@example.com")]),
+        # No account stamped, so the guard holds the list: nobody on it is reminded.
+        ("list_held", [("newsletter", "reader@example.com")]),
+    ],
+)
+def test_a_run_that_fell_short_exits_non_zero(
+    https, monkeypatch: pytest.MonkeyPatch, capsys, run_main, case: str, people,
+) -> None:
+    if case == "refused":
+        _lock_lost(monkeypatch)
+    monkeypatch.setattr("app.services.email.send_email", _send_that(case))
+    _seed(*people)
+
+    with pytest.raises(SystemExit) as exc:
+        run_main(["--reminder", "--send", "--quiet"])
+
+    assert exc.value.code == 1, exc.value.code
+    out = capsys.readouterr().out
+    assert "@" not in out, out
+
+
+def test_a_clean_run_and_a_harmless_re_run_exit_zero(
+    https, monkeypatch: pytest.MonkeyPatch, run_main,
+) -> None:
+    """The other side: a full delivery is green, and so is a later re-run that
+    finds everyone reminded and (correctly) leaves the list to the first run."""
+    monkeypatch.setattr("app.services.email.send_email", _send_that("sent"))
+    _seed(("account", "a@example.com"), ("newsletter", "reader@example.com"))
+
+    run_main(["--reminder", "--send", "--quiet"])  # raises SystemExit if red
+    run_main(["--reminder", "--send", "--quiet"])

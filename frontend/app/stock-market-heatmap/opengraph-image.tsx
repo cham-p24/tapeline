@@ -10,6 +10,6 @@ export default async function OG() {
     eyebrow: "FEATURE",
     title: "Stock Market Heatmap.",
     subtitle:
-      "Live US sectors + tickers — tiles sized by $-volume, coloured by performance, joined to each Tapeline score. Pro feature.",
+      "US sectors + tickers — tiles sized by $-volume, coloured by performance, joined to each Tapeline score. Pro feature.",
   });
 }

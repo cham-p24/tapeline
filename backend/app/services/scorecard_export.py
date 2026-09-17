@@ -366,6 +366,36 @@ KNOWN_LIMITATIONS: list[dict[str, str]] = [
         ),
         "status": "Unresolved.",
     },
+    {
+        "date": "2026-09-14",
+        "period": (
+            "sessions 2026-08-24 to 2026-09-11 (16 rows); sessions before "
+            "2026-08-24 cannot be checked"
+        ),
+        "limitation": (
+            "16 rows were ranked while the ticker held a Smart Money value with "
+            "no SEC Form 4 filing on file: BBH on 2026-08-24, 2026-08-25, "
+            "2026-08-26, 2026-08-28, 2026-09-01, 2026-09-03 and 2026-09-08; BBP "
+            "on 2026-08-25, 2026-08-26, 2026-08-28 and 2026-09-01; BIB on "
+            "2026-08-26 and 2026-09-01; PLX on 2026-09-08, 2026-09-10 and "
+            "2026-09-11. The same tickers also appear in 7 earlier rows (BBH on "
+            "2026-08-19 and 2026-08-21, BBP on 2026-08-20, BIB on 2026-08-07, "
+            "2026-08-12, 2026-08-13 and 2026-08-20), where whether they held "
+            "such a value cannot be checked. At 13:30 UTC on 2026-09-14, 856 "
+            "tickers held such a value (629 ETFs, 222 stocks, 5 commodity "
+            "futures contracts), 42 of them below 10 or above 90; the Form 4 "
+            "calculation only produces values from 10 to 90. Where the values "
+            "came from has not been established."
+        ),
+        "status": (
+            "From 2026-09-14 (PR #824) an empty Form 4 answer removes the value "
+            "and the ticker's stored filings, unless a stored filing from the "
+            "same source records a transaction in the last 80 days; a ticker "
+            "holding a value with no filing on file becomes due for a re-check "
+            "at the next daily run, ahead of other Smart Money re-checks (PR "
+            "#833). Lists not changed."
+        ),
+    },
 ]
 
 
@@ -428,7 +458,7 @@ def dataset_meta(*, row_count: int, session_count: int, delay_days: int,
             f"Entries are published in this export about {delay_days} days after the "
             f"session they describe. The most recent session included here is the "
             f"one ending on or before {cutoff.isoformat()}. The delay is a product "
-            f"gate on the live ranking, not a data-quality filter — no entry is "
+            f"gate on the most recent entries, not a data-quality filter — no entry is "
             f"withheld beyond it."
         ),
         "sample_size_rows": row_count,

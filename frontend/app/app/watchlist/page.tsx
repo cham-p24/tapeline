@@ -85,7 +85,8 @@ export default function WatchlistPage() {
       // (matches the legacy single-list behaviour exactly).
       const r = await api.watchlist(activeId);
       setItems(r.items);
-    } catch (e) { console.error(e); }
+      return true;
+    } catch (e) { console.error(e); return false; }
     finally { setLoading(false); }
   }, [activeId]);
 
@@ -100,9 +101,13 @@ export default function WatchlistPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
   useEffect(() => { loadLists(); }, [loadLists]);
-  const { status, lastUpdate } = useLiveStream(load);
+  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived.
+  const { status, lastUpdate, markLoaded } = useLiveStream(load);
+  useEffect(() => {
+    void load().then((ok) => { if (ok) markLoaded(); });
+  }, [load, markLoaded]);
 
   const watchlistsCap = WATCHLISTS_CAP_BY_TIER[user?.tier ?? "free"] ?? 1;
 
@@ -530,7 +535,7 @@ export default function WatchlistPage() {
       )}
 
       {/* Track record — the Premium blend of watchlist + scorecard: each
-          watched ticker's live score alongside its own next-day-vs-SPY record.
+          watched ticker's current score alongside its own next-day-vs-SPY record.
           Self-gates (Premium → data, Free/Pro → upgrade teaser) and self-hides
           when nothing is watched. */}
       <WatchlistTrackRecord />

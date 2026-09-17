@@ -15,7 +15,7 @@ import { PRICING, REFUND, usd } from "@/lib/pricing";
  * the top of the page.
  *
  * Renders three things, in reading order:
- *   1. A prominent primary CTA — "Try the live scanner — 30-day trial" →
+ *   1. A prominent primary CTA — "Open the scanner — free account" →
  *      /signup?from=<from>. The signup page personalises its H1 on ?from=
  *      (finviz | screener | scorecard | compare), so each page passes the
  *      best-fitting existing slug for message-match. Secondary CTA links to
@@ -45,8 +45,10 @@ type Props = {
       true. Set false on pages that already show a data table above the fold
       (e.g. /compare/*, where the comparison table is the proof). */
   showPreview?: boolean;
-  /** Primary CTA label. Defaults to the scanner-forward "Try the live scanner
-      — 30-day trial". Pages can override for tighter intent match. */
+  /** Primary CTA label. Defaults to the scanner-forward "Open the scanner
+      — free account": signup takes an email and a password, and the scanner
+      runs on the free plan, so the label must not imply the scanner needs the
+      trial. Pages can override for tighter intent match. */
   primaryLabel?: string;
   /** Secondary CTA href — defaults to the public scorecard. */
   secondaryHref?: string;
@@ -59,7 +61,7 @@ type Props = {
 export function LandingCta({
   from,
   showPreview = true,
-  primaryLabel = "Try the live scanner — 30-day trial",
+  primaryLabel = "Open the scanner — free account",
   secondaryHref = "/scorecard",
   secondaryLabel = "See the public scorecard",
   className = "mt-6",
@@ -110,7 +112,7 @@ export function LandingCta({
         <div className="mt-6">
           <ScannerPreview />
           <p className="mt-2 text-center text-xs text-subtle">
-            A live preview of the Tapeline scanner. Every liquid US stock &amp; ETF,
+            A preview of the Tapeline scanner (a cached snapshot, prices delayed about 15 minutes). Every liquid US stock &amp; ETF,
             scored on six named factors.
           </p>
         </div>

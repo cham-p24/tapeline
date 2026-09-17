@@ -26,9 +26,13 @@ vi.mock("@/lib/gtag", () => ({
   trackUpgradePromptShown: vi.fn(),
   trackUpgradePromptClicked: vi.fn(),
 }));
-vi.mock("@/lib/useLiveStream", () => ({
-  useLiveStream: () => ({ status: "live", lastUpdate: null }),
-}));
+vi.mock("@/lib/useLiveStream", () => {
+  // Stable like the real hook's useCallback: pages list it in effect deps.
+  const markLoaded = () => {};
+  return {
+    useLiveStream: () => ({ status: "connected", lastUpdate: null, markLoaded }),
+  };
+});
 vi.mock("@/lib/useEarningsCalendar", () => ({
   useEarningsCalendar: () => new Map(),
 }));

@@ -23,9 +23,13 @@ vi.mock("@/components/UserContext", () => ({
   useUser: vi.fn(),
 }));
 
-vi.mock("@/lib/useLiveStream", () => ({
-  useLiveStream: () => ({ status: "live", lastUpdate: null }),
-}));
+vi.mock("@/lib/useLiveStream", () => {
+  // Stable like the real hook's useCallback: pages list it in effect deps.
+  const markLoaded = () => {};
+  return {
+    useLiveStream: () => ({ status: "connected", lastUpdate: null, markLoaded }),
+  };
+});
 
 const proSectors = [
   {
@@ -106,7 +110,7 @@ describe("HeatmapPage", () => {
     expect(screen.getByText("312 tickers")).toBeInTheDocument();
     // Locked copy states the REAL summed live-ticker count (312+96+140 = 548).
     expect(
-      screen.getByText("Per-ticker tiles for 548 live tickers are on Pro"),
+      screen.getByText("Per-ticker tiles for 548 scored tickers are on Pro"),
     ).toBeInTheDocument();
     // Deep-links to billing with the pro intent pre-selected.
     expect(screen.getByRole("link", { name: /Upgrade to Pro/ }))
@@ -124,7 +128,7 @@ describe("HeatmapPage", () => {
       expect(screen.getByText("Per-ticker tiles are on Pro")).toBeInTheDocument();
     });
     expect(screen.getByText(/No sector data available right now/)).toBeInTheDocument();
-    expect(screen.queryByText(/0 live tickers/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/0 scored tickers/)).not.toBeInTheDocument();
   });
 
   it("shows an error state with retry when the preview load fails", async () => {

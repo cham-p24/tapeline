@@ -98,9 +98,12 @@ describe("UpgradeNudge", () => {
     render(<UpgradeNudge />);
     // Caps come from /api/me.nudge, not a hardcoded string.
     expect(await screen.findByText(/top 10 tickers/i)).toBeInTheDocument();
-    expect(screen.getByText(/live scores/i)).toBeInTheDocument();
+    expect(screen.getByText(/scores for the top 10 tickers/i)).toBeInTheDocument();
+    // Integrity 2026-09-14: prices are vendor-delayed ~15 min on every plan,
+    // so Free is not "live" and Pro is not "real-time".
+    expect(document.body.textContent ?? "").not.toMatch(/live scores|real-time/i);
     expect(screen.getByText(/5-ticker watchlist/i)).toBeInTheDocument();
-    // Free is live now — no "Nh delayed" clause should render.
+    // The delay is the same on every plan, so it is not a Free-vs-Pro clause.
     expect(screen.queryByText(/delayed/i)).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /see pro plans/i }),

@@ -9,6 +9,7 @@ import { LiveBadge } from "@/components/LiveBadge";
 import { useUser } from "@/components/UserContext";
 import { canUse } from "@/lib/auth";
 import { PRICING } from "@/lib/pricing";
+import { PASS_CADENCE_PHRASE, PRICE_DELAY_NOTE } from "@/lib/freshness";
 
 /**
  * Market Heatmap — per-ticker tiles are Pro+.
@@ -60,7 +61,7 @@ export default function HeatmapPage() {
   const load = useCallback(async () => {
     // Tier decides the endpoint — don't fire until the session resolves, or
     // we'd guess wrong and eat a 403.
-    if (userLoading) return;
+    if (userLoading) return false;
     try {
       if (!hasFullHeatmap) {
         // Free / signed-out: the public sector aggregate. Same underlying
@@ -69,7 +70,7 @@ export default function HeatmapPage() {
         const r = await heatmapPreview();
         setPreviewSectors(r.sectors || []);
         setLoadError(null);
-        return;
+        return true;
       }
       const r = await api.heatmap(debouncedSearch || undefined);
       setSectors(r.sectors || []);
@@ -84,17 +85,23 @@ export default function HeatmapPage() {
         });
       }
       setLoadError(null);
+      return true;
     } catch (e) {
       // 401 (signed out), 5xx (backend hiccup) land here. A failed load must
       // never masquerade as an empty market — surface the error and keep the
       // page alive instead of crashing the tree.
       setLoadError(errorMessage(e));
       setSectors([]);
+      return false;
     }
   }, [debouncedSearch, hasFullHeatmap, userLoading]);
 
-  useEffect(() => { load(); }, [load]);
-  const { status, lastUpdate } = useLiveStream(load);
+  // `load` resolves to false when it failed, so the badge's "Updated HH:MM"
+  // only ever moves for data that actually arrived.
+  const { status, lastUpdate, markLoaded } = useLiveStream(load);
+  useEffect(() => {
+    void load().then((ok) => { if (ok) markLoaded(); });
+  }, [load, markLoaded]);
 
   // Client-side sector filter sits on top of the (already-server-filtered)
   // sector list. Keeping it client-side means changing the dropdown is
@@ -133,10 +140,13 @@ export default function HeatmapPage() {
         <LiveBadge status={status} lastUpdate={lastUpdate} />
       </div>
 
-      {/* Live-freshness banner — surfaces backend's newest/oldest
-          updated_at so the user can see "data is X seconds old" at a
-          glance. Founder feedback 2026-05-21: "people trade based on
-          the information being live — is the information live?" */}
+      {/* Freshness banner — surfaces backend's newest/oldest updated_at so
+          the user can see when the worker last wrote a tile. Founder
+          feedback 2026-05-21: "people trade based on the information being
+          live — is the information live?" It is not: updated_at is the
+          worker's write time, and the prices it wrote are vendor-delayed
+          about 15 minutes (measured 14 Sep 2026). So the chip says RECENT /
+          STALE about the write, never LIVE, and the delay is stated beside it. */}
       {freshness && freshness.newest && (() => {
         const newestMs = Date.now() - new Date(freshness.newest).getTime();
         const oldestMs = freshness.oldest ? Date.now() - new Date(freshness.oldest).getTime() : 0;
@@ -146,18 +156,20 @@ export default function HeatmapPage() {
         return (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
             <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 ${fresh ? "bg-up/15 text-up" : "bg-warn/15 text-warn"}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${fresh ? "bg-up" : "bg-warn"} ${fresh ? "animate-pulse" : ""}`} />
-              {fresh ? "LIVE" : "DELAYED"}
+              <span className={`h-1.5 w-1.5 rounded-full ${fresh ? "bg-up" : "bg-warn"}`} />
+              {fresh ? "RECENT PASS" : "STALE"}
             </span>
             <span className="text-muted">
-              Newest tile: <span className="font-semibold text-fg nums">{newestSec}s</span> ago
+              Newest write: <span className="font-semibold text-fg nums">{newestSec}s</span> ago
             </span>
             <span className="text-subtle">·</span>
             <span className="text-muted">
-              Oldest tile: <span className="font-semibold text-fg nums">{oldestMin}m</span> ago
+              Oldest write: <span className="font-semibold text-fg nums">{oldestMin}m</span> ago
             </span>
             <span className="text-subtle">·</span>
             <span className="text-muted nums">{freshness.count}{" "}tickers shown</span>
+            <span className="text-subtle">·</span>
+            <span className="text-muted" data-testid="price-delay-note">{PRICE_DELAY_NOTE}</span>
           </div>
         );
       })()}
@@ -203,7 +215,7 @@ export default function HeatmapPage() {
               <>
                 {" "}from{" "}
                 <span className="font-semibold text-fg nums">{previewTickerTotal.toLocaleString()}</span>{" "}
-                live tickers
+                scored tickers
               </>
             )}
           </div>
@@ -211,7 +223,7 @@ export default function HeatmapPage() {
           <div className="card mt-3 p-4">
             {previewSectors.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted">
-                No sector data available right now. The worker rescans every ~60 seconds.
+                No sector data available right now. The worker rescans {PASS_CADENCE_PHRASE} during US market hours.
               </p>
             ) : (
               <div className="flex flex-wrap gap-1">
@@ -249,8 +261,8 @@ export default function HeatmapPage() {
           </div>
 
           <p className="mt-2 text-[11px] text-subtle">
-            Each sector tile is the dollar-volume-weighted average 1-day move of the live
-            tickers in that sector.
+            Each sector tile is the dollar-volume-weighted average 1-day move of the scored
+            tickers in that sector, from prices delayed about 15 minutes.
           </p>
 
           {/* Locked section — states what the paid view adds and the REAL
@@ -263,7 +275,7 @@ export default function HeatmapPage() {
             </div>
             <h2 className="mt-3 text-lg font-bold tracking-tight">
               {previewTickerTotal > 0
-                ? `Per-ticker tiles for ${previewTickerTotal.toLocaleString()} live tickers are on Pro`
+                ? `Per-ticker tiles for ${previewTickerTotal.toLocaleString()} scored tickers are on Pro`
                 : "Per-ticker tiles are on Pro"}
             </h2>
             <p className="mt-2 text-sm text-muted">

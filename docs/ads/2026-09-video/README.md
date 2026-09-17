@@ -31,7 +31,7 @@ Library on 2026-09-08 (US, active ads, keyword `stock screener` and
 
 ## What the sweep actually teaches
 
-**1. The hypey lane is crowded and closed to us.** "Real-Time Buy & Sell
+**1. The hypey lane is crowded and closed to us.** "Real-Time Buy & Sell <!-- copy-compliance-allow false-data-freshness -- quotes a competitor's ad headline as copy Tapeline cannot write; not a claim about Tapeline's data -->
 Alerts", "Executives just loaded up on their own stock", "spot the morning
 breakout before the crowd" — this is the dominant register, and every one of
 those phrases is prescriptive. Under the publisher-exemption posture Tapeline

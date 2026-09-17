@@ -515,44 +515,40 @@ async def set_recent_insider_transactions_db(
 
     sym = symbol.upper()
 
-    # Dedupe on the NATURAL KEY before touching the DB.
+    # Number the lines that share a NATURAL KEY instead of dropping them.
     #
-    # InsiderTransaction carries
-    #   UniqueConstraint(symbol, transaction_date, insider_name, share_change)
-    # which deliberately excludes transaction_price and code — but
-    # fetch_insider_transactions maps Finnhub's payload ONE ROW PER LINE ITEM
-    # with no dedupe, and share_change falls back to 0 when `change` is absent.
-    # Two Form 4 lines therefore collide routinely.
+    # The key is (transaction_date, insider_name, share_change); price and code
+    # are not in it. It used to be the whole of `uq_insider_natural`, so two
+    # lines sharing it made the single commit raise IntegrityError, the handler
+    # rolled back the DELETE too, and the symbol's data froze until the pair aged
+    # out of the 90-day window. The first fix kept the first line and dropped the
+    # rest - right for Finnhub, which repeated lines.
     #
-    # When they did, the single commit raised IntegrityError and the handler
-    # below rolled back — which also rolled back the DELETE. The symbol kept its
-    # OLD rows, and because the trigger is deterministic VENDOR DATA rather than
-    # a race, the next run failed identically. fetch_insider_transactions
-    # re-requests the same rolling 90-day window daily, so the offending pair
-    # kept reappearing until it aged out: a Premium feature's data frozen for up
-    # to three months.
+    # It is wrong for SEC EDGAR, where such lines are different transactions.
+    # Measured 2026-09-17: GSHD's conversion (C -5,000 at $0) and sale (S -5,000
+    # at $65.20) by the same insider on the same day collided, and the SALE was
+    # dropped, so the Insider tab showed a $0 conversion instead of a $326k sale;
+    # HFWA's equal vesting tranches were stored once. The score is computed from
+    # every line, so ~1.4% of equities held a sub_smart_money their stored rows
+    # could not reproduce.
     #
-    # It was invisible too — only a warning fired, the worker still counted
-    # `refreshed += 1`, and compute_smart_money_score cached the FRESH score, so
-    # the displayed transactions and the sub_smart_money factor disagreed.
-    #
-    # By the schema's own definition two rows sharing the 4-tuple ARE the same
-    # transaction, so collapsing them is consistent with it. First occurrence
-    # wins (vendor order, deterministic) and the collapse is logged so the
-    # narrowness of the key stays visible rather than silently losing lines.
+    # So every line is kept, and `line_seq` counts earlier lines with the same
+    # key, in source order, which keeps the rows unique under
+    # `uq_insider_natural` (migration 0071). A repeated key is logged, so how
+    # often it happens stays visible.
     rows: list[InsiderTransaction] = []
-    seen: set[tuple[str, str, int]] = set()
-    collapsed = 0
+    seen: dict[tuple[str, str, int], int] = {}
+    repeated = 0
     for t in txns or []:
         share_change = int(t.get("share_change") or 0)
         price = float(t.get("transaction_price") or 0)
         insider_name = (t.get("filer_name") or "")[:120]
         transaction_date = (t.get("transaction_date") or "")[:10]
         key = (transaction_date, insider_name, share_change)
-        if key in seen:
-            collapsed += 1
-            continue
-        seen.add(key)
+        line_seq = seen.get(key, 0)
+        seen[key] = line_seq + 1
+        if line_seq:
+            repeated += 1
         rows.append(
             InsiderTransaction(
                 symbol=sym,
@@ -563,13 +559,13 @@ async def set_recent_insider_transactions_db(
                 transaction_value=round(abs(share_change * price), 2),
                 code=(t.get("code") or "")[:4],
                 source=source,
+                line_seq=line_seq,
             )
         )
-    if collapsed:
+    if repeated:
         logger.info(
-            "insider.collapsed_duplicate_natural_key symbol=%s dropped=%d kept=%d "
-            "(uq_insider_natural excludes price+code)",
-            sym, collapsed, len(rows),
+            "insider.repeated_natural_key symbol=%s repeated=%d rows=%d",
+            sym, repeated, len(rows),
         )
 
     async with session_scope() as session:
@@ -579,11 +575,11 @@ async def set_recent_insider_transactions_db(
         try:
             await session.commit()
         except IntegrityError:
-            # With the payload deduped above, this can only be a genuine race
+            # With every line numbered above, this can only be a genuine race
             # against another concurrent refresh of the SAME symbol. Roll back
             # and let the next refresh re-run cleanly — that really is transient.
             # Logged at ERROR, not warning: it should now be rare, and if it
-            # starts recurring for one symbol the dedupe above has a hole.
+            # starts recurring for one symbol the numbering above has a hole.
             await session.rollback()
             logger.error("insider.write_race symbol=%s rows=%d", sym, len(rows))
 
@@ -1307,6 +1303,15 @@ async def fetch_insider_transactions(
             data = r.json()
             if not isinstance(data, dict):
                 raise ValueError(f"expected a JSON object, got {type(data).__name__}")
+            # Only an explicit list is an answer. `data.get("data") or []` read
+            # {}, {"error": ...} and {"data": null} as "no filings" and cached
+            # that for 24h. The worker's insider pass reads SEC EDGAR since #835
+            # and no longer calls this, but the ticker page's insider endpoint
+            # still does, and a body that says nothing is not "no filings".
+            if not isinstance(data.get("data"), list):
+                raise ValueError(
+                    f"expected a data list, got {type(data.get('data')).__name__}",
+                )
     except (FinnhubThrottledError, FinnhubUnavailableError):
         raise
     except Exception as exc:
@@ -1316,7 +1321,7 @@ async def fetch_insider_transactions(
             ) from exc
         return None
 
-    raw = data.get("data") or []
+    raw = data["data"]
     rows: list[dict[str, Any]] = []
     for it in raw:
         rows.append({

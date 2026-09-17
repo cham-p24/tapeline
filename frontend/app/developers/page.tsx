@@ -114,7 +114,7 @@ const FAQ = [
   },
   {
     q: "Is there a free tier for the API?",
-    a: `The API itself is a Premium feature. Signing up costs nothing and takes an email and a password, but a free account issues no key: the free plan covers the in-app product (live scores on the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups/day, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-symbol watchlist` : ""}), not programmatic access. Adding a card starts a 30-day Premium trial — $0 that day, first charge on day 30, one click to cancel before then — and the trial issues a working key at 100 requests/day, so you can build and test against the real endpoints before deciding.`,
+    a: `The API itself is a Premium feature. Signing up costs nothing and takes an email and a password, but a free account issues no key: the free plan covers the in-app product (scores on the top ${FREE_LIMITS.scannerRows} scanner rows, ${FREE_LIMITS.dailyLookups} look-ups/day, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-symbol watchlist` : ""}), not programmatic access. Adding a card starts a 30-day Premium trial — $0 that day, first charge on day 30, one click to cancel before then — and the trial issues a working key at 100 requests/day, so you can build and test against the real endpoints before deciding.`,
   },
 ];
 
