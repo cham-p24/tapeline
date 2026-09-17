@@ -80,10 +80,17 @@ t=15-35 API live bridge sees the pass settle and pushes one SSE update to client
 | Squeeze Watch | — (no real data) | — (no real data, #818) | — (no real data, #818) |
 | Market Regime | ✅ basic | ✅ full | ✅ full |
 | Congress Trades | — | — | — (no real source, #820) |
-| Email alerts | — | 10/day | unlimited |
-| Browser push alerts | 0 rules (since #683) | effectively uncapped | effectively uncapped |
+| Email alerts | — | 10/day | 50/day |
+| Browser push alerts | 0 rules (since #683) | 50/day | 50/day |
 | CSV export | — | ✅ | ✅ |
 | API access | — | — | ✅ (1000 req/day) |
+
+Alert caps are DELIVERIES per UTC day, per channel, counted across every rule
+plus the watchlist smart alert. Premium email was 10,000/day and browser push
+had no cap at all until 2026-09-18; `services/alerts.ALERT_DAILY_CEILING` now
+puts 50 under every plan, and a plan's own lower cap (Pro email: 10) still
+applies first. Free receives none on either channel: its email cap is 0 and
+`_channel_entitled` refuses its web push.
 
 Email and browser push are the **only** alert channels. Telegram was retired as a
 customer channel on 2026-08-11 (Discord + SMS on 2026-05-04); `routers/alerts.py`

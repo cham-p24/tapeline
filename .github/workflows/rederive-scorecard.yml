@@ -29,6 +29,11 @@ name: Re-derive scorecard from real closes
 #   1. mode=estimate            — cost only, no vendor calls, no writes
 #   2. mode=dry-run             — real fetches, reports before/after, NO writes
 #   3. mode=apply               — writes. Irreversible; rewrites the public record.
+#
+# NO SILENT REWRITE. apply needs `restatement`: the date of an entry ALREADY
+# merged and deployed in backend/app/services/scorecard_export.py RESTATEMENTS
+# (the dated list that ships inside the downloadable record). The script refuses
+# otherwise, and only writes rows recorded before that date.
 
 on:
   workflow_dispatch:
@@ -54,6 +59,10 @@ on:
         description: "Days per ssh session (0 = one long session). 30 keeps each slice well inside the ~45min the stream survives."
         required: false
         default: "30"
+      restatement:
+        description: "For mode=apply ONLY: YYYY-MM-DD of the deployed RESTATEMENTS entry that discloses this rewrite"
+        required: false
+        default: ""
       confirm:
         description: "For mode=apply ONLY, type exactly: rewrite-the-public-record"
         required: false
@@ -90,6 +99,7 @@ jobs:
           SINCE: ${{ inputs.since }}
           PACE: ${{ inputs.pace }}
           SLICE_DAYS: ${{ inputs.slice_days }}
+          RESTATEMENT: ${{ inputs.restatement }}
         run: |
           set -euo pipefail
           if [ -z "${FLY_API_TOKEN:-}" ]; then
@@ -101,7 +111,12 @@ jobs:
           case "$MODE" in
             estimate) args="--estimate" ;;
             dry-run)  args="" ;;
-            apply)    args="--apply" ;;
+            apply)
+              if ! printf '%s' "${RESTATEMENT:-}" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+                echo "::error title=No restatement::mode=apply needs the YYYY-MM-DD of the deployed RESTATEMENTS entry that discloses this rewrite."
+                exit 1
+              fi
+              args="--apply --restatement ${RESTATEMENT}" ;;
             *) echo "::error::unknown mode $MODE"; exit 1 ;;
           esac
           [ -n "${PACE:-}" ]  && args="$args --pace ${PACE}"

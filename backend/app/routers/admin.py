@@ -8,14 +8,13 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from sqlalchemy import delete, func, literal, or_, select
+from sqlalchemy import func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_session
 from app.models import (
     AlertEvent,
-    DailyScorecardEntry,
     McpToolCall,
     StripeWebhookEvent,
     Subscription,
@@ -157,56 +156,15 @@ async def set_user_tier(
     return {"ok": True, "user_id": user_id, "tier": body.tier}
 
 
-class ScorecardResetBody(BaseModel):
-    # When true, wipe everything. When false (default), only delete entries
-    # known to be bad: zero flag price, or back-check that recorded the buggy
-    # "next-day price equals flag price" snapshot pattern.
-    wipe_all: bool = False
-
-
-@router.post("/scorecard/reset")
-async def reset_scorecard(
-    body: ScorecardResetBody,
-    _: None = Depends(require_admin),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    """Clean up the public scorecard before launch.
-
-    Two modes:
-      - `wipe_all=true`: drop every row. Use this once before launch to start
-        the public record from a clean state.
-      - `wipe_all=false` (default): drop only known-bad rows. Specifically:
-          * `price_at_flag <= 0` (broken upstream data)
-          * `price_next_day == price_at_flag` AND `change_pct_1d_after == 0`
-            (the stale-snapshot back-check bug — every pick recorded as 0%)
-    """
-    before_q = await session.execute(select(func.count()).select_from(DailyScorecardEntry))
-    before = before_q.scalar() or 0
-
-    if body.wipe_all:
-        await session.execute(delete(DailyScorecardEntry))
-        mode = "all"
-    else:
-        # Same-value snapshot bug: price_next_day equals price_at_flag AND
-        # the recorded return is 0. Catches the entire 5/9-style cohort.
-        await session.execute(
-            delete(DailyScorecardEntry).where(
-                or_(
-                    DailyScorecardEntry.price_at_flag <= 0,
-                    (DailyScorecardEntry.price_next_day == DailyScorecardEntry.price_at_flag)
-                    & (DailyScorecardEntry.change_pct_1d_after == 0.0),
-                )
-            )
-        )
-        mode = "bad_only"
-
-    await session.commit()
-
-    after_q = await session.execute(select(func.count()).select_from(DailyScorecardEntry))
-    after = after_q.scalar() or 0
-
-    logger.warning("admin.scorecard_reset mode=%s before=%d after=%d removed=%d", mode, before, after, before - after)
-    return {"ok": True, "mode": mode, "before": before, "after": after, "removed": before - after}
+# There is deliberately NO endpoint here that deletes, re-ranks or rewrites
+# daily_scorecard or the point-in-time archive. POST /scorecard/reset used to exist: a
+# 2026-05-10 pre-launch cleanup that could drop every row (wipe_all) or every
+# row matching a bad-data predicate. The public record says entries are never
+# re-ranked or deleted, and an admin key that can do either makes that sentence
+# depend on nobody calling it. A value correction goes through
+# app/scripts/rederive_scorecard.py, which refuses to write until the dated
+# restatement is in scorecard_export.RESTATEMENTS.
+# tests/test_record_cannot_be_reset.py pins this for every non-GET route.
 
 
 @router.get("/stats")

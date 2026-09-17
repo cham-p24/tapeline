@@ -822,7 +822,9 @@ async def tick() -> None:
         await broker.publish("squeeze_updated", {"count": len(squeezes)})
 
     # Evaluate alert rules against the freshly-updated state.
-    # Each evaluator is debounced internally (15min), safe to run every tick.
+    # Safe to run every tick: alerts fire on a CROSSING, remembered in
+    # alert_rule_states, not while a condition stays true (services/alerts),
+    # and one machine evaluates at a time (dblock.LOCK_ALERT_RULES).
     _set_stage("alerts")
     async with session_scope() as alert_session:
         try:
@@ -2796,6 +2798,30 @@ _FUNDAMENTALS_UNSAVED_BEFORE = datetime(2026, 9, 13, 23, 0, tzinfo=UTC)
 #: re-read on their horizon.
 _SMART_MONEY_EDGAR_SINCE = datetime(2026, 9, 14, 14, 10, tzinfo=UTC)
 
+#: Smart money stamped before this instant is due NOW, and an EDGAR Form 4 row
+#: fetched before it is not evidence against an empty answer.
+#:
+#: The EDGAR reader changed how a filing becomes rows (services/edgar_form4.py,
+#: points 5-7), and every stored row predates it:
+#:
+#: * ATTRIBUTION. A filing used to be written under EVERY ticker SEC lists for
+#:   its CIK. On 2026-09-17, 70 CIKs spread 2,609 rows over 173 symbols:
+#:   Strategy's STRC/STRF/STRK/STRD preferreds carried MSTR's insider sales,
+#:   JPM's VYLD/AMJB ETNs carried JPM's, notes like GREEL and TMUSZ their
+#:   issuer's. Now only the ticker the filing names gets the lines.
+#: * AMENDMENTS. A 4/A dropped every Form 4 its owner filed that day, e.g. 51 of
+#:   Magnetar's CRWV sale lines. Now only the original it restates.
+#: * FUTURE DATES. A GIC filing's 2027-09-03 typo sat at the top of the Holdings
+#:   feed. Now a trade dated after its filing date is dropped.
+#:
+#: So every row is re-read once. Most filings come from the parse cache, so a
+#: re-read costs one submissions request; only multi-ticker CIKs download
+#: their filings again. The guard half matters as much: a preferred's CORRECT
+#: empty answer would otherwise be "contradicted" by the issuer rows it wrongly
+#: held, counted as a failure, and never cleared - and ten such symbols in forty
+#: would stop the pass. Rows fetched from here on are trusted as before.
+_SMART_MONEY_REREAD_BEFORE = datetime(2026, 9, 17, 17, 30, tzinfo=UTC)
+
 #: A row holding a smart-money value with NO Form 4 row on file is due again
 #: once its stamp is this old, whatever its asset class's horizon says.
 #:
@@ -2882,6 +2908,7 @@ def _factor_due_clause(stamp_col: Any, now: datetime) -> Any:
         )
     if stamp_col.key == "last_smart_money_at":
         due = due | (stamp_col < _SMART_MONEY_EDGAR_SINCE)
+        due = due | (stamp_col < _SMART_MONEY_REREAD_BEFORE)
         due = due | (
             _unbacked_smart_money()
             & (stamp_col < now - _UNBACKED_SMART_MONEY_RECHECK_AFTER)
@@ -3837,9 +3864,21 @@ async def _clear_smart_money_reading(symbol: str) -> tuple[bool, bool]:
     )
     cleared = False
     async with session_scope() as session:
+        # Evidence against the empty answer: EDGAR rows fetched under the
+        # current attribution and amendment rules (_SMART_MONEY_REREAD_BEFORE),
+        # never a future trade date (a filer's year typo would contradict every
+        # empty answer for a year). The count is every EDGAR row, for the
+        # return value.
+        trusted = (
+            (InsiderTransaction.fetched_at >= _SMART_MONEY_REREAD_BEFORE)
+            & (InsiderTransaction.transaction_date <= date.today().isoformat())
+        )
         newest, edgar_rows = (await session.execute(
             select(
-                func.max(func.nullif(InsiderTransaction.transaction_date, "")),
+                func.max(case(
+                    (trusted, func.nullif(InsiderTransaction.transaction_date, "")),
+                    else_=None,
+                )),
                 func.count(),
             )
             .where(InsiderTransaction.symbol == sym, InsiderTransaction.source == "edgar")

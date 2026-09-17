@@ -1,6 +1,6 @@
 "use client";
 
-import { PRICING, FREE_LIMITS, usd, usdCompact, annualSaving, billedAnnuallyNote, freeHasWatchlist } from "@/lib/pricing";
+import { ALERT_DAILY_CEILING, PRICING, FREE_LIMITS, usd, usdCompact, annualSaving, billedAnnuallyNote, freeHasWatchlist } from "@/lib/pricing";
 import { useBillingPeriod } from "@/components/BillingToggle";
 import { BestValueBadge } from "@/components/BestValueBadge";
 import { ACTIVE_SCORED_TICKERS } from "@/lib/universe";
@@ -78,7 +78,9 @@ const SECTIONS: Section[] = [
     name: "Watchlist & alerts",
     rows: [
       { label: "Watchlist", free: freeHasWatchlist() ? `${FREE_LIMITS.watchlistTickers} tickers` : "—", pro: "50 tickers · smart alerts", premium: "200 tickers · smart alerts" },
-      { label: "Email alerts per day", free: "—", pro: "10", premium: "Unlimited" },
+      // Premium read "Unlimited". The sender stops at ALERT_DAILY_CEILING on
+      // every plan, so the column now states the number it stops at.
+      { label: "Email alerts per day", free: "—", pro: "10", premium: String(ALERT_DAILY_CEILING) },
       { label: "Daily briefing email", free: "—", pro: "✓", premium: "✓" },
       // #683 took the free allowance to ZERO in backend tier.py
       // (FREE_WEB_PUSH_ALERTS = 0) on the reasoning that an alert IS the
@@ -86,7 +88,10 @@ const SECTIONS: Section[] = [
       // while charging for it on the other sold nothing. lib/pricing.ts has
       // been brought back in line with tier.py, so this reads from the
       // constant again rather than hardcoding the dash.
-      { label: "Browser push", free: FREE_LIMITS.webPushAlerts > 0 ? `${FREE_LIMITS.webPushAlerts} alert rules` : "—", pro: "✓", premium: "✓" },
+      // Browser push had NO daily cap at all until 2026-09-18 (one account
+      // took 258 pushes in a day). It now carries the same ceiling as email,
+      // so a bare tick would overstate it.
+      { label: "Browser push", free: FREE_LIMITS.webPushAlerts > 0 ? `${FREE_LIMITS.webPushAlerts} alert rules` : "—", pro: `${ALERT_DAILY_CEILING}/day`, premium: `${ALERT_DAILY_CEILING}/day` },
     ],
   },
   {

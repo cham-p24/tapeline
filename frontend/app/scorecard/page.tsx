@@ -87,7 +87,7 @@ function ScorecardHero({ liveMissing }: { liveMissing?: readonly string[] | null
   return (
     <>
       <h1 className="text-4xl font-bold tracking-tight">
-        Every daily top-10, recorded when it printed and checked against SPY. Losing days included.
+        Each daily top 10 on the record, recorded when it printed and checked against SPY. Losing days included.
       </h1>
       <p className="mt-3 max-w-2xl text-muted">
         At each US market close the six-factor composite produces a ranking. We write the top 10 down &mdash;

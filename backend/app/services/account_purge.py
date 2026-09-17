@@ -38,12 +38,13 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import delete, func
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     AlertEvent,
     AlertRule,
+    AlertRuleState,
     ApiKey,
     NewsletterSubscriber,
     RoadmapVote,
@@ -73,6 +74,15 @@ async def purge_user_owned_rows(
     person. Only the erasure path needs that; the cancel path may pass it too.
     """
     await session.execute(delete(AlertEvent).where(AlertEvent.user_id == user_id))
+    # Crossing state belongs to the rules (ON DELETE CASCADE in Postgres),
+    # deleted explicitly so SQLite does not orphan it.
+    await session.execute(
+        delete(AlertRuleState).where(
+            AlertRuleState.rule_id.in_(
+                select(AlertRule.id).where(AlertRule.user_id == user_id)
+            )
+        )
+    )
     await session.execute(delete(AlertRule).where(AlertRule.user_id == user_id))
     # WatchlistItem before Watchlist — items FK the parent list (ON DELETE
     # CASCADE), but both also key users.id directly, so delete the child first.

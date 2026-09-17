@@ -85,6 +85,19 @@ class WatchlistItem(Base):
     last_alert_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
+    # Where the score stands against the alert band: "inside" (|delta| below
+    # alert_threshold_delta), "up" or "down". The smart alert fires when this
+    # CHANGES to "up" or "down", not while it stays there — see
+    # services/alerts.evaluate_watchlist_alerts and migration 0072.
+    #
+    # New rows start "inside": baseline_score is captured from the live score
+    # when the item is added, so the delta is ~0 at that moment. Rows that
+    # pre-date 0072 are NULL, which the evaluator treats as "not yet seen": it
+    # records the zone without alerting, so shipping edge-triggering did not
+    # send one more alert for every item already past its threshold.
+    alert_zone: Mapped[str | None] = mapped_column(
+        String(8), nullable=True, default="inside",
+    )
 
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,

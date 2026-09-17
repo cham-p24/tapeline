@@ -144,7 +144,7 @@ export default function WhyPage() {
             <Link href="/scorecard" className="link">
               public scorecard
             </Link>
-            . Every daily top-10 is written down and checked against what
+            . Each recorded daily top 10 was written down the day it printed and checked against what
             happened next, and the days that went nowhere are on the page in the
             same styling as the days that went well. Nothing is removed after the
             fact. When the method changes, the change is dated in the{" "}

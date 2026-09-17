@@ -295,7 +295,7 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
       `Tapeline 6-factor score on ${t.symbol} (${t.name}) — composite, ` +
       `signal label, Trend / Relative Strength / Fundamentals / Smart Money / ` +
       `Macro / Momentum sub-scores, plain-English reason, and the public ` +
-      `scorecard's track record. Same formula, every ticker, every day.`,
+      `scorecard's track record. Same formula for every scored ticker.`,
     path: `/blog/ticker/${t.symbol}`,
     ogType: "article",
     publishedTime: "2026-05-14",
@@ -580,7 +580,7 @@ export default async function TickerBlogPost({ params }: { params: Promise<{ sym
             </>
           ) : (
             <p className="mt-3 text-base text-fg leading-relaxed">
-              {t.symbol} hasn't been in a Tapeline top-10 cohort yet, so there's no per-ticker back-check history on the public scorecard. That's not a negative read — only the top-scoring 10 names per session are frozen for back-checking, so the bar for inclusion is high. Today's composite ({fmtScore(composite)}) shows where {t.symbol} currently ranks. The full universe-wide scorecard, including every other ticker that has been frozen, lives at{" "}
+              {t.symbol} hasn't been in a Tapeline top-10 cohort yet, so there's no per-ticker back-check history on the public scorecard. That's not a negative read — only the top-scoring 10 names on each recorded daily list are back-checked, so the bar for inclusion is high. Today's composite ({fmtScore(composite)}) shows where {t.symbol} currently ranks. The full universe-wide scorecard, including every other ticker that has been on a recorded daily list, lives at{" "}
               <Link href="/scorecard" className="text-accent hover:underline">/scorecard</Link>.
             </p>
           )}

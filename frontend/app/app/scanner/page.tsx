@@ -720,10 +720,11 @@ export default function ScannerPage() {
               delay ~15 min; the worker re-reads every row about every
               60 s, and during the US session (04:00-20:00 ET) the live
               bridge makes this page refetch about once per pass
-              (useLiveStream below), so no reload is needed. */}
+              (useLiveStream below), so no reload is needed. The 60 s
+              cadence is stated once, inside IN_APP_REFRESH_SENTENCE. */}
           <p className="text-xs text-subtle" data-testid="price-delay-note">
-            {priceDelayNote(meta?.delayMinutes)}, re-read {PASS_CADENCE_PHRASE} during
-            US market hours (crypto: once a day). {IN_APP_REFRESH_SENTENCE}
+            {priceDelayNote(meta?.delayMinutes)}, re-read on each pass (see below) during US market
+            hours (crypto: once a day). {IN_APP_REFRESH_SENTENCE}
           </p>
         </div>
         <div className="flex items-center gap-3">

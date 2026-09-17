@@ -146,7 +146,7 @@ quote the steady-state Free caps, never the promo numbers — see
 - Market regime: full view with VIX/DXY/10Y/sector leaders · heatmap
 - Full ticker detail, news, IPOs, earnings; ticker look-ups unmetered
 - Watchlist: 50 tickers across 5 named lists, with smart alerts
-- Email alerts: up to 10/day · browser push (effectively unlimited)
+- Email alerts: up to 10/day · browser push: up to 50/day
 - Daily briefing email · CSV export · 10 saved scans
 - No API access
 
@@ -171,7 +171,8 @@ quote the steady-state Free caps, never the promo numbers — see
   pending the lawyer's answer, so do not list it as a Premium benefit.
 - **API access**: 1,000 requests/day (throttled to 100/day while on trial —
   `_TRIAL_PREMIUM_REDUCTIONS`)
-- Email alerts: unlimited · watchlist 200 tickers / 20 lists · 100 saved scans
+- Email alerts: up to 50/day · browser push: up to 50/day · watchlist 200
+  tickers / 20 lists · 100 saved scans
 - Priority support
 
 Note: Telegram alerts were removed as a user-facing feature in 2026-08

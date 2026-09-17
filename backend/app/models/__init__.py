@@ -26,7 +26,14 @@ from app.models.squeeze import SqueezeSetup
 from app.models.survey import SurveyResponse
 from app.models.telegram_token import TelegramLinkToken
 from app.models.ticker import Ticker
-from app.models.user import AlertEvent, AlertRule, MfaRecoveryCode, Subscription, User
+from app.models.user import (
+    AlertEvent,
+    AlertRule,
+    AlertRuleState,
+    MfaRecoveryCode,
+    Subscription,
+    User,
+)
 from app.models.watchlist import Watchlist, WatchlistItem
 from app.models.watchlist_trackrecord import WatchlistTrackRecordEntry
 from app.models.web_push import WebPushSubscription
@@ -37,6 +44,7 @@ __all__ = [
     "SCAN_LOG_TOP_N",
     "AlertEvent",
     "AlertRule",
+    "AlertRuleState",
     "ApiKey",
     "CapEvent",
     "CongressTrade",

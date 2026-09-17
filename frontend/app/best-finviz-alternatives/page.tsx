@@ -97,7 +97,7 @@ const TOOLS: Tool[] = [
     },
     pros: [
       "Six named scoring factors, published methodology — no black-box",
-      "Public scorecard back-checking every top-10 pick vs SPY",
+      "Public scorecard back-checking each recorded daily top-10 pick vs SPY",
       "Plain-English Why on every row — no upgrade gates the reasoning",
       "Prices delayed about 15 minutes, re-read about every 60 seconds during US market hours",
       "A free plan runs the scanner — ten scored rows per scan",
@@ -373,7 +373,7 @@ const WHY_LOOK_BEYOND = [
   },
   {
     title: "You want an audit-able track record, not just self-reported stats",
-    body: "Finviz doesn't publish a scorecard of its screener results vs SPY. Most competitors report aggregate statistics that can't be reconciled to individual calls. Tapeline auto-logs every top-10 daily pick at /scorecard with its rank, score and price, and the realized next-session return vs SPY, losing picks included and downloadable as CSV. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026.",
+    body: "Finviz doesn't publish a scorecard of its screener results vs SPY. Most competitors report aggregate statistics that can't be reconciled to individual calls. Tapeline auto-logs each recorded daily top-10 pick at /scorecard with its rank, score and price, and the realized next-session return vs SPY, losing picks included and downloadable as CSV. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026.",
   },
   {
     title: "You want plain-English explanations, not just data",
@@ -409,7 +409,7 @@ const MIGRATION_STEPS = [
   },
   {
     name: "Set up alerts to replace your Finviz email digest",
-    text: "If you relied on Finviz's email alerts, make sure the new tool has alerts of comparable cadence. Tapeline Pro includes 10 email alerts/day; Premium is unlimited email. TradingView's alert system is more granular but costs extra on free tier.",
+    text: "If you relied on Finviz's email alerts, make sure the new tool has alerts of comparable cadence. Tapeline Pro includes 10 email alerts/day; Premium goes up to 50/day. TradingView's alert system is more granular but costs extra on free tier.",
   },
   {
     name: "Migrate your saved watchlist",
@@ -436,7 +436,7 @@ const FAQ = [
   },
   {
     q: "Which Finviz alternative offers a public scorecard?",
-    a: "Tapeline is the only tool on this list that auto-publishes every top-10 daily pick with the realized next-day return vs SPY at /scorecard. Most competitors report aggregate statistics (e.g., 'historical Rank #1 returns'); few publish a dated, per-pick record.",
+    a: "Tapeline is the only tool on this list that auto-publishes each recorded daily top-10 pick with the realized next-day return vs SPY at /scorecard, open to everyone 7 days after the session. Most competitors report aggregate statistics (e.g., 'historical Rank #1 returns'); few publish a dated, per-pick record.",
   },
   {
     q: "How was this list ranked?",

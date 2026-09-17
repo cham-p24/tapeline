@@ -263,7 +263,7 @@ export function organizationJsonLd() {
     alternateName: "Tapeline.io",
     slogan: "Read the tape",
     description:
-      `Tapeline is a transparent quantitative stock scanner for US equities and ETFs. Every actively-traded ticker gets one 0-100 composite score from six named, publicly-documented factors (trend, relative strength, fundamentals, smart money, macro, momentum). Prices are ${PRICE_DELAY_PHRASE}; during US market hours every covered stock and ETF is re-read ${PASS_CADENCE_PHRASE}, and most score inputs are daily readings, so a score usually changes about once a day. Every top-10 daily pick is logged to a public scorecard and back-checked against SPY the next session.`,
+      `Tapeline is a transparent quantitative stock scanner for US equities and ETFs. Every actively-traded ticker gets one 0-100 composite score from six named, publicly-documented factors (trend, relative strength, fundamentals, smart money, macro, momentum). Prices are ${PRICE_DELAY_PHRASE}; during US market hours every covered stock and ETF is re-read ${PASS_CADENCE_PHRASE}, and most score inputs are daily readings, so a score usually changes about once a day. Each recorded daily top 10 is logged to a public scorecard and back-checked against SPY the next session.`,
     url: "https://tapeline.io",
     logo: "https://tapeline.io/favicon.svg",
     foundingDate: "2026",
@@ -481,7 +481,7 @@ export function howToJsonLd(a: HowToArgs) {
  * Schema.org Dataset for /scorecard.
  *
  * The public scorecard is Tapeline's flagship proprietary asset — a record of
- * every top-10 daily pick with its rank, score and prices, back-checked vs SPY
+ * each recorded daily top-10 pick with its rank, score and prices, back-checked vs SPY
  * the next session. It is NOT described as append-only or unedited: recorded
  * values were corrected on 2026-06-15 (scores capped) and 2026-08-25 (prices),
  * and it stores no signal label or reasoning (integrity wave, 2026-09-14). Modeling it as Dataset
@@ -498,7 +498,7 @@ export function scorecardDatasetJsonLd() {
     name: "Tapeline Public Scorecard",
     alternateName: "Tapeline Top-10 Daily Picks Track Record",
     description:
-      "Public record of every top-10 daily pick produced by the Tapeline 6-factor scanner. Each entry holds the rank, the recorded Tapeline Score, the recorded price, and the realised next-session return benchmarked against SPY; losing picks are included. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. Trading days with no entry and other known limitations are listed with the data.",
+      "Public record of each recorded daily top-10 pick produced by the Tapeline 6-factor scanner. Each entry holds the rank, the recorded Tapeline Score, the recorded price, and the realised next-session return benchmarked against SPY; losing picks are included. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. Trading days with no entry and other known limitations are listed with the data.",
     url: "https://tapeline.io/scorecard",
     isAccessibleForFree: true,
     license: "https://tapeline.io/legal/terms",
@@ -730,7 +730,7 @@ export function aboutProfilePageJsonLd() {
       url: "https://tapeline.io",
       logo: "https://tapeline.io/favicon.svg",
       description:
-        "Tapeline is a quantitative stock scanner that names the six factors behind its score and back-checks every top-10 daily pick against the next-day SPY-relative move.",
+        "Tapeline is a quantitative stock scanner that names the six factors behind its score and back-checks each recorded daily top-10 pick against the next-day SPY-relative move.",
       knowsAbout: [
         "Quantitative equity scoring",
         "Multi-factor models",
@@ -950,7 +950,7 @@ export function compareJsonLd(a: CompareArgs) {
       ],
       featureList: [
         "Six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum), weighted most toward Trend and Relative Strength and least toward Momentum",
-        "Public scorecard — every top-10 daily pick back-checked vs SPY next session",
+        "Public scorecard — each recorded daily top-10 pick back-checked vs SPY next session",
         `Prices ${PRICE_DELAY_PHRASE}, re-read for every covered stock and ETF ${PASS_CADENCE_PHRASE} during market hours`,
         "A one-sentence plain-English read per scored ticker (free tier included)",
         "Market-regime detection",

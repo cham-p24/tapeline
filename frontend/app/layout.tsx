@@ -16,7 +16,7 @@ import {
   CLARITY_ID,
   PLAUSIBLE_DOMAIN,
 } from "@/lib/trackers";
-import { PRICING, usd } from "@/lib/pricing";
+import { PRICING, annualRateLabel } from "@/lib/pricing";
 import {
   jsonLdScript,
   organizationJsonLd,
@@ -101,7 +101,7 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description:
-    `Stock scanner with a public methodology: six named factors, one 0-100 score per US ticker, every top-10 pick logged with next-day return. Pro from ${usd(PRICING.pro.annualPerMonth)}/mo.`,
+    `Stock scanner with a public methodology: six named factors, one 0-100 score per US ticker, each recorded daily top-10 pick logged with next-day return. Pro from ${annualRateLabel(PRICING.pro)}.`,
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://tapeline.io"),
   applicationName: "Tapeline",
   authors: [{ name: "Tapeline", url: "https://tapeline.io" }],
@@ -121,7 +121,7 @@ export const metadata: Metadata = {
     // (matches X/LinkedIn banner copy) rather than the SERP-loaded variant.
     title: "Tapeline — Read the tape",
     description:
-      `Read the tape. One score per US ticker, six named factors with the weight ordering published, daily back-checked scorecard. The whole record is free to read with no account. Pro ${usd(PRICING.pro.annualPerMonth)}/mo, Premium ${usd(PRICING.premium.annualPerMonth)}/mo.`,
+      `Read the tape. One score per US ticker, six named factors with the weight ordering published, daily back-checked scorecard. The record is free to read with no account, each entry 7 days after its session. Pro ${annualRateLabel(PRICING.pro)}; Premium ${annualRateLabel(PRICING.premium)}.`,
     url: "/",
     siteName: "Tapeline",
     type: "website",
