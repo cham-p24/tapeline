@@ -716,6 +716,7 @@ async def test_a_restart_no_longer_loses_a_reading_the_pass_computed(
 
     # The restart: memory gone, and nothing ever put the value on the row.
     monkeypatch.setattr(finnhub_feed, "_SMART_MONEY_SCORE_CACHE", {})
+    monkeypatch.setattr(finnhub_feed, "_PASS_READINGS", {})
     async with session_scope() as s:
         row = (await s.execute(select(Ticker).where(Ticker.symbol == "OXY"))).scalar_one()
         assert row.sub_smart_money is None

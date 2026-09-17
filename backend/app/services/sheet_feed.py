@@ -42,7 +42,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 import httpx
-from sqlalchemy import func, select
+from sqlalchemy import Table, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -818,14 +818,13 @@ async def upsert_tickers(
     `sector` and `name` are left alone for the existing flow to fill —
     _backfill_sectors handles both.
 
-    ALL SIX sub-scores are written, not left alone. That sentence used to say
-    the opposite and it was years out of date: the loop at the bottom of this
-    function setattr's every `sub_*` column from the composite, INCLUDING None.
-    See the comment there for why None must be written rather than skipped, and
-    `finnhub_feed.warm_factor_caches_from_db` for the consequence — a process
-    whose Finnhub factor caches are cold blanks `sub_fundamentals` and
-    `sub_smart_money` on every sheet-governed row and re-scores it with the
-    NEUTRAL fallback in both slots.
+    ALL SIX sub-scores are written, not left alone, INCLUDING None, with the
+    score and label computed from exactly the six written. On an existing row
+    fundamentals and smart money are the ROW's own values, not this process's
+    caches: the factor passes own those two and write them onto the row
+    themselves. See `_write_factor_sets` for why, and for the compare-and-set
+    that keeps a reading saved mid-ingest. A new row takes all six from the
+    parse.
     """
     inserted = updated = 0
     # The rows added by this call, by symbol. The session does not autoflush,
@@ -835,6 +834,9 @@ async def upsert_tickers(
     # fail the commit, and leave the whole sheet un-ingested on every retry.
     # The later sheet row wins, as it already does for a symbol that exists.
     added: dict[str, Ticker] = {}
+    # Existing rows' factor sets, by symbol, with the cache-owned factors as
+    # loaded. The later sheet row wins here too.
+    factor_writes: dict[str, tuple[Mapping[str, Any], dict[str, Any]]] = {}
     for r in rows:
         t = added.get(r["symbol"])
         if t is None:
@@ -879,13 +881,6 @@ async def upsert_tickers(
         # a newly-reclassified geared fund would put it back in the default
         # ranked view — the exact failure this flag exists to stop.
         t.is_leveraged = is_leveraged_fund(t.name, t.asset_class)
-        # Clamp to the documented 0-100 composite AT THE COLUMN BOUNDARY. The
-        # composite already clamps in score.compute_tapeline_composite, but
-        # guarding the write itself means no future scorer change or new write
-        # path can ever leak a raw factor value (>100) into Ticker.score — the
-        # root cause behind the corrupt public-scorecard rows.
-        t.score = None if r["score"] is None else max(0.0, min(100.0, r["score"]))
-        t.signal = r["signal"]
         t.price = r["price"]
         if r.get("confidence_pct") is not None:
             t.confidence_pct = r["confidence_pct"]
@@ -909,13 +904,273 @@ async def upsert_tickers(
         # 50 — the displayed numbers wouldn't add up. Writing None on
         # cache miss clears the stale value so the UI shows "—".
         # (Codex review on PR #225 + PR #226 caught this; thanks.)
-        for key in ("sub_trend", "sub_rs", "sub_fundamentals",
-                    "sub_smart_money", "sub_macro", "sub_momentum"):
-            setattr(t, key, r.get(key))
+        #
+        # A row this call inserts has no other writer yet, so it takes the
+        # parsed set on the object. An existing row takes the workbook's four
+        # factors beside its own fundamentals and smart money, in
+        # `_write_factor_sets` after this loop: see there for why, and why not
+        # through the ORM. The None-writing rule above now applies to the four.
+        if t.symbol in added:
+            _set_factor_set_on(t, r)
+        else:
+            factor_writes[t.symbol] = (
+                r, {c: getattr(t, c) for c in _ROW_OWNED_FACTORS},
+            )
 
     _warn_collapsed_duplicates(rows, "sheet_feed.duplicate_symbols_collapsed")
     await session.commit()
+    await _write_factor_sets(session, factor_writes)
     return {"inserted": inserted, "updated": updated, "total": inserted + updated}
+
+
+#: The six factor columns, in composite-weight order.
+_FACTOR_COLUMNS: tuple[str, ...] = (
+    "sub_trend", "sub_rs", "sub_fundamentals",
+    "sub_smart_money", "sub_macro", "sub_momentum",
+)
+
+#: The factors the ROW owns. The worker's factor passes write their readings
+#: onto the row themselves (`signal_publisher._save_factor_readings`), the
+#: insider pass clears smart money on the row (`_clear_smart_money_reading`),
+#: and every process warms its caches from the rows. This ingest reads them
+#: from the row; it no longer writes them over an existing row.
+_ROW_OWNED_FACTORS: tuple[str, ...] = ("sub_fundamentals", "sub_smart_money")
+
+#: The factors the workbook itself determines.
+_SHEET_OWNED_FACTORS: tuple[str, ...] = tuple(
+    c for c in _FACTOR_COLUMNS if c not in _ROW_OWNED_FACTORS
+)
+
+#: Existing rows per factor-set statement.
+_FACTOR_WRITE_CHUNK = 500
+
+#: Attempts at one row's factor set, after the chunk statement missed it,
+#: before it is left to the next ingest.
+_FACTOR_WRITE_ATTEMPTS = 3
+
+
+def _clamped_score(score: float | None) -> float | None:
+    """Clamp to the documented 0-100 composite AT THE COLUMN BOUNDARY. The
+    composite already clamps in score.compute_tapeline_composite, but guarding
+    the write itself means no future scorer change or new write path can ever
+    leak a raw factor value (>100) into Ticker.score - the root cause behind the
+    corrupt public-scorecard rows."""
+    return None if score is None else max(0.0, min(100.0, score))
+
+
+def _set_factor_set_on(t: Ticker, r: Mapping[str, Any]) -> None:
+    t.score = _clamped_score(r["score"])
+    t.signal = r["signal"]
+    for key in _FACTOR_COLUMNS:
+        setattr(t, key, r.get(key))
+
+
+def _row_owned_values(
+    symbol: str, held: Mapping[str, float | None], *, cache_for_null: bool = True,
+) -> tuple[dict[str, float | None], bool]:
+    """Fundamentals and smart money to write beside the workbook's four, and
+    whether smart money came from the cache for a NULL row.
+
+    In order, for each of the two:
+
+    1. What THIS process's factor passes last learned
+       (`finnhub_feed._PASS_READINGS`). It is never older than the row, and it
+       is how a reading or a retirement whose own write lost its compare-and-set
+       reaches a sheet-owned row: the pass leaves it for the row's owner.
+    2. The row's value. Otherwise the caches only repeat the rows - the warm
+       fills them from the rows - and in the API process they are a snapshot
+       taken before this multi-minute ingest began.
+    3. Only for a NULL row, the cache as it is now: a reading the boot rebuild
+       restored from stored Form 4 rows. The caller writes such a smart-money
+       value only while the symbol still HAS Form 4 rows, because a reading
+       retired in another process leaves this process's cache holding it.
+    """
+    from app.services.finnhub_feed import (
+        get_cached_score,
+        get_cached_smart_money_score,
+        pass_reading,
+    )
+
+    lookups = {
+        "sub_fundamentals": get_cached_score,
+        "sub_smart_money": get_cached_smart_money_score,
+    }
+    values: dict[str, float | None] = {}
+    smart_money_from_cache = False
+    for c in _ROW_OWNED_FACTORS:
+        produced, reading = pass_reading(c, symbol)
+        if produced:
+            values[c] = reading
+        elif held[c] is not None or not cache_for_null:
+            values[c] = held[c]
+        else:
+            values[c] = lookups[c](symbol)
+            smart_money_from_cache |= c == "sub_smart_money" and values[c] is not None
+    return values, smart_money_from_cache
+
+
+def _factor_set(
+    r: Mapping[str, Any], row_owned: Mapping[str, float | None],
+) -> dict[str, Any]:
+    """The workbook's four factors beside the row-owned two, with the composite
+    and label of all six - the same function both owners' composites use.
+
+    When the two are the ones the parse used, the parse's score and label ARE
+    that composite, and are kept as parsed."""
+    from app.services.score import composite_from_factors
+
+    factors = {**{c: r.get(c) for c in _SHEET_OWNED_FACTORS}, **row_owned}
+    if all(row_owned[c] == r.get(c) for c in _ROW_OWNED_FACTORS):
+        return {**factors, "score": _clamped_score(r["score"]), "signal": r["signal"]}
+    score = _clamped_score(composite_from_factors(
+        {c.removeprefix("sub_"): v for c, v in factors.items()},
+    ))
+    return {**factors, "score": score, "signal": score_to_signal(score)}
+
+
+async def _write_factor_sets(
+    session: AsyncSession,
+    writes: Mapping[str, tuple[Mapping[str, Any], Mapping[str, float | None]]],
+) -> None:
+    """Write each existing row's six factors, score and signal as ONE set, with
+    fundamentals and smart money chosen by `_row_owned_values`.
+
+    FOUND IN REVIEW, 2026-09-17: two races with the worker's factor passes
+    ----------------------------------------------------------------------
+    This ingest used to set all six factors, score and signal on each loaded
+    Ticker - fundamentals and smart money from this process's caches, as they
+    stood when the CSV was PARSED - and commit once, minutes later, for ~4,100
+    rows. Since #825/#829 the factor passes write each reading onto its row in
+    between, and #824 clears smart money on the row.
+
+    * TORN ROW. The ORM's UPDATE carries only attributes that differ from what
+      it LOADED. A reading saved after the load was left in place - it had "not
+      changed" - beside a score and label computed without it. Reproduced on
+      SQLite: sub_smart_money 90.0 beside 48.9 NEUTRAL, where the stored factors
+      make 59.7 CONSTRUCTIVE. Nothing repaired it until the sheet next changed.
+    * REVERTED READING. A reading saved after the PARSE but before the load was
+      overwritten with the parse-time value. The row stayed consistent, but a
+      restart before the next ingest lost the reading until the row came due
+      again (36h for smart money), because the boot rebuild repairs only NULLs.
+
+    WHAT HAPPENS NOW. Each chunk is one statement that writes the whole set
+    only where the two row-owned factors still hold what this call loaded (a
+    compare-and-set). A row another writer changed in between is missed; it is
+    re-read and written again, with the two chosen afresh beside the workbook's
+    four and the composite of all six. So the ingest neither tears the row nor
+    reverts the reading. After `_FACTOR_WRITE_ATTEMPTS` misses the row keeps the
+    set the other writer left, which is consistent, and the workbook's four
+    factors wait for the next ingest.
+
+    A NULL row taking smart money from the cache is written on its own, in a
+    statement that also requires the symbol's Form 4 rows to exist. A reading
+    retired in the worker (#824: row NULL, Form 4 rows deleted) while the API
+    process's webhook ingest runs is otherwise written back from the API's
+    cache, which was warmed before the retirement.
+
+    `updated_at` is held still: a factor set is not live data (see the comment
+    on Ticker.updated_at). The price this ingest writes moves it, through the
+    ORM, in the commit before this runs.
+    """
+    from sqlalchemy import bindparam, exists, update
+
+    from app.models import InsiderTransaction
+
+    table: Table = Ticker.__table__  # type: ignore[assignment]
+    chunk_stmt = (
+        update(table)
+        .where(
+            table.c.symbol == bindparam("b_symbol"),
+            *(
+                table.c[c].is_not_distinct_from(bindparam(f"b_{c}"))
+                for c in _ROW_OWNED_FACTORS
+            ),
+        )
+        .values({
+            **{c: bindparam(f"v_{c}") for c in (*_FACTOR_COLUMNS, "score", "signal")},
+            "updated_at": table.c.updated_at,
+        })
+    )
+
+    symbols = list(writes)
+    one_by_one: list[str] = []
+    for start in range(0, len(symbols), _FACTOR_WRITE_CHUNK):
+        chunk = symbols[start:start + _FACTOR_WRITE_CHUNK]
+        intended: dict[str, dict[str, Any]] = {}
+        params = []
+        for sym in chunk:
+            r, held = writes[sym]
+            values, smart_money_from_cache = _row_owned_values(sym, held)
+            if smart_money_from_cache:
+                one_by_one.append(sym)
+                continue
+            intended[sym] = _factor_set(r, values)
+            params.append({
+                "b_symbol": sym,
+                **{f"b_{c}": held[c] for c in _ROW_OWNED_FACTORS},
+                **{f"v_{c}": v for c, v in intended[sym].items()},
+            })
+        if params:
+            await session.execute(chunk_stmt, params)
+            await session.commit()
+            # An executemany reports no per-row count. A row whose statement
+            # missed still holds factors the workbook did not send.
+            stored = (await session.execute(
+                select(table.c.symbol, *(table.c[c] for c in _SHEET_OWNED_FACTORS))
+                .where(table.c.symbol.in_(list(intended)))
+            )).all()
+            one_by_one.extend(
+                row.symbol for row in stored
+                if any(getattr(row, c) != intended[row.symbol][c] for c in _SHEET_OWNED_FACTORS)
+            )
+
+    missed = unwritten = 0
+    for sym in one_by_one:
+        r = writes[sym][0]
+        cache_for_null = True
+        for attempt in range(_FACTOR_WRITE_ATTEMPTS):
+            if attempt:
+                missed += 1
+            current = (await session.execute(
+                select(*(table.c[c] for c in _ROW_OWNED_FACTORS))
+                .where(table.c.symbol == sym)
+            )).one_or_none()
+            if current is None:
+                break
+            held = dict(zip(_ROW_OWNED_FACTORS, current, strict=True))
+            values, smart_money_from_cache = _row_owned_values(
+                sym, held, cache_for_null=cache_for_null,
+            )
+            where = [
+                table.c.symbol == sym,
+                *(table.c[c].is_not_distinct_from(v) for c, v in held.items()),
+            ]
+            if smart_money_from_cache:
+                where.append(exists().where(InsiderTransaction.symbol == sym))
+            result = await session.execute(
+                update(table)
+                .where(*where)
+                .values({**_factor_set(r, values), "updated_at": table.c.updated_at})
+            )
+            await session.commit()
+            if result.rowcount == 1:  # type: ignore[attr-defined]
+                break
+            # Either the row moved again or its Form 4 rows are gone. In the
+            # second case the cache's reading is retired, so do not offer it.
+            cache_for_null = not smart_money_from_cache
+        else:
+            unwritten += 1
+    if writes:
+        # The statements above bypass the objects this session loaded, which
+        # still hold the pre-write factors (expire_on_commit is off). Expire
+        # them so a later query in the same session reads the committed row
+        # instead of a stale identity-map copy.
+        session.expire_all()
+    if missed or unwritten:
+        logger.info(
+            "sheet_feed.factor_set_contended retries=%d kept_other_writer=%d",
+            missed, unwritten,
+        )
 
 
 async def refresh_from_workbook(session: AsyncSession) -> dict[str, int]:
@@ -1265,9 +1520,14 @@ async def upsert_etfs(
         # owns the flag. See services/leverage.py.
         t.is_leveraged = is_leveraged_fund(t.name, t.asset_class)
 
-        # Same 0-100 column-boundary clamp as the equity upsert above.
-        t.score = None if r["score"] is None else max(0.0, min(100.0, r["score"]))
-        t.signal = r["signal"]
+        # Score and signal are NOT written. The tab's Score column is the
+        # signal-system's own number, and Ticker.score is Tapeline's
+        # six-factor composite (fix 2, docs/SCORING_AUDIT_2026-06-01.md).
+        # Writing it published a label beside factors that did not make it:
+        # on a sheet-owned ETF such as SPY, a clamped 131 as 100 HIGH
+        # CONVICTION beside factors whose composite was 41.6 NEUTRAL, until
+        # the ALL SIGNALS tab next changed. Found in review 2026-09-17; the
+        # tab parsed to 0 rows in production at the time.
         # 1M proxy from 3M / 3 (ETFs barely move intraday; coarser is fine)
         if r["change_pct_3m"] is not None:
             t.change_pct_1m = r["change_pct_3m"] / 3.0
@@ -1559,6 +1819,9 @@ async def upsert_smart_money(
 ) -> dict[str, int]:
     """Update Ticker.sub_smart_money for symbols flagged by the SMART MONEY tab.
 
+    NOT CALLED since 2026-09-17 - see `refresh_smart_money_from_workbook`. It
+    writes a factor without the composite beside it; do not re-wire it as is.
+
     Only WRITES to sub_smart_money — leaves all other Ticker columns alone.
     If a symbol in the sheet doesn't exist in Ticker yet (rare — the
     universe is already broader after PR #52 lit up ALL SIGNALS), we skip
@@ -1580,33 +1843,41 @@ async def upsert_smart_money(
     return {"inserted": 0, "updated": updated, "total": updated, "skipped": skipped}
 
 
+#: Whether this process has said, once, that the tab is set but not ingested.
+_smart_money_tab_retired_logged = False
+
+
 async def refresh_smart_money_from_workbook(session: AsyncSession) -> dict[str, int]:
+    """RETIRED 2026-09-17: the SMART MONEY & CONGRESS tab no longer writes
+    `sub_smart_money`. Returns skipped whether or not the URL is set.
+
+    WHY. The tab's value is an appearance count - congress trades, committee
+    overlaps, hedge-fund and 13F mentions and Form 4 lines together - and
+    `upsert_smart_money` wrote it over the row's reading without recomputing
+    the score beside it. Smart money is published as SEC Form 4 read from EDGAR
+    (#835, changelog #848), a value with no Form 4 rows on file is re-checked
+    and cleared (#833), and the insider pass writes its reading with the
+    composite (#829). Ingesting the tab would undo all three: on every worker
+    boot and every sheet-changed webhook (both start with an empty content-hash
+    cache) it replaced EDGAR readings with a count, left the stored score
+    computed from the old value, and the next boot's cache warm adopted the
+    count as the reading for the row's whole horizon. Found in review; the
+    SMART_MONEY_CONGRESS_CSV_URL secret was not set on Fly when this was
+    retired, so production behaviour did not change.
+
+    To bring the tab back, decide first how a count may coexist with a Form 4
+    reading, and write the composite beside it.
+    """
+    global _smart_money_tab_retired_logged
     url = get_settings().smart_money_congress_csv_url
-    if not url:
-        return {"inserted": 0, "updated": 0, "total": 0, "skipped": 1}
-    try:
-        text = await fetch_csv(url)
-    except Exception:
-        logger.exception("sheet_feed.smart_money_fetch_failed")
-        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
-    if text is None:
-        # Content hash matched the prior fetch — nothing to upsert.
-        # Saves a parse + DB round-trip on every steady-state 30s tick.
-        logger.debug("sheet_feed.smart_money_unchanged_skip")
-        return {"inserted": 0, "updated": 0, "total": 0, "unchanged": 1}
-    try:
-        rows = parse_smart_money_csv(text)
-    except Exception:
-        logger.exception("sheet_feed.smart_money_parse_failed")
-        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
-    try:
-        counts = await upsert_smart_money(session, rows)
-    except Exception:
-        logger.exception("sheet_feed.smart_money_upsert_failed")
-        return {"inserted": 0, "updated": 0, "total": 0, "error": 1}
-    commit_csv_hash(url, text)
-    logger.info("sheet_feed.smart_money_refreshed rows=%d", counts["total"])
-    return counts
+    if url and not _smart_money_tab_retired_logged:
+        _smart_money_tab_retired_logged = True
+        logger.warning(
+            "sheet_feed.smart_money_tab_retired SMART_MONEY_CONGRESS_CSV_URL is set "
+            "but the tab no longer writes sub_smart_money; see "
+            "refresh_smart_money_from_workbook",
+        )
+    return {"inserted": 0, "updated": 0, "total": 0, "skipped": 1}
 
 
 async def refresh_all_tabs(session: AsyncSession) -> dict[str, dict[str, int]]:

@@ -177,10 +177,35 @@ def get_cached_score(symbol: str) -> float | None:
     return _FUND_SCORE_CACHE.get(symbol.upper())
 
 
-def set_cached_score(symbol: str, score: float | None) -> None:
-    """Worker-side setter — call after each fetch_basic_financials + compute."""
+def set_cached_score(symbol: str, score: float | None, *, from_row: bool = False) -> None:
+    """Worker-side setter — call after each fetch_basic_financials + compute.
+
+    `from_row=True` for a value loaded from the Ticker row (the cache warm),
+    which is not a new reading; see `_PASS_READINGS`."""
     if score is not None:
-        _FUND_SCORE_CACHE[symbol.upper()] = score
+        sym = symbol.upper()
+        _FUND_SCORE_CACHE[sym] = score
+        if not from_row:
+            _PASS_READINGS[("sub_fundamentals", sym)] = score
+
+
+#: What THIS process's factor passes last learned, by (column, SYMBOL): a
+#: reading, or None for one an empty insider answer retired.
+#:
+#: The caches alone cannot say whether they are newer than the row: the boot
+#: warm and every sheet-changed webhook fill them FROM the rows. A pass's own
+#: result can. It is never older than the row - the pass puts it here before it
+#: writes the row - and it is what the row's owner must write when the pass's
+#: own write lost its compare-and-set (`signal_publisher._save_factor_readings`,
+#: `_clear_smart_money_reading`). `sheet_feed._write_factor_sets` reads this to
+#: decide between the row and the cache for a sheet-owned row.
+_PASS_READINGS: dict[tuple[str, str], float | None] = {}
+
+
+def pass_reading(column: str, symbol: str) -> tuple[bool, float | None]:
+    """(whether this process's passes produced a value for it, that value)."""
+    key = (column, symbol.upper())
+    return key in _PASS_READINGS, _PASS_READINGS.get(key)
 
 
 def fund_cache_size() -> int:
@@ -232,11 +257,17 @@ def get_cached_smart_money_score(symbol: str) -> float | None:
     return _SMART_MONEY_SCORE_CACHE.get(symbol.upper())
 
 
-def set_cached_smart_money_score(symbol: str, score: float | None) -> None:
+def set_cached_smart_money_score(
+    symbol: str, score: float | None, *, from_row: bool = False,
+) -> None:
+    """`from_row=True` for a value loaded or rebuilt from stored rows, which is
+    not a new reading; see `_PASS_READINGS`."""
     if score is not None:
         sym = symbol.upper()
         _SMART_MONEY_SCORE_CACHE[sym] = score
         _SMART_MONEY_CLEARED.discard(sym)
+        if not from_row:
+            _PASS_READINGS[("sub_smart_money", sym)] = score
 
 
 def clear_cached_smart_money_score(symbol: str) -> None:
@@ -246,6 +277,7 @@ def clear_cached_smart_money_score(symbol: str) -> None:
     sym = symbol.upper()
     _SMART_MONEY_SCORE_CACHE.pop(sym, None)
     _SMART_MONEY_CLEARED.add(sym)
+    _PASS_READINGS[("sub_smart_money", sym)] = None
 
 
 def smart_money_cleared_symbols() -> frozenset[str]:
@@ -365,7 +397,7 @@ async def _rebuild_unsaved_smart_money_scores() -> int:
         for sym, txns in by_symbol.items():
             score = compute_smart_money_score(txns)
             if score is not None and get_cached_smart_money_score(sym) is None:
-                set_cached_smart_money_score(sym, score)
+                set_cached_smart_money_score(sym, score, from_row=True)
                 rebuilt += 1
     except Exception:
         # Guards the WHOLE rebuild, scoring included: the warm is awaited
@@ -458,10 +490,10 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
                 )).scalars().all())
         for sym, fund, sm in rows:
             if fund is not None:
-                set_cached_score(sym, float(fund))
+                set_cached_score(sym, float(fund), from_row=True)
                 funds += 1
             if sm is not None:
-                set_cached_smart_money_score(sym, float(sm))
+                set_cached_smart_money_score(sym, float(sm), from_row=True)
                 smart += 1
         for sym in unbacked:
             if sym not in with_form4:
