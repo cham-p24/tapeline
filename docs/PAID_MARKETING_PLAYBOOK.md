@@ -126,7 +126,7 @@ Search Terms report mined weekly; harvest converters into exact, push junk to ne
 
 ### 5.3 Responsive Search Ad copy — compliance-checked
 
-*Corrected 15 September 2026: removed "Scores Refresh Every Minute" (a pass takes about 70 to 80 seconds on prices delayed about 15 minutes, and scores usually change once a day), "live", and congressional trades and squeeze setups (neither exists today). See `docs/COPY_FACTS.md`.*
+*Corrected 15 September 2026: this section used to say "Scores Refresh Every Minute"; that line is removed (a pass lands about every 60 seconds on prices delayed about 15 minutes, and scores usually change once a day), "live", and congressional trades and squeeze setups (neither exists today). See `docs/COPY_FACTS.md`.*
 
 Every line below was checked against: descriptive-only (no buy/sell/should/recommend), no "beat the market"/outperform/guaranteed, no urgency/countdown, no exact factor weights, no "signal(s)", no vs-SPY figure in a headline, no regulator names or logos, no implied edge ("before it moves"). All headlines ≤30 chars, descriptions ≤90.
 

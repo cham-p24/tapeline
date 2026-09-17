@@ -205,36 +205,6 @@
       "reason": "Quotes the phrase in order to criticise it ('the \"back-tested results\" in marketing ... don't actually track it'). Tapeline publishes no backtest; the post argues against relying on them."
     },
     {
-      "file": "docs/BRAND_SERP_KIT.md",
-      "rule": "false-data-freshness",
-      "phrase": "sub-60",
-      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
-    },
-    {
-      "file": "docs/BRAND_SERP_KIT.md",
-      "rule": "false-data-freshness",
-      "phrase": "under 60 seconds",
-      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
-    },
-    {
-      "file": "docs/launch/LAUNCH_PLAYBOOK.md",
-      "rule": "false-data-freshness",
-      "phrase": "sub-60",
-      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
-    },
-    {
-      "file": "docs/launch/LAUNCH_PLAYBOOK.md",
-      "rule": "false-data-freshness",
-      "phrase": "live data",
-      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
-    },
-    {
-      "file": "docs/launch/LAUNCH_PLAYBOOK.md",
-      "rule": "false-data-freshness",
-      "phrase": "real-time",
-      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
-    },
-    {
       "file": "frontend/app/changelog/page.tsx",
       "rule": "false-data-freshness",
       "phrase": "live data",

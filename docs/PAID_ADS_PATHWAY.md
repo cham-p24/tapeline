@@ -2,7 +2,7 @@
 
 > **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
 >
-> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 70 to 80 seconds (gaps of 71 to 74 seconds measured on 14 September 2026), and most score inputs are daily, so a score usually changes about once a day. In-app pages do not update on their own, and public pages are cached snapshots that can be an hour or more old. Nothing is real-time, sub-60s or "every minute".
+> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 60 seconds (gaps of 59.99 to 60.02 seconds measured on 14 September 2026 after #843; longer around a deploy), and most score inputs are daily, so a score usually changes about once a day. The scanner and the other auto-refreshing in-app pages reload about once per pass during the US session (04:00 to 20:00 ET on trading days), and public pages are cached snapshots that can be an hour or more old. It is not real-time, not sub-60s and not "every minute".
 > - **Congressional trades.** There is no real source of congressional trade disclosures. Tapeline shows none, none feeds the score, and they are not a Premium feature (#770, #820).
 > - **Squeeze detection.** No real squeeze data source is configured. The squeeze pages show an empty state, squeeze alerts cannot fire, and squeeze is not sold (#818).
 > - **Trial and card.** Signing up is free and needs no card (the card wall ran from 22 to 30 August 2026, #548 to #683). A card starts the 30-day Premium trial, and the pre-charge email goes about 7 days before the first charge.
@@ -92,7 +92,7 @@ The #1 paid-ads mistake is optimizing toward **free trials** — you train Googl
 ### STEP 4 — Google Search campaign structure
 - **One Search campaign**, 3–6 **Single-Theme Ad Groups** (STAGs), each → its matched LP. Starting themes (cheapest, highest-intent first):
   1. **Competitor-alternative** (cheapest intent, warmest): `finviz alternative`, `trade ideas alternative`, `tipranks alternative`, `zacks alternative`, `trendspider alternative`, `stock rover alternative`.
-  2. **Category tool**: `stock scanner`, `stock screener`, `best stock screener`. *(15 September 2026: `real-time stock scanner` removed — prices are delayed about 15 minutes.)*
+  2. **Category tool**: `stock scanner`, `stock screener`, `best stock screener`. *(15 September 2026: this list used to say "real-time stock scanner"; it is removed, because prices are delayed about 15 minutes.)*
   3. **Use-case**: `swing trading scanner`, `momentum stock scanner`, `stock screener for swing trading`. *(15 September 2026: `squeeze scanner` removed — no working squeeze detection, #818.)*
   4. **Differentiator angle** (cheap, on-brand): `transparent stock score`, `insider buying tracker`. *(15 September 2026: `congress stock tracker` removed — no congressional trade data, #820.)* (Not `13f tracker` — Quiver was cancelled and there is no 13F surface to send the click to.)
 - **Match types**: start **Phrase + Exact** (control at zero data); graduate to Broad + Smart Bidding once you have ~30 conversions.

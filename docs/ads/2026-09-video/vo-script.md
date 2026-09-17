@@ -3,7 +3,7 @@
 > **DO NOT USE the scene-02 on-screen line in the B2 and D long cuts (noted 15 September 2026).**
 > The on-screen text "Six named factors, one 0–100 composite, re-scored through the US
 > session." (B2 and D, scene 02 below) implies a score moves during the day. Scores are
-> recalculated on every worker pass, about every 70 to 80 seconds, but most of their
+> recalculated on every worker pass, about every 60 seconds, but most of their
 > inputs are daily readings, so a score usually changes about once a day
 > (`docs/COPY_FACTS.md` §1). The rendered files that show it are
 > `voiceover/tapeline-concept-{b,d}-vo-{1x1,4x5,9x16}.mp4`, `stills/4x5/02-turn.png` and the

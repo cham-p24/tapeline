@@ -7,7 +7,7 @@
 > in place; check every other line against `docs/COPY_FACTS.md`:
 >
 > - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
->   covered stock and ETF about every 70 to 80 seconds during US market hours,
+>   covered stock and ETF about every 60 seconds during US market hours,
 >   and most score inputs are daily readings, so a score usually changes about
 >   once a day. Do not call anything live, real-time, sub-60s or "every minute".
 > - **The scorecard:** summary figures are current; per-day entries are on a

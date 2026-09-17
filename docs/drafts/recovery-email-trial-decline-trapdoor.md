@@ -7,8 +7,8 @@ fresh founder approval"*).
 ## What happened to them
 
 Between **2026-08-27 and 2026-08-28**, three people signed up, were shown the
-trial offer, and declined it. The decline button promised them *"live scores,
-top-10 scanner, 12 look-ups a day"* and sent them to `/app/scanner` — but their
+trial offer, and declined it. The decline button, which used to read *"live scores,
+top-10 scanner, 12 look-ups a day"*, sent them to `/app/scanner` — but their
 accounts had been created after `CARD_GATE_START`, so `/app/scanner` bounced
 them straight back into the card wall. The button told them there was a free
 product and then did not give it to them.

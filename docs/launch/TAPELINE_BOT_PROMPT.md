@@ -263,7 +263,7 @@ fly secrets set -a tapeline-backend KEY=value KEY2=value2
 
 The bot is "shipped" when:
 
-1. A Tier 2 Reddit comment ("what's $NVDA score?") receives an auto-reply containing the live score within 5 minutes.
+1. A Tier 2 Reddit comment ("what's $NVDA score?") receives an auto-reply containing the current score within 5 minutes.
 2. A Tier 1 LinkedIn-tone email (long methodology critique) arrives → founder gets a Telegram notification with the draft reply → founder hits `/approve_<id>` → the reply lands in the inbox within 30 seconds.
 3. The same Reddit comment delivered twice (e.g. PRAW polled the same window) is processed once — second pass is a no-op.
 4. Discord and SMS channels are NOT re-enabled (founder retired them 2026-05-04 for unit economics reasons).

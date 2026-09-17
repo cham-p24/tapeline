@@ -4,7 +4,7 @@
 
 Tapeline scores about 11,500 US stocks and ETFs on six named factors, shows SEC Form 4 insider filings per ticker, and classifies the overall market regime. About 100 crypto pairs are scored separately, once a day.
 
-Prices are delayed about 15 minutes (the data plan is Massive Stocks Starter). During US market hours the scoring worker re-reads them for every covered stock and ETF about every 70 to 80 seconds. Scores are recalculated on each pass, but most of their inputs are daily readings, so a score usually changes about once a day. See `docs/COPY_FACTS.md` for the measurements (14 September 2026) and for what copy may say.
+Prices are delayed about 15 minutes (the data plan is Massive Stocks Starter). During US market hours the scoring worker re-reads them for every covered stock and ETF about every 60 seconds. Scores are recalculated on each pass, but most of their inputs are daily readings, so a score usually changes about once a day. See `docs/COPY_FACTS.md` for the measurements (14 September 2026) and for what copy may say.
 
 Not available today: congressional trade data (no real source; the pages say so) and squeeze detection (no real data source is configured, so the squeeze pages are empty and squeeze alerts cannot fire).
 

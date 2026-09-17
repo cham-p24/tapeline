@@ -9,9 +9,9 @@
 > `docs/COPY_FACTS.md`, which has the measurements and times:
 >
 > - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
->   covered stock and ETF about every 70 to 80 seconds during US market hours,
->   and a score usually changes about once a day. Do not call anything live,
->   real-time, sub-60s or "every minute".
+>   covered stock and ETF about every 60 seconds during US market hours (longer
+>   around a deploy), and a score usually changes about once a day. Never call
+>   the data live: not real-time, not sub-60s, not "every minute".
 > - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
 >   updated once a day. Not ~2,500.
 > - **Congressional trades and squeeze detection do not exist today.** Do not
@@ -88,7 +88,7 @@ version of "go get customers."
 | Thing | Current truth |
 |---|---|
 | **Free** | $0, no card · 12 ticker look-ups/day (unmetered first 24h) · top-10 scanner rows · watchlist (5) · 1 saved screen · public scorecard (per-day entries on a 7-day delay) |
-| **Prices** | Delayed about 15 minutes on every plan; re-read about every 70 to 80 seconds during US market hours. Scores usually change about once a day. Never "live" or "no delay" |
+| **Prices** | Delayed about 15 minutes on every plan; re-read about every 60 seconds during US market hours. Scores usually change about once a day. Never "live" or "no delay" |
 | **Pro** | **$9.99/mo** or **$8.25/mo billed annually** ($99/yr) · every row of the scan (about 11,500 US stocks and ETFs) · alerts · calendars · CSV |
 | **Premium** | **$19.99/mo** or **$16.58/mo billed annually** ($199/yr) · + per-ticker SEC Form 4 filings · + API 1,000/day |
 | **Trial** | 30 days of Premium, **card required** ($0 charged today, first charge on day 30, an email about 7 days before it, one-click cancel before then). Signing up takes an email and a password. Adding a card is what starts the trial. The published record — daily Top 10, the public scorecard (per-day entries on a 7-day delay), per-ticker pages, CSV/JSON export (to 7 days ago) — needs no account and no card. |
@@ -191,9 +191,9 @@ Methodology and scorecard are free to inspect at /how-it-works and /scorecard. R
 Post as a **text submission with `https://tapeline.io` in the URL field**. Tuesday
 or Thursday, **8 AM ET**. Hang around for 60 minutes answering every comment.
 
-**Title (79 chars):**
+**Title (75 chars):**
 ```
-Show HN: A stock scanner that logs every top-10 pick vs SPY the next day
+Show HN: A stock scanner that records its daily top 10 and checks it vs SPY
 ```
 
 **Text:**

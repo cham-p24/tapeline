@@ -90,7 +90,7 @@ Every data source used in production must be documented here with license terms,
 
 | Source | Production refresh cadence |
 |---|---|
-| Massive snapshot | Re-read about every 70 to 80 seconds during market hours (one pass per worker loop, measured 14 September 2026); the prices themselves are delayed about 15 minutes |
+| Massive snapshot | Re-read about every 60 seconds during market hours (one pass per worker loop, measured 14 September 2026); the prices themselves are delayed about 15 minutes |
 | Massive daily aggregates (trend, RS, momentum) | Once per 24 hours per worker process; the latch resets on deploy |
 | Regime inputs (VIX, DXY, 10Y) | FRED daily closes (the Starter plan has no indices entitlement) |
 | Crypto | Once a day, from daily bars |

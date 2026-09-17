@@ -9,9 +9,9 @@
 > `docs/COPY_FACTS.md`, which has the measurements and times:
 >
 > - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
->   covered stock and ETF about every 70 to 80 seconds during US market hours,
->   and a score usually changes about once a day. Do not call anything live,
->   real-time, sub-60s or "every minute".
+>   covered stock and ETF about every 60 seconds during US market hours (longer
+>   around a deploy), and a score usually changes about once a day. Never call
+>   the data live: not real-time, not sub-60s, not "every minute".
 > - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
 >   updated once a day. Not ~2,500.
 > - **Congressional trades and squeeze detection do not exist today.** Do not
@@ -87,7 +87,7 @@ All tweets verified ≤ 280 chars (Twitter counts URLs as 23 chars regardless).
 ## Tweet 4 (~190 chars)
 
 ```
-And every top-10 pick gets back-checked vs SPY the next day. Wins AND losses both stay on the page, corrections dated, no survivor bias. The current median alpha and its sample size are on tapeline.io/scorecard.
+And each recorded top 10 gets back-checked vs SPY the next day. Wins AND losses both stay on the page, corrections dated, no survivor bias. The current median alpha and its sample size are on tapeline.io/scorecard.
 ```
 
 **Why this works:** it points at the live figure instead of baking in a

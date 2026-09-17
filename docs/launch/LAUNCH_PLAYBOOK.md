@@ -9,9 +9,9 @@
 > `docs/COPY_FACTS.md`, which has the measurements and times:
 >
 > - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
->   covered stock and ETF about every 70 to 80 seconds during US market hours,
->   and a score usually changes about once a day. Do not call anything live,
->   real-time, sub-60s or "every minute".
+>   covered stock and ETF about every 60 seconds during US market hours (longer
+>   around a deploy), and a score usually changes about once a day. Never call
+>   the data live: not real-time, not sub-60s, not "every minute".
 > - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
 >   updated once a day. Not ~2,500.
 > - **Congressional trades and squeeze detection do not exist today.** Do not
@@ -101,7 +101,7 @@ The thing I care most about: a public scorecard. Each trading day I log the top 
 Free tier: top-10 rows, 12 ticker look-ups a day, 5-name watchlist. No card.
 Pro $9.99/mo: every row of the scan (about 11,500 US stocks and ETFs) + watchlist alerts.
 Premium $19.99/mo: + per-ticker SEC Form 4 filings, API.
-Prices are delayed about 15 minutes and re-read about every 70 to 80 seconds during US market hours; most score inputs are daily readings.
+Prices are delayed about 15 minutes and re-read about every 60 seconds during US market hours; most score inputs are daily readings.
 30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. Signing up itself takes only an email and a password. The daily Top 10 and the public scorecard (per-day entries on a 7-day delay) are readable with no account.
 
 Stack: Next.js 16 + FastAPI + Massive (formerly Polygon) + Finnhub + FRED. Deployed on Fly.io.
@@ -169,7 +169,7 @@ I got annoyed at every "AI stock recommendation" service refusing to show its tr
 
 What's free:
 - One 0-100 score per stock with a plain-English why
-- Public scorecard tracking every top-10 pick I make, back-checked against SPY the next day
+- Public scorecard of the daily top 10 it records, back-checked against SPY the next day
 - 5-ticker watchlist
 
 What costs $9.99/mo (Pro):
@@ -203,7 +203,7 @@ The Fundamentals factor reads five reported figures:
 - Return on equity, as reported
 - An earnings multiple — lower moves the reading up
 
-Scores are recalculated about every 70 to 80 seconds during US market hours on prices delayed about 15 minutes (Massive, formerly Polygon). Most inputs are daily readings (fundamentals, SEC Form 4 filings, FRED macro), so a score usually changes about once a day.
+Scores are recalculated about every 60 seconds during US market hours on prices delayed about 15 minutes (Massive, formerly Polygon). Most inputs are daily readings (fundamentals, SEC Form 4 filings, FRED macro), so a score usually changes about once a day.
 
 Concrete example a SecurityAnalysis crowd might find useful: filter to `/sector/financials` and the score will give you a 0-100 read on every financial. Click any ticker → /t/$X → see the six-factor breakdown so you can drill into which factor is dragging or pulling.
 

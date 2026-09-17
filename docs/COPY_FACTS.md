@@ -1,6 +1,6 @@
 # Copy facts: what is true to say about Tapeline
 
-**Last checked:** 15 September 2026. **Why this exists:** the integrity wave the
+**Last checked:** 15 September 2026; freshness and record sections re-checked 18 September 2026 after #840, #842 and #843. **Why this exists:** the integrity wave the
 founder approved on 14 September 2026 (#817, #818, #820, #821, #826, #827, #830)
 corrected the product. The copy banks under `docs/` kept repeating the old claims,
 because nothing checks them. This page is the one place a copy bank, an outreach
@@ -15,7 +15,9 @@ will be read after the date shown.
 ## 1. Prices and freshness
 
 **Say:** "Prices are delayed about 15 minutes. During US market hours Tapeline
-re-reads them for every covered stock and ETF about every 70 to 80 seconds."
+re-reads them for every covered stock and ETF about every 60 seconds." The code
+wording lives in `frontend/lib/freshness.ts` and `backend/app/services/freshness.py`
+(#842); copy should match it.
 
 - **Prices are delayed about 15 minutes.** The data plan is Massive (formerly
   Polygon) Stocks Starter, which is a 15-minute delayed plan. Measured on
@@ -25,35 +27,36 @@ re-reads them for every covered stock and ETF about every 70 to 80 seconds."
   13:41 UTC found SPY, AAPL, NVDA and MSFT 15.0 minutes old. A response
   timestamp that reads "0 seconds old" is the time of the response, not the
   time of the trade.
-- **A pass takes about 70 to 80 seconds.** Each pass rewrites the price and score
-  of every scored stock and ETF (about 11,500 rows, in about 5 seconds), then the
-  worker sleeps. Gaps measured on 14 September 2026: 72.2, 71.1, 74.3 and 71.6
-  seconds (13:49 to 13:54 UTC); 71, 73 and 71 seconds (14:02 to 14:07 UTC). A
-  deploy stretched one gap to 98 seconds and a restart stretched another to
-  about 6 minutes.
+- **A pass lands about every 60 seconds.** Each pass rewrites the price and score
+  of every scored stock and ETF (about 11,500 rows, in about 5 seconds). Since
+  #843 (merged 14 September 2026, 18:34 UTC) the worker loop is fixed-rate: 22
+  gaps measured 59.99 to 60.02 seconds during the US session (18:45 to 19:12 UTC).
+  Before #843 it slept 60 seconds after each tick, and passes landed 69.7 to
+  74.3 seconds apart. A deploy or restart still leaves a gap of several minutes.
 - **Scores usually change about once a day.** A score is recalculated on every
   pass, but most of its inputs (daily price bars for trend, relative strength
   and momentum; fundamentals; SEC Form 4 filings; the macro regime from a daily
   VIX close) are daily readings. In one 2.5-minute window about 38 of 11,546
   scores changed while about 4,161 prices did.
 - **Crypto prices and scores update once a day**, from daily bars.
-- **In-app pages do not update on their own today.** The scanner and the other
-  `/app` pages load the latest data when you open them or change a filter.
-  A 300-second capture of the browser stream on 14 September 2026 (14:02:11 to
-  14:07:11 UTC) received 0 update events while the database was rewritten 4
-  times. Do not write copy that promises pages refresh themselves.
+- **The auto-refreshing in-app pages reload about once per pass during the US
+  session.** The scanner, heatmap, watchlist, ticker, regime, news, earnings and
+  IPO pages get an update event from the API's live bridge (#840) about once
+  per pass from 04:00 to 20:00 ET on trading days, and refetch on it; the badge
+  reads "Auto-refreshing" while those events arrive. Outside that window they
+  load the latest data when you open them or change a filter. Before #840 a
+  300-second capture on 14 September 2026 received 0 update events. The prices
+  they reload are still delayed about 15 minutes.
 - **Public pages are saved snapshots.** The heatmap showcase, signal and sector
   lists, ticker pages (`/t/...`), the homepage and similar pages are cached and
   can be an hour old or more. On 14 September 2026 at 14:09 UTC the heatmap page
   was serving a copy built before the 13:30 UTC open, and `/t/AAPL` showed price
   data 49 minutes 47 seconds old. For current numbers, point people at the app.
 
-**Never write:** "real-time", "live data", "live prices", "live, not delayed",
-"no delay", "not delayed", "streaming", "sub-60s", "under 60 seconds",
-"every minute", "per minute", "60s cadence", "refreshed every 5 minutes",
-or a "Live" badge. None of them held when measured.
+<!-- copy-compliance-allow false-data-freshness -- this line lists the banned phrasings in order to ban them -->
+**Never write:** "real-time", "live data", "live prices", "live, not delayed", "no delay", "not delayed", "streaming", "sub-60s", "under 60 seconds", "every minute", "per minute", "60s cadence", "refreshed every 5 minutes", or a "Live" badge. None of them held when measured.
 
-Whether a paid data plan with real-time prices is bought is a founder decision.
+Whether to buy a data plan without the 15-minute delay is a founder decision.
 Do not write copy that assumes it.
 
 ## 2. What is covered
@@ -69,10 +72,13 @@ Do not write copy that assumes it.
 
 ## 3. The public record
 
-**Say:** "Each trading day's top 10 goes on a public scorecard with its
-next-session result against SPY, losses included. Entries are not re-ranked or
-deleted. We have corrected recorded values twice, and said so: prices on
-25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026."
+**Say:** "The day's top 10 is recorded at the close and goes on a public
+scorecard with its next-session result against SPY, losses included. Entries
+are not re-ranked or deleted. We have corrected recorded values twice, and said
+so: prices on 25 August 2026, and scores from 18 May to 12 June capped on
+15 June 2026. No top 10 was recorded on 31 August, 2, 4 or 9 September 2026."
+Do not write "every top-10 pick is logged" or anything else that implies a list
+for every trading day.
 
 - **Two corrections.** On 25 August 2026 the record switched to official
   closing prices and past rows were recomputed (684 of 688 rows; 4 kept as first
@@ -83,7 +89,7 @@ deleted. We have corrected recorded values twice, and said so: prices on
   14 September 2026.
 - **Who sees what.** Reading the scorecard needs no account. Without Pro or
   Premium the per-day entries show on a 7-day delay (`_FREE_DELAY_DAYS` in
-  `backend/app/routers/scorecard.py`); the summary figures are not delayed. The
+  `backend/app/routers/scorecard.py`); the summary figures show without the hold-back. The
   CSV/JSON export stops 7 days back for every caller, paid or not (`_export_cutoff`).
   Say "the public scorecard needs no account", not "the full record, live, free".
 - **Four missing days.** No top 10 was recorded for 31 August, 2 September,
@@ -143,6 +149,7 @@ deleted. We have corrected recorded values twice, and said so: prices on
 | Trial length | `backend/app/routers/billing.py` `TRIAL_DAYS`, `frontend/lib/trial.ts` |
 | Pre-charge notice | `backend/app/services/precharge_notice.py`, `frontend/lib/trial.ts` `PRECHARGE_NOTICE_DAYS` |
 | Prices, plan limits | `frontend/lib/pricing.ts`, `backend/app/services/tier.py` |
+| Price delay, pass cadence, refresh wording | `frontend/lib/freshness.ts`, `backend/app/services/freshness.py` (#842) |
 | Universe counts | `frontend/lib/universe.ts` (with the measuring queries) |
 | Record corrections | `/changelog` entries dated 2026-08-24, 2026-06-15 and 2026-09-14; `/scorecard` "Gaps and known limitations" |
 | Congress, squeeze | `backend/app/services/congress_integrity.py`, `backend/app/services/squeeze_integrity.py` |

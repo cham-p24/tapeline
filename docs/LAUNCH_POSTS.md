@@ -9,9 +9,9 @@
 > `docs/COPY_FACTS.md`, which has the measurements and times:
 >
 > - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
->   covered stock and ETF about every 70 to 80 seconds during US market hours,
->   and a score usually changes about once a day. Do not call anything live,
->   real-time, sub-60s or "every minute".
+>   covered stock and ETF about every 60 seconds during US market hours (longer
+>   around a deploy), and a score usually changes about once a day. Never call
+>   the data live: not real-time, not sub-60s, not "every minute".
 > - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
 >   updated once a day. Not ~2,500.
 > - **Congressional trades and squeeze detection do not exist today.** Do not
@@ -76,7 +76,7 @@ free tier, and pitched the removed Quiver/13F feature) — all removed.
   Any "beat the market / +X% vs SPY" line is false AND a Google/FTC/ASIC violation. The
   hook is the honesty: *"Most scanners show you the wins. We show the whole record —
   losses included."*
-- **Current facts (corrected 2026-09-15 — see `docs/COPY_FACTS.md`):** about 11,500 US stocks and ETFs scored on prices delayed about 15 minutes, re-read about every 70 to 80 seconds in US market hours (scores usually change about once a day) · six-factor score whose
+- **Current facts (corrected 2026-09-15 — see `docs/COPY_FACTS.md`):** about 11,500 US stocks and ETFs scored on prices delayed about 15 minutes, re-read about every 60 seconds in US market hours (scores usually change about once a day) · six-factor score whose
   factor set and weight ordering are public (the exact weights are not) · one-sentence "why"
   per ticker · public scorecard freezes each daily top-10 and back-checks vs SPY, keeping the
   losing days · **Free with no account at all:** the daily Top 10, the public scorecard (per-day
@@ -132,7 +132,7 @@ I built Tapeline. It scores about 11,500 US stocks and ETFs on one published
 factor set and weight ordering on /how-it-works) and writes a one-sentence plain-English
 "why" per ticker.
 
-The part I care about: it freezes each day's top-10 and back-checks them against SPY on a
+The part I care about: it freezes the daily top-10 and back-checks them against SPY on a
 public scorecard that keeps the losing days. Honest status — the record currently trails
 SPY. I leave it up; entries are not re-ranked or deleted, and the two corrections I've made
 to recorded values are dated on the page. The whole point is you can check my work instead of
@@ -165,7 +165,7 @@ Six factors — trend, relative strength, fundamentals, smart money, macro, mome
 weighted most toward trend and relative strength, least toward momentum. The ordering is
 published; the numbers are not.
 
-The scorecard freezes each day's top-10 and grades it against SPY — wins and losses both
+The scorecard freezes the daily top-10 and grades it against SPY — wins and losses both
 stay up. Honest status: it currently trails SPY. Small sample, and I'm leaving it public
 regardless. Entries are not re-ranked or deleted, and the corrections I've made are dated.
 
@@ -191,7 +191,7 @@ Tapeline publishes both:
 · One 0–100 score per US ticker from six published factors (weight ordering public, exact
   numbers not)
 · One plain-English sentence why, on every row
-· A public scorecard that freezes each day's top-10 vs SPY — losing days kept
+· A public scorecard that freezes the daily top-10 vs SPY — losing days kept
 
 Honest note: the record currently trails SPY, and it's all on the page. The product is the
 transparency and the time saved, not a promise of returns.
@@ -207,7 +207,7 @@ Feedback I'd love: is /how-it-works clear, and would you share a /t/[ticker] pag
 **Title:** "After years of stock scanners, I built one that shows its work"
 ```
 TL;DR: Tapeline scores about 11,500 US stocks and ETFs with a published 6-factor methodology, writes
-a one-line why, and publishes a scorecard that back-checks each day's top-10 vs SPY — losses
+a one-line why, and publishes a scorecard that back-checks the daily top-10 vs SPY — losses
 kept. tapeline.io · the published record is free with no account · 30-day Premium trial, card
 required ($0 today, first charge day 30).
 

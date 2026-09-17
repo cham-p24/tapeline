@@ -30,7 +30,7 @@ What I'd bring to a CWT episode:
 
 — A specific worked example: pull a ticker during the episode, decompose its score, show what the factor breakdown is saying that the composite hides.
 
-— Tooling: how a single worker re-scores about 11,500 US stocks and ETFs every 70 to 80 seconds on 15-minute-delayed prices, on Fly.io + Neon Postgres + Massive (formerly Polygon) data, the cost structure, where the engineering bottlenecks are.
+— Tooling: how a single worker re-scores about 11,500 US stocks and ETFs about every 60 seconds on 15-minute-delayed prices, on Fly.io + Neon Postgres + Massive (formerly Polygon) data, the cost structure, where the engineering bottlenecks are.
 
 I built this solo over the last six months. Background in trading-system development before this. The whole thing is a single-founder project with a public methodology and a public scorecard.
 
@@ -194,7 +194,7 @@ Michael + Ben — long-time Animal Spirits listener; have referenced your "thing
 
 Pitching a Tapeline (tapeline.io) episode. The hook for the show: I built a retail stock-scanning tool with one mandate that everyone in the category refuses to do — publish every miss.
 
-The /scorecard page records every top-10 daily pick and its next-day return vs SPY. Wins are recorded, misses are recorded; entries are not re-ranked or deleted, and the two corrections to recorded values are dated. Since May 2026 the record trails SPY. The misses are visible. The model gets things wrong on a real percentage of calls. That's the whole point of publishing.
+The /scorecard page records the daily top 10 and its next-day return vs SPY; four days (31 August, 2, 4 and 9 September 2026) have no list. Wins are recorded, misses are recorded; entries are not re-ranked or deleted, and the two corrections to recorded values are dated. Since May 2026 the record trails SPY. The misses are visible. The model gets things wrong on a real percentage of calls. That's the whole point of publishing.
 
 Animal Spirits often covers "this tool says X" without auditing what the tool's track record actually is. I think your listeners would benefit from one episode that walks through:
 
@@ -332,7 +332,7 @@ The angle that's right for Acquirers:
 
 — A specific worked example: take a deep-value name (Acquirer's Funds holding or otherwise) and decompose the Tapeline score. Where the 6-factor view agrees with the deep-value framing and where it diverges. The disagreements are usually more interesting than the agreements.
 
-— Operating economics. One worker re-scoring about 11,500 US stocks and ETFs every 70 to 80 seconds on Fly.io + Neon Postgres + Massive (formerly Polygon). The cost-per-paid-user math and where the operational moat actually is (transparent forward-test, not the factor list).
+— Operating economics. One worker re-scoring about 11,500 US stocks and ETFs about every 60 seconds on Fly.io + Neon Postgres + Massive (formerly Polygon). The cost-per-paid-user math and where the operational moat actually is (transparent forward-test, not the factor list).
 
 Background: trading-system developer for ~10 years; built Tapeline solo over six months. Melbourne-based.
 

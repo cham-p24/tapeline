@@ -2,7 +2,7 @@
 
 > **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
 >
-> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 70 to 80 seconds (gaps of 71 to 74 seconds measured on 14 September 2026), and most score inputs are daily, so a score usually changes about once a day. In-app pages do not update on their own, and public pages are cached snapshots that can be an hour or more old. Nothing is real-time, sub-60s or "every minute".
+> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 60 seconds (gaps of 59.99 to 60.02 seconds measured on 14 September 2026 after #843; longer around a deploy), and most score inputs are daily, so a score usually changes about once a day. The scanner and the other auto-refreshing in-app pages reload about once per pass during the US session (04:00 to 20:00 ET on trading days), and public pages are cached snapshots that can be an hour or more old. It is not real-time, not sub-60s and not "every minute".
 > - **Coverage.** About 11,500 US stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs updated once a day. 2,500 was a snapshot setting, fixed by #763/#765 and corrected in copy by #826.
 >
 > Measurements, times and approved wording: `docs/COPY_FACTS.md`.
@@ -33,7 +33,7 @@ ad-hoc analyses in chat.
   running across ~2,500 actively-scored tickers. The weights are
   INTERNAL — PR #342 stripped them from the public site; never write
   them into marketing, briefs or outreach copy
-- Sub-60s tick cadence *(15 September 2026: not true — a pass takes about 70 to 80 seconds and prices are delayed about 15 minutes; see `docs/COPY_FACTS.md`)*; news refresh every 5 min (Massive + Finnhub
+- A tick cadence this list used to call "Sub-60s" *(15 September 2026: not true — a pass lands about every 60 seconds and prices are delayed about 15 minutes; see `docs/COPY_FACTS.md`)*; news refresh every 5 min (Massive + Finnhub
   parallel merge, including international names)
 - Public surfaces: `/`, `/pricing`, `/how-it-works`, `/scorecard`,
   `/security`, `/status`, `/changelog`, `/blog`, `/compare/{finviz,

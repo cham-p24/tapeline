@@ -4,16 +4,16 @@
 
 Tapeline is a multi-tenant SaaS that delivers quantitative market scores to retail traders via a web dashboard.
 
-> **Updated 15 September 2026.** Corrected against production measurements taken on 14 September 2026 (see `docs/COPY_FACTS.md`): prices are delayed about 15 minutes by the data plan; a worker pass takes about 70 to 80 seconds (the tick, then a 60-second sleep); push updates never reach the browser because the broker is in-process and the worker and API are separate machines; congressional trades and squeeze detection have no real data source. It reuses the scoring engine from the personal `C:\signal-system\` tool, but wraps it in a commercial-grade pipeline: licensed data in, multi-tenant web app out.
+> **Updated 15 September 2026.** Corrected against production measurements taken on 14 September 2026 (see `docs/COPY_FACTS.md`): prices are delayed about 15 minutes by the data plan; a worker pass lands about every 60 seconds (a fixed-rate loop since #843); the in-app pages that auto-refresh get one update event per pass from the API's live bridge (#840) during the US session; congressional trades and squeeze detection have no real data source. It reuses the scoring engine from the personal `C:\signal-system\` tool, but wraps it in a commercial-grade pipeline: licensed data in, multi-tenant web app out.
 
 ## Component map
 
 ### 1. Scoring worker (`backend/app/workers/signal_publisher.py`)
-- Runs in a loop: one tick, then a 60-second sleep, so a pass takes about 70 to 80 seconds during market hours (measured gaps of 71 to 74 seconds on 14 September 2026; longer around deploys)
+- Runs a fixed-rate loop (#843): a pass starts about every 60 seconds during market hours (22 gaps of 59.99 to 60.02 seconds measured on 14 September 2026, 18:45 to 19:12 UTC; longer around a deploy or restart). Before #843 the loop was a tick then a 60-second sleep, and passes landed 69.7 to 74.3 seconds apart
 - Pulls snapshots from **Massive (formerly Polygon.io)** (NOT yfinance or Alpaca — licensing). On the Stocks Starter plan these prices are delayed about 15 minutes (measured 14 September 2026: AAPL snapshot 899 seconds old)
 - Calls the adapted scoring functions (composite score, spike detection, regime classification)
 - Writes results to Postgres
-- Publishes change events to `services/pubsub.py`'s in-process `InMemoryBroker` (not Redis). The worker runs in its own process on its own Fly machine, so these events never reach the API process that serves SSE — see §5
+- Publishes change events to `services/pubsub.py`'s in-process `InMemoryBroker` (not Redis). The worker runs in its own process on its own Fly machine, so these events cannot reach the API process that serves SSE; the API's live bridge reads the database instead — see §5
 
 ### 2. Database (Postgres)
 Core tables:
@@ -51,13 +51,13 @@ Core tables:
 - `/app/alerts` — alert rule configuration
 - `/app/billing` — Stripe customer portal link
 
-### 5. Push delivery (SSE) — designed, not working in production
+### 5. Push delivery (SSE)
 - Server-Sent Events (SSE), not WebSockets
-- **Design:** browser opens `/api/stream/live` and refetches when an `update` event arrives
-- **Reality, measured 14 September 2026 14:02:11–14:07:11 UTC:** a 300-second capture received 1 `hello`, 11 `ping` and **0 `update`** events while the database was rewritten 4 times. The worker publishes to an in-process broker on the worker machine; the API subscribes to its own, separate in-process broker. `frontend/lib/useLiveStream.ts` also marks the stream "live" on `ping`, so a "Live" badge shows while nothing updates
-- A fix needs a cross-process channel (Postgres LISTEN/NOTIFY, Redis, or the API polling `max(tickers.updated_at)`)
+- Browser opens `/api/stream/live` and refetches when an `update` event arrives
+- **Since #840:** each API process runs `services/live_bridge.py`, which polls the lower-quartile `tickers.updated_at` and publishes one `scores_updated` event per worker pass once the writes settle (roughly 10 to 30 seconds after the pass ends), during the US session (04:00 to 20:00 ET on trading days). The in-app badge reads "Auto-refreshing" only while those events arrive
+- **Before #840, measured 14 September 2026 14:02:11–14:07:11 UTC:** a 300-second capture received 1 `hello`, 11 `ping` and **0 `update`** events while the database was rewritten 4 times. The worker publishes to an in-process broker on the worker machine; the API subscribes to its own, separate in-process broker. `frontend/lib/useLiveStream.ts` also marked the stream as updating on `ping`, so the old badge said it was updating while nothing did. LISTEN/NOTIFY was ruled out because the production database URL is transaction-pooled
 
-## Data flow per pass (market hours, about every 70 to 80 seconds)
+## Data flow per pass (market hours, about every 60 seconds)
 
 ```
 t=0    Worker fires
@@ -67,9 +67,9 @@ t=3.0  Composite score computed (trend, RS, fundamentals, smart money, macro, mo
 t=3.5  Spike detection (no real squeeze writer in production)
 t=4.0  Regime classification (VIX, breadth, yield curve)
 t=4.2  Postgres upsert (scores, snapshots, squeeze_setups)
-t=4.3  In-process publish "update" event (worker process only)
-t=4.4  (design) SSE pushes to clients — does not happen today, see §5
+t=4.3  In-process publish "update" event (worker process only; nothing outside it listens)
 t=4.5  Alert rules evaluated; matched rules trigger email/web-push delivery
+t=15-35 API live bridge sees the pass settle and pushes one SSE update to clients, see §5
 ```
 
 ## Tier gating

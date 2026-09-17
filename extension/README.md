@@ -112,7 +112,7 @@ land on the same backend as the public site, so it caches per symbol for 15
 minutes in `chrome.storage.session` and collapses concurrent requests for the
 same symbol into one. Scores move on a daily cadence, so a stale-by-minutes read
 is correct. Prices behind the score are already delayed about 15 minutes by the
-data plan, so nothing the extension shows is real-time; see `docs/COPY_FACTS.md`.
+data plan, so what the extension shows is not real-time; see `docs/COPY_FACTS.md`.
 
 Every extension call carries a `tlx_…` bearer token and hits
 `/api/extension/*`, which authenticates the caller but does not run the daily

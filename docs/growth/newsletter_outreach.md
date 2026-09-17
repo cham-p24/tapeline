@@ -9,9 +9,9 @@
 > `docs/COPY_FACTS.md`, which has the measurements and times:
 >
 > - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
->   covered stock and ETF about every 70 to 80 seconds during US market hours,
->   and a score usually changes about once a day. Do not call anything live,
->   real-time, sub-60s or "every minute".
+>   covered stock and ETF about every 60 seconds during US market hours (longer
+>   around a deploy), and a score usually changes about once a day. Never call
+>   the data live: not real-time, not sub-60s, not "every minute".
 > - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
 >   updated once a day. Not ~2,500.
 > - **Congressional trades and squeeze detection do not exist today.** Do not
@@ -99,7 +99,7 @@ A $300 budget at $50 CPM = ~6,000 opens worth of exposure. That's tight for a ne
 ```
 Hi Daily Upside team,
 
-Pitching Tapeline (tapeline.io) for a secondary placement. We're a 6-factor stock-scoring tool for US retail traders, with one positioning choice that matches Daily Upside's editorial voice: a published methodology (six named factors and their weight ordering) and a public scorecard that back-checks every top-10 daily pick against SPY the next session. No survivor bias, no opaque "AI" branding.
+Pitching Tapeline (tapeline.io) for a secondary placement. We're a 6-factor stock-scoring tool for US retail traders, with one positioning choice that matches Daily Upside's editorial voice: a published methodology (six named factors and their weight ordering) and a public scorecard that back-checks each daily top 10 it records against SPY the next session. No survivor bias, no opaque "AI" branding.
 
 Why your audience fits:
 — The public scorecard (per-day entries on a 7-day delay) needs no account; a free account adds the top 10 scanner rows and 12 look-ups a day. Genuine product, not a feature-stripped preview. Reads naturally as "try this useful thing."
@@ -154,7 +154,7 @@ Christian Piyatilaka, founder.
 ```
 Marc — long-time Net Interest reader (the Schwab-vs-Robinhood deep dive last year was a highlight).
 
-Pitching Tapeline (tapeline.io) for a single-issue sponsorship. The angle: Tapeline is a 6-factor composite stock score with the six factors and their weight ordering published on /how-it-works and a /scorecard page that back-checks every top-10 daily pick against SPY the next session. No survivor bias, no opaque "AI score" framing.
+Pitching Tapeline (tapeline.io) for a single-issue sponsorship. The angle: Tapeline is a 6-factor composite stock score with the six factors and their weight ordering published on /how-it-works and a /scorecard page that back-checks each daily top 10 it records against SPY the next session. No survivor bias, no opaque "AI score" framing.
 
 Why your audience fits specifically:
 — Net Interest readers are professionals who read 10-Ks and quarterly filings. The Smart Money factor reads disclosed SEC Form 4 insider transactions and nets them over a recent window — not 13F and not congressional disclosures. Every other retail scoring tool either hides the smart-money methodology or skips it.
@@ -181,7 +181,7 @@ Christian Piyatilaka, founder. Solo project; trading-system development backgrou
 ```
 Edwin — long-time Bear Cave reader.
 
-Pitching Tapeline (tapeline.io) for a single-issue sponsored block. The angle that's right for Bear Cave specifically: I built a stock-scanning tool with a public scorecard that records every top-10 daily pick and its next-day return vs SPY — including misses. Entries are not re-ranked or deleted; the two corrections to recorded values and the four days with no list are dated on the page. The lists recorded since May 2026 are on /scorecard; without Pro or Premium, the last 7 days of entries are held back.
+Pitching Tapeline (tapeline.io) for a single-issue sponsored block. The angle that's right for Bear Cave specifically: I built a stock-scanning tool with a public scorecard that records the daily top 10 and its next-day return vs SPY — including misses. Entries are not re-ranked or deleted; the two corrections to recorded values and the four days with no list are dated on the page. The lists recorded since May 2026 are on /scorecard; without Pro or Premium, the last 7 days of entries are held back.
 
 Your audience is the cohort that most cares about this. Most retail scoring tools (Tipranks, Zacks, WallStreetZen) won't tell you what's in the score and don't publish a per-pick track record. Tapeline names its six factors and publishes the record. The framing matches Bear Cave's quantitative-accountability ethos.
 
@@ -210,7 +210,7 @@ Christian Piyatilaka, founder.
 ```
 Hi Andrew,
 
-Pitching Tapeline (tapeline.io) for a sponsorship slot. Quick overview: stock-scanning tool for retail traders with a published 6-factor methodology and a public scorecard that back-checks every daily pick against SPY the next session. The record is free with no account; free-tier accounts get the top 10 scanner rows. Pro at $8.25/mo annual.
+Pitching Tapeline (tapeline.io) for a sponsorship slot. Quick overview: stock-scanning tool for retail traders with a published 6-factor methodology and a public scorecard that back-checks each recorded daily pick against SPY the next session. The record is free with no account; free-tier accounts get the top 10 scanner rows. Pro at $8.25/mo annual.
 
 Why your audience: 100K+ subscribers reading personal-finance content are the exact cohort considering a stock tool. The published record is a low-friction way for them to try it — no account, no card, ever. The 30-day Premium trial does take a card, charges $0 today, and cancels in one click.
 

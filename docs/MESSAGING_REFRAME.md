@@ -5,7 +5,7 @@
 > copy was corrected in place on 15 September 2026 after the integrity wave the
 > founder approved on 14 September 2026: the universe is about 11,500 US stocks
 > and ETFs, not ~2,500; prices are delayed about 15 minutes and re-read about
-> every 70 to 80 seconds, so "in under 60 seconds" is not a claim to make; the
+> every 60 seconds; the subhead used to say "in under 60 seconds" and no longer does; the <!-- copy-compliance-allow record-never-edited -- the next line names the banned phrases in order to retire them -->
 > record has been corrected twice and has four days with no list, so "no edits"
 > and "never delete" are out; the trial is 30 days; signing up needs no card.
 > Check any line against `docs/COPY_FACTS.md` before using it.
@@ -62,7 +62,7 @@ Replace the recommendation-flavored "picks" with score-flavored language everywh
 
 **Reframe (keep the H1, rewrite the subhead to add time-savings + soften "call"):**
 > # A scanner that shows its work.
-> Scan **about 11,500 US stocks and ETFs** on one transparent 0–100 score — six named factors, the weighting order in the open (most on Trend and Relative Strength, least on Momentum), no black box. Then check the receipts: **every daily top 10 is back-checked against SPY and stays on the record — the misses too. Corrections are dated.**
+> Scan **about 11,500 US stocks and ETFs** on one transparent 0–100 score — six named factors, the weighting order in the open (most on Trend and Relative Strength, least on Momentum), no black box. Then check the receipts: **each daily top 10 we record is back-checked against SPY and stays on the record — the misses too. Corrections and missing days are dated.**
 
 CTAs stay: **"Start the 30-day Premium trial →"** / **"See the record"**. Subline becomes the honest one ("card required · $0 today · cancel in one click"), attached to the trial. The public record needs no account and no card, and since #683 (2026-08-30) signing up needs no card either. The one step that takes a card is starting the Premium trial.
 

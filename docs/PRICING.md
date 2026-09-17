@@ -14,17 +14,17 @@
 
 > **Updated 15 September 2026 (integrity wave approved by the founder on
 > 14 September 2026).** This doc still described congressional trades and
-> Squeeze Watch as features, the scanner as "live (sub-60s refresh)", Free as
+> Squeeze Watch as features, the scanner as live (it used to say "sub-60s refresh"), Free as
 > not self-serve, 2 anonymous look-ups a day and 2 free push rules. None of
 > that is true. The sections below were corrected against the code on
 > 15 September 2026. Freshness, record and coverage facts, with measurements:
 > `docs/COPY_FACTS.md`.
 >
 > - **Prices are delayed about 15 minutes on every plan** (Massive Stocks
->   Starter). The worker re-reads them about every 70 to 80 seconds during US
+>   Starter). The worker re-reads them about every 60 seconds during US
 >   market hours; scores usually change about once a day. `tier.py`'s
->   `data_delay_minutes = 0` means Tapeline adds no delay of its own, not that
->   the data is real-time.
+>   `data_delay_minutes = 0` means Tapeline adds nothing to the vendor's delay.
+>   The data is not real-time on any plan.
 > - **No congressional trade data and no working squeeze detection** (#818,
 >   #820). `congress.feed` and `squeeze.full` remain as entitlement keys only;
 >   nothing may be sold on them.
@@ -139,8 +139,10 @@ quote the steady-state Free caps, never the promo numbers — see
 - Scanner: the full scan (about 11,500 US stocks and ETFs): 1,000 rows per
   request (`TIER_LIMITS[PRO]["scanner_rows"]`) and paging reaches every matching
   row, on prices delayed about 15 minutes.
-  In-app pages load the latest data when opened or when a filter changes; they
-  do not update on their own today (`docs/COPY_FACTS.md`)
+  The scanner and the other auto-refreshing in-app pages reload about once per
+  pass during the US session (04:00 to 20:00 ET on trading days); outside it
+  they load the latest data when opened or when a filter changes
+  (`docs/COPY_FACTS.md`)
 - Market regime: full view with VIX/DXY/10Y/sector leaders · heatmap
 - Full ticker detail, news, IPOs, earnings; ticker look-ups unmetered
 - Watchlist: 50 tickers across 5 named lists, with smart alerts

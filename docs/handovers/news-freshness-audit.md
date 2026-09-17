@@ -14,9 +14,12 @@ A scanner that shows 14-hour-old news is not a "live" scanner. The
 news bar undermines. Everything Tapeline sells (transparency, public
 scorecard, fresh data) breaks visually if news is stale.
 
-> *Note added 15 September 2026: Tapeline does not have a real-time edge. Prices are
-> delayed about 15 minutes, and the "Live" pill never receives an update event in
-> production (measured 14 September 2026). See `docs/COPY_FACTS.md`.*
+> *Note added 15 September 2026, updated 18 September 2026:
+> Tapeline does not have a real-time edge. Prices are delayed about 15 minutes.
+> The pill this audit calls "● Live" received no update events in production when
+> measured on 14 September 2026; since #840 it reads "Auto-refreshing", and only
+> while update events arrive, about once per pass during the US session. See
+> `docs/COPY_FACTS.md`.*
 
 ## Confirmed symptom (2026-05-08)
 

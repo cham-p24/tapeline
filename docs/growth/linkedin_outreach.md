@@ -9,9 +9,9 @@
 > `docs/COPY_FACTS.md`, which has the measurements and times:
 >
 > - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
->   covered stock and ETF about every 70 to 80 seconds during US market hours,
->   and a score usually changes about once a day. Do not call anything live,
->   real-time, sub-60s or "every minute".
+>   covered stock and ETF about every 60 seconds during US market hours (longer
+>   around a deploy), and a score usually changes about once a day. Never call
+>   the data live: not real-time, not sub-60s, not "every minute".
 > - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
 >   updated once a day. Not ~2,500.
 > - **Congressional trades and squeeze detection do not exist today.** Do not
@@ -148,9 +148,9 @@ I run Tapeline (tapeline.io) — a solo-built quantitative scanner
 that scores about 11,500 US stocks and ETFs with a 0-100 composite from a
 published 6-factor methodology (the factors and their weight
 ordering). The piece I'm proud of is the public
-back-checked scorecard at tapeline.io/scorecard: every top-10
-daily pick logged with next-day return vs SPY, every miss still on
-the page, corrections dated.
+back-checked scorecard at tapeline.io/scorecard: each daily top 10
+it records, with next-day return vs SPY, every miss still on
+the page, corrections and missing days dated.
 
 I noticed you covered [specific recent article they wrote] — the
 piece on [specific angle they took]. The angle that might be
@@ -199,7 +199,7 @@ Hi [first name],
 
 I run Tapeline (tapeline.io) — a US-equity scoring SaaS scoring every
 US ticker via a public 6-factor composite. The scorecard
-(tapeline.io/scorecard) is what I'd pitch you on: every top-10 pick
+(tapeline.io/scorecard) is what I'd pitch you on: each recorded top 10
 back-checked vs SPY, misses kept, corrections dated, public methodology.
 
 I noticed [their product] is building in [adjacent space]. Two angles

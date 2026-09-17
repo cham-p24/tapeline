@@ -180,7 +180,7 @@
             <a class="tl-btn" href="${esc(data.url)}" target="_blank" rel="noopener">Full breakdown</a>
             <a class="tl-btn tl-btn-ghost" href="${esc(data.scorecardUrl)}" target="_blank" rel="noopener">Public record</a>
           </div>
-          <p class="tl-fine">Descriptive six-factor scoring — not investment advice. Every daily top-10 pick is logged publicly, including the ones that lose.</p>
+          <p class="tl-fine">Descriptive six-factor scoring — not investment advice. The daily top 10 is recorded publicly, including the ones that lose.</p>
         </div>`;
     }
 

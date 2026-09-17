@@ -2,7 +2,7 @@
 
 > **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
 >
-> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 70 to 80 seconds (gaps of 71 to 74 seconds measured on 14 September 2026), and most score inputs are daily, so a score usually changes about once a day. In-app pages do not update on their own, and public pages are cached snapshots that can be an hour or more old. Nothing is real-time, sub-60s or "every minute".
+> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 60 seconds (gaps of 59.99 to 60.02 seconds measured on 14 September 2026 after #843; longer around a deploy), and most score inputs are daily, so a score usually changes about once a day. The scanner and the other auto-refreshing in-app pages reload about once per pass during the US session (04:00 to 20:00 ET on trading days), and public pages are cached snapshots that can be an hour or more old. It is not real-time, not sub-60s and not "every minute".
 > - **Coverage.** About 11,500 US stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs updated once a day. 2,500 was a snapshot setting, fixed by #763/#765 and corrected in copy by #826.
 >
 > Measurements, times and approved wording: `docs/COPY_FACTS.md`.
@@ -22,7 +22,7 @@ Every line below is verified live on `https://tapeline.io` / `https://api.tapeli
 | Layer | What works | How to verify |
 |---|---|---|
 | Marketing site | 12 public pages with shared nav + footer + risk disclaimer | Visit `/`, `/pricing`, `/how-it-works`, `/scorecard`, `/blog`, `/changelog`, `/roadmap`, `/status`, `/legal/{terms,privacy,risk}`, `/compare/{finviz,zacks,wallstreetzen}` |
-| Per-ticker share | Public `/t/[symbol]` pages with dynamic OG cards (tier-coloured live score) | Tweet `https://tapeline.io/t/NVDA`, see preview |
+| Per-ticker share | Public `/t/[symbol]` pages with dynamic OG cards (tier-coloured current score) | Tweet `https://tapeline.io/t/NVDA`, see preview |
 | Sitemap | 132+ URLs, auto-grows as worker scores more tickers + you add blog posts | `curl -s https://tapeline.io/sitemap.xml \| grep -c '<loc>'` |
 | OG cards | 7 distinct (root, pricing, how-it-works, scorecard, changelog, roadmap, dynamic per-ticker) | `curl -sI https://tapeline.io/{page}/opengraph-image` returns `image/png` |
 | Security headers | HSTS 2yr+preload, X-Frame DENY, nosniff, Referrer + Permissions Policy, XSS-Protection | `curl -sI https://tapeline.io \| grep -i strict-transport` |
@@ -164,7 +164,7 @@ Once you have ~50 signups and a few payments through Stripe:
 | `/about` founder page | Better after some traction so you have stats to point at |
 | API documentation page | Premium-tier API access is wired but only needs docs once you have your first API user |
 | Mobile app | Web is mobile-responsive (verified on `/t/[symbol]` + `/app/billing`); native app is post-PMF |
-| Real-time push notifications | Web Push is wired (`alerts.web_push` Pro+ feature); native iOS/Android post-PMF |
+| Push notifications | Web Push is wired (`alerts.web_push` Pro+ feature); native iOS/Android post-PMF |
 | Welcome-email A/B subject testing | Needs Plausible analytics first to measure |
 
 ---
