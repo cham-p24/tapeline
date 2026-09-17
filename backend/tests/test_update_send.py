@@ -1135,11 +1135,15 @@ def test_the_redacting_formatter_removes_addresses_even_from_tracebacks() -> Non
 
 @pytest.fixture
 def restore_root_logging():
+    import sys
+
     root = logging.getLogger()
-    handlers, level = list(root.handlers), root.level
+    # configure_quiet_logging also installs a redacting sys.excepthook.
+    handlers, level, hook = list(root.handlers), root.level, sys.excepthook
     yield
     root.handlers[:] = handlers
     root.setLevel(level)
+    sys.excepthook = hook
 
 
 def test_main_quiet_routes_logs_through_the_redactor(

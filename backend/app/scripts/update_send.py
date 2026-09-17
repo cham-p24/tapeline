@@ -56,9 +56,9 @@ Five layers, because each one covers a failure the others do not.
      has no per-row marker (`last_sent_at` belongs to the daily digest, which
      would stop sending if this job wrote it). So accounts always go first, and
      the newsletter phase runs only when no account carried the token before
-     this run AND this run stamped at least one. The second condition closes a
-     hole the survey reminder's guard has: a run that stamps no account leaves
-     no trace, so without it a re-run would mail the list a second time. A crash
+     this run AND this run stamped at least one. The second condition matters:
+     a run that stamps no account leaves no trace, so without it a re-run would
+     mail the list a second time. A crash
      therefore under-sends rather than double-sends. `--force-newsletter` is
      for a human who has checked Resend's log first.
   4. AN ERROR AFTER THE REQUEST LEFT IS STAMPED, NOT RETRIED. `send_email`
@@ -126,7 +126,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
-import re
 import sys
 
 from sqlalchemy import select
@@ -137,6 +136,12 @@ from app.scripts.survey_send import (
     SUNSET_TOKEN,
     collect_newsletter,
     first_name,
+)
+from app.services.broadcast_safety import (  # noqa: F401 — RedactAddresses is re-exported
+    RedactAddresses,
+    configure_quiet_logging,
+    outcome_unknown,
+    room_for_token,
 )
 from app.services.dblock import LOCK_PRODUCT_UPDATE, one_machine_at_a_time
 
@@ -200,29 +205,11 @@ async def collect_accounts(session) -> tuple[list, list]:
 def _room_for_token(drip_state: str | None) -> bool:
     """Whether appending UPDATE_TOKEN still fits `users.drip_state`.
 
-    The column is VARCHAR(255) and this has already bitten once: weekly tokens
-    overran it and Postgres raised StringDataRightTruncation on commit (see
-    email.run_weekly_newsletter). Here the stamp is written AFTER the email is
-    delivered and outside the send's try, so an overflow would abort the run
-    with that person mailed but unstamped — and every retry would mail them
-    again. Skipping them, counted, is the only order that cannot double-send.
-    SQLite does not enforce the length, so the test suite could never see the
-    failure; the capacity is read from the model rather than restated here.
+    Here the stamp is written AFTER the email is delivered and outside the
+    send's try, so an overflow would leave that person mailed but unstamped.
+    Shared with the survey reminder; see `broadcast_safety.room_for_token`.
     """
-    from sqlalchemy import String
-
-    from app.models import User
-
-    # Narrowed with isinstance so mypy knows `.length` exists (a bare
-    # TypeEngine does not declare it). Text subclasses String with
-    # length=None, i.e. no limit, so a future Text column never blocks a send.
-    col_type = User.__table__.c.drip_state.type
-    capacity = col_type.length if isinstance(col_type, String) else None
-    if capacity is None:
-        return True
-    current = drip_state or ""
-    needed = len(current) + (1 if current else 0) + len(UPDATE_TOKEN)
-    return needed <= capacity
+    return room_for_token(drip_state, UPDATE_TOKEN)
 
 
 async def collect_newsletter_only(session) -> tuple[list, list]:
@@ -237,26 +224,9 @@ async def collect_newsletter_only(session) -> tuple[list, list]:
     return recipients, skipped
 
 
-def _outcome_unknown(exc: BaseException) -> bool:
-    """Whether Resend may have accepted the email even though the send raised.
-
-    True only for errors that can happen AFTER the request reached Resend: a
-    timeout or broken connection while writing the request or reading the
-    response, a malformed response, or a 5xx (a gateway can answer 502/504
-    after the upstream queued the email). False for anything that proves
-    Resend never took it: a connect or pool timeout, a refused connection, a
-    4xx rejection, or an error raised before the POST, such as a render bug.
-    See layer 4 in the module docstring for why the distinction matters.
-    """
-    import httpx
-
-    if isinstance(exc, httpx.HTTPStatusError):
-        return exc.response.status_code >= 500
-    return isinstance(exc, (
-        httpx.ReadTimeout, httpx.WriteTimeout,
-        httpx.ReadError, httpx.WriteError, httpx.CloseError,
-        httpx.RemoteProtocolError, httpx.DecodingError,
-    ))
+#: Whether Resend may have accepted an email whose send raised — layer 4. Shared
+#: with the survey reminder; see `services/broadcast_safety.outcome_unknown`.
+_outcome_unknown = outcome_unknown
 
 
 async def _stamp(session, user_id: str) -> None:
@@ -489,29 +459,6 @@ async def run(*, send: bool, quiet: bool = False, force_newsletter: bool = False
 
     print(f"\nresult: {counts}\n")
     return counts
-
-
-#: Anything shaped like local@domain. Deliberately loose: redacting a
-#: non-address that happens to contain "@" costs nothing in a count-only log,
-#: and missing a real address costs a customer's privacy.
-_ADDRESS_SHAPED = re.compile(r"[^\s<>\"'(),;:\[\]]+@[^\s<>\"'(),;:\[\]]+")
-
-
-class RedactAddresses(logging.Formatter):
-    """Formats a record — traceback included — then removes address-shaped text."""
-
-    def format(self, record: logging.LogRecord) -> str:
-        return _ADDRESS_SHAPED.sub("<address>", super().format(record))
-
-
-def configure_quiet_logging() -> logging.Handler:
-    """Route every log line through RedactAddresses. See SAFETY in the docstring."""
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(RedactAddresses("%(levelname)s %(name)s %(message)s"))
-    root = logging.getLogger()
-    root.handlers[:] = [handler]
-    root.setLevel(logging.WARNING)
-    return handler
 
 
 def main(argv: list[str] | None = None) -> None:
