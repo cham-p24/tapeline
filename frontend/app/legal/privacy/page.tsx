@@ -69,7 +69,7 @@ export default function PrivacyPage() {
             <li>An internal <strong>drip-email state token list</strong> — a comma-separated string like <code>"3,7,end"</code> that records which lifecycle emails we've already sent so we don't double-send.</li>
             <li>Account <code>created_at</code> and <code>updated_at</code> timestamps for audit.</li>
             <li>{trackerEnabled.meta ? "For" : "If we enable Meta advertising, for"}{" "}
-              the Meta events described under <em>Sub-processors</em> only: the <strong>most recent IP address and browser user agent</strong> from your signup or checkout request, when we record them, and the latest <code>_fbp</code> value and Meta click identifier (<code>_fbc</code>) your browser sent with those requests. Each is replaced by a newer one and used for nothing else.</li>
+              the Meta events described under <em>Sub-processors</em> only: the <strong>most recent IP address and browser user agent</strong> from your signup or checkout request, when we record them, the latest <code>_fbp</code> value your browser sent with those requests, and the <strong>most recent Meta click identifier</strong> (<code>_fbc</code>) it has sent us, along with when your browser first saw that click so we can tell a newer one from an older one. Each is replaced only by something newer, and used for nothing else.</li>
           </ul>
 
           <h2 className="mt-8 text-lg font-semibold text-fg">What we explicitly do <em>not</em> collect or store</h2>
