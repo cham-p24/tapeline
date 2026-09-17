@@ -3,7 +3,9 @@ alerts (which fall back to email when Telegram is unset) and the inbox
 Approve/Reject card helpers."""
 from __future__ import annotations
 
+import enum
 import logging
+import re
 from datetime import datetime
 
 import httpx
@@ -14,6 +16,74 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 TG_API = "https://api.telegram.org"
+
+#: Printed in place of a chat id. These logs reach GitHub Actions run logs on a
+#: PUBLIC repository (stale-link-audit.yml, seo-weekly-digest.yml), so a failed
+#: send must not print the founder's chat id, or anything that can echo it.
+REDACTED = "<redacted>"
+
+# A run of 5+ digits in Telegram's error text could be a chat id, a user id, or
+# the numeric half of a bot token ("123456789:AA..."). None of them is needed to
+# diagnose a failure.
+_LONG_NUMBER = re.compile(r"\d{5,}")
+
+
+def _failure_detail(r: httpx.Response, chat_id: object) -> str:
+    """Telegram's `description` for a failed call, with anything that could
+    identify the chat or the bot removed. Never the raw body."""
+    try:
+        description = str((r.json() or {}).get("description") or "")
+    except Exception:
+        return "unparseable"
+    for secret in (str(chat_id), settings.telegram_bot_token or ""):
+        if secret:
+            description = description.replace(secret, REDACTED)
+    return _LONG_NUMBER.sub(REDACTED, description)[:200]
+
+
+class SendStatus(enum.Enum):
+    DELIVERED = "delivered"
+    SKIPPED = "skipped"      # no bot token: nothing was sent
+    REFUSED = "refused"      # Telegram answered 4xx: it did not deliver
+    UNCERTAIN = "uncertain"  # Telegram answered 5xx after taking the request: it may have
+
+
+async def send_message_status(
+    chat_id: str,
+    text: str,
+    *,
+    parse_mode: str = "Markdown",
+    reply_markup: dict | None = None,
+) -> SendStatus:
+    """Send a single Telegram message and say what is known about delivery.
+
+    Raises what httpx raises. A caller that must not send twice has to treat
+    any error after the connection opened (a read timeout, a dropped
+    connection) like UNCERTAIN: Telegram may already have delivered.
+    """
+    if not settings.telegram_bot_token:
+        logger.warning("telegram.skipped no_bot_token")
+        return SendStatus.SKIPPED
+    payload: dict = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": parse_mode,
+        "disable_web_page_preview": True,
+    }
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    async with httpx.AsyncClient(timeout=10) as c:
+        r = await c.post(
+            f"{TG_API}/bot{settings.telegram_bot_token}/sendMessage",
+            json=payload,
+        )
+        if r.status_code != 200:
+            logger.warning(
+                "telegram.send_failed chat=%s status=%d detail=%s",
+                REDACTED, r.status_code, _failure_detail(r, chat_id),
+            )
+            return SendStatus.UNCERTAIN if r.status_code >= 500 else SendStatus.REFUSED
+    return SendStatus.DELIVERED
 
 
 async def send_message(
@@ -29,26 +99,10 @@ async def send_message(
     inbox alert flow so the founder can Approve/Reject from their
     phone with one tap rather than typing a command).
     """
-    if not settings.telegram_bot_token:
-        logger.warning("telegram.skipped no_bot_token")
-        return False
-    payload: dict = {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": parse_mode,
-        "disable_web_page_preview": True,
-    }
-    if reply_markup is not None:
-        payload["reply_markup"] = reply_markup
-    async with httpx.AsyncClient(timeout=10) as c:
-        r = await c.post(
-            f"{TG_API}/bot{settings.telegram_bot_token}/sendMessage",
-            json=payload,
-        )
-        if r.status_code != 200:
-            logger.warning("telegram.send_failed chat=%s body=%s", chat_id, r.text[:200])
-            return False
-    return True
+    status = await send_message_status(
+        chat_id, text, parse_mode=parse_mode, reply_markup=reply_markup,
+    )
+    return status is SendStatus.DELIVERED
 
 
 async def deliver_founder_alert(*, subject: str, text: str) -> None:
@@ -247,13 +301,16 @@ async def send_message_with_id(
             json=payload,
         )
         if r.status_code != 200:
-            logger.warning("telegram.send_with_id_failed chat=%s body=%s", chat_id, r.text[:200])
+            logger.warning(
+                "telegram.send_with_id_failed chat=%s status=%d detail=%s",
+                REDACTED, r.status_code, _failure_detail(r, chat_id),
+            )
             return None
         try:
             data = r.json()
             return int(data.get("result", {}).get("message_id"))
         except Exception:
-            logger.exception("telegram.send_with_id_parse_failed chat=%s", chat_id)
+            logger.exception("telegram.send_with_id_parse_failed chat=%s", REDACTED)
             return None
 
 
