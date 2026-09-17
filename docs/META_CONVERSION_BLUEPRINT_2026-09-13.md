@@ -133,6 +133,10 @@ Two notes on the table. First, no official Meta page read here says a $0 Purchas
 
 **Order.** Ship P1–P3 before any flight, because the current optimisation event (CompleteRegistration) also lacks UA and IP. Ship P4–P5 before anyone reads Meta value or Purchase columns, and before any StartTrial switch.
 
+**Status, 2026-09-17.** P1–P5 are implemented in PR #859, which also covers `_fbp` on the OAuth path. The proposals above are left as written. Two things differ from them:
+- IP address and user agent ship behind `META_CAPI_SEND_IP_UA`, which is off by default. The privacy policy promises account holders 14 days' notice of a new category of data, so P1 is not live, and §3.3 condition 1 is not met, until that notice has run and the switch is set.
+- P4's pending Stripe check is done: all 4 completed trial checkouts had `amount_total` 0 and `amount_subtotal` 0 (read-only, 2026-09-17).
+
 ---
 
 ## 3. When to change the optimisation event
