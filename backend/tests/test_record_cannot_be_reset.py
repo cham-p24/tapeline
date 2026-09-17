@@ -28,7 +28,9 @@ What remains, and is pinned here:
 """
 from __future__ import annotations
 
+import importlib
 import inspect
+import pkgutil
 import re
 import sys
 import uuid as _uuid
@@ -37,6 +39,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from fastapi import APIRouter
 from fastapi.routing import APIRoute
 from sqlalchemy import delete, select
 
@@ -147,13 +150,49 @@ async def test_an_admin_cannot_reset_the_record_through_the_api(monkeypatch) -> 
         await _clean(RESET_DAY)
 
 
+def _write_routes() -> list[tuple[str, APIRoute]]:
+    """Every POST/PUT/PATCH/DELETE route, as (module, route).
+
+    Walks each APIRouter defined in app/routers/ directly, plus the assembled
+    app's own routes (recursing into mounts). Reading only `app.routes` is not
+    enough: newer FastAPI (0.141 in CI) no longer flattens included routers
+    into it, and the walk then saw 2 write routes instead of the real set.
+    """
+    import app.routers as routers_pkg
+
+    found: dict[int, tuple[str, APIRoute]] = {}
+    for info in pkgutil.iter_modules(routers_pkg.__path__):
+        mod = importlib.import_module(f"app.routers.{info.name}")
+        for obj in vars(mod).values():
+            if isinstance(obj, APIRouter):
+                for route in obj.routes:
+                    if isinstance(route, APIRoute) and route.methods & _WRITE_METHODS:
+                        found[id(route)] = (info.name, route)
+    stack = list(app.routes)
+    while stack:
+        route = stack.pop()
+        if isinstance(route, APIRoute):
+            if route.methods & _WRITE_METHODS and id(route) not in found:
+                found[id(route)] = (route.endpoint.__module__, route)
+        elif getattr(route, "routes", None):
+            stack.extend(route.routes)
+    return list(found.values())
+
+
+def test_the_route_walk_sees_the_write_routes() -> None:
+    routes = _write_routes()
+    paths = {(mod, r.path) for mod, r in routes}
+    assert len(routes) > 20, f"the walk found only {len(routes)} write routes"
+    # Known write routes, so a walk that silently misses routers fails here.
+    assert ("admin", "/users/{user_id}/tier") in paths
+    assert ("admin", "/growth-tick/run") in paths
+
+
 def test_no_route_path_under_scorecard_accepts_a_write() -> None:
     offenders = [
-        (sorted(route.methods & _WRITE_METHODS), route.path)
-        for route in app.routes
-        if isinstance(route, APIRoute)
-        and route.methods & _WRITE_METHODS
-        and "scorecard" in route.path.lower()
+        (mod, sorted(route.methods & _WRITE_METHODS), route.path)
+        for mod, route in _write_routes()
+        if mod.endswith("scorecard") or "scorecard" in route.path.lower()
     ]
     assert not offenders, f"write routes on the record: {offenders}"
 
@@ -180,16 +219,11 @@ _RECORD_TOKENS = (
 
 def test_no_write_route_references_the_record() -> None:
     offenders = []
-    checked = 0
-    for route in app.routes:
-        if not isinstance(route, APIRoute) or not (route.methods & _WRITE_METHODS):
-            continue
-        checked += 1
+    for mod, route in _write_routes():
         src = _code_only(inspect.getsource(route.endpoint))
         hits = [t for t in _RECORD_TOKENS if t in src]
         if hits:
-            offenders.append((route.path, hits))
-    assert checked > 10, "the route walk found almost no write routes; it is not checking anything"
+            offenders.append((mod, route.path, hits))
     assert not offenders, (
         "a POST/PUT/PATCH/DELETE route references the public record or a job that "
         f"writes it: {offenders}"
