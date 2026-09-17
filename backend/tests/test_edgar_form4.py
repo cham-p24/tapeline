@@ -522,7 +522,7 @@ def worker(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(finnhub_feed, "_SMART_MONEY_SCORE_CACHE", {})
     monkeypatch.setattr(finnhub_feed, "_SMART_MONEY_CLEARED", set())
     monkeypatch.setattr(sp, "_sheet_is_scoring_source", lambda: False)
-    # Rows these tests seed are fetched "now", before the 2026-09-18 re-read
+    # Rows these tests seed are fetched "now", before the 2026-09-17 re-read
     # instant, which would make them untrusted as contradictions.
     monkeypatch.setattr(sp, "_SMART_MONEY_REREAD_BEFORE", datetime(1970, 1, 1, tzinfo=UTC))
 

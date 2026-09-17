@@ -177,6 +177,44 @@ def test_an_amendment_replaces_only_the_same_day_filing_it_restates() -> None:
     assert superseded_accessions(own, parsed) == {"a14"}
 
 
+def test_an_amendment_replaces_the_original_it_matches_best_not_every_overlap() -> None:
+    """Two same-day filings share a trade date; the 4/A restates one of them.
+    Mutation: replace every overlapping candidate - the other filing's lines go
+    with it."""
+    own = [_f("keep", "4", "2026-08-14"), _f("amended", "4", "2026-08-14"),
+           _f("amd", "4/A", "2026-08-18")]
+    parsed = {
+        # Both report a trade on 12 Aug; only `amended`'s whole lines match.
+        "keep": _r("OWN", ["2026-08-12"]),
+        "amended": _r("OWN", ["2026-08-12", "2026-08-13"]),
+        "amd": _r("OWN", ["2026-08-12", "2026-08-13"], original="2026-08-14"),
+    }
+    assert superseded_accessions(own, parsed) == {"amended"}
+
+
+def test_a_second_amendment_of_one_original_replaces_the_first() -> None:
+    """A filer corrected the same Form 4 twice. Mutation: claim nothing - the
+    original is dropped once but BOTH amendments are read, so the trade is
+    counted twice."""
+    own = [_f("orig", "4", "2026-08-14"), _f("amd1", "4/A", "2026-08-18"),
+           _f("amd2", "4/A", "2026-08-21")]
+    parsed = {
+        "orig": _r("OWN", ["2026-08-12"]),
+        "amd1": _r("OWN", ["2026-08-12"], original="2026-08-14"),
+        "amd2": _r("OWN", ["2026-08-12"], original="2026-08-14"),
+    }
+    assert superseded_accessions(own, parsed) == {"orig", "amd1"}
+    # Two amendments of DIFFERENT originals keep each other.
+    two = [_f("o1", "4", "2026-08-14"), _f("o2", "4", "2026-08-14"),
+           _f("a1", "4/A", "2026-08-18"), _f("a2", "4/A", "2026-08-19")]
+    parsed_two = {
+        "o1": _r("OWN", ["2026-08-11"]), "o2": _r("OWN", ["2026-08-12"]),
+        "a1": _r("OWN", ["2026-08-11"], original="2026-08-14"),
+        "a2": _r("OWN", ["2026-08-12"], original="2026-08-14"),
+    }
+    assert superseded_accessions(two, parsed_two) == {"o1", "o2"}
+
+
 def test_an_amendment_finds_an_original_edgar_dated_later() -> None:
     """EDGAR dates an after-hours submission to the next business day.
     Mutation: exact-date match only - both filings count."""
@@ -324,7 +362,7 @@ async def test_rows_fetched_before_the_reread_do_not_contradict_an_empty_answer(
     """STRK held MSTR's filings. Its correct empty answer must retire them.
     Mutation: drop the fetched_at condition - the clear raises, counts as a
     failure, and the rows stay forever."""
-    cut = datetime(2026, 9, 18, 18, 30, tzinfo=UTC)
+    cut = datetime(2026, 9, 17, 17, 30, tzinfo=UTC)
     monkeypatch.setattr(sp, "_SMART_MONEY_REREAD_BEFORE", cut)
     async with session_scope() as s:
         s.add(Ticker(symbol="STRK", name="Strategy Inc", sub_smart_money=20.0))
@@ -359,7 +397,7 @@ async def test_every_stamp_before_the_reread_is_due(
 ) -> None:
     """Mutation: no re-read rule - the wrongly attributed rows wait out a 36h
     or 30-day horizon."""
-    cut = datetime(2026, 9, 18, 18, 30, tzinfo=UTC)
+    cut = datetime(2026, 9, 17, 17, 30, tzinfo=UTC)
     monkeypatch.setattr(sp, "_SMART_MONEY_EDGAR_SINCE", datetime(1970, 1, 1, tzinfo=UTC))
     monkeypatch.setattr(sp, "_SMART_MONEY_REREAD_BEFORE", cut)
     at = cut + timedelta(hours=2)
@@ -374,5 +412,5 @@ async def test_every_stamp_before_the_reread_is_due(
 def test_the_reread_instant_follows_the_edgar_switch() -> None:
     assert sp._SMART_MONEY_REREAD_BEFORE.tzinfo is not None
     assert sp._SMART_MONEY_REREAD_BEFORE > sp._SMART_MONEY_EDGAR_SINCE
-    assert sp._SMART_MONEY_REREAD_BEFORE.date() == date(2026, 9, 18)
+    assert sp._SMART_MONEY_REREAD_BEFORE.date() == date(2026, 9, 17)
 

@@ -28,18 +28,21 @@ Finnhub function it replaces)
        classes. A filing's lines go to ONE of them - the ticker the filing
        itself names in issuerTradingSymbol, or the CIK's first-listed SEC
        ticker when the named symbol is not one SEC lists for the CIK. Until
-       2026-09-18 every ticker of the CIK received the issuer's whole Form 4
+       2026-09-17 every ticker of the CIK received the issuer's whole Form 4
        set: 70 CIKs, e.g. Strategy's STRC/STRF/STRK/STRD preferreds carried
        MSTR's insider sales, JPM's VYLD/AMJB ETNs carried JPM's, and notes like
        GREEL and TMUSZ carried their issuer's.
-    6. A 4/A replaces only the same owner's original(s) it restates: originals
-       filed on its dateOfOriginalSubmission (or up to 4 days later, since
-       EDGAR's filing date can move past the filer's submission date) whose
-       trade dates overlap the amendment's; failing any overlap, the single
-       original filed on that exact date. An amendment with no non-derivative
-       lines replaces nothing. Until 2026-09-18 a 4/A dropped EVERY Form 4 its
-       owner filed that day: CRWV lost 51 sale lines Magnetar filed separately
-       on 14 Aug, because one of three same-day filings was amended.
+    6. A 4/A replaces ONE original of the same owner: among the originals filed
+       on its dateOfOriginalSubmission (or up to 4 days later, since EDGAR's
+       filing date can move past the filer's submission date), the one whose
+       trade dates it matches best; failing any overlap, the single original
+       filed on that exact date. An amendment with no non-derivative lines
+       replaces nothing. Until 2026-09-17 a 4/A dropped EVERY Form 4 its owner
+       filed that day: CRWV lost 51 sale lines Magnetar filed separately on
+       14 Aug, because one of three same-day filings was amended.
+    6a. A second 4/A of the same original replaces the first: amendments are
+       read newest first, and an older one restating an original already
+       claimed is dropped, so an amended trade is not counted twice.
     7. A line whose trade date is later than the filing's own filing date is a
        typo (a 2026-09-03 GIC filing reported a trade on 2027-09-03) and is
        dropped: a future date sorted to the top of every "most recent" list.
@@ -115,7 +118,7 @@ PARSE_VERSION = 2
 #: filings below it are fetched and parsed again.
 MIN_PARSE_VERSION = 1
 
-#: The first version that records `issuer_symbol` (2026-09-18). Only a CIK with
+#: The first version that records `issuer_symbol` (2026-09-17). Only a CIK with
 #: more than one SEC ticker needs it for attribution, so a single-ticker CIK
 #: keeps serving version-1 rows and only ~70 issuers' filings are downloaded
 #: again (see `_fetch`).
@@ -525,20 +528,78 @@ def attributed_ticker(reading: dict[str, Any], cik_tickers: list[str]) -> str:
     return named if named in cik_tickers else cik_tickers[0]
 
 
+def _line_dates(reading: dict[str, Any]) -> set[str]:
+    return {line["transaction_date"] for line in reading["lines"] or []}
+
+
+def _line_keys(reading: dict[str, Any]) -> set[tuple[str, int, str]]:
+    """Each line as (trade date, shares, code) — what an amendment restates."""
+    return {
+        (line["transaction_date"], line["share_change"], line["code"])
+        for line in reading["lines"] or []
+    }
+
+
+def _restated_original(
+    reading: dict[str, Any], candidates: list[dict[str, str]],
+    parsed: dict[str, dict[str, Any]], original_date: str,
+) -> dict[str, str] | None:
+    """The ONE original filing this amendment restates, or None.
+
+    A 4/A refiles one Form 4, so it can replace at most one. The best match is
+    the candidate sharing the most trade dates with it, then the most whole
+    lines, then an exact trade-date match; accession order breaks a remaining
+    tie so the choice is deterministic. Matching on dates alone would drop
+    every same-day filing that happens to share a trade date, which is how the
+    old rule lost lines.
+    """
+    amended_dates = _line_dates(reading)
+    amended_keys = _line_keys(reading)
+    best: dict[str, str] | None = None
+    best_rank: tuple[int, int, int] | None = None
+    for f in candidates:
+        other = parsed[f["accession"]]
+        dates = _line_dates(other)
+        overlap = len(amended_dates & dates)
+        if not overlap:
+            continue
+        rank = (overlap, len(amended_keys & _line_keys(other)), int(dates == amended_dates))
+        if (
+            best_rank is None
+            or rank > best_rank
+            or (rank == best_rank and best is not None and f["accession"] < best["accession"])
+        ):
+            best, best_rank = f, rank
+    if best is not None:
+        return best
+    # No trade date in common: the amendment may be correcting the date itself.
+    # Only an unambiguous same-day original can be the one it restates.
+    same_day = [f for f in candidates if f["filing_date"] == original_date]
+    return same_day[0] if len(same_day) == 1 else None
+
+
 def superseded_accessions(
     own: list[dict[str, str]], parsed: dict[str, dict[str, Any]],
 ) -> set[str]:
-    """Accessions of original Form 4s that a 4/A in `own` restates.
+    """Accessions in `own` that a 4/A restates: the original it amends, and any
+    earlier 4/A of the same original.
 
-    See point 6 of the module docstring for the rule, and for why it is not
-    "every Form 4 the owner filed that day"."""
+    See points 6 and 6a of the module docstring for the rule, and for why it is
+    not "every Form 4 the owner filed that day"."""
     replaced: set[str] = set()
     originals = [f for f in own if f["form"] == "4"]
-    for amendment in (f for f in own if f["form"] == "4/A"):
+    # Newest amendment first, so when a filer amends the same original twice,
+    # the newest wins and the earlier 4/A is dropped instead of being counted
+    # alongside it.
+    amendments = sorted(
+        (f for f in own if f["form"] == "4/A"),
+        key=lambda f: (f["filing_date"], f["accession"]), reverse=True,
+    )
+    claimed: set[str] = set()
+    for amendment in amendments:
         reading = parsed[amendment["accession"]]
         original_date = reading.get("original_filing_date")
-        amended_dates = {line["transaction_date"] for line in reading["lines"] or []}
-        if not original_date or not amended_dates:
+        if not original_date or not _line_dates(reading):
             continue
         try:
             earliest = date.fromisoformat(original_date)
@@ -550,17 +611,15 @@ def superseded_accessions(
             if parsed[f["accession"]]["owner_cik"] == reading["owner_cik"]
             and original_date <= f["filing_date"] <= latest
         ]
-        overlapping = [
-            f for f in candidates
-            if amended_dates
-            & {line["transaction_date"] for line in parsed[f["accession"]]["lines"] or []}
-        ]
-        if overlapping:
-            replaced.update(f["accession"] for f in overlapping)
+        restated = _restated_original(reading, candidates, parsed, original_date)
+        if restated is None:
             continue
-        same_day = [f for f in candidates if f["filing_date"] == original_date]
-        if len(same_day) == 1:
-            replaced.add(same_day[0]["accession"])
+        if restated["accession"] in claimed:
+            # A newer 4/A already restates this original; this one is stale.
+            replaced.add(amendment["accession"])
+            continue
+        claimed.add(restated["accession"])
+        replaced.add(restated["accession"])
     return replaced
 
 

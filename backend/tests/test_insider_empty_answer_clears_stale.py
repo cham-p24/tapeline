@@ -79,7 +79,7 @@ def _isolated(monkeypatch: pytest.MonkeyPatch) -> None:
     # #835's switchover rule makes every stamp before 2026-09-14 14:10 UTC due.
     # Moved out of the way so these tests measure their own rules only.
     monkeypatch.setattr(sp, "_SMART_MONEY_EDGAR_SINCE", datetime(1970, 1, 1, tzinfo=UTC))
-    # The 2026-09-18 re-read rule makes every older stamp due, and stops rows
+    # The 2026-09-17 re-read rule makes every older stamp due, and stops rows
     # fetched before it from contradicting an empty answer. Also out of the way.
     monkeypatch.setattr(sp, "_SMART_MONEY_REREAD_BEFORE", datetime(1970, 1, 1, tzinfo=UTC))
 

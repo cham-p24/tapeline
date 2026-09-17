@@ -2820,7 +2820,7 @@ _SMART_MONEY_EDGAR_SINCE = datetime(2026, 9, 14, 14, 10, tzinfo=UTC)
 #: empty answer would otherwise be "contradicted" by the issuer rows it wrongly
 #: held, counted as a failure, and never cleared - and ten such symbols in forty
 #: would stop the pass. Rows fetched from here on are trusted as before.
-_SMART_MONEY_REREAD_BEFORE = datetime(2026, 9, 18, 18, 30, tzinfo=UTC)
+_SMART_MONEY_REREAD_BEFORE = datetime(2026, 9, 17, 17, 30, tzinfo=UTC)
 
 #: A row holding a smart-money value with NO Form 4 row on file is due again
 #: once its stamp is this old, whatever its asset class's horizon says.
