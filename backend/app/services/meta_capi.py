@@ -274,7 +274,7 @@ def event_id_for(kind: str, stable_id: str) -> str:
     return f"{kind}.{digest[:32]}"
 
 
-# Column widths on `users` (migration 0072). A value that does not fit is
+# Column widths on `users` (migration 0073). A value that does not fit is
 # dropped, never truncated: a truncated cookie or user agent matches nothing.
 FBP_MAX = 200
 FBC_MAX = 500

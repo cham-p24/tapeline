@@ -317,7 +317,7 @@ class User(Base):
     signup_fbclid: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # Meta Conversions API match keys — the LATEST values, not first-touch
-    # (migration 0072, blueprint P1-P3). Written only while Meta CAPI is
+    # (migration 0073, blueprint P1-P3). Written only while Meta CAPI is
     # configured, by services/meta_capi.remember_browser, from requests the
     # visitor's own browser sends straight to the API: email signup, the OAuth
     # callback, POST /api/billing/checkout. Read back for StartTrial, Purchase
