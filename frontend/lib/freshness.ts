@@ -97,6 +97,14 @@ export const PUBLIC_SNAPSHOT_SENTENCE =
 export const PUBLIC_SNAPSHOT_FOOTER =
   `Saved snapshot; can be an hour old or more. Prices ${PRICE_DELAY_PHRASE}.`;
 
-/** In-app pages do not update themselves (the push channel never reached the browser). */
+/**
+ * In-app pages that use useLiveStream (scanner, heatmap, watchlist, ticker,
+ * regime, news, earnings, ipos, squeeze) receive an update event from the
+ * API's live bridge (#840) about once per worker pass during the US extended
+ * session, 04:00-20:00 ET on trading days, and refetch on it. The LiveBadge
+ * reads "Auto-refreshing" while those events arrive.
+ */
 export const IN_APP_REFRESH_SENTENCE =
-  "The page shows the latest data when you open it or change a filter; reload to see newer numbers.";
+  "During the US session (04:00-20:00 ET on trading days) this page refreshes " +
+  `itself about once per pass (a pass lands ${PASS_CADENCE_PHRASE}), so you do ` +
+  "not need to reload.";

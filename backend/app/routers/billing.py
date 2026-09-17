@@ -48,7 +48,8 @@ _CANCEL_REASONS = frozenset(
 # ── Card-required 30-day trial ──────────────────────────────────────────────
 #
 # Creating an account is email + password only and lands on FREE, and FREE is
-# a working product: the top ten scored rows of any scan on live data, one
+# a working product: the top ten scored rows of any scan (prices delayed about
+# 15 minutes, the same as every plan), one
 # saved screen, a five-symbol watchlist, twelve ticker pages a day. No card is
 # asked for at the door. The route wall that used to stand at /app/start was
 # removed in #683; `tier.must_add_card` survives it, but it now drives what we

@@ -11,7 +11,7 @@
  * is one of the few high-intent clusters a two-month-old domain can realistically
  * win. The page is built entirely on the four assets nobody can copy: the
  * public scorecard (not re-ranked or deleted, corrections dated), the downloadable CSV/JSON dataset, the named
- * six-factor methodology, and the per-ticker frozen records at /scorecard/{TICKER}.
+ * six-factor methodology, and the per-ticker records at /scorecard/{TICKER}.
  *
  * COMPLIANCE POSTURE (docs/COMPLIANCE_COPY_RULES.md — scripts/lint-copy-compliance.mjs)
  * ------------------------------------------------------------------------------------
@@ -33,6 +33,7 @@ import { LandingCta } from "@/components/LandingCta";
 import { TransparencyStrip } from "@/components/TransparencyStrip";
 import { MethodologyCaveat } from "@/components/MethodologyCaveat";
 import { pageMeta } from "@/lib/seo";
+import { TRIAL_DAYS } from "@/lib/trial";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 
 export const metadata = pageMeta({
@@ -144,7 +145,7 @@ export default function VerifyPage() {
           <LandingCta
             from="scorecard"
             showPreview={false}
-            primaryLabel="Try the scanner — 30-day trial"
+            primaryLabel="Open the scanner — free account"
             secondaryHref="/scorecard"
             secondaryLabel="Open the public scorecard"
           />
@@ -224,7 +225,7 @@ export default function VerifyPage() {
               </span>
               <div className="text-sm text-muted leading-relaxed">
                 <span className="font-medium text-fg">Spot-check a single ticker.</span>{" "}
-                Open the frozen record for any symbol — for example{" "}
+                Open the recorded entries for any symbol — for example{" "}
                 <Link href="/scorecard/AAPL" className="link">/scorecard/AAPL</Link>{" "}
                 — and confirm the row on the page matches the row in your download.
                 Cross-reference the current factor readings on its{" "}
@@ -353,7 +354,8 @@ export default function VerifyPage() {
           </h2>
           <p className="mt-3 text-muted">
             The scorecard is public and the raw data is a click away &mdash; no account
-            for either. The scanner is the part that takes a card.
+            for either. The scanner takes an email and a password on the free plan; the{" "}
+            {TRIAL_DAYS}-day Premium trial is the part that takes a card.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link href="/scorecard" className="btn-primary">

@@ -34,11 +34,15 @@ vi.mock("@/components/ScannerPreview", () => ({
 }));
 
 describe("LandingCta", () => {
-  it("renders a primary signup CTA with the scanner-forward, trial-terms copy", () => {
+  it("renders a primary signup CTA that opens the scanner on a free account", () => {
     render(<LandingCta from="screener" showPreview={false} />);
+    // Review round 2 of #842: "Try the scanner — 30-day trial" implied the
+    // scanner needs the trial. Signup takes an email and a password and the
+    // scanner runs on the free plan; only the Premium trial takes a card.
     const primary = screen.getByRole("link", {
-      name: new RegExp(`try the scanner — ${TRIAL_DAYS}-day trial`, "i"),
+      name: /open the scanner — free account/i,
     });
+    expect(primary.textContent ?? "").not.toMatch(/trial/i);
     expect(primary).toBeInTheDocument();
     expect(primary).toHaveAttribute("href", "/signup?from=screener");
   });
@@ -46,12 +50,12 @@ describe("LandingCta", () => {
   it("message-matches the signup page via the ?from= slug", () => {
     const { rerender } = render(<LandingCta from="finviz" showPreview={false} />);
     expect(
-      screen.getByRole("link", { name: /try the scanner/i }),
+      screen.getByRole("link", { name: /open the scanner/i }),
     ).toHaveAttribute("href", "/signup?from=finviz");
 
     rerender(<LandingCta from="compare" showPreview={false} />);
     expect(
-      screen.getByRole("link", { name: /try the scanner/i }),
+      screen.getByRole("link", { name: /open the scanner/i }),
     ).toHaveAttribute("href", "/signup?from=compare");
   });
 
@@ -95,7 +99,7 @@ describe("LandingCta", () => {
     expect(screen.queryByTestId("scanner-preview")).toBeNull();
     // The CTA + offer strip still render.
     expect(
-      screen.getByRole("link", { name: /try the scanner/i }),
+      screen.getByRole("link", { name: /open the scanner/i }),
     ).toBeInTheDocument();
   });
 });

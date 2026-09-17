@@ -157,7 +157,7 @@ const CRITERIA = [
   },
   {
     h: "2. Losing picks kept, and corrections dated",
-    p: "The misses must be present at the same size and weight as the winners, frozen the day they printed, never re-ranked or quietly deleted. If a recorded value is ever corrected, the correction has to be dated and explained where the record lives. A record that can change silently after the fact isn't a record — it's a highlight reel.",
+    p: "The misses must be present at the same size and weight as the winners, recorded the day they printed, never re-ranked or quietly deleted. If a recorded value is ever corrected, the correction has to be dated and explained where the record lives. A record that can change silently after the fact isn't a record — it's a highlight reel.",
   },
   {
     h: "3. Every pick benchmarked against SPY",
@@ -261,7 +261,8 @@ export default async function StockScreenerTrackRecordPage() {
           ) : (
             ","
           )}{" "}
-          each frozen the day it printed and checked against SPY the next session,{" "}
+          each recorded the day it printed and checked against SPY the next session (entries are not re-ranked
+          or deleted; corrections are dated),{" "}
           <strong className="text-fg">losses kept</strong> and the whole archive downloadable as CSV and JSON. This page
           explains what a real track record has to contain &mdash; so you can judge any screener&rsquo;s claim, not just
           this one.

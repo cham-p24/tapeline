@@ -458,7 +458,7 @@ def dataset_meta(*, row_count: int, session_count: int, delay_days: int,
             f"Entries are published in this export about {delay_days} days after the "
             f"session they describe. The most recent session included here is the "
             f"one ending on or before {cutoff.isoformat()}. The delay is a product "
-            f"gate on the live ranking, not a data-quality filter — no entry is "
+            f"gate on the most recent entries, not a data-quality filter — no entry is "
             f"withheld beyond it."
         ),
         "sample_size_rows": row_count,

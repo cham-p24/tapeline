@@ -218,30 +218,56 @@ export function expandKnownConstants(text) {
  * ---------------------------------------------------------
  *   - A negated claim ("not a real-time record", "no live data source") —
  *     the shared negation guard.
- *   - A dated correction that quotes the old claim ("this line used to say
- *     ... 'live scores (no delay)'") — see `isDatedCorrection`. Dated history is
+ *   - A dated correction that QUOTES the old claim (this line used to say
+ *     Free had "live scores (no delay)") — see `isDatedCorrection`. The match
+ *     has to sit inside a double-quoted string that opens after the "used to
+ *     say/call/read/claim" token, in the same paragraph. Dated history is
  *     corrected with a dated note, not silently rewritten, and the note has
- *     to be able to name what changed. A bare "Updated <date>" is NOT enough.
+ *     to be able to name what changed. A bare "Updated <date>" is NOT enough,
+ *     and neither is an unquoted "used to say otherwise. Now real-time."
  *   - A term MENTIONED as a quoted term on its own ('"Real-time" means
  *     different things at different price tiers'): the quote must close right
  *     after the matched term.
  *   - Competitor descriptions are NOT suppressed by the rule (review of #842):
- *     each one is a file+rule+phrase `allow` entry with a reason in
- *     scripts/copy-compliance.allow.json, so a Tapeline claim next to a
- *     competitor's name cannot slip through.
+ *     each one carries a line-specific inline
+ *     `copy-compliance-allow false-data-freshness -- <reason>` marker, which
+ *     covers its own line and the line after it, so a Tapeline claim next to
+ *     a competitor's name elsewhere cannot slip through.
  * "live" on its own is NOT matched: "your account is live", "a live
  * scorecard", "Live checks" on /status are ordinary English. Only the data
  * phrasings the measurements made false are.
  * ------------------------------------------------------------------ */
-const DATED_CORRECTION =
-  /\b(?:used\s+to\s+(?:say|said|call|read|claim)|measured\s+false)\b/i;
+const DATED_CORRECTION = /\bused\s+to\s+(?:say|said|call|read|claim)\b/gi;
+
+// Double-quote shapes only. A straight or curly single quote is also an
+// apostrophe ("Tapeline's", "can’t"), so it cannot say where a quote opens.
+const DQ_TOKEN = /&ldquo;|&rdquo;|&quot;|\\"|[“”"]/g;
+
+/** True when `segment` ends inside a double-quoted string that opened in it. */
+function endsInsideQuote(segment) {
+  let open = false;
+  for (const m of segment.matchAll(DQ_TOKEN)) {
+    const t = m[0];
+    if (t === "“" || t === "&ldquo;") open = true;
+    else if (t === "”" || t === "&rdquo;") open = false;
+    else open = !open;
+  }
+  return open;
+}
 
 function isDatedCorrection(text, matchIndex) {
   // Same paragraph only: a blank line (or a closing paragraph tag) resets it.
   const before = text.slice(Math.max(0, matchIndex - 320), matchIndex);
   const cut = Math.max(before.lastIndexOf("\n\n"), before.lastIndexOf("</p>"), before.lastIndexOf("</li>"));
   const scope = cut === -1 ? before : before.slice(cut);
-  return DATED_CORRECTION.test(scope);
+  // The old claim has to be QUOTED after the "used to say" token: the match
+  // must sit inside a double-quoted string that opened after that token.
+  // "Our old page used to say otherwise. Tapeline is now real-time." quotes
+  // nothing, so it is a fresh claim (review round 2 of #842).
+  for (const m of scope.matchAll(DATED_CORRECTION)) {
+    if (endsInsideQuote(scope.slice(m.index + m[0].length))) return true;
+  }
+  return false;
 }
 
 const QUOTE_OPEN = /(?:["“'‘]|&quot;|&ldquo;|\\")$/;

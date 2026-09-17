@@ -437,8 +437,9 @@ export default function CardGateStartPage() {
               The public record
             </Link>
             <span className="text-muted">
-              {" "}&mdash; every daily top-10 we have published, frozen when it
-              printed and checked against SPY. Losing days included.
+              {" "}&mdash; every daily top-10 we have published, recorded when it
+              printed and checked against SPY. Losing days included; entries are
+              not re-ranked or deleted, and corrections are dated.
             </span>
           </li>
           <li>

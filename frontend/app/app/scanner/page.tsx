@@ -18,7 +18,7 @@ import {
   openAccessJustEnded,
 } from "@/lib/pricing";
 import { SECTOR_SLUG_TO_CANONICAL, TodaysTape } from "@/components/TodaysTape";
-import { PASS_CADENCE_PHRASE, priceDelayNote } from "@/lib/freshness";
+import { IN_APP_REFRESH_SENTENCE, PASS_CADENCE_PHRASE, priceDelayNote } from "@/lib/freshness";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { HoverCard } from "@/components/HoverCard";
@@ -718,11 +718,12 @@ export default function ScannerPage() {
           <p className="text-sm text-muted">Every liquid US stock &amp; ETF, scored on 6 factors.</p>
           {/* Delay disclosure (integrity wave 2026-09-14): measured vendor
               delay ~15 min; the worker re-reads every row about every
-              60 s. This page does not update itself. */}
+              60 s, and during the US session (04:00-20:00 ET) the live
+              bridge makes this page refetch about once per pass
+              (useLiveStream below), so no reload is needed. */}
           <p className="text-xs text-subtle" data-testid="price-delay-note">
             {priceDelayNote(meta?.delayMinutes)}, re-read {PASS_CADENCE_PHRASE} during
-            US market hours (crypto: once a day). Reload or change a filter for newer
-            numbers.
+            US market hours (crypto: once a day). {IN_APP_REFRESH_SENTENCE}
           </p>
         </div>
         <div className="flex items-center gap-3">

@@ -137,7 +137,7 @@ def has_feature(user_tier: Tier | str, feature: str) -> bool:
 # as "never meter, always allow" for Pro/Premium/active-trial users.
 UNLIMITED: Final[None] = None
 
-# FREE tier (forever; the tier trial users lapse to). LIVE data — no 24h cliff.
+# FREE tier (forever; the tier trial users lapse to). No extra tier delay — no 24h cliff.
 # EXTRA delay a tier adds on top of the vendor's ~15 min (services/freshness).
 FREE_DATA_DELAY_MINUTES = 0      # no extra delay (was 1440 = 24h before the freemium retune)
 FREE_SCANNER_ROWS = 10           # top-10 rows (was 20)

@@ -49,7 +49,8 @@ const FACT_SHEET = [
   { label: "Premium trial",   value: `${TRIAL_DAYS}-day Premium; card required, $0 charged today, first charge on day ${TRIAL_DAYS}` },
   { label: "Universe scored", value: "About 11,500 US-listed stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs scored separately and updated once a day" },
   // Measured 14 Sep 2026 (integrity wave): vendor prices ~15 min delayed,
-  // worker passes 70-74 s apart, scores change about once a day.
+  // worker passes about 60 s apart since #843 (70-74 s before it), scores
+  // change about once a day.
   { label: "Update cadence",  value: `${PRICE_FRESHNESS_SENTENCE} ${SCORE_CADENCE_SENTENCE}` },
   { label: "Data categories", value: "Market data (prices delayed about 15 minutes), fundamentals, macro indicators, SEC filings, news" },
   { label: "Integrations",    value: "Public MCP server for AI assistants (tapeline.io/mcp) · CSV export · API (tapeline.io/developers)" },

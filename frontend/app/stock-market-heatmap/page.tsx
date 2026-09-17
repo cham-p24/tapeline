@@ -132,7 +132,7 @@ export default async function StockMarketHeatmapPage() {
         },
         {
           q: "How often does the heatmap refresh?",
-          a: "Prices are delayed about 15 minutes, and Tapeline re-reads them for every covered stock and ETF about every 60 seconds during US market hours. Scores are recalculated on each pass, but most of their inputs are daily readings, so a score usually changes about once a day. The public showcase above is a saved snapshot that can be an hour old or more. The in-app heatmap shows the latest data when you open it; reload to see newer numbers.",
+          a: "Prices are delayed about 15 minutes, and Tapeline re-reads them for every covered stock and ETF about every 60 seconds during US market hours. Scores are recalculated on each pass, but most of their inputs are daily readings, so a score usually changes about once a day. The public showcase above is a saved snapshot that can be an hour old or more. The in-app heatmap refreshes itself about once per pass during the US session (04:00-20:00 ET on trading days), so you do not need to reload it.",
         },
         {
           q: "Does the heatmap include commodities and ETFs?",

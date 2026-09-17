@@ -476,7 +476,8 @@ async def list_scanner(
     # tier-imposed delay from tier.py (0 for every tier since the 2026-06-20
     # retune). This field read 0 for every tier while the vendor plan was
     # 15-minute delayed, which told every consumer the data was undelayed.
-    delay_minutes = data_delayed_minutes(tier_limit(tier, "data_delay_minutes"))
+    tier_delay_minutes = int(tier_limit(tier, "data_delay_minutes") or 0)
+    delay_minutes = data_delayed_minutes(tier_delay_minutes)
     return {
         "count": len(rows),
         "tier": tier.value,
@@ -513,9 +514,14 @@ async def list_scanner(
                 "sub_smart_money": r.sub_smart_money,
                 "confidence_pct": r.confidence_pct,
                 "reason": r.reason,
+                # When Tapeline last wrote the row (the MCP server's `as_of`
+                # says the same), shifted back only by a TIER-imposed delay.
+                # The vendor's ~15-minute delay is reported in
+                # `data_delayed_minutes`, not folded into this timestamp
+                # (review round 2 of #842).
                 "updated_at": (
-                    (r.updated_at - timedelta(minutes=delay_minutes)).isoformat()
-                    if r.updated_at and delay_minutes
+                    (r.updated_at - timedelta(minutes=tier_delay_minutes)).isoformat()
+                    if r.updated_at and tier_delay_minutes
                     else (r.updated_at.isoformat() if r.updated_at else None)
                 ),
             }

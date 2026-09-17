@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { render, screen } from "@testing-library/react";
 import {
+  IN_APP_REFRESH_SENTENCE,
   PASS_CADENCE_PHRASE,
   PASS_INTERVAL_SECONDS,
   PRICE_DELAY_MINUTES,
@@ -117,6 +118,33 @@ describe("surfaces that show or sell prices state the delay", () => {
   it("the scanner and the public ticker page render the delay note", () => {
     expect(read("app/app/scanner/page.tsx")).toMatch(/data-testid="price-delay-note"[\s\S]{0,120}priceDelayNote\(meta\?\.delayMinutes\)/);
     expect(read("app/t/[symbol]/page.tsx")).toMatch(/data-testid="price-delay-note"[\s\S]{0,200}PRICE_DELAY_NOTE/);
+  });
+
+  it("in-app pages say they refresh themselves during the US session (review round 2 of #842)", () => {
+    // The scanner and heatmap call useLiveStream and refetch about once per
+    // pass during 04:00-20:00 ET on trading days (#840 bridge); the LiveBadge
+    // says "Auto-refreshing". Copy telling users to reload contradicted it.
+    expect(IN_APP_REFRESH_SENTENCE).toMatch(/refreshes itself about once per pass/);
+    expect(IN_APP_REFRESH_SENTENCE).toMatch(/04:00-20:00 ET/);
+    expect(IN_APP_REFRESH_SENTENCE).toContain(PASS_CADENCE_PHRASE);
+    expect(IN_APP_REFRESH_SENTENCE).toMatch(/do not need to reload/);
+    expect(IN_APP_REFRESH_SENTENCE).not.toMatch(FALSE_FRESHNESS);
+
+    const scanner = read("app/app/scanner/page.tsx");
+    expect(scanner).toMatch(/useLiveStream\(/);
+    expect(scanner).toMatch(/data-testid="price-delay-note"[\s\S]{0,300}\{IN_APP_REFRESH_SENTENCE\}/);
+    expect(scanner).not.toMatch(/does not update itself|Reload or change a filter/);
+
+    expect(read("app/app/heatmap/page.tsx")).toMatch(/useLiveStream\(/);
+    const heatmapFaq = read("app/stock-market-heatmap/page.tsx");
+    expect(heatmapFaq).toMatch(/in-app heatmap refreshes itself about once per pass during the US session/);
+    expect(heatmapFaq).not.toMatch(/reload to see newer numbers/);
+  });
+
+  it("/pricing does not call client-fetched numbers hours old (review round 2 of #842)", () => {
+    const pricing = read("app/pricing/page.tsx");
+    expect(pricing).toContain("These numbers are read from the scorecard when you open this page.");
+    expect(pricing).not.toMatch(/six hours old/);
   });
 
   it("llms.txt states the delay and the pass interval, and drops the false claims", () => {

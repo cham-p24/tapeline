@@ -732,7 +732,8 @@ export default function BestFinvizAlternativesPage() {
                 <tr>
                   <th className="px-3 py-3 text-left font-medium sticky left-0 bg-background">Tool</th>
                   <th className="px-3 py-3 text-center font-medium" title="Single 0-100 score per ticker">Composite score</th>
-                  <th className="px-3 py-3 text-center font-medium" title="Per-pick public track record">Scorecard</th> {/* copy-compliance-allow false-data-freshness -- the next column header defines undelayed intraday data for the competitors compared; Tapeline's own cell is "no" */}
+                  <th className="px-3 py-3 text-center font-medium" title="Per-pick public track record">Scorecard</th>
+                  {/* copy-compliance-allow false-data-freshness -- the next column header defines undelayed intraday data for the competitors compared; Tapeline's own cell is "no" */}
                   <th className="px-3 py-3 text-center font-medium" title="Undelayed intraday prices during market hours">Intraday</th>
                   <th className="px-3 py-3 text-center font-medium">Charting</th>
                   <th className="px-3 py-3 text-center font-medium">Fundamentals</th>

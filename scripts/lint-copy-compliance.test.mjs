@@ -918,6 +918,22 @@ test("llms.txt stays inside the default lint scope", () => {
   );
 });
 
+test("OpenGraph share cards stay inside the default lint scope", () => {
+  // Excluded until review round 2 of #842, while about 20 share cards carried
+  // "Live" / "sub-60s" wording that the false-data-freshness rule blocks
+  // everywhere else.
+  const config = loadAllowlist();
+  for (const og of [
+    "frontend/app/opengraph-image.tsx",
+    "frontend/app/scorecard/opengraph-image.tsx",
+    "frontend/app/t/[symbol]/opengraph-image.tsx",
+  ]) {
+    assert.ok(config.include.some((g) => globMatch(g, og)), `${og} matches no include glob`);
+    assert.ok(!config.exclude.some((g) => globMatch(g, og)), `${og} is excluded, so CI does not scan it`);
+  }
+  assert.ok(fires('<div>Live sub-60s refresh</div>', "false-data-freshness", "frontend/app/scorecard/opengraph-image.tsx"));
+});
+
 /* ------------------------------------------------------------------ *
  * unbacked-feature-claim — congress / squeeze on a sell surface.
  *
@@ -1031,8 +1047,8 @@ test("record-never-edited leaves the replacement wording and ordinary uses alone
  * false-data-freshness — the data is delayed, and the site must say so.
  *
  * Integrity wave, founder-approved 2026-09-14. Measured during the US session
- * on 14 Sep 2026: vendor prices ~15 minutes behind, worker passes 70-74 s
- * apart, scores changing about once a day, public pages cached an hour or
+ * on 14 Sep 2026: vendor prices ~15 minutes behind, worker passes about 60 s
+ * apart since #843 (69.7-74.3 s before it), scores changing about once a day, public pages cached an hour or
  * more. Every "bad" line below shipped on origin/main before this change.
  * ------------------------------------------------------------------ */
 
@@ -1067,6 +1083,11 @@ test("false-data-freshness fires on the claims that shipped", () => {
     ["<p>Unlike Finviz, our scanner is real-time.</p>", "frontend/app/blog/posts.ts"],
     ["Compared to TradingView, we refresh sub-60s.", "frontend/app/blog/posts.ts"],
     ["<li>Finviz free: 15-minute delay. Elite: real-time.</li>", "frontend/app/blog/posts.ts"],
+    // Review round 2 of #842: "used to say" without a quote of the old claim.
+    ["<p>Our old page used to say otherwise. Tapeline is now real-time.</p>", "frontend/app/blog/posts.ts"],
+    ["<p>We measured false claims before; this one is real-time.</p>", "frontend/app/blog/posts.ts"],
+    ["this paragraph used to say the worker ticks every minute from fresh data", "frontend/app/blog/posts.ts"],
+    ['<p>This used to say "delayed". Tapeline is real-time now.</p>', "frontend/app/blog/posts.ts"],
   ];
   for (const [src, file] of bad) {
     assert.ok(fires(src, "false-data-freshness", file), `missed in ${file}: ${src}`);
@@ -1086,7 +1107,8 @@ test("false-data-freshness leaves true, negated, dated and quoted-term wording a
     ['"No real-time intraday update cadence",', "frontend/app/best-finviz-alternatives/page.tsx"],
     // A dated correction quoting the old claim.
     ['<em>Updated 15 September 2026: this line used to say Free had "live scores (no delay)" and Pro+ had "~60-second freshness".</em>', "frontend/app/blog/posts.ts"],
-    ["this paragraph used to say the worker ticks every minute from fresh data", "frontend/app/blog/posts.ts"],
+    ['this paragraph used to say the worker recomputed the composite "from fresh snapshot data" and that the public pages show a "live score"', "frontend/app/blog/posts.ts"],
+    ["<em>this cell used to say &ldquo;live data, no delay&rdquo;</em>", "frontend/app/blog/posts.ts"],
     // A term mentioned in quotes, not used.
     ['<p>"Real-time" means different things at different price tiers.</p>', "frontend/app/blog/posts.ts"],
     // Ordinary English and state values.
@@ -1107,4 +1129,19 @@ test("false-data-freshness is not fooled by a competitor named BEFORE a Tapeline
   assert.ok(
     fires("<p>Finviz charges $40 a month. Tapeline is real-time for $8.</p>", "false-data-freshness", "frontend/app/blog/posts.ts"),
   );
+});
+
+test("false-data-freshness in ad mode: a quoted multi-word competitor headline needs its inline marker", () => {
+  // docs/ads/2026-09-video/README.md quotes a competitor's ad headline as copy
+  // Tapeline cannot write. The quoted-term guard only covers a quote that is
+  // just the term, so the headline is flagged unless a line-specific marker
+  // with a reason sits on it (review round 2 of #842).
+  const file = "docs/ads/2026-09-video/README.md";
+  const bare =
+    '**1. The hypey lane is crowded and closed to us.** "Real-Time Buy & Sell\nAlerts", "Executives just loaded up on their own stock"\n';
+  const marked =
+    "**1. The hypey lane is crowded and closed to us.** \"Real-Time Buy & Sell <!-- copy-compliance-allow false-data-freshness -- quotes a competitor's ad headline as copy Tapeline cannot write -->\nAlerts\", \"Executives just loaded up on their own stock\"\n";
+  const rules = (src) => scanSource(src, file, { ads: true }).map((f) => f.rule);
+  assert.ok(rules(bare).includes("false-data-freshness"));
+  assert.ok(!rules(marked).includes("false-data-freshness"));
 });

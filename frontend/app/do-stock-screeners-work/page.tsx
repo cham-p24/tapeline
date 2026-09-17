@@ -208,7 +208,7 @@ const HOWTO_STEPS = [
   },
   {
     name: "Check that losers are included and corrections are dated",
-    text: "A record that shows only winners is marketing. The misses have to be there, frozen the day they printed, never re-ranked or removed, and any correction to a recorded value dated. If the losing picks aren't visible, assume they were dropped.",
+    text: "A record that shows only winners is marketing. The misses have to be there, recorded the day they printed, never re-ranked or removed, and any correction to a recorded value dated. If the losing picks aren't visible, assume they were dropped.",
   },
   {
     name: "Confirm every pick is benchmarked",
@@ -310,7 +310,7 @@ export default async function DoStockScreenersWorkPage() {
         <h2 className="mt-12 text-2xl font-semibold tracking-tight">A worked example: one screener that shows its record</h2>
         <p className="mt-3 leading-relaxed text-muted">
           Tapeline was built around the check above. A six-factor composite scores about 11,500 US stocks and ETFs;
-          each day&rsquo;s top 10 is frozen when it prints, and each pick&rsquo;s next-session result versus SPY is
+          each day&rsquo;s top 10 is recorded when it prints, and each pick&rsquo;s next-session result versus SPY is
           recorded a session later. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026. The full archive downloads as CSV and JSON. The newest picks are
           logged the day they print and back-checked one session later, so the back-checked count below always trails
           the full log by a day or so of picks.

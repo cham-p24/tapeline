@@ -18,7 +18,8 @@ import { userLocale } from "@/lib/datetime";
  * WHAT A "FLAG" IS, EXACTLY
  * -------------------------
  * A session on which this ticker appeared in our published daily top-10. The
- * row is frozen when it is written; recorded values have been corrected twice
+ * row is recorded when it is written and is not re-ranked or deleted; recorded
+ * values have been corrected twice
  * (prices on 25 August 2026, scores capped on 15 June 2026), both dated on
  * /scorecard, which is what keeps the archive auditable. The outcome attached to it is the NEXT SESSION
  * ONLY — the single trading day after the flag — measured against SPY over the
@@ -58,7 +59,7 @@ import { userLocale } from "@/lib/datetime";
 /** The single, deliberate rendering of "we do not hold this value". */
 const EMPTY = "—";
 
-/** One frozen flag. Mirrors the public scorecard's row shape. */
+/** One recorded flag. Mirrors the public scorecard's row shape. */
 export type TickerRecordRow = {
   as_of: string;
   score_at_flag: number | null;
@@ -183,8 +184,9 @@ export function TickerRecord({ symbol, record }: { symbol: string; record: unkno
         </h2>
         <p className="mt-0.5 text-xs text-muted">
           Every session {symbol} has appeared in our published daily top-10, and
-          what the next session did. Rows are frozen when written; corrections
-          to recorded values are dated on the scorecard.
+          what the next session did. Rows are recorded when written and are not
+          re-ranked or deleted; corrections to recorded values are dated on the
+          scorecard.
         </p>
       </div>
 

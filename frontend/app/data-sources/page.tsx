@@ -40,7 +40,8 @@ const CATEGORIES: Category[] = [
     surfaceArea:
       "Every ticker price, every chart, every percentage change, the heatmap tiles, the scanner table.",
     // Measured 14 Sep 2026: the vendor snapshot was ~15 min behind and
-    // worker passes landed 70-74 s apart. Daily bars are read once a day.
+    // worker passes landed about 60 s apart after #843 (70-74 s before it).
+    // Daily bars are read once a day.
     refreshCadence: `${PRICE_FRESHNESS_SENTENCE} Daily OHLC bars (used for trend and relative strength) are read about once a day.`,
     publicRecord: false,
   },

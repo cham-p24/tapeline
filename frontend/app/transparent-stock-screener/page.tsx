@@ -153,7 +153,7 @@ function buildFaq(scale: RecordScale | null, spy: SpyFigures | null): { q: strin
   return [
     {
       q: "Does any stock screener show its losing picks?",
-      a: `Very few do — Tapeline is built around it. Every daily top-10 is frozen the day it prints, and its next-session move versus SPY is recorded 24 hours later, with losing days kept on the page at the same size and weight as winners. The published record${size} is downloadable in full, so the misses can’t be quietly dropped.`,
+      a: `Very few do — Tapeline is built around it. Every daily top-10 is recorded the day it prints, entries are not re-ranked or deleted, corrections are dated, and its next-session move versus SPY is recorded 24 hours later, with losing days kept on the page at the same size and weight as winners. The published record${size} is downloadable in full, so the misses can’t be quietly dropped.`,
     },
     {
       q: "How is Tapeline’s track record verified?",
@@ -192,7 +192,7 @@ export async function generateMetadata() {
     : "";
   return pageMeta({
     title: "The stock screener that publishes its losing picks",
-    description: `Tapeline is the stock screener that publishes every daily top-10 pick — ${scaleClause}frozen the day it printed, not re-ranked or deleted, each checked against SPY the next session, losing days included, corrections dated, downloadable as raw data.`,
+    description: `Tapeline is the stock screener that publishes every daily top-10 pick — ${scaleClause}recorded the day it printed, not re-ranked or deleted, each checked against SPY the next session, losing days included, corrections dated, downloadable as raw data.`,
     path: "/transparent-stock-screener",
   });
 }
@@ -244,7 +244,7 @@ export default async function TransparentScreenerPage() {
               {scale.since ? ` since ${scale.since}` : ""}
             </>
           )}{" "}
-          &mdash; frozen the day it prints, with each pick&rsquo;s next-session result versus SPY recorded,{" "}
+          &mdash; recorded the day it prints, with each pick&rsquo;s next-session result versus SPY recorded,{" "}
           <strong className="text-fg">losing days included</strong>. Entries are not re-ranked or deleted. We have
           corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June
           capped on 15 June 2026. Entries appear publicly 7 days after the session, and the archive is downloadable

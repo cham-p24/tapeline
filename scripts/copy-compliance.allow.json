@@ -22,6 +22,10 @@
     "of them, three weeks after #683 made it false. Listed by name to keep the",
     "scope narrow.",
     "",
+    "OpenGraph share cards (frontend/app/**/opengraph-image.tsx) are IN scope",
+    "since review round 2 of #842: about 20 of them were hand-edited to remove 'Live' and",
+    "'sub-60s' wording while excluded, with nothing to stop it coming back. All scan clean.",
+    "",
     "See docs/COMPLIANCE_COPY_RULES.md."
   ],
   "include": [
@@ -49,7 +53,6 @@
     "**/*.spec.tsx",
     "**/__tests__/**",
     "**/e2e/**",
-    "frontend/app/**/opengraph-image.tsx",
     "frontend/app/**/icon.tsx"
   ],
   "allow": [

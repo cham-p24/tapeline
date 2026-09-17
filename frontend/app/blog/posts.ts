@@ -1520,7 +1520,8 @@ RSI = 100 - (100 / (1 + RS))</pre>
         this line said ~6,900 before). <em>Updated 15 September 2026: this line
         used to say Free had "live scores (no delay)" and Pro+ had "~60-second
         freshness". Measured on 14 September 2026, the price vendor's data was
-        about 15 minutes behind and a worker pass took 70 to 74 seconds.</em></li>
+        about 15 minutes behind and a worker pass took 70 to 74 seconds (about
+        60 seconds after a fix later that day).</em></li>
       </ul>
 
       <p>Tapeline gates on breadth rather than freshness — every plan reads
@@ -1528,7 +1529,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
       look-ups a day, unmetered for the first 24 hours), while Pro opens every
       row of the full universe. If you're testing the product, the
       <a href="/scorecard">public scorecard</a> shows the real
-      composite quality at full freshness.</p>
+      composite quality.</p>
 
       <h3>3. Methodology transparency</h3>
 
@@ -1909,9 +1910,10 @@ RSI = 100 - (100 / (1 + RS))</pre>
       readings, so a score usually changes about once a day. The public
       ticker pages show that score without an account, from a cached
       snapshot that can be an hour old or more. <em>Updated 15 September
-      2026: this paragraph used to say the worker "ticks every 60 seconds"
-      from fresh data and that the public pages show a "live score". Both
-      were measured false on 14 September 2026.</em></p>
+      2026: this paragraph used to say the worker recomputed the composite
+      "from fresh snapshot data" and that the public pages show a "live score";
+      on 14 September 2026 prices measured about 15 minutes delayed and ticker
+      pages were cached snapshots.</em></p>
 
       <h2>Test 5: What's the unsubscribe / cancel friction?</h2>
 
