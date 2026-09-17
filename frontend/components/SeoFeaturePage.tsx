@@ -257,7 +257,7 @@ export function SeoFeaturePage({
         <section className="mt-12 rounded-2xl bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <p className="eyebrow text-accent">{tierLabel} feature</p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight">
-            See this live across {activeScoredLabel} actively scored tickers.
+            See this across {activeScoredLabel} actively scored tickers.
           </h2>
           <p className="mt-3 text-sm text-muted">{tierCopy}</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">

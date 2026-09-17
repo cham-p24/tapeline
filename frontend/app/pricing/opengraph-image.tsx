@@ -66,7 +66,7 @@ export default async function OG() {
               display: "flex",
             }}
           >
-            Live scanner. Public scorecard.
+            Scanner. Public scorecard.
           </div>
           <div style={{ fontSize: "30px", color: "#a1a1aa", lineHeight: 1.4, display: "flex" }}>
             Free plan, no card. Public record needs no account. Premium trial takes a card. Prices in USD.
@@ -95,7 +95,7 @@ export default async function OG() {
             tier="Pro"
             price="$8.25"
             sub="/mo annual"
-            note="Full live scanner · alerts · CSV"
+            note="Full scanner · alerts · CSV"
             outline
           />
           <Tile

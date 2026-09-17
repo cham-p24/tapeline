@@ -79,13 +79,15 @@ const TOOLS: Tool[] = [
     capability: {
       composite: "yes",
       scorecard: "yes",
-      intraday: "yes",
+      // "no" (integrity fix 2026-09-14/15): the column means undelayed intraday
+      // prices, and Tapeline's prices are delayed about 15 minutes on every plan.
+      intraday: "no",
       charting: "limited",
       fundamentals: "yes",
       aiSignals: "limited",
       // "yes" from 2026-08-30, when the card moved off the front door: a new
       // account is an email and a password, and it lands on a free plan that
-      // runs the live scanner — the top ten scored rows of any scan, live,
+      // runs the scanner — the top ten scored rows of any scan,
       // with one saved screen and a five-symbol watchlist. A card is what
       // turns on every matching row, alerts, CSV export and SEC Form 4
       // insider filings. Separately, the published record — the daily Top 10, the whole
@@ -97,8 +99,8 @@ const TOOLS: Tool[] = [
       "Six named scoring factors, published methodology — no black-box",
       "Public scorecard back-checking every top-10 pick vs SPY",
       "Plain-English Why on every row — no upgrade gates the reasoning",
-      "Sub-60s refresh cadence during US market hours",
-      "A free plan runs the live scanner — ten scored rows per scan, live data",
+      "Prices delayed about 15 minutes, re-read about every 60 seconds during US market hours",
+      "A free plan runs the scanner — ten scored rows per scan",
       "Daily picks, full scorecard and raw CSV/JSON readable with no account",
     ],
     cons: [
@@ -225,7 +227,7 @@ const TOOLS: Tool[] = [
     cons: [
       "Fundamental-investor lean — sparse intraday signals",
       "UI feels dated next to 2026-built tools",
-      "No live composite scoring with public methodology",
+      "No composite score with a public methodology",
     ],
     verdict:
       "Best Finviz alternative for buy-and-hold fundamental investors who want a portfolio analytics layer. Less suitable for active swing traders.",
@@ -379,7 +381,7 @@ const WHY_LOOK_BEYOND = [
   },
   {
     title: "You want intraday speed without paying Trade Ideas pricing",
-    body: "Finviz Elite refreshes most fields every 1 minute, which is fine for swing trading but a beat slower than dedicated intraday tools. Trade Ideas runs sub-second but costs $120-240/mo. Tapeline runs sub-60-second during US market hours at $8.25/mo annual — the middle ground that most retail traders actually need.",
+    body: "Finviz Elite refreshes most fields every 1 minute, which is fine for swing trading but a beat slower than dedicated intraday tools. Trade Ideas runs sub-second but costs $120-240/mo. Tapeline is not an intraday speed tool: its prices are delayed about 15 minutes and re-read about every 60 seconds, at $8.25/mo annual. It fits screening for swing and position ideas, not timing entries.",
   },
 ];
 
@@ -399,7 +401,7 @@ const MIGRATION_STEPS = [
   },
   {
     name: "Run both tools in parallel for two weeks",
-    text: "Don't cancel Finviz yet. Use the new tool's free tier or trial, replicate your usual screen each morning, see if the results are actionable. Tapeline's free plan is built for exactly this: an email and a password opens the live scanner, and you see the top ten scored rows of whatever scan you build, plus one saved screen you can come back to. Add a card only if the parallel run tells you that you want every matching row, alerts and CSV export — that starts the 30-day Premium trial, $0 that day, first charge on day 30, one click cancels before then. TradingView and Stockanalysis.com both have free tiers too.",
+    text: "Don't cancel Finviz yet. Use the new tool's free tier or trial, replicate your usual screen each morning, see if the results are actionable. Tapeline's free plan is built for exactly this: an email and a password opens the scanner, and you see the top ten scored rows of whatever scan you build, plus one saved screen you can come back to. Add a card only if the parallel run tells you that you want every matching row, alerts and CSV export — that starts the 30-day Premium trial, $0 that day, first charge on day 30, one click cancels before then. TradingView and Stockanalysis.com both have free tiers too.",
   },
   {
     name: "Recreate your screener filters in the new tool",
@@ -415,7 +417,7 @@ const MIGRATION_STEPS = [
   },
   {
     name: "Verify the public-facing pages and shareable links",
-    text: "If you share Finviz screen URLs with friends or in tweets, check the alternative's equivalent. Tapeline's per-ticker pages (/t/NVDA) are public and indexed; the live scanner requires auth but per-ticker score + signal is shareable.",
+    text: "If you share Finviz screen URLs with friends or in tweets, check the alternative's equivalent. Tapeline's per-ticker pages (/t/NVDA) are public and indexed; the scanner requires auth but per-ticker score + signal is shareable.",
   },
   {
     name: "Cancel Finviz Elite — or keep it for the 30% of features the new tool doesn't replicate",
@@ -426,7 +428,7 @@ const MIGRATION_STEPS = [
 const FAQ = [
   {
     q: "What's the closest free alternative to Finviz Elite?",
-    a: "Stockanalysis.com offers the closest free experience — full screener access without a paywall, fundamental data tables, and ETF/IPO coverage. TradingView's free tier covers charting and a basic screener. Tapeline's free plan is a different shape: an email and a password opens the live scanner, but you see the top ten scored rows of a scan rather than every match, and alerts and CSV export are what a card turns on. Its published output stays free to read with no account at all: the daily Top 10, the whole scorecard, a page per scored ticker, and the raw CSV/JSON record. None of these match Finviz Elite's 60+ raw screener fields, but each is honest about what it provides.",
+    a: "Stockanalysis.com offers the closest free experience — full screener access without a paywall, fundamental data tables, and ETF/IPO coverage. TradingView's free tier covers charting and a basic screener. Tapeline's free plan is a different shape: an email and a password opens the scanner, but you see the top ten scored rows of a scan rather than every match, and alerts and CSV export are what a card turns on. Its published output stays free to read with no account at all: the daily Top 10, the whole scorecard, a page per scored ticker, and the raw CSV/JSON record. None of these match Finviz Elite's 60+ raw screener fields, but each is honest about what it provides.",
   },
   {
     q: "Why isn't Finviz the right tool for everyone?",
@@ -458,7 +460,7 @@ const FAQ = [
   },
   {
     q: "Which Finviz alternative is best for day traders specifically?",
-    a: "Trade Ideas if you can afford $120+/mo and want AI auto-execution. Tapeline at one-fifth the price if you want a sub-60-second composite score with intraday refresh — the /best-stocks-for/day-traders page filters to today's biggest movers AND composite 60+ for confluence. TradingView for chart-driven entries. Finviz Elite remains competitive for raw-filter pre-market scans.",
+    a: "Trade Ideas if you can afford $120+/mo and want AI auto-execution. Tapeline is not built for timing day trades: its prices are delayed about 15 minutes. Its /best-stocks-for/day-traders page filters to today's biggest movers AND composite 60+ for confluence. TradingView for chart-driven entries. Finviz Elite remains competitive for raw-filter pre-market scans.",
   },
   {
     q: "What's the best Finviz alternative for fundamentals investors?",
@@ -614,7 +616,7 @@ export default function BestFinvizAlternativesPage() {
               <Link href="/signup?from=finviz" className="text-accent hover:underline">
                 An email and a password
               </Link>{" "}
-              opens the live scanner at ten rows a scan; a card is what shows every match and
+              opens the scanner at ten rows a scan; a card is what shows every match and
               starts the 30-day Premium trial — $0 today, one click to cancel. Pro is $8.25/mo
               annual. The{" "}
               <Link href="/scorecard" className="text-accent hover:underline">
@@ -649,7 +651,7 @@ export default function BestFinvizAlternativesPage() {
             The label names what the button actually does since 2026-08-30:
             signing up is an email and a password onto the free plan, and the
             trial is a later, separate choice. */}
-        <LandingCta from="finviz" primaryLabel="Open the live scanner — free account" />
+        <LandingCta from="finviz" primaryLabel="Open the scanner — free account" />
 
         {/* Quick-pick by intent — decision tree. Targets specific user intents
             like "best finviz alternative for [X]" long-tail. */}
@@ -731,7 +733,8 @@ export default function BestFinvizAlternativesPage() {
                   <th className="px-3 py-3 text-left font-medium sticky left-0 bg-background">Tool</th>
                   <th className="px-3 py-3 text-center font-medium" title="Single 0-100 score per ticker">Composite score</th>
                   <th className="px-3 py-3 text-center font-medium" title="Per-pick public track record">Scorecard</th>
-                  <th className="px-3 py-3 text-center font-medium" title="Sub-minute refresh during market hours">Intraday</th>
+                  {/* copy-compliance-allow false-data-freshness -- the next column header defines undelayed intraday data for the competitors compared; Tapeline's own cell is "no" */}
+                  <th className="px-3 py-3 text-center font-medium" title="Undelayed intraday prices during market hours">Intraday</th>
                   <th className="px-3 py-3 text-center font-medium">Charting</th>
                   <th className="px-3 py-3 text-center font-medium">Fundamentals</th>
                   <th className="px-3 py-3 text-center font-medium" title="AI/ML-driven signals">AI signals</th>
@@ -770,8 +773,8 @@ export default function BestFinvizAlternativesPage() {
               covers, and where it stops, in the same place they see it. */}
           <p className="mt-3 text-xs text-subtle leading-relaxed">
             On the Free tier column: Tapeline reads &quot;yes&quot; because an email and
-            a password opens the live scanner on a free plan — the top ten scored rows
-            of any scan, live, with one saved screen and a five-symbol watchlist. What
+            a password opens the scanner on a free plan — the top ten scored rows
+            of any scan, with one saved screen and a five-symbol watchlist. What
             a card buys is every matching row instead of the first ten, a second saved
             screen, alerts, CSV export and SEC Form 4 insider filings. Separately again, the
             published output — the daily Top 10, the full scorecard, a page per scored
@@ -959,9 +962,9 @@ export default function BestFinvizAlternativesPage() {
 
         {/* CTA */}
         <section className="mt-16 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
-          <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick — the live scanner.</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Try the #1 pick — the scanner.</h2>
           <p className="mt-3 text-sm text-muted">
-            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. An account is an email and a password: the live scanner opens on the free plan at ten scored rows a scan. A card is what shows every matching row and turns on alerts and CSV export — it starts the 30-day Premium trial, $0 today, first charge on day 30, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
+            The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no account. An account is an email and a password: the scanner opens on the free plan at ten scored rows a scan. A card is what shows every matching row and turns on alerts and CSV export — it starts the 30-day Premium trial, $0 today, first charge on day 30, one click to cancel. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
             ({usd(PRICING.pro.annual)}/yr), with a 30-day money-back guarantee. Keep your
             existing Finviz subscription if you want — they solve different problems.
           </p>

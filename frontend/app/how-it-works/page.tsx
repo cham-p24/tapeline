@@ -25,7 +25,7 @@ const HOW_FAQ = [
   },
   {
     q: "How often does the score update?",
-    a: "Scores re-tick every minute during market hours and persist between sessions. Most data feeds (price, volume, RSI, MACD, regime) update sub-60s; fundamentals refresh on company filing cadence. Insider Form 4 filings are re-checked with a data vendor about every two days per stock (about monthly for ETFs), and the vendor's filings can run weeks behind SEC EDGAR.",
+    a: "Scores are recalculated on each worker pass, about every 60 seconds during US market hours, and persist between sessions. Prices are delayed about 15 minutes. Most score inputs are daily readings (daily price bars for trend, relative strength and momentum, and the macro regime), so a score usually changes about once a day; fundamentals refresh on company filing cadence. Insider Form 4 filings are re-checked with a data vendor about every two days per stock (about monthly for ETFs), and the vendor's filings can run weeks behind SEC EDGAR.",
   },
   {
     q: "What is the per-ticker confidence percentage?",
@@ -285,10 +285,10 @@ export default function HowItWorksPage() {
 
       {/* CTA */}
       <section className="section py-8 sm:py-10 text-center">
-        <h2 className="text-3xl font-semibold">See the scores live.</h2>
+        <h2 className="text-3xl font-semibold">See the scores in the scanner.</h2>
         <p className="mt-3 text-muted">
           An email and a password puts you on the free plan, where every scan
-          returns its top ten scored rows, live. A card starts the 30-day
+          returns its top ten scored rows. A card starts the 30-day
           Premium trial &mdash; every matching row, $0 charged that day, first
           charge on day 30, one click to cancel.
         </p>

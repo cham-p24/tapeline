@@ -42,8 +42,8 @@ async def test_public_signals_returns_200_unauth(client):
 
 @pytest.mark.asyncio
 async def test_public_signals_no_tier_delay(client):
-    """The /api/scanner endpoint reports a `data_delayed_minutes` field (0 for
-    every tier since the 2026-06-20 retune removed the Free delay).
+    """The /api/scanner endpoint reports a `data_delayed_minutes` field (the
+    vendor's ~15 min price delay for every tier; see services/freshness.py).
     /api/public/signals must NOT have that field at all — it serves live data
     to every visitor and applies no tier logic."""
     async with client:

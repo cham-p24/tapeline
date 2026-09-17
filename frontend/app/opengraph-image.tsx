@@ -12,7 +12,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Tapeline — Read the tape. Live.";
+export const alt = "Tapeline — Read the tape.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -84,7 +84,7 @@ export default async function OG() {
               display: "flex",
             }}
           >
-            Live quantitative scanner with market regime, SEC Form 4 insider filings, and a public scorecard.
+            Quantitative scanner with market regime, SEC Form 4 insider filings, and a public scorecard.
           </div>
         </div>
 

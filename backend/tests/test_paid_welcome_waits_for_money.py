@@ -446,9 +446,8 @@ async def test_first_charge_clearing_through_dunning_sends_exactly_one(monkeypat
     assert h.alerts[0]["amount"] == pytest.approx(19.99)
     assert h.alerts[0]["tier"] == "premium"
     assert await _latch_exists(sub_id)
-    # ONE billing email for one charge. The dunning all-clear says the
-    # subscription is "fully current again" and "Nothing lapsed" — false for
-    # someone who has never paid — so the welcome replaces it here.
+    # ONE billing email for one charge: the welcome replaces the dunning
+    # all-clear here.
     assert len(at_the_charge) == 1 and at_the_charge[0].startswith("You're in"), at_the_charge
     async with session_scope() as s:
         drip = (await s.execute(select(User.drip_state).where(User.id == u["id"]))).scalar_one()
@@ -829,7 +828,9 @@ def test_the_welcome_makes_no_freshness_or_coverage_claims():
     low = html.lower()
     for claim in ("live-updating", "every alert channel", "full universe", "full data feed is live", "the moment"):
         assert claim not in low, f"welcome still claims {claim!r}"
-    assert "your first payment went through" in low
+    # "your payment", not "your first payment": a returning customer's
+    # win-back subscription is welcomed too (test_never_paid_billing_copy.py).
+    assert "your payment went through" in low
 
 
 def test_plan_price_line_reads_the_line_in_both_payload_shapes():

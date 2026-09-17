@@ -48,7 +48,8 @@ _CANCEL_REASONS = frozenset(
 # ── Card-required 30-day trial ──────────────────────────────────────────────
 #
 # Creating an account is email + password only and lands on FREE, and FREE is
-# a working product: the top ten scored rows of any scan on live data, one
+# a working product: the top ten scored rows of any scan (prices delayed about
+# 15 minutes, the same as every plan), one
 # saved screen, a five-symbol watchlist, twelve ticker pages a day. No card is
 # asked for at the door. The route wall that used to stand at /app/start was
 # removed in #683; `tier.must_add_card` survives it, but it now drives what we
@@ -546,7 +547,7 @@ async def trial_offer(
           Whether this account can start a trial, and — when it can't — the
           plain sentence explaining why. Declining is a normal outcome and
           leaves the user somewhere real: an account that says no keeps the
-          free tier — top-ten rows on live data, one saved screen, a
+          free tier — top-ten rows, one saved screen, a
           watchlist — and is not sent anywhere.
       card_required
           True, and it is about the TRIAL. There used to be a

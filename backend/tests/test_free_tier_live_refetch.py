@@ -1,7 +1,7 @@
 """A live-update refetch must cost a Free user nothing, and must not page the founder.
 
 Reported against #840 (the live bridge): once the API really delivers an SSE
-``update`` about every 70-80s, every open /app page refetches on its own. For a
+``update`` about every 60s, every open /app page refetches on its own. For a
 Free user past the 24h first-session grace window that meant:
 
   * GET /api/ticker/{symbol} spent one of FREE_DAILY_LOOKUPS per refetch, then

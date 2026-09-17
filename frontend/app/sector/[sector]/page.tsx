@@ -21,6 +21,7 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { SECTORS } from "../sectors";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+import { PUBLIC_SNAPSHOT_FOOTER } from "@/lib/freshness";
 
 // Render on-demand and cache for 1 hour (ISR). Matches the per-fetch
 // `revalidate: 3600` below (data rolls daily; hourly is plenty), and keeps this
@@ -95,7 +96,7 @@ export async function generateMetadata({ params }: { params: Promise<{ sector: s
   }
   return pageMeta({
     title: `Top ${sector.display} Stocks Ranked by Tapeline Score (2026)`,
-    description: `Live ranking of ${sector.display} stocks by the Tapeline 6-factor composite score, updated sub-60s during US market hours. Transparent public methodology.`,
+    description: `Ranking of ${sector.display} stocks by the Tapeline 6-factor composite score. A cached snapshot; prices delayed about 15 minutes. Transparent public methodology.`,
     path: `/sector/${sector.slug}`,
   });
 }
@@ -104,7 +105,7 @@ function sectorFaq(display: string) {
   return [
     {
       q: `What are the top-scoring ${display} stocks today?`,
-      a: `The live ranked list above shows the top ${display} sector tickers by Tapeline composite score, refreshed every 5 minutes. Each name links to its full per-ticker page with the 6-factor breakdown, plain-English Why, and FAQ.`,
+      a: `The ranked list above shows the top ${display} sector tickers by Tapeline composite score, from a saved snapshot that can be an hour old or more. Each name links to its full per-ticker page with the 6-factor breakdown, plain-English Why, and FAQ.`,
     },
     {
       q: `How are ${display} stocks scored?`,
@@ -116,7 +117,7 @@ function sectorFaq(display: string) {
     },
     {
       q: `How often does the ${display} sector ranking update?`,
-      a: `Underlying scores re-tick every minute during US market hours. This landing page caches the snapshot for 5 minutes to avoid hammering the API on every search-engine crawl; manual refresh shows the latest scored ranking.`,
+      a: `The public list is a saved snapshot: it is cached for an hour, and the first visit after that still gets the old copy while a new one is built, so it can be an hour old or more. Prices are delayed about 15 minutes, and scores usually change about once a day because most of their inputs are daily readings. The in-app scanner shows the latest data when you open it.`,
     },
   ];
 }
@@ -163,17 +164,16 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
           Top {sector.display} Stocks by Tapeline Score
         </h1>
         <p className="mt-4 text-lg text-muted">
-          Live ranking of US-listed {sector.display} sector stocks by the Tapeline 6-factor
-          composite score. Updated sub-60s during market hours; this snapshot caches for 5
-          minutes.
+          Ranking of US-listed {sector.display} sector stocks by the Tapeline 6-factor
+          composite score. {PUBLIC_SNAPSHOT_FOOTER}
         </p>
 
         <section className="mt-10">
           {tickers.length === 0 ? (
             <div className="rounded-xl border border-border bg-panel p-8 text-center">
-              <p className="text-muted">No live snapshot available right now.</p>
+              <p className="text-muted">No snapshot available right now.</p>
               <p className="mt-3 text-sm text-subtle">
-                The {sector.display} ranking refreshes every 5 minutes — check back shortly.
+                The {sector.display} ranking is rebuilt at most about once an hour — check back later.
                 Or browse the{" "}
                 <Link href="/scorecard" className="text-accent hover:underline">
                   full public scorecard
@@ -311,7 +311,7 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
         </nav>
 
         <p className="mt-10 text-xs text-subtle text-center">
-          Snapshot cached 5 minutes. Sub-60s tick during market hours. Not investment advice — see{" "}
+          {PUBLIC_SNAPSHOT_FOOTER} Not investment advice — see{" "}
           <Link href="/legal/risk" className="text-accent hover:underline">
             risk disclosure
           </Link>

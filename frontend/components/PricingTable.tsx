@@ -22,6 +22,7 @@ import { BillingToggle, useBillingPeriod } from "@/components/BillingToggle";
 import { BestValueBadge } from "@/components/BestValueBadge";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 import { ACTIVE_SCORED_TICKERS } from "@/lib/universe";
+import { PASS_CADENCE_PHRASE, PRICE_DELAY_NOTE } from "@/lib/freshness";
 
 const PLANS = [
   {
@@ -46,7 +47,7 @@ const PLANS = [
     tagline: "An email and a password. No card.",
     prices: { monthly: 0, annual: 0, annualPerMonth: 0 },
     highlights: [
-      `The live scanner — the top ${FREE_LIMITS.scannerRows} scored rows of any scan`,
+      `The scanner — the top ${FREE_LIMITS.scannerRows} scored rows of any scan`,
       "One saved screen, re-run whenever you open it",
       `A ${FREE_LIMITS.watchlistTickers}-ticker watchlist`,
       `${FREE_LIMITS.dailyLookups} ticker look-ups a day`,
@@ -73,7 +74,7 @@ const PLANS = [
   },
   {
     name: "Pro",
-    tagline: "Live scanner. Daily edge.",
+    tagline: "The full scanner. Daily briefing.",
     prices: {
       monthly: PRICING.pro.monthly,
       annual: PRICING.pro.annual,
@@ -81,7 +82,7 @@ const PLANS = [
     },
     highlights: [
       "Unlimited ticker look-ups",
-      `Real-time, full ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker scanner`,
+      `Every row of the full ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker scanner`,
       "Score + plain-English Why on every row",
       "Regime · Heatmap",
       "IPOs · Earnings · News calendars",
@@ -186,6 +187,12 @@ export function PricingTable({ now }: { now?: Date } = {}) {
           top documented abandonment cause; this is the answer to it. */}
       <p className="mt-3 text-center text-xs text-muted">
         {chargeDisclosureLine(disclosure)}
+      </p>
+      {/* Data age, stated where the plans are sold (integrity wave,
+          2026-09-14). Every plan reads the same vendor feed, so the delay is
+          not a tier difference and no plan may be sold as "real-time". */}
+      <p className="mt-1 text-center text-xs text-muted" data-testid="price-delay-note">
+        {PRICE_DELAY_NOTE} on every plan, re-read {PASS_CADENCE_PHRASE} during US market hours.
       </p>
       {billing === "annual" && (
         <p className="mt-1 text-center text-xs text-up/90">Save 2 months · your rate, locked in</p>

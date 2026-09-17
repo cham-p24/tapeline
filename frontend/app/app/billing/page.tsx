@@ -35,6 +35,7 @@ import { BillingPeriodProvider } from "@/components/BillingToggle";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 import { errorText } from "@/lib/errorText";
 import { ACTIVE_SCORED_TICKERS } from "@/lib/universe";
+import { PASS_CADENCE_PHRASE, PRICE_DELAY_NOTE } from "@/lib/freshness";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -47,14 +48,14 @@ const TIER_META = {
     monthly: 0,
     annual: 0,
     annualMonthly: 0,
-    blurb: `Live scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.dailyLookups} look-ups/day`,
+    blurb: `Scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.dailyLookups} look-ups/day`,
   },
   pro: {
     name: "Pro",
     monthly: PRICING.pro.monthly,
     annual: PRICING.pro.annual,
     annualMonthly: PRICING.pro.annualPerMonth,
-    blurb: "Live scanner. Daily edge.",
+    blurb: "The full scanner. Daily briefing.",
   },
   premium: {
     name: "Premium",
@@ -862,7 +863,7 @@ export default function BillingPage() {
                     before then and never be billed.
                   </>
                 )}{" "}
-                Skip it and your account stays on the Free plan, with no expiry — live scores,
+                Skip it and your account stays on the Free plan, with no expiry — scores,
                 top-{FREE_LIMITS.scannerRows}{" "}scanner, {FREE_LIMITS.dailyLookups}{" "}look-ups/day{freeHasWatchlist() ? `, ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""}.
               </p>
               <button onClick={openPlanPicker} className="mt-4 text-xs text-accent hover:underline">
@@ -946,6 +947,11 @@ export default function BillingPage() {
                   hardcoded "All prices in USD" that nobody re-checks. Stated
                   before the redirect so the hosted page can't surprise. */}
               <p className="mt-1 text-xs text-subtle">{chargeDisclosureLine(disclosure)}</p>
+              {/* Data age, stated where plans are sold (integrity wave
+                  2026-09-14): the same vendor feed on every plan. */}
+              <p className="mt-1 text-xs text-subtle" data-testid="price-delay-note">
+                {PRICE_DELAY_NOTE} on every plan, re-read {PASS_CADENCE_PHRASE} during US market hours.
+              </p>
             </div>
             <div className="inline-flex rounded-full border border-border bg-panel p-1">
               {(["monthly", "annual"] as const).map((p) => (
@@ -971,7 +977,7 @@ export default function BillingPage() {
               price="$0"
               note="No monthly charge"
               items={[
-                `Live scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.dailyLookups} look-ups/day`,
+                `Scores, top-${FREE_LIMITS.scannerRows} scanner, ${FREE_LIMITS.dailyLookups} look-ups/day`,
                 "Public scorecard + basic regime",
                 `${freeHasWatchlist() ? `Watchlist of ${FREE_LIMITS.watchlistTickers} · ` : ""}${FREE_LIMITS.savedScans} saved screen`,
                 // #683 took Free to zero alerts on EVERY channel, push
@@ -987,7 +993,7 @@ export default function BillingPage() {
               price={billingPeriod === "annual" ? usd(TIER_META.pro.annualMonthly) : usd(TIER_META.pro.monthly)}
               note={billingPeriod === "annual" ? `${usd(TIER_META.pro.annual)}/yr · billed annually · save $${annualSaving(TIER_META.pro)}${isCardlessTrial ? ` · or ${usd(TIER_META.pro.monthly)}/mo monthly` : ""}` : "billed monthly"}
               items={[
-                `Full ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} ticker universe, live`,
+                `Every row of the full ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")} ticker universe`,
                 "Score breakdown + Why on every row",
                 "Regime + Heatmap",
                 "Watchlist (50) with smart alerts",
@@ -1130,8 +1136,8 @@ export default function BillingPage() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Why people pay</h2>
           <div className="mt-4 grid gap-5 md:grid-cols-3">
             <Selling
-              title="One live data spine"
-              body="Live market data, macro indicators, fundamentals, SEC filings — the same shape of inputs quant desks work from, refreshed sub-60s during market hours."
+              title="One data spine"
+              body={`Market data, macro indicators, fundamentals, SEC filings — the same shape of inputs quant desks work from. ${PRICE_DELAY_NOTE}; most score inputs are daily readings.`}
             />
             <Selling
               title="Public scorecard, day 1"

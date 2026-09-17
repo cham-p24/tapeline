@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import AlertEvent, User, WatchlistItem
 from app.services.auth import current_user_required
+from app.services.freshness import data_delayed_minutes
 from app.services.tier import TIER_LIMITS, Tier, effective_limit, is_on_trial, limit
 from app.services.usage import _is_unmetered as lookups_unmetered
 
@@ -39,7 +40,9 @@ async def my_usage(
         "watchlist_tickers":     effective_limit(user, "watchlist_tickers"),
         "email_alerts_per_day":  effective_limit(user, "email_alerts_per_day"),
         "api_requests_per_day":  effective_limit(user, "api_requests_per_day"),
-        "data_delay_minutes":    effective_limit(user, "data_delay_minutes"),
+        # Vendor delay + any tier delay: the true age of the prices this user
+        # sees (services/freshness). It read 0 while prices were 15 min delayed.
+        "data_delay_minutes":    data_delayed_minutes(effective_limit(user, "data_delay_minutes")),
     }
 
     # Watchlist size

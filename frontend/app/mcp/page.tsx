@@ -165,7 +165,7 @@ export default function McpPage() {
             At the current sample the picks <strong className="text-fg">do not beat SPY</strong>,
             and the server says so: every response carrying a performance number also carries the
             qualifier that at this sample size the values do not distinguish the ranking from
-            chance. The numbers are read live on every call, so an assistant quotes today&rsquo;s
+            chance. The numbers are read from the database on every call, so an assistant quotes today&rsquo;s
             record rather than a figure that was true last month.
           </p>
           <p className="mt-3 text-sm leading-relaxed text-subtle">

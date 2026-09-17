@@ -261,6 +261,29 @@ describe("rendered static pages", () => {
   });
 });
 
+describe("record copy says recorded, not frozen", () => {
+  // Review round 2 of #842: recorded values were corrected twice (prices on
+  // 25 August 2026, scores capped on 15 June 2026), so no entry is "frozen".
+  // The true wording: entries are recorded, not re-ranked or deleted, and
+  // corrections are dated.
+  const FILES = [
+    "app/scorecard/page.tsx",
+    "app/app/start/page.tsx",
+    "app/do-stock-screeners-work/page.tsx",
+    "app/stock-screener-track-record/page.tsx",
+    "app/transparent-stock-screener/page.tsx",
+    "app/verify/page.tsx",
+    "components/TickerRecord.tsx",
+  ];
+  for (const file of FILES) {
+    it(file, () => {
+      const copy = shippedCopy(readFileSync(join(ROOT, file), "utf8"));
+      const m = copy.match(/\bfrozen\b/i);
+      expect(m, `${file} ships "frozen": …${m ? copy.slice(Math.max(0, m.index! - 60), m.index! + 60) : ""}…`).toBeNull();
+    });
+  }
+});
+
 describe("approved replacement wording is present", () => {
   const PATTERN = /Entries are not re-ranked or deleted\. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026\./;
   for (const file of [

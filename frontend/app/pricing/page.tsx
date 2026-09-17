@@ -64,7 +64,7 @@ const FAQ_ITEMS = [
     // splits by surface, but there are now three of them, not two — reading
     // asks for nothing, signing up asks for an email and a password, and the
     // card is what buys the Premium surface for fourteen days.
-    a: `To read Tapeline, no. The daily Top 10, the whole public scorecard, a page per scored ticker and the raw CSV/JSON export are open to anyone with no account and no card. To sign up, still no: the form takes an email and a password. A new account lands on the free plan and can run the live scanner the same minute — the top ${FREE_LIMITS.scannerRows} scored rows of any scan, live and undelayed, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-symbol watchlist` : ""} and ${FREE_LIMITS.dailyLookups} ticker deep-pages a day. A card is what starts the 30-day Premium trial, and that is what turns on every matching row instead of the first ${FREE_LIMITS.scannerRows}, a second saved screen, alerts by email and browser push, CSV export, the 200-symbol watchlist, and SEC Form 4 insider filings. $0 is charged the day you add it, the first charge is on day 30 at the plan you picked, and one click cancels before then.`,
+    a: `To read Tapeline, no. The daily Top 10, the whole public scorecard, a page per scored ticker and the raw CSV/JSON export are open to anyone with no account and no card. To sign up, still no: the form takes an email and a password. A new account lands on the free plan and can run the scanner the same minute — the top ${FREE_LIMITS.scannerRows} scored rows of any scan (prices delayed about 15 minutes, as on every plan), one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-symbol watchlist` : ""} and ${FREE_LIMITS.dailyLookups} ticker deep-pages a day. A card is what starts the 30-day Premium trial, and that is what turns on every matching row instead of the first ${FREE_LIMITS.scannerRows}, a second saved screen, alerts by email and browser push, CSV export, the 200-symbol watchlist, and SEC Form 4 insider filings. $0 is charged the day you add it, the first charge is on day 30 at the plan you picked, and one click cancels before then.`,
   },
   {
     q: "What happens when my trial ends?",
@@ -121,7 +121,7 @@ export default function PricingPage() {
           <p className="mt-5 text-base sm:text-lg text-muted leading-relaxed">
             The published record is free to read and always will be &mdash; no
             account, no card. Signing up takes an email and a password, and puts
-            you on the free plan with the live scanner running. A card is what
+            you on the free plan with the scanner running. A card is what
             starts the 30-day Premium trial: $0 is charged that day, the first
             charge is on day 30, and one click cancels before then. Subscribers
             keep their price for as long as the subscription stays active.
@@ -188,7 +188,7 @@ export default function PricingPage() {
               Check the record before you pay.
             </h2>
             <p className="mt-2 text-sm text-muted">
-              Each day&rsquo;s top 10 is logged the same day. Losing days stay, and corrections are dated in the changelog. These numbers are live.
+              Each day&rsquo;s top 10 is logged the same day. Losing days stay, and corrections are dated in the changelog. These numbers are read from the scorecard when you open this page.
             </p>
           </div>
           <div className="mx-auto mt-8 max-w-2xl">
@@ -217,7 +217,7 @@ export default function PricingPage() {
               Create your account &rarr;
             </Link>
             <p className="mt-3 text-xs text-subtle">
-              Email and password · free plan, live scanner · a card starts the
+              Email and password · free plan, scanner · a card starts the
               30-day Premium trial, $0 that day, cancel in one click ·{" "}
               <Link href="/support" className="hover:text-muted underline-offset-2 hover:underline">
                 more questions

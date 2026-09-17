@@ -157,7 +157,7 @@ async def consume_ticker_lookup(session: AsyncSession, user: User) -> dict:
 #
 # The in-app ticker page refetches GET /api/ticker/{symbol} each time the API's
 # live bridge announces a worker pass (services/live_bridge.py, about every
-# 70-80s in the US session). That is the SAME page the user already paid a
+# 60s in the US session). That is the SAME page the user already paid a
 # look-up for, so it must not spend another, and at the cap it must not be a
 # 402, a cap_events row or a founder email either.
 #

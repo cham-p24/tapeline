@@ -60,6 +60,15 @@ class Claim:
     #: Set only when CLAIMED: the token this caller wrote, and when.
     owner: str | None = None
     claimed_at: datetime | None = None
+    #: Set only when BUSY: the other run's owner token and claim time, as read.
+    #: Diagnostics only. `owner` stays None, so this caller cannot complete or
+    #: release a claim it did not win.
+    held_by: str | None = None
+    held_since: datetime | None = None
+
+    def retryable_after(self) -> datetime | None:
+        """When a BUSY claim goes stale and the next run may take it over."""
+        return self.held_since + STALE_CLAIM_AFTER if self.held_since else None
 
 
 async def claim_period(job: str, period: str, *, now: datetime | None = None) -> Claim:
@@ -88,13 +97,27 @@ async def claim_period(job: str, period: str, *, now: datetime | None = None) ->
         if taken.rowcount == 1:  # type: ignore[attr-defined]
             logger.warning("job_claim.reclaimed_stale job=%s period=%s", job, period)
             return Claim(job, period, ClaimStatus.CLAIMED, owner, now)
-        completed = await session.scalar(
-            select(JobPeriodClaim.completed_at).where(
-                JobPeriodClaim.job == job, JobPeriodClaim.period == period,
-            )
-        )
-    status = ClaimStatus.DONE if completed is not None else ClaimStatus.BUSY
-    return Claim(job, period, status)
+        held = (await session.execute(
+            select(
+                JobPeriodClaim.owner, JobPeriodClaim.claimed_at, JobPeriodClaim.completed_at,
+            ).where(JobPeriodClaim.job == job, JobPeriodClaim.period == period)
+        )).one_or_none()
+    if held is not None and held.completed_at is not None:
+        return Claim(job, period, ClaimStatus.DONE)
+    # BUSY. `held` is None only if the holder released the claim between the two
+    # statements; the next run claims it.
+    return Claim(
+        job, period, ClaimStatus.BUSY,
+        held_by=held.owner if held is not None else None,
+        held_since=_aware(held.claimed_at) if held is not None else None,
+    )
+
+
+def _aware(at: datetime | None) -> datetime | None:
+    # SQLite (the test database) returns naive datetimes; Postgres returns aware.
+    if at is not None and at.tzinfo is None:
+        return at.replace(tzinfo=UTC)
+    return at
 
 
 def _owned_by(claim: Claim):  # type: ignore[no-untyped-def]

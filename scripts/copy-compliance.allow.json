@@ -22,6 +22,10 @@
     "of them, three weeks after #683 made it false. Listed by name to keep the",
     "scope narrow.",
     "",
+    "OpenGraph share cards (frontend/app/**/opengraph-image.tsx) are IN scope",
+    "since review round 2 of #842: about 20 of them were hand-edited to remove 'Live' and",
+    "'sub-60s' wording while excluded, with nothing to stop it coming back. All scan clean.",
+    "",
     "See docs/COMPLIANCE_COPY_RULES.md."
   ],
   "include": [
@@ -29,8 +33,12 @@
     "frontend/app/**/*.ts",
     "frontend/components/**/*.tsx",
     "frontend/lib/**/*.ts",
+    "frontend/lib/**/*.tsx",
     "backend/app/services/email*.py",
     "backend/app/services/inbox_templates.py",
+    "backend/app/services/newsletter.py",
+    "backend/app/services/briefing.py",
+    "backend/app/routers/mcp.py",
     "backend/app/services/**/*template*.py",
     "docs/BRAND_SERP_KIT.md",
     "docs/extension/CHROME_STORE_LISTING.md",
@@ -45,7 +53,6 @@
     "**/*.spec.tsx",
     "**/__tests__/**",
     "**/e2e/**",
-    "frontend/app/**/opengraph-image.tsx",
     "frontend/app/**/icon.tsx"
   ],
   "allow": [
@@ -140,6 +147,12 @@
       "rule": "record-never-edited",
       "phrase": "unedited",
       "reason": "Published blog posts keep their words; a false claim about the record is corrected by an 'Updated 14 September 2026' note placed next to it (integrity wave, founder-approved 2026-09-14). frontend/__tests__/recordEditClaimsSweep.test.ts asserts every remaining occurrence in posts.ts sits next to such a note (or is 'This post stays up unedited below', which is about the post, not the record), so a NEW claim still fails there even though this entry lets the linter pass."
+    },
+    {
+      "file": "docs/launch/google-ads/APPLY-ADGROUPS-2-3.md",
+      "rule": "false-data-freshness",
+      "phrase": "live data",
+      "reason": "An operator runbook noting that a Google Ads console page (/aw/overview) \"rendered live data normally\" during a 2026-06-01 UI incident. It describes Google's dashboard, not Tapeline's data, so it makes no freshness claim about the product."
     }
   ],
   "_knownViolations_readme": [
@@ -190,6 +203,54 @@
       "rule": "derived-performance-stat",
       "phrase": "back-tested results",
       "reason": "Quotes the phrase in order to criticise it ('the \"back-tested results\" in marketing ... don't actually track it'). Tapeline publishes no backtest; the post argues against relying on them."
+    },
+    {
+      "file": "docs/BRAND_SERP_KIT.md",
+      "rule": "false-data-freshness",
+      "phrase": "sub-60",
+      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
+    },
+    {
+      "file": "docs/BRAND_SERP_KIT.md",
+      "rule": "false-data-freshness",
+      "phrase": "under 60 seconds",
+      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
+    },
+    {
+      "file": "docs/launch/LAUNCH_PLAYBOOK.md",
+      "rule": "false-data-freshness",
+      "phrase": "sub-60",
+      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
+    },
+    {
+      "file": "docs/launch/LAUNCH_PLAYBOOK.md",
+      "rule": "false-data-freshness",
+      "phrase": "live data",
+      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
+    },
+    {
+      "file": "docs/launch/LAUNCH_PLAYBOOK.md",
+      "rule": "false-data-freshness",
+      "phrase": "real-time",
+      "reason": "Pre-existing copy-bank text found when false-data-freshness was switched on (integrity wave, 2026-09-14/15). Measured 14 Sep 2026: prices are delayed about 15 minutes and a worker pass runs about every 60 seconds, so this is false. docs/** is owned by the DOCS lane of the same wave, not the freshness-copy PR that added the rule; the DOCS change must fix the copy and DELETE this entry in the same PR (a stale entry fails the full run)."
+    },
+    {
+      "file": "frontend/app/changelog/page.tsx",
+      "rule": "false-data-freshness",
+      "phrase": "live data",
+      "reason": "Dated changelog entry (Free plan, 30 Aug 2026) saying the free plan runs \"on live data, no delay\". False as measured on 14 Sep 2026 (vendor prices ~15 minutes delayed on every plan). Dated history is not rewritten: the fix is a new dated note beside the entry, and changelog/page.tsx is owned by another session in this wave (do-not-edit list), so it is carried here as visible debt. Delete this entry when that note lands and the phrase is gone or quoted inside it."
+    },
+    {
+      "file": "frontend/app/changelog/page.tsx",
+      "rule": "false-data-freshness",
+      "phrase": "no delay",
+      "reason": "Two hits. (1) The same dated 30 Aug 2026 Free-plan entry as the \"live data\" entry above: debt, same fix, same owner. (2) The scorecard-delay entry describing a bug (\"served the same rows with no delay at all\") - not a freshness claim, but the phrase cannot be told apart by file+rule+phrase. Delete this entry once (1) is corrected by a dated note."
+    },
+    {
+      "file": "frontend/app/changelog/page.tsx",
+      "rule": "false-data-freshness",
+      "phrase": "live score",
+      "reason": "Dated changelog entries calling ticker-page and Free-tier scores \"live\" (share pages; the superseded Free-tier note). Measured 14 Sep 2026: prices ~15 minutes delayed, scores usually change about once a day, and /t pages are cached snapshots. Dated history gets a dated note, not a rewrite, and changelog/page.tsx is owned by another session in this wave; carried as visible debt. Delete when the notes land."
     }
   ]
 }

@@ -28,6 +28,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
+import httpx
 import pytest
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
@@ -37,6 +38,7 @@ from app.models import JobPeriodClaim
 from app.services import job_claims, seo_health
 from app.services.job_claims import ClaimStatus, claim_period, complete_period, release_period
 from app.services.seo_health import DigestOutcome
+from app.services.telegram import SendStatus
 
 # NO pytestmark: pytest.ini sets asyncio_mode = auto.
 
@@ -168,8 +170,12 @@ class _Digest:
         self.clock = clock
         self.crawls = 0
         self.sends: list[str] = []
-        self.send_result: bool | Exception = True
+        self.send_attempts = 0
+        self.send_result: SendStatus | Exception = SendStatus.DELIVERED
         self.crawl_error: Exception | None = None
+        self.crawl_result: dict = {
+            "checked": 3, "healthy": 2, "broken": [{"url": "https://tapeline.io/x", "status": 404}],
+        }
         self.crawl_minutes = 0
         self.open_scopes = 0
         self.scopes_open_during_crawl: list[int] = []
@@ -181,12 +187,14 @@ class _Digest:
         if self.crawl_error is not None:
             raise self.crawl_error
         self.clock.now += timedelta(minutes=self.crawl_minutes)
-        return {"checked": 3, "healthy": 2, "broken": [{"url": "https://tapeline.io/x", "status": 404}]}
+        return self.crawl_result
 
-    async def send(self, chat_id: str, text_: str) -> bool:
+    async def send(self, chat_id: str, text_: str) -> SendStatus:
+        self.send_attempts += 1
         if isinstance(self.send_result, Exception):
             raise self.send_result
-        self.sends.append(text_)
+        if self.send_result is SendStatus.DELIVERED:
+            self.sends.append(text_)
         return self.send_result
 
     async def owner_chat_id(self, session) -> str | None:
@@ -217,7 +225,7 @@ def digest(monkeypatch: pytest.MonkeyPatch, clock: _Clock) -> _Digest:
 
     monkeypatch.setattr(seo_health, "session_scope", _counted_scope)
     monkeypatch.setattr(seo_health, "run_stale_link_audit", d.crawl)
-    monkeypatch.setattr(seo_health, "send_message", d.send)
+    monkeypatch.setattr(seo_health, "send_message_status", d.send)
     monkeypatch.setattr(seo_health, "_owner_chat_id", d.owner_chat_id)
     monkeypatch.setattr(seo_health.settings, "telegram_bot_token", "test-token")
     monkeypatch.setattr(seo_health, "COMPLETE_RETRY_SECONDS", 0.0)
@@ -228,10 +236,10 @@ async def _run(clock: _Clock) -> DigestOutcome:
     return await asyncio.wait_for(seo_health.run_weekly_digest(clock=clock), timeout=10)
 
 
-async def _row() -> JobPeriodClaim | None:
+async def _row(period: str = WEEK) -> JobPeriodClaim | None:
     async with session_scope() as s:
         return await s.scalar(select(JobPeriodClaim).where(
-            JobPeriodClaim.job == seo_health.DIGEST_JOB, JobPeriodClaim.period == WEEK,
+            JobPeriodClaim.job == seo_health.DIGEST_JOB, JobPeriodClaim.period == period,
         ))
 
 
@@ -288,6 +296,49 @@ async def test_a_week_before_the_first_claimed_week_is_never_sent(digest: _Diges
     assert digest.crawls == 0
 
 
+@pytest.mark.parametrize(("when", "period"), [
+    (datetime(2026, 12, 28, 10, 0, tzinfo=UTC), "2026W53"),  # Monday; 2026 has 53 ISO weeks
+    (datetime(2027, 1, 1, 10, 0, tzinfo=UTC), "2026W53"),    # Friday: calendar 2027, ISO 2026
+    (datetime(2027, 1, 4, 10, 0, tzinfo=UTC), "2027W01"),    # Monday: week 1 < 39, but 2027 > 2026
+    (datetime(2027, 12, 27, 10, 0, tzinfo=UTC), "2027W52"),  # calendar and ISO year agree
+    (datetime(2029, 12, 31, 10, 0, tzinfo=UTC), "2030W01"),  # Monday: calendar 2029, ISO 2030
+])
+async def test_the_week_is_the_iso_week_across_a_year_boundary(
+    digest: _Digest, clock: _Clock, when: datetime, period: str,
+) -> None:
+    """Mutations: the calendar year in the period key (2027-01-01 would become
+    2027W53, a second digest for ISO week 2026-W53); a first-week gate on the
+    week number alone (2027-W01 to W38 would never send); the header week read
+    from the wall clock instead of the claimed period."""
+    clock.now = when
+    assert await _run(clock) is DigestOutcome.SENT
+    assert await _row(period) is not None, f"not recorded under {period}"
+    year, week = period.split("W")
+    assert f"week {year}-W{week}" in digest.sends[0], digest.sends[0].splitlines()[0]
+
+
+async def test_one_iso_week_spanning_new_year_is_sent_once(digest: _Digest, clock: _Clock) -> None:
+    """Mutation: the calendar year in the period key."""
+    clock.now = datetime(2026, 12, 28, 10, 0, tzinfo=UTC)
+    assert await _run(clock) is DigestOutcome.SENT
+    clock.now = datetime(2027, 1, 2, 10, 0, tzinfo=UTC)
+    assert await _run(clock) is DigestOutcome.ALREADY_SENT
+    assert len(digest.sends) == 1
+
+
+async def test_the_header_names_the_claimed_week_not_the_render_time(
+    digest: _Digest, clock: _Clock,
+) -> None:
+    """A run claimed late on Sunday of W39 that renders after midnight UTC must
+    still say W39, the week it is recorded under. Mutation: the header week
+    taken from the clock at render time."""
+    clock.now = datetime(2026, 9, 27, 23, 50, tzinfo=UTC)
+    digest.crawl_minutes = 20
+    assert await _run(clock) is DigestOutcome.SENT
+    assert "week 2026-W39" in digest.sends[0]
+    assert await _row("2026W39") is not None
+
+
 async def test_no_session_is_open_while_the_site_is_crawled(digest: _Digest, clock: _Clock) -> None:
     """MUST-FIX 1. Postgres kills a transaction left idle for 5 minutes, and the
     crawl takes longer. Mutation: crawling inside the session that renders."""
@@ -298,30 +349,100 @@ async def test_no_session_is_open_while_the_site_is_crawled(digest: _Digest, clo
 
 
 async def test_a_telegram_refusal_releases_the_week(digest: _Digest, clock: _Clock) -> None:
-    """send_message returns False on a Telegram non-200 rather than raising.
-    That is nothing sent, so the next run must retry. Mutation: treating a
-    False send as done."""
-    digest.send_result = False
+    """A Telegram 4xx is REFUSED rather than raised. That is nothing sent, so
+    the next run must retry. Mutation: treating a refused send as done."""
+    digest.send_result = SendStatus.REFUSED
     assert await _run(clock) is DigestOutcome.FAILED
     assert await _row() is None, "a refused send marked the week done"
 
-    digest.send_result = True
+    digest.send_result = SendStatus.DELIVERED
     clock.now += timedelta(days=1)
     assert await _run(clock) is DigestOutcome.SENT
 
 
-@pytest.mark.parametrize("where", ["crawl", "send"])
-async def test_an_error_before_the_send_completes_releases_the_week(
+@pytest.mark.parametrize("where", ["crawl", "connect_error", "connect_timeout", "pool_timeout"])
+async def test_an_error_before_telegram_has_the_digest_releases_the_week(
     digest: _Digest, clock: _Clock, where: str,
 ) -> None:
-    """Mutation: no release in the except path."""
+    """A crawl error, or a send that never opened a connection: nothing can
+    have been delivered, so the next run must retry. Mutations: no release in
+    the except path; classifying a connect failure as an unknown delivery."""
     if where == "crawl":
-        digest.crawl_error = RuntimeError("sitemap unreachable")
+        digest.crawl_error = RuntimeError("crawl exploded")
+    elif where == "connect_error":
+        digest.send_result = httpx.ConnectError("x")
+    elif where == "connect_timeout":
+        digest.send_result = httpx.ConnectTimeout("x")
     else:
-        digest.send_result = RuntimeError("telegram connect timeout")
+        digest.send_result = httpx.PoolTimeout("x")
     assert await _run(clock) is DigestOutcome.FAILED
     assert await _row() is None
     assert digest.sends == []
+
+    digest.crawl_error = None
+    digest.send_result = SendStatus.DELIVERED
+    clock.now += timedelta(days=1)
+    assert await _run(clock) is DigestOutcome.SENT
+
+
+@pytest.mark.parametrize("result", [
+    httpx.ReadTimeout("x"),
+    httpx.WriteTimeout("x"),
+    httpx.ReadError("x"),
+    httpx.WriteError("x"),
+    httpx.RemoteProtocolError("x"),
+    RuntimeError("anything else the send raises"),
+    SendStatus.UNCERTAIN,   # a Telegram 5xx
+], ids=lambda r: getattr(r, "value", type(r).__name__))
+async def test_a_send_that_may_have_delivered_keeps_the_week(
+    digest: _Digest, clock: _Clock, result: SendStatus | Exception,
+) -> None:
+    """Telegram accepted the digest and the response read timed out, or a 5xx
+    came back after it took the request. Releasing the week would send it again
+    the next day: the double send #831 fixed for the survey reminder. The week
+    is recorded as sent and the run goes red for a person to check Telegram.
+    Mutations: releasing on any send exception; treating a 5xx as a refusal;
+    leaving the claim incomplete (taken over, and re-sent, an hour later)."""
+    digest.send_result = result
+    assert await _run(clock) is DigestOutcome.SEND_UNKNOWN
+    row = await _row()
+    assert row is not None, "an uncertain send released the week"
+    assert row.completed_at is not None, "an uncertain send can be taken over and re-sent"
+
+    digest.send_result = SendStatus.DELIVERED
+    for later in (STALE + timedelta(minutes=1), timedelta(days=1)):
+        clock.now = MONDAY_10 + later
+        assert await _run(clock) is DigestOutcome.ALREADY_SENT
+    assert digest.send_attempts == 1, "the week was sent a second time"
+
+
+async def test_an_uncertain_send_says_to_check_telegram_before_a_re_dispatch(
+    digest: _Digest, clock: _Clock, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Mutation: the send_unknown log line dropped, or not naming the week."""
+    digest.send_result = httpx.ReadTimeout("x")
+    with caplog.at_level(logging.INFO, logger=seo_health.__name__):
+        assert await _run(clock) is DigestOutcome.SEND_UNKNOWN
+    unknown = [r.getMessage() for r in caplog.records if "seo_digest.send_unknown" in r.getMessage()]
+    assert any("Check the founder's Telegram" in m and WEEK in m for m in unknown), unknown
+    assert all("founder-chat" not in r.getMessage() for r in caplog.records)
+
+
+async def test_an_unreadable_sitemap_is_not_reported_as_a_healthy_site(
+    digest: _Digest, clock: _Clock,
+) -> None:
+    """run_stale_link_audit returns checked 0, broken [] when it cannot fetch the
+    sitemap. Sending that is "0 URLs, 0 broken" about a site nobody checked, and
+    marks the week done so it is never retried. Mutation: no sitemap check."""
+    digest.crawl_result = {
+        "checked": 0, "healthy": 0, "broken": [], "note": "sitemap_unavailable",
+    }
+    assert await _run(clock) is DigestOutcome.SITEMAP_UNAVAILABLE
+    assert (digest.send_attempts, await _row()) == (0, None)
+
+    digest.crawl_result = {"checked": 3, "healthy": 3, "broken": []}
+    clock.now += timedelta(days=1)
+    assert await _run(clock) is DigestOutcome.SENT
 
 
 async def test_a_sent_digest_is_never_released_when_recording_fails(
@@ -369,6 +490,43 @@ async def test_a_run_in_flight_elsewhere_is_not_doubled(digest: _Digest, clock: 
     assert (await claim_period(seo_health.DIGEST_JOB, WEEK, now=elsewhere)).status is ClaimStatus.CLAIMED
     assert await _run(clock) is DigestOutcome.IN_FLIGHT
     assert (digest.crawls, digest.sends) == (0, [])
+
+
+async def test_in_flight_says_whose_claim_it_is_and_when_it_can_be_taken_over(
+    digest: _Digest, clock: _Clock, caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A re-dispatch soon after a run killed by a deploy shows green IN_FLIGHT
+    while nothing runs. The log must say how old the claim is, whose, and when
+    a run can take it over. Mutations: no detail; the age or the takeover time
+    computed from the wrong end; the full owner token printed."""
+    elsewhere = clock.now - timedelta(minutes=25)
+    held = await claim_period(seo_health.DIGEST_JOB, WEEK, now=elsewhere)
+    assert held.owner is not None
+
+    with caplog.at_level(logging.INFO, logger=seo_health.__name__):
+        assert await _run(clock) is DigestOutcome.IN_FLIGHT
+    lines = [r.getMessage() for r in caplog.records if "seo_digest.in_flight" in r.getMessage()]
+    assert len(lines) == 1, lines
+    line = lines[0]
+    assert f"owner={held.owner[:8]}..." in line
+    assert held.owner not in line, "the full owner token was printed"
+    assert f"claimed_at={elsewhere.isoformat()}" in line
+    assert "age=25m" in line
+    assert f"retryable_after={(elsewhere + STALE).isoformat()}" in line
+    assert "founder-chat" not in line
+
+
+async def test_a_busy_claim_carries_the_holder_but_cannot_be_used_to_finish_it() -> None:
+    """Mutation: returning the holder's token as `owner`, which would let a
+    BUSY caller complete or release someone else's claim."""
+    t0 = datetime(2026, 9, 21, 10, 0, tzinfo=UTC)
+    held = await claim_period(JOB, WEEK, now=t0)
+    busy = await claim_period(JOB, WEEK, now=t0 + timedelta(minutes=7))
+    assert busy.status is ClaimStatus.BUSY
+    assert (busy.owner, busy.claimed_at) == (None, None)
+    assert busy.held_by == held.owner
+    assert busy.held_since == t0
+    assert busy.retryable_after() == t0 + STALE
 
 
 async def test_a_run_that_overruns_its_budget_sends_nothing(digest: _Digest, clock: _Clock) -> None:
@@ -425,11 +583,15 @@ async def test_no_recipient_claims_and_crawls_nothing(
     (DigestOutcome.NO_RECIPIENT, 0),
     (DigestOutcome.FAILED, 1),
     (DigestOutcome.SENT_UNRECORDED, 1),
+    (DigestOutcome.SEND_UNKNOWN, 1),
+    (DigestOutcome.SITEMAP_UNAVAILABLE, 1),
 ])
 async def test_the_script_turns_the_run_red_only_when_it_needs_a_look(
-    monkeypatch: pytest.MonkeyPatch, outcome: DigestOutcome, code: int,
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    outcome: DigestOutcome, code: int,
 ) -> None:
-    """Mutation: a failed run exiting 0, which leaves the workflow green."""
+    """Mutations: a failed run exiting 0, which leaves the workflow green; a red
+    run with no annotation saying what to do."""
     from app.scripts import seo_weekly_digest as script
 
     async def _fixed() -> DigestOutcome:
@@ -437,6 +599,20 @@ async def test_the_script_turns_the_run_red_only_when_it_needs_a_look(
 
     monkeypatch.setattr(script, "run_weekly_digest", _fixed)
     assert await script.main() == code
+    out = capsys.readouterr().out
+    assert f"seo_digest.outcome={outcome.value}" in out
+    if code:
+        assert "::error title=" in out, "a red run gives no reason in the Actions UI"
+
+
+def test_every_red_outcome_is_annotated() -> None:
+    """Mutation: a red outcome added without an annotation saying what to do."""
+    from app.scripts import seo_weekly_digest as script
+
+    for outcome in script._RED:
+        assert script.ANNOTATIONS[outcome].startswith("::error "), outcome
+    assert "Telegram BEFORE re-dispatching" in script.ANNOTATIONS[DigestOutcome.SEND_UNKNOWN]
+    assert script.ANNOTATIONS[DigestOutcome.IN_FLIGHT].startswith("::notice ")
 
 
 def test_the_script_keeps_the_bot_token_out_of_the_public_log() -> None:
@@ -477,6 +653,21 @@ def test_the_workflow_runs_it_daily_and_never_beside_the_other_crawl() -> None:
     assert minutes > seo_health.DIGEST_BUDGET.total_seconds() / 60
 
 
+@pytest.mark.parametrize("name", ["seo-weekly-digest.yml", "stale-link-audit.yml"])
+def test_both_crawls_are_pinned_to_the_worker_and_warn_that_cron_runs_late(name: str) -> None:
+    """Mutations: an unpinned `flyctl ssh console`, which may land on an api
+    machine; the header note that Actions starts crons hours late removed."""
+    import re
+
+    wf = (_REPO / ".github" / "workflows" / name).read_text(encoding="utf-8")
+    consoles = re.findall(r"flyctl ssh console[^\n]*", wf)
+    consoles = [c for c in consoles if " -a " in c]
+    assert consoles, f"{name} no longer runs over flyctl ssh"
+    for line in consoles:
+        assert re.search(r"\s-g worker\b", line), f"{name}: not pinned to the worker: {line}"
+    assert re.search(r"1\s*(?:#\s*)?to 7 hours", wf), f"{name}: the late-cron note is gone"
+
+
 # =============================================================================
 # 4. The daily audit shares the crawl, and had the same session bug.
 # =============================================================================
@@ -504,3 +695,34 @@ async def test_the_daily_audit_holds_no_transaction_across_its_crawl(
         assert await seo_health.run_stale_audit_alert(session) is False
 
     assert held == [False], "the audit's session was mid-transaction for the whole crawl"
+
+
+async def test_the_daily_audit_does_not_call_an_unreadable_sitemap_clean(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The audit returned False ("no broken URLs") when it had checked nothing,
+    so the workflow stayed green through a sitemap outage. Mutations: no
+    sitemap check; the workflow not turning SitemapUnavailableError into exit 1."""
+    sends: list[str] = []
+
+    async def _owner(session) -> str:
+        return "founder-chat"
+
+    async def _crawl() -> dict:
+        return {"checked": 0, "healthy": 0, "broken": [], "note": "sitemap_unavailable"}
+
+    async def _send(chat_id: str, text_: str) -> bool:
+        sends.append(text_)
+        return True
+
+    monkeypatch.setattr(seo_health, "_owner_chat_id", _owner)
+    monkeypatch.setattr(seo_health, "run_stale_link_audit", _crawl)
+    monkeypatch.setattr(seo_health, "send_message", _send)
+    async with session_scope() as session:
+        with pytest.raises(seo_health.SitemapUnavailableError):
+            await seo_health.run_stale_audit_alert(session)
+    assert sends == []
+
+    wf = (_REPO / ".github" / "workflows" / "stale-link-audit.yml").read_text(encoding="utf-8")
+    assert "except SitemapUnavailableError" in wf
+    assert "return 1" in wf and "sys.exit(asyncio.run(main()))" in wf

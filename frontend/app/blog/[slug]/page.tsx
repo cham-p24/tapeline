@@ -118,14 +118,16 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
         />
 
         <div className="mt-16 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/5 via-panel to-panel p-8">
-          <h2 className="text-xl font-semibold tracking-tight">See it live.</h2>
+          <h2 className="text-xl font-semibold tracking-tight">See it in the scanner.</h2>
           <p className="mt-2 text-sm text-muted">
             30-day Premium trial — starting it takes a card, $0 is charged
             that day, and one click cancels before the day-{TRIAL_DAYS} charge. Signing
             up is an email and a password, and lands you on the free plan. Or
             read the public record instead: the daily Top 10, the full
             scorecard and the raw CSV/JSON need no account at all. The
-            scoring formula above runs on every US ticker every minute.
+            scoring formula above runs on every scored US stock and ETF on each
+            worker pass during US market hours, over prices delayed about 15
+            minutes.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href="/signup" className="btn-accent">
