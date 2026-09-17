@@ -645,12 +645,14 @@ async def public_regime() -> dict[str, object]:
 
 @app.get("/api/public/insider-buys")
 async def public_insider_buys(limit: int = 10) -> dict[str, object]:
-    """Public, no-auth feed of recent open-market insider buys (Form 4 code 'P').
+    """Public, no-auth feed of recent insider purchases (Form 4 code 'P': an
+    open-market or private purchase), newest trade first.
 
-    Powers /insider-buying. The underlying data is SEC EDGAR public
-    filings (we fetch via Finnhub) so there's no licensing constraint
-    on exposing a preview. Capped at 20 rows to keep the SEO surface
-    a teaser, not a replacement for /app/holdings (Premium).
+    Powers /insider-buying. The rows are SEC Form 4 filings read directly from
+    SEC EDGAR by the worker's insider pass (services/edgar_form4.py), which are
+    public filings, so there is no licensing constraint on exposing a preview.
+    Capped at 20 rows to keep the SEO surface a teaser, not a replacement for
+    /app/holdings (Premium).
     """
     from sqlalchemy import desc, select
 
@@ -658,13 +660,16 @@ async def public_insider_buys(limit: int = 10) -> dict[str, object]:
     from app.models import InsiderTransaction
 
     capped = max(1, min(limit, 20))
+    today = _datetime.now(_UTC).date().isoformat()
     async with session_scope() as session:
         result = await session.execute(
             select(InsiderTransaction)
-            # SEC Form 4 code 'P' = open-market buy. The high-signal cluster
-            # we surface separately from option-grant / sale rows.
+            # SEC Form 4 code 'P' = a purchase on the open market or in a
+            # private sale, surfaced separately from grants, exercises and sales.
             .where(InsiderTransaction.code == "P")
             .where(InsiderTransaction.share_change > 0)
+            # Never a future trade date: a filer's year typo sorts to the top.
+            .where(InsiderTransaction.transaction_date <= today)
             .order_by(desc(InsiderTransaction.transaction_date))
             .limit(capped)
         )
