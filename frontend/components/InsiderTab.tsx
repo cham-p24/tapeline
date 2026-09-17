@@ -44,7 +44,9 @@ export function InsiderTab({ symbol }: { symbol: string }) {
       <p className="text-sm text-muted">
         No Form 4 filings for {symbol} in the last {data.days_back} days. That&rsquo;s
         common — insiders typically file in batches around earnings windows, then go
-        quiet. Empty here is normal, not a data problem.
+        quiet. A filing is listed under the ticker it names, so where a company has
+        more than one listed share class, its insiders&rsquo; filings may sit under
+        another of its tickers.
       </p>
     );
 
@@ -66,9 +68,17 @@ export function InsiderTab({ symbol }: { symbol: string }) {
           ))}
         </tbody>
       </table>
+      {data.truncated && (
+        <p className="mt-3 text-xs text-muted" data-testid="insider-truncated">
+          Showing the newest {data.transactions.length.toLocaleString("en-US")} Form 4
+          transactions for {symbol} in the last {data.days_back} days; older ones in
+          the window are not listed.
+        </p>
+      )}
       <p className="mt-3 text-xs text-muted">
-        Source: SEC Form 4 filings, read from SEC EDGAR. Codes: P = open-market purchase, S = sale,
-        A = grant/award, M = option exercise, G = gift, F = tax withholding.
+        Source: SEC Form 4 filings, read from SEC EDGAR. Codes: P = open-market or private
+        purchase, S = open-market or private sale, A = grant/award, M = option exercise,
+        G = gift, F = tax withholding.
       </p>
     </div>
   );
@@ -108,5 +118,6 @@ function actionLabel(code: string, buy: boolean): string {
   if (c === "M") return "Option (M)";
   if (c === "G") return "Gift (G)";
   if (c === "F") return "Tax (F)";
-  return buy ? "Buy" : "Sell";
+  // Any other code moved shares without a purchase or sale.
+  return buy ? "Acquired" : "Disposed";
 }

@@ -14,8 +14,9 @@ import { userLocale } from "@/lib/datetime";
  * Recent Insider Buys feed.
  *
  * Replaces the previous "Elite 13F holdings" page (which depended on a paid
- * Quiver feed we never wired). Source is now SEC Form 4 filings via Finnhub,
- * already powering the Smart Money sub-score on every Tapeline Score — so
+ * Quiver feed we never wired). Source is SEC Form 4 filings read from SEC
+ * EDGAR (through Finnhub until 2026-09-14), the same rows behind the Smart
+ * Money sub-score on every Tapeline Score — so
  * this page is the "receipt" for the Smart Money pillar.
  *
  * Full feed is Premium. 2026-07-18: the page used to wrap everything in
@@ -23,7 +24,7 @@ import { userLocale } from "@/lib/datetime";
  * render, so a Free/Pro user's "product shot" was an upgrade card floating
  * over nothing. Now it branches on tier: Premium loads the full filterable
  * feed (unchanged), everyone else loads GET /api/holdings/preview — the 3 most
- * recent REAL Form 4 filings plus the real feed size — rendered normally, with
+ * recent REAL Form 4 transactions plus the real feed size — rendered normally, with
  * a locked section stating the true held-back count.
  */
 export default function HoldingsPage() {
@@ -80,9 +81,8 @@ export default function HoldingsPage() {
         <h1 className="text-2xl font-bold tracking-tight">Recent insider buys</h1>
         <p className="text-sm text-muted">
           SEC Form 4 filings across the active universe — officers, directors and 10%+ owners
-          trading their own company&apos;s stock. Each stock is re-checked about every two days,
-          but our data vendor&apos;s filings can run weeks behind SEC EDGAR.
-          This is the data behind the Smart Money pillar of every Tapeline Score.
+          trading their own company&apos;s stock, read from SEC EDGAR. Each stock is re-checked
+          about every two days. This is the data behind the Smart Money pillar of every Tapeline Score.
         </p>
       </div>
 
@@ -119,11 +119,11 @@ export default function HoldingsPage() {
               onChange={(e) => setBuysOnly(e.target.checked)}
               className="h-3.5 w-3.5"
             />
-            <span>Buys only</span>
+            <span>Purchases only (P)</span>
           </label>
           <span className="ml-auto self-center text-xs text-muted">
             Showing <strong className="text-fg">{rows.length}</strong> of{" "}
-            <strong className="text-fg">{feedSize}</strong> tracked · each stock re-checked about every two days
+            <strong className="text-fg">{feedSize.toLocaleString()}</strong> tracked transactions · each stock re-checked about every two days
           </span>
         </div>
       )}
@@ -131,7 +131,7 @@ export default function HoldingsPage() {
       {isPreview && rows.length > 0 && (
         <p className="mt-6 text-xs text-muted">
           Most recent <strong className="text-fg">{rows.length}</strong>{" "}
-          {rows.length === 1 ? "filing" : "filings"}
+          {rows.length === 1 ? "transaction" : "transactions"}
           {previewDays != null && <> from the last {previewDays}{" "}days</>}
           {feedSize > 0 && (
             <>
@@ -190,10 +190,14 @@ export default function HoldingsPage() {
               <tr><td colSpan={7} className="px-4 py-8 text-center text-muted">
                 <p>No insider transactions match these filters.</p>
                 <p className="mt-2 text-xs">Try widening the lookback window, clearing the symbol filter,
-                or unchecking &ldquo;Buys only&rdquo;.</p>
+                or unchecking &ldquo;Purchases only&rdquo;.</p>
               </td></tr>
             ) : rows.map((t, i) => {
               const isBuy = t.share_change > 0;
+              // BUY and SELL only for P and S. A grant, exercise or conversion
+              // also adds shares, but nobody bought them.
+              const action =
+                t.code === "P" ? "BUY" : t.code === "S" ? "SELL" : isBuy ? "ACQUIRED" : "DISPOSED";
               return (
                 <tr key={`${t.symbol}-${t.transaction_date}-${t.insider_name}-${i}`}
                     className="border-b border-border/20 hover:bg-panel/60">
@@ -209,7 +213,7 @@ export default function HoldingsPage() {
                       "inline-block px-1.5 py-0.5 rounded text-xs font-medium " +
                       (isBuy ? "bg-up/15 text-up" : "bg-down/15 text-down")
                     } title={codeLabel(t.code)}>
-                      {isBuy ? "BUY" : "SELL"}{t.code ? ` · ${t.code}` : ""}
+                      {action}{t.code ? ` · ${t.code}` : ""}
                     </span>
                   </td>
                   <td className={"px-4 py-2 text-right " + (isBuy ? "text-up" : "text-down")}>
@@ -228,7 +232,7 @@ export default function HoldingsPage() {
         </table>
       </div>
 
-      {/* Free/Pro locked section — the rows above are REAL Form 4 filings;
+      {/* Free/Pro locked section — the rows above are REAL Form 4 transactions;
           this states the real feed size reported by the backend (omitted
           entirely if the worker hasn't backfilled yet, rather than printing
           a made-up number). Descriptive only. */}
@@ -239,12 +243,12 @@ export default function HoldingsPage() {
           </div>
           <h2 className="mt-3 text-lg font-bold tracking-tight">
             {feedSize > rows.length
-              ? `Showing ${rows.length} of ${feedSize.toLocaleString()} tracked filings — full feed on Premium`
-              : `Free shows the ${FREE_INSIDER_PREVIEW_LIMIT} most recent filings`}
+              ? `Showing ${rows.length} of ${feedSize.toLocaleString()} tracked Form 4 transactions — Premium opens the feed`
+              : `Free shows the ${FREE_INSIDER_PREVIEW_LIMIT} most recent transactions`}
           </h2>
           <p className="mt-2 text-sm text-muted">
-            The full insider feed — every tracked Form 4 filing, with symbol, lookback-window
-            and buys-only filters — is part of the ${PRICING.premium.monthly}/mo (Premium)
+            The insider feed — up to 200 of the newest Form 4 transactions, filterable by
+            symbol, by a lookback of up to 90 days and to purchases only — is part of the ${PRICING.premium.monthly}/mo (Premium)
             plan (USD), or ${PRICING.premium.annualPerMonth}/mo billed annually
             (${PRICING.premium.annual}/yr).
           </p>
@@ -258,15 +262,15 @@ export default function HoldingsPage() {
       <p className="mt-4 text-xs text-subtle">
         {/* Cadence: backend/app/workers/signal_publisher.py
             _EQUITY_FACTOR_DUE_AFTER (36h) on the 24h factor chain, so each
-            stock is re-read about every 48h; non-equities every 30 days. The
-            vendor lag is measured, not hedged: on 2026-09-14 its newest Form 4
-            for AAPL/NVDA/META was 14/67/30 days behind EDGAR's.
+            stock is re-read about every 48h; non-equities every 30 days. Source:
+            SEC EDGAR directly since #835 (2026-09-14); the vendor it replaced
+            ran 14-67 days behind EDGAR for AAPL/NVDA/META.
             Pinned by __tests__/insiderRefreshCadenceCopy.test.tsx. */}
-        Source: SEC Form 4 filings, through a data vendor whose filings can run weeks
-        behind SEC EDGAR. Each stock&rsquo;s filings are re-checked about every two days
+        Source: SEC Form 4 filings, read from SEC EDGAR. Each stock&rsquo;s filings are re-checked about every two days
         (ETFs and other non-stocks about monthly) across the tickers we track.
-        Codes: P = open-market buy, S = open-market sale, A = grant/award,
-        M = option exercise, G = gift, F = payment of tax via shares.
+        Codes: P = open-market or private purchase, S = open-market or private sale,
+        A = grant/award, M = option exercise, G = gift, F = payment of tax via shares,
+        D = disposition to the issuer.
       </p>
     </div>
   );
@@ -274,8 +278,15 @@ export default function HoldingsPage() {
   function formatDate(d: string): string {
     if (!d) return "—";
     try {
-      return new Date(d + "T00:00:00Z").toLocaleDateString(userLocale(), {
-        day: "numeric", month: "short",
+      const dt = new Date(d + "T00:00:00Z");
+      if (Number.isNaN(dt.getTime())) return d;
+      // The stored value is a calendar date: format it in UTC, or a reader
+      // west of UTC sees the day before. The year shows whenever it is not
+      // the current one, so an old line never reads as this year's.
+      const thisYear = dt.getUTCFullYear() === new Date().getUTCFullYear();
+      return dt.toLocaleDateString(userLocale(), {
+        day: "numeric", month: "short", timeZone: "UTC",
+        ...(thisYear ? {} : { year: "numeric" }),
       });
     } catch {
       return d;
@@ -300,7 +311,7 @@ function compactUSD(n: number): string {
 
 function titleCase(s: string): string {
   if (!s) return "—";
-  // Finnhub returns insider names in uppercase ("LEVINSON ARTHUR D"). Title-case
+  // Form 4 filings carry insider names in uppercase ("LEVINSON ARTHUR D"). Title-case
   // the first/last name, preserve middle initials.
   return s
     .toLowerCase()
@@ -311,13 +322,13 @@ function titleCase(s: string): string {
 
 function codeLabel(code: string): string {
   const map: Record<string, string> = {
-    P: "Open-market buy",
-    S: "Open-market sale",
+    P: "Open-market or private purchase",
+    S: "Open-market or private sale",
     A: "Grant / award",
     M: "Option exercise",
     G: "Gift",
     F: "Payment of tax via shares",
-    D: "Disposition non-open-market",
+    D: "Disposition to the issuer",
     C: "Conversion of derivative",
   };
   return code ? (map[code] || `Form 4 code: ${code}`) : "";

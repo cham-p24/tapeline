@@ -302,7 +302,13 @@ function buildEditorialCommentary(d: TickerData): string {
       case "fundamentals":
         return `${sym}'s strongest factor is Fundamentals at ${v.toFixed(0)}/100 — a ${tier} read on reported margin, return on equity, EPS and revenue growth, and the earnings multiple. High Fundamentals doesn't guarantee a near-term move, but every input is a figure the company has already published in a filing.`;
       case "smart_money":
-        return `${sym}'s strongest factor is Smart Money at ${v.toFixed(0)}/100 — a ${tier} read on disclosed corporate-insider transactions from SEC Form 4, netted over a recent window. High Smart Money means those disclosed filings currently net toward buying on this name — a descriptive read of public filings, not a signal to follow.`;
+        return `${sym}'s strongest factor is Smart Money at ${v.toFixed(0)}/100 — a ${tier} read on disclosed corporate-insider transactions from SEC Form 4, netted over a recent window. ${
+          v > 50
+            ? `It means those disclosed filings currently net toward buying on this name`
+            : v < 50
+              ? `It is still the highest of the six, but the disclosed filings net toward selling`
+              : `The disclosed filings net to nothing — either the buying and selling cancel, or none of the lines carried a disclosed dollar value`
+        } — a descriptive read of public filings, not a signal to follow.`;
       case "macro":
         return `${sym}'s strongest factor is Macro at ${v.toFixed(0)}/100 — meaning the market-wide regime classification is ${tier} supportive. Macro is the same reading for every ticker on the board at a given moment, so it says nothing about ${sym} specifically.`;
       case "momentum":
@@ -323,7 +329,13 @@ function buildEditorialCommentary(d: TickerData): string {
       case "fundamentals":
         return `The weakest factor is Fundamentals at ${v.toFixed(0)}/100 — ${tier} reported profitability and growth figures. A low fundamentals score is the canonical "value trap" warning: technical setups on broken fundamentals don't tend to compound.`;
       case "smart_money":
-        return `The weakest factor is Smart Money at ${v.toFixed(0)}/100 — ${tier} net of disclosed SEC Form 4 insider transactions. Could mean nobody with edge is positioning here, or just that the disclosure data is sparse for ${sym}.`;
+        return `The weakest factor is Smart Money at ${v.toFixed(0)}/100 — ${tier} net of disclosed SEC Form 4 insider transactions. ${
+          v < 50
+            ? `The insider transactions disclosed for ${sym} in the window net toward selling`
+            : v > 50
+              ? `The insider transactions disclosed for ${sym} in the window net toward buying, but less strongly than the other factors read`
+              : `The insider transactions disclosed for ${sym} in the window net to nothing — either the buying and selling cancel, or none of the lines carried a disclosed dollar value`
+        }; on a thinly filed name a few filings can set this reading.`;
       case "macro":
         return `The weakest factor is Macro at ${v.toFixed(0)}/100 — ${tier} backdrop. A macro headwind drags every name in the cohort; if ${sym} is still scoring well on the composite despite this, the company-specific factors must be doing heavy lifting.`;
       case "momentum":
@@ -603,7 +615,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `How often does the ${sym} score update?`,
-      a: `${sym}'s score is recalculated ${PASS_CADENCE_PHRASE} during US market hours and persists between sessions, but it usually changes about once a day: trend, relative strength and momentum come from daily price bars, and prices themselves are ${PRICE_DELAY_PHRASE}; fundamentals refresh on company filing cadence; insider Form 4 filings are re-checked about every two days for stocks (about monthly for ETFs), through a data vendor whose filings can run weeks behind SEC EDGAR.`,
+      a: `${sym}'s score is recalculated ${PASS_CADENCE_PHRASE} during US market hours and persists between sessions, but it usually changes about once a day: trend, relative strength and momentum come from daily price bars, and prices themselves are ${PRICE_DELAY_PHRASE}; fundamentals refresh on company filing cadence; insider Form 4 filings are read from SEC EDGAR and re-checked about every two days for stocks (about monthly for ETFs).`,
     },
     {
       q: `Where can I see the historical track record for Tapeline scores?`,

@@ -13,6 +13,6 @@ export default async function OG() {
     eyebrow: "FEATURE",
     title: "Insider Buying Stocks.",
     subtitle:
-      "The most recent SEC Form 4 open-market buys in our data, newest trade first, each linked to its Tapeline page.",
+      "The most recent SEC Form 4 insider purchases (code P) in our data, newest trade first, each linked to its Tapeline page.",
   });
 }
