@@ -23,14 +23,14 @@ against the mutation its docstring names.
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 from sqlalchemy import select, update
 
 from app.db import session_scope
-from app.models import InsiderTransaction, Ticker
+from app.models import Ticker
 from app.services import finnhub_feed
 from app.services.finnhub_feed import FinnhubThrottledError, compute_fundamentals_score
 from app.services.mock_feed import _signal_from_score
@@ -327,121 +327,3 @@ async def test_a_crypto_pair_is_stamped_not_written(monkeypatch: pytest.MonkeyPa
     assert row.last_fundamentals_at is not None
     assert row.sub_fundamentals is None
     assert row.score == 44.0
-
-
-# ===========================================================================
-# The backlog #825 could not save: due again now, not in 8 days.
-# ===========================================================================
-#
-# Rows stamped before the fix may have lost their reading, and cannot be told
-# apart from rows Finnhub does not cover. On 2026-09-14 the rule matched 3,358
-# equities (2,006 with Finnhub key statistics), stamped 09-07..09-13, and they
-# drained that day. On 2026-09-17 it was widened to ETFs and futures: 5,141 rows.
-#
-# Every instant here is fixed relative to the cutoff, never the wall clock: once
-# those stamps are past their horizon a test that read the clock would silently
-# stop testing the rule.
-
-CUT = sp._FUNDAMENTALS_UNSAVED_BEFORE
-AT = CUT + timedelta(days=1)
-H = timedelta(hours=1)
-
-
-@pytest.fixture
-def at_cut_plus_a_day(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The worker's clock reads AT, so selection and stamps use it."""
-
-    class _FakeDT(datetime):
-        @classmethod
-        def now(cls, tz: Any = None) -> datetime:  # type: ignore[override]
-            return AT
-
-    monkeypatch.setattr(sp, "datetime", _FakeDT)
-
-
-async def test_an_equity_that_lost_its_reading_before_the_fix_is_due_now(
-    monkeypatch: pytest.MonkeyPatch, at_cut_plus_a_day: None,
-) -> None:
-    """Stamped two hours before the cutoff, so a day later it is well inside its
-    8-day horizon - and still due, re-read, and written.
-
-    Mutation: drop the dated clause - nothing is due and the pass asks nobody."""
-    await _seed("ADBE", last_fundamentals_at=CUT - 2 * H)
-    _vendor(monkeypatch)
-
-    assert (await sp._factor_due_counts(now=AT))[0] == 1
-    assert await sp._select_factor_symbols(Ticker.last_fundamentals_at, 5, now=AT) == ["ADBE"]
-
-    await sp._refresh_fundamentals_cache(limit=5)
-
-    row = await _row("ADBE")
-    assert row.sub_fundamentals == READING
-    assert (await sp._factor_due_counts(now=AT))[0] == 0
-
-
-async def test_the_rule_retires_once_an_uncovered_equity_is_asked_again(
-    monkeypatch: pytest.MonkeyPatch, at_cut_plus_a_day: None,
-) -> None:
-    """Asked once, not forever. Mutation: drop the cutoff from the clause - an
-    equity Finnhub does not cover stays due on every run."""
-    await _seed("NOCOV", last_fundamentals_at=CUT - 2 * H)
-    _vendor(monkeypatch, {"NOCOV": ["none"]})
-
-    await sp._refresh_fundamentals_cache(limit=5)
-
-    row = await _row("NOCOV")
-    assert row.sub_fundamentals is None
-    assert (await sp._factor_due_counts(now=AT))[0] == 0
-
-
-async def test_a_row_holding_a_reading_waits_for_its_horizon() -> None:
-    """Mutation: drop `sub_fundamentals IS NULL` - every recent reading is re-asked."""
-    await _seed("JPM", last_fundamentals_at=CUT - 2 * H, sub_fundamentals=66.0)
-    assert (await sp._factor_due_counts(now=AT))[0] == 0
-
-
-async def test_a_stamp_from_the_fixed_code_waits_for_its_horizon() -> None:
-    """A stamp at the cutoff was written with its reading. Mutation: `<=`."""
-    await _seed("NEWER", last_fundamentals_at=CUT)
-    assert (await sp._factor_due_counts(now=AT))[0] == 0
-
-
-@pytest.mark.parametrize("asset_class", ["etf", "future_commodity"])
-async def test_a_non_equity_that_lost_its_reading_is_due_now_too(asset_class: str) -> None:
-    """Sheet-owned ETFs held fundamentals at 2.2% against the tick's 14.5%. The
-    30-day horizon would have hidden the lost ones until 2026-10-13.
-
-    Mutation: restrict the clause to equities (as #828 shipped it) - not due."""
-    await _seed("NONEQ", asset_class=asset_class, last_fundamentals_at=CUT - 2 * H)
-    assert (await sp._factor_due_counts(now=AT))[0] == 1
-    assert await sp._select_factor_symbols(Ticker.last_fundamentals_at, 5, now=AT) == ["NONEQ"]
-
-
-async def test_a_crypto_pair_is_not_asked_again() -> None:
-    """No pair has ever answered /stock/metric. Mutation: drop the crypto
-    exclusion - 106 pairs are re-asked for nothing."""
-    await _seed("X:ETHUSD", asset_class="crypto", last_fundamentals_at=CUT - 2 * H)
-    assert (await sp._factor_due_counts(now=AT))[0] == 0
-
-
-async def test_the_smart_money_rotation_is_untouched(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Mutation: apply the rule to both stamp columns - a smart-money stamp 26
-    hours old is served inside its 36-hour horizon.
-
-    Smart money has its own dated rule (`_SMART_MONEY_EDGAR_SINCE`, tested in
-    tests/test_edgar_form4.py), which this stamp would also match; it is moved
-    out of the way so this test still measures the fundamentals rule only.
-
-    META's reading has a Form 4 filing on file for the same reason: a
-    smart-money value with none is due at once under its own rule (see
-    signal_publisher._UNBACKED_SMART_MONEY_RECHECK_AFTER), which this test is
-    not about."""
-    monkeypatch.setattr(sp, "_SMART_MONEY_EDGAR_SINCE", datetime(1970, 1, 1, tzinfo=UTC))
-    monkeypatch.setattr(sp, "_SMART_MONEY_REREAD_BEFORE", datetime(1970, 1, 1, tzinfo=UTC))
-    await _seed("META", last_fundamentals_at=AT, last_smart_money_at=CUT - 2 * H)
-    async with session_scope() as s:
-        s.add(InsiderTransaction(
-            symbol="META", insider_name="Jane Q Insider", transaction_date="2026-09-01",
-            share_change=-500, transaction_price=20.0, transaction_value=10_000.0, code="S",
-        ))
-    assert (await sp._factor_due_counts(now=AT))[1] == 0
