@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Fragment } from "react";
+import { PRICE_DELAY_MINUTES } from "@/lib/freshness";
 
 /**
  * Landing-hero product shot — the REAL anonymous scanner top list.
@@ -69,7 +70,7 @@ const WHY_TEASER_CHARS = 70;
  * 40–54 NEUTRAL · 25–39 CAUTION · <25 WEAK.
  */
 export const SAMPLE_ROWS: Row[] = [
-  { sym: "NVDA", sector: "Tech",        score: 92.4, conf: 94, sig: "HIGH CONVICTION", d1:  2.14, why: "Sample row — each live row carries a one-sentence read generated from its six factor scores." },
+  { sym: "NVDA", sector: "Tech",        score: 92.4, conf: 94, sig: "HIGH CONVICTION", d1:  2.14, why: "Sample row — each real row carries a one-sentence read generated from its six factor scores." },
   { sym: "MSFT", sector: "Tech",        score: 88.7, conf: 91, sig: "HIGH CONVICTION", d1:  1.02, why: "Scores of 85+ read HIGH CONVICTION: most of the six factors aligned in the same direction." },
   { sym: "LLY",  sector: "Healthcare",  score: 81.3, conf: 88, sig: "STRONG SETUP",    d1:  0.74, why: "Scores of 70–84 read STRONG SETUP: the factor mix leans positive without full agreement." },
   { sym: "CAT",  sector: "Industrials", score: 76.1, conf: 82, sig: "STRONG SETUP",    d1:  0.45, why: "Trend and Relative Strength carry the most weight, Momentum the least — same formula on every row." },
@@ -121,8 +122,9 @@ export async function ScannerPreview() {
  * Pure presentational table — exported separately so tests can render it
  * synchronously. `real` switches the truthful data label vs the clearly
  * marked sample-data fallback; nothing pulses in either mode because
- * nothing on this surface genuinely streams (the data refreshes on a
- * 30-min ISR cadence).
+ * nothing on this surface genuinely streams (the data is a cached snapshot:
+ * 30-min ISR with serve-stale, so it can be an hour old or more, over prices
+ * the vendor already delays ~15 minutes).
  */
 export function ScannerPreviewTable({ rows, real }: { rows: Row[]; real: boolean }) {
   return (
@@ -134,8 +136,8 @@ export function ScannerPreviewTable({ rows, real }: { rows: Row[]; real: boolean
             <h3 className="text-base font-semibold tracking-tight">Scanner</h3>
             <p className="text-[11px] text-muted">
               {real
-                ? "Today’s actual top-scoring tickers · refreshed every 30 min"
-                : "Sample data — the live top-scoring list is temporarily unavailable"}
+                ? `Today’s actual top-scoring tickers · a saved snapshot that can be an hour old or more · prices delayed about ${PRICE_DELAY_MINUTES} min`
+                : "Sample data — the top-scoring list is temporarily unavailable"}
             </p>
           </div>
           {!real && (
@@ -158,7 +160,7 @@ export function ScannerPreviewTable({ rows, real }: { rows: Row[]; real: boolean
           {real ? (
             <>Top {rows.length}{" "}of today&rsquo;s Top 10</>
           ) : (
-            <>Sample rows &mdash; not live data</>
+            <>Sample rows &mdash; not real data</>
           )}
         </div>
       </div>

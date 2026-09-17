@@ -27,7 +27,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 export const alt =
-  "Tapeline public scorecard — every daily top-10 frozen at the close, not re-ranked or deleted, losing days kept";
+  "Tapeline public scorecard — every daily top-10 recorded at the close, not re-ranked or deleted, corrections dated, losing days kept";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -98,7 +98,7 @@ export default async function OG() {
               maxWidth: "1020px",
             }}
           >
-            Every daily top-10, frozen when it printed.
+            Every daily top-10, recorded when it printed.
           </div>
           <div
             style={{

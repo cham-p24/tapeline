@@ -328,7 +328,6 @@ _last_eod_digest_date: str | None = None  # "YYYY-MM-DD" of last EOD digest run 
 _last_weekly_newsletter_token: str | None = None  # "weekly_YYYYWww" of last newsletter run
 _last_daily_newsletter_date: str | None = None  # "YYYY-MM-DD" of last Daily Top 10 digest run (UTC)
 _last_indexnow_date: str | None = None  # "YYYY-MM-DD" of last IndexNow batch submit (UTC)
-_last_seo_digest_token: str | None = None  # "seo_YYYYWww" of last weekly SEO digest run
 _last_growth_tick_date: str | None = None  # "YYYY-MM-DD" of last growth-bot tick (UTC)
 _last_fundamentals_refresh: datetime | None = None
 _last_insider_refresh: datetime | None = None
@@ -1469,37 +1468,16 @@ async def tick() -> None:
     # wrong place to crawl a website from. GitHub Actions is the right place,
     # is free, and cannot take production scoring down when it runs long.
 
-    # Weekly SEO digest — Monday at/after 09:00 UTC (~7pm Sydney
-    # post-Monday-close, ~5am ET pre-market). Sends a Markdown summary
-    # to the founder's Telegram: sitemap size, broken-URL count,
-    # ticker-universe stats, and suggested next steps. Process-level
-    # token + Telegram-side dedupe make double-fires harmless.
-    _set_stage("seo_digest_token")
-    global _last_seo_digest_token
-    seo_digest_token = f"seo_{iso_year}W{iso_week:02d}"
-    if (
-        iso_dow == 1                                    # Monday
-        and started.hour >= 9                           # 09:00 UTC onward
-        and _last_seo_digest_token != seo_digest_token
-    ):
-        # Slot claimed BEFORE the work and rolled back only on a CAUGHT
-        # failure — the pattern already applied to the calendar seed and
-        # the trial check in #797. Latch-on-success protects against a
-        # transient error; it does NOT protect against a hang, because a
-        # cycle killed by the tick watchdog never reaches the except
-        # clause either. The stale value then survives, the next tick
-        # restarts the same job, and the worker wedges until something
-        # restarts it.
-        _seo_prev = _last_seo_digest_token
-        _last_seo_digest_token = seo_digest_token
-        try:
-            from app.services.seo_health import run_weekly_digest
-            async with session_scope() as seo_session:
-                sent = await run_weekly_digest(seo_session)
-            logger.info("seo_digest.weekly.ran sent=%s token=%s", sent, seo_digest_token)
-        except Exception:
-            _last_seo_digest_token = _seo_prev
-            logger.exception("seo_digest.weekly.failed")
+    # The weekly SEO digest USED TO RUN HERE, and does not any more: it runs
+    # from .github/workflows/seo-weekly-digest.yml (seo_health.run_weekly_digest).
+    #
+    # It crawls the whole sitemap (11,982 URLs, 2026-09-14), which is the job
+    # the paragraph above moved out of this process. It stayed behind a
+    # process-memory token, so on a Monday the first tick after every deploy
+    # ran it again, inline, until the watchdog killed the tick: measured
+    # 2026-09-14 18:45Z, `tick.timeout elapsed=240.1s stage=seo_digest_token`
+    # and four minutes with no price pass. Its once-a-week guarantee now lives
+    # in the database (job_period_claims), not in this process.
 
     # Daily growth-bot tick. Fires once per UTC day at/after 22:00 UTC
     # — ~8am Melbourne the next morning AEST, ~6pm ET the prior evening.
@@ -2778,8 +2756,8 @@ _EQUITY_FACTOR_DUE_AFTER: dict[str, timedelta] = {
 #: symbol that does gain coverage is still picked up within a month.
 _NON_EQUITY_FACTOR_DUE_AFTER = timedelta(days=30)
 
-#: Equity fundamentals stamped before this instant, with no reading on the row,
-#: are due NOW instead of when their 8-day horizon passes.
+#: Fundamentals stamped before this instant, with no reading on the row, are due
+#: NOW instead of when their horizon passes. Every asset class but crypto.
 #:
 #: Until #825 (worker restarted on it at 22:58 UTC on 2026-09-13) a stamp could
 #: land without its reading: the pass cached the value and a deploy took it
@@ -2790,14 +2768,20 @@ _NON_EQUITY_FACTOR_DUE_AFTER = timedelta(days=30)
 #: owned by the tick from the 09-06..09-11 outage. Stamps ran 09-07..09-13, so
 #: the horizon alone would have taken until 09-21.
 #:
-#: So every such equity is asked once more: about 3,400 calls, roughly 40% of
-#: them to symbols Finnhub genuinely does not cover. A re-read stamps the row
-#: after this instant, so the rule retires row by row and needs no clean-up; by
-#: 2026-09-22 every row it could match is past its horizon anyway.
+#: So every such row is asked once more. A re-read stamps the row after this
+#: instant, so the rule retires row by row. Once it matches nothing it is dead
+#: code: remove it then, with the fixture that disables it in
+#: tests/test_factor_refresh_what_is_due.py.
 #:
-#: Equities only. Sheet-owned ETFs lost readings too, but only about 1 ETF in 7
-#: has fundamentals at all, so re-asking ~5,000 of them would recover ~150;
-#: those come due on the 30-day horizon by 2026-10-13.
+#: #828 asked equities only; the equities drained 2026-09-14 (3,134 of 3,358
+#: re-reads came back with a reading). ETFs and futures were added on 2026-09-17.
+#: Their 30-day horizon would have hidden the lost ones until 2026-10-13, and
+#: sheet-owned ETFs held fundamentals at 2.2% against 14.5% for the tick's own:
+#: about 150 lost readings. That costs ~5,100 re-reads, once, served after every
+#: due equity. The run it lands in had no smart money due, so it fits the phase
+#: budget.
+#:
+#: Crypto is never asked: no pair has ever answered /stock/metric.
 _FUNDAMENTALS_UNSAVED_BEFORE = datetime(2026, 9, 13, 23, 0, tzinfo=UTC)
 
 #: Smart money stamped before this instant came from Finnhub, and is due NOW.
@@ -2894,7 +2878,7 @@ def _factor_due_clause(stamp_col: Any, now: datetime) -> Any:
     )
     if stamp_col.key == "last_fundamentals_at":
         due = due | (
-            (Ticker.asset_class == "equity")
+            (Ticker.asset_class != "crypto")
             & Ticker.sub_fundamentals.is_(None)
             & (stamp_col < _FUNDAMENTALS_UNSAVED_BEFORE)
         )

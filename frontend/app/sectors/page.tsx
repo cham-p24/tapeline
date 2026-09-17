@@ -25,6 +25,7 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { SECTORS } from "@/app/sector/sectors";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+import { PUBLIC_SNAPSHOT_FOOTER } from "@/lib/freshness";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -101,7 +102,7 @@ function buildSectorStats(rows: SignalRow[]): SectorStat[] {
 const FAQ = [
   {
     q: "Which stock market sectors are strongest right now?",
-    a: "The cards above rank all 11 GICS sectors by the average Tapeline composite score of their constituent stocks, refreshed every 5 minutes. The sector at the top has the highest mean score across its scored names — a proxy for where trend, relative strength, and macro tailwinds are currently concentrated.",
+    a: "The cards above rank all 11 GICS sectors by the average Tapeline composite score of their constituent stocks, from a saved snapshot that can be an hour old or more. The sector at the top has the highest mean score across its scored names — a proxy for where trend, relative strength, and macro tailwinds are currently concentrated.",
   },
   {
     q: "How is a sector's average score calculated?",
@@ -113,14 +114,14 @@ const FAQ = [
   },
   {
     q: "How often do the sector rankings update?",
-    a: "Underlying stock scores re-tick every minute during US market hours. This index and the individual sector pages cache their snapshot for 5 minutes to avoid hammering the API on every search-engine crawl, so figures are at most a few minutes stale.",
+    a: "The public list is a saved snapshot: it is cached for an hour, and the first visit after that still gets the old copy while a new one is built, so it can be an hour old or more. Prices are delayed about 15 minutes, and scores usually change about once a day because most of their inputs are daily readings. The in-app scanner shows the latest data when you open it.",
   },
 ];
 
 export const metadata = pageMeta({
   title: "US Stock Market Sectors Ranked by Tapeline Score (2026)",
   description:
-    "All 11 GICS stock market sectors ranked by average Tapeline 6-factor score — see which sectors are strongest right now, then drill into the top-scoring stocks in each. Live, updated sub-60s during market hours.",
+    "All 11 GICS stock market sectors ranked by average Tapeline 6-factor score — see which sectors score highest, then drill into the top-scoring stocks in each. A cached snapshot; prices delayed about 15 minutes.",
   path: "/sectors",
 });
 
@@ -160,7 +161,7 @@ export default async function SectorsIndexPage() {
           All 11 GICS sectors, ranked by the average Tapeline 6-factor composite score of
           their constituent stocks. The strongest sectors sit at the top. Pick a sector to
           see its top-scoring names, then drill into any ticker for the full breakdown.
-          Updated sub-60s during market hours; this snapshot caches for 5 minutes.
+          {PUBLIC_SNAPSHOT_FOOTER}
         </p>
 
         <section className="mt-10 grid gap-4 sm:grid-cols-2">
@@ -190,7 +191,7 @@ export default async function SectorsIndexPage() {
                 <span>
                   {s.count > 0
                     ? `${s.count} stock${s.count === 1 ? "" : "s"} scored`
-                    : "Live ranking"}
+                    : "Ranking"}
                 </span>
                 {s.top ? (
                   <span className="font-mono text-subtle">
@@ -255,13 +256,13 @@ export default async function SectorsIndexPage() {
 
         {/* Conversion CTA — /sectors was the lone SEO page with no in-body
             signup ask, leaking organic "sector rotation" traffic. Honest
-            data-access framing (drill into the live scanner), no edge claim. */}
+            data-access framing (drill into the scanner), no edge claim. */}
         <section className="mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <h2 className="text-2xl font-bold tracking-tight">
             See which stocks are driving each sector.
           </h2>
           <p className="mt-3 text-sm text-muted">
-            Drill from any sector into its top-scoring names on the live scanner.
+            Drill from any sector into its top-scoring names on the scanner.
             An account takes an email and a password; the free plan returns the
             top ten scored rows of any scan. A card starts the 30-day Premium
             trial — every matching row across the full scored universe (about 11,500 US stocks and ETFs),
@@ -278,7 +279,7 @@ export default async function SectorsIndexPage() {
         </section>
 
         <p className="mt-10 text-xs text-subtle text-center">
-          Snapshot cached 5 minutes. Sub-60s tick during market hours. Not investment advice — see{" "}
+          {PUBLIC_SNAPSHOT_FOOTER} Not investment advice — see{" "}
           <Link href="/legal/risk" className="text-accent hover:underline">
             risk disclosure
           </Link>

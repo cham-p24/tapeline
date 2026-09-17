@@ -24,7 +24,7 @@ import { faqJsonLd, jsonLdScript, breadcrumbJsonLd } from "@/lib/jsonld";
 export const metadata = pageMeta({
   title: "Tapeline Score Badge — Free Embeddable Stock Widget",
   description:
-    "Embed a live Tapeline Score for any US ticker in your blog, Substack, or GitHub README. Free, no auth, iframe-able, updates live. Two-line iframe snippet. MIT-permissive — link back and you're good.",
+    "Embed a Tapeline Score for any US ticker in your blog, Substack, or GitHub README. Free, no auth, iframe-able, no screenshots to update. Two-line iframe snippet. MIT-permissive — link back and you're good.",
   path: "/embed",
 });
 
@@ -39,7 +39,7 @@ const FAQ = [
   },
   {
     q: "How fresh is the data in the badge?",
-    a: "Server-cached 60 seconds during US market hours — same cadence as the per-ticker pages at tapeline.io/t/{TICKER}. The underlying score recalculates every minute from a six-factor formula (trend, relative strength, fundamentals, smart money, macro, momentum). For most embedded use cases this is far fresher than a screenshot.",
+    a: "The widget reads a cached copy of the ticker's data, refreshed at most about every 30 minutes and served stale while it refreshes, so it can be half an hour old or more. Prices in it are also delayed about 15 minutes. The score is recalculated during US market hours from a six-factor formula (trend, relative strength, fundamentals, smart money, macro, momentum), but most inputs are daily readings, so it usually changes about once a day. For most embedded use cases that is still fresher than a screenshot.",
   },
   {
     q: "Can I customise the badge appearance?",
@@ -47,7 +47,7 @@ const FAQ = [
   },
   {
     q: "Does the badge work in GitHub README files?",
-    a: "Iframes don't render in GitHub markdown — but the SVG variant does. Drop this into any README: ![Tapeline Score](https://tapeline.io/badge/NVDA). Swap NVDA for any ticker; add ?theme=dark for the dark variant. The badge is a flat Shields.io-style SVG showing the ticker, current score, and short signal label. Cached 60s server-side. Free, no auth, link-back welcome.",
+    a: "Iframes don't render in GitHub markdown — but the SVG variant does. Drop this into any README: ![Tapeline Score](https://tapeline.io/badge/NVDA). Swap NVDA for any ticker; add ?theme=dark for the dark variant. The badge is a flat Shields.io-style SVG showing the ticker, current score, and short signal label. Cached server-side, so it can be half an hour old or more. Free, no auth, link-back welcome.",
   },
   {
     q: "What's the licence?",
@@ -115,21 +115,21 @@ export default function EmbedDocsPage() {
       <article className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
         <p className="eyebrow">Free tool</p>
         <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight">
-          Embed a live Tapeline Score in your blog, Substack, or site.
+          Embed a Tapeline Score in your blog, Substack, or site.
         </h1>
         <p className="mt-4 text-lg text-muted leading-relaxed">
-          Paste a two-line iframe. Get a live, six-factor stock-score badge for any US ticker.
-          Updates every 60 seconds during US market hours. Free, no API key, no auth, no rate
-          limits for normal use.
+          Paste a two-line iframe. Get a six-factor stock-score badge for any US ticker. Its
+          data is cached, so it can be half an hour old or more, and prices in it are delayed
+          about 15 minutes. Free, no API key, no auth, no rate limits for normal use.
         </p>
         <p className="mt-3 text-sm text-muted">
           Built for finance bloggers, Substack writers, and personal-site owners who want
-          live data in their posts without screenshot-and-update toil.
+          current scores in their posts without screenshot-and-update toil.
         </p>
 
         {/* Above-the-fold demo + snippet */}
         <section className="mt-10">
-          <h2 className="text-xl font-semibold">See it live</h2>
+          <h2 className="text-xl font-semibold">See it in action</h2>
           <p className="mt-2 text-sm text-muted">
             This is the actual widget — loaded the same way your readers will see it.
           </p>
@@ -144,7 +144,7 @@ export default function EmbedDocsPage() {
               style={{ maxWidth: "100%", display: "block", margin: "0 auto" }}
             />
             <p className="mt-4 text-xs text-subtle text-center">
-              Live score for NVDA · refreshes every 60 seconds when market is open
+              Score for NVDA · cached data, can be half an hour old or more · prices delayed about 15 minutes
             </p>
           </div>
           <div className="mt-5">
@@ -163,7 +163,7 @@ export default function EmbedDocsPage() {
           <h2 className="text-2xl font-semibold tracking-tight">Variants</h2>
           <p className="mt-2 text-sm text-muted">
             Pick the size and theme that fits the surrounding content. All variants are free; all
-            update live; all attribute back to Tapeline via the footer.
+            refresh from the same cached data; all attribute back to Tapeline via the footer.
           </p>
 
           {EXAMPLES.map((ex) => (
@@ -239,12 +239,12 @@ export default function EmbedDocsPage() {
           <ul className="mt-5 space-y-4 text-sm text-muted leading-relaxed">
             <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
               <strong className="text-fg">Finance bloggers + Substack writers.</strong> Drop a
-              badge inline when you mention a ticker. Reader gets a live score; you don&rsquo;t
+              badge inline when you mention a ticker. Reader gets a recent score; you don&rsquo;t
               have to update screenshots when prices change.
             </li>
             <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
               <strong className="text-fg">Personal trading-journal sites.</strong> Show your
-              watchlist with live Tapeline scores instead of static numbers.
+              watchlist with current Tapeline scores instead of static numbers.
             </li>
             <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
               <strong className="text-fg">Newsletter authors.</strong> Some email clients render

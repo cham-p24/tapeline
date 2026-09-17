@@ -16,7 +16,7 @@ export default function Image() {
     eyebrow: "Stock Directory",
     headline: "Every ticker we score.",
     subhead:
-      "The entire scored US universe, each with a live 0-100 score and a plain-English read. Browse it all by sector.",
+      "The entire scored US universe, each with a 0-100 score and a plain-English read. Browse it all by sector.",
     footerNote: "One score. One sentence. Every ticker.",
     path: "tapeline.io/stocks",
   });

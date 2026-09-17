@@ -35,7 +35,8 @@ Verified against the live vendor on 2026-09-07:
     **403**, and `/v3/snapshot` on a pair returns `NOT_ENTITLED`. Live crypto
     is not on the current plan.
 
-So crypto is DAILY while equities are sub-60s, and that difference is stated
+So crypto is DAILY while equity prices are re-read each ~60 s pass (and are
+themselves ~15 min delayed), and that difference is stated
 on the surface rather than smoothed over — a stale price presented as live is
 the failure this codebase keeps having.
 """

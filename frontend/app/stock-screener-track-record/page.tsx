@@ -157,7 +157,7 @@ const CRITERIA = [
   },
   {
     h: "2. Losing picks kept, and corrections dated",
-    p: "The misses must be present at the same size and weight as the winners, frozen the day they printed, never re-ranked or quietly deleted. If a recorded value is ever corrected, the correction has to be dated and explained where the record lives. A record that can change silently after the fact isn't a record — it's a highlight reel.",
+    p: "The misses must be present at the same size and weight as the winners, recorded the day they printed, never re-ranked or quietly deleted. If a recorded value is ever corrected, the correction has to be dated and explained where the record lives. A record that can change silently after the fact isn't a record — it's a highlight reel.",
   },
   {
     h: "3. Every pick benchmarked against SPY",
@@ -223,7 +223,7 @@ export default async function StockScreenerTrackRecordPage() {
     },
     {
       q: "How far back does the record go, and how big is it?",
-      a: `${sizeClause} The counts on this page are read from the live scorecard rather than typed in, so the scorecard itself is always the current figure.`,
+      a: `${sizeClause} The counts on this page are read from the scorecard rather than typed in, so the scorecard itself is always the current figure.`,
     },
     {
       q: "Does the track record beat SPY?",
@@ -261,7 +261,8 @@ export default async function StockScreenerTrackRecordPage() {
           ) : (
             ","
           )}{" "}
-          each frozen the day it printed and checked against SPY the next session,{" "}
+          each recorded the day it printed and checked against SPY the next session (entries are not re-ranked
+          or deleted; corrections are dated),{" "}
           <strong className="text-fg">losses kept</strong> and the whole archive downloadable as CSV and JSON. This page
           explains what a real track record has to contain &mdash; so you can judge any screener&rsquo;s claim, not just
           this one.
@@ -391,9 +392,9 @@ export default async function StockScreenerTrackRecordPage() {
 
         {/* CTA */}
         <div className="mt-12 rounded-2xl border border-border bg-panel p-6 text-center sm:p-8">
-          <h2 className="text-xl font-semibold">See the record, then the live scores</h2>
+          <h2 className="text-xl font-semibold">See the record, then the scores</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-            Live six-factor scores on the full scanner, on a 30-day Premium trial &mdash; $0 today. The downloadable record stays
+            Six-factor scores on the full scanner, on a 30-day Premium trial &mdash; $0 today. The downloadable record stays
             public either way.
           </p>
           <Link href="/signup" className="mt-5 inline-flex items-center justify-center rounded-md bg-accent px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90">

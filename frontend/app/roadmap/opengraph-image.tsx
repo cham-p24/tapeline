@@ -57,7 +57,7 @@ export default async function OG() {
             What&rsquo;s shipping next.
           </div>
           <div style={{ fontSize: "26px", color: "#a1a1aa", lineHeight: 1.4, display: "flex", maxWidth: "950px" }}>
-            Public list. Premium subscribers vote on order — counts update live.
+            Public list. Premium subscribers vote on order.
           </div>
         </div>
 

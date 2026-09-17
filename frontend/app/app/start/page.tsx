@@ -7,7 +7,7 @@
  * was the one screen standing between a brand-new account and the logged-in
  * product: /app/* did not open until a card was on file, and app/app/layout
  * redirected every other /app route here. That is gone. A new account lands on
- * the FREE plan with the live scanner already working, and this page is now an
+ * the FREE plan with the scanner already working, and this page is now an
  * OFFER it can walk past — nothing behind it is closed.
  *
  * WHO SEES IT: an account the session payload marks `must_add_card`, i.e. one
@@ -314,7 +314,7 @@ export default function CardGateStartPage() {
       <p className="mt-3 text-sm leading-relaxed text-muted">
         It takes a card and charges <strong className="text-fg">$0 today</strong>.
         {" "}Your account already works without one &mdash; the free plan runs the
-        live scanner on the top ten scored rows. What the card adds is every
+        scanner on the top ten scored rows. What the card adds is every
         matching row instead of the first ten, a second saved screen, alerts,
         CSV export and SEC Form 4 insider filings; the trial becomes a paid subscription
         if you keep it. Here is exactly what that means, before you enter
@@ -404,7 +404,7 @@ export default function CardGateStartPage() {
 
       {/* THE WAY OUT. Not a footnote and not a dark-pattern "no thanks, I hate
           value" line. Since #683 the strongest exit is the honest one: the
-          account already works. So this leads with the free plan's own live
+          account already works. So this leads with the free plan's own
           scanner, then the two destinations that need no account at all, then
           the door. */}
       <section
@@ -422,10 +422,10 @@ export default function CardGateStartPage() {
             href="/app/scanner"
             className={`rounded font-medium text-accent underline underline-offset-2 hover:text-fg ${FOCUS}`}
           >
-            live scanner
+            scanner
           </Link>{" "}
-          keeps working &mdash; the top ten scored rows of any scan, live data,
-          no delay. Two more pages stay open to everyone, free, with no account
+          keeps working &mdash; the top ten scored rows of any scan (prices
+          delayed about 15 minutes, as on every plan). Two more pages stay open to everyone, free, with no account
           and no card at all:
         </p>
         <ul className="mt-3 space-y-2 text-sm">
@@ -437,8 +437,9 @@ export default function CardGateStartPage() {
               The public record
             </Link>
             <span className="text-muted">
-              {" "}&mdash; every daily top-10 we have published, frozen when it
-              printed and checked against SPY. Losing days included.
+              {" "}&mdash; every daily top-10 we have published, recorded when it
+              printed and checked against SPY. Losing days included; entries are
+              not re-ranked or deleted, and corrections are dated.
             </span>
           </li>
           <li>

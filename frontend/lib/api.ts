@@ -658,8 +658,8 @@ export const api = {
       Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))
     );
     // `tier` / `row_cap` / `data_delayed_minutes` are the server-computed
-    // gating facts (Free is capped to the top rows; scores are live, so
-    // data_delayed_minutes is 0). The scanner page reads them to render its
+    // gating facts (Free is capped to the top rows; data_delayed_minutes is the vendor's
+    // ~15-minute price delay plus any tier delay, from services/freshness.py). The scanner page reads them to render its
     // inline upgrade hint instead of recomputing tier math client-side.
     return get<{
       count: number;

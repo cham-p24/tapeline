@@ -501,7 +501,7 @@ def test_frontend_timing_constants_fit_the_bridge_cadence():
     """frontend/lib/useLiveStream.ts timing is pinned to this bridge.
 
     * The "auto-refreshing" window must outlast the normal gap between events:
-      a pass every ~70-80s plus up to one poll interval and the settle delay.
+      a pass every ~60s plus up to one poll interval and the settle delay.
     * The refetch floor must be shorter than the smallest gap between two
       passes' events (the worker sleeps 60s between passes; publish latency
       can differ by up to one poll interval), so it only merges events from

@@ -73,8 +73,11 @@ function h1Text(): string {
 describe("scorecard H1 (Rule 3)", () => {
   it("describes the mechanism, not the outcome", () => {
     const h1 = h1Text();
-    // The mechanism: what is recorded, when it is frozen, that losses stay.
-    expect(h1).toMatch(/frozen/i);
+    // The mechanism: what is recorded, when it is recorded, that losses stay.
+    // "frozen" was dropped here too on 2026-09-15 (review round 2 of #842):
+    // recorded values were later corrected, so nothing on the record is frozen.
+    expect(h1).toMatch(/recorded when it printed/i);
+    expect(h1).not.toMatch(/frozen/i);
     expect(h1).toMatch(/losing days/i);
   });
 
@@ -109,7 +112,9 @@ describe("scorecard <title> and meta description (Rule 3)", () => {
   });
 
   it("still describes the mechanism", () => {
-    expect(`${title} ${description}`).toMatch(/frozen/i);
+    // "frozen" was dropped on 2026-09-15 (review of #842): recorded values were
+    // later corrected, so the page says when an entry is recorded instead.
+    expect(`${title} ${description}`).toMatch(/recorded at the close/i);
     // "append-only" was dropped on 2026-09-14: recorded values were changed
     // on 2026-06-15 and 2026-08-25, so the archive is not strictly append-only.
     expect(`${title} ${description}`).not.toMatch(/append-only/i);

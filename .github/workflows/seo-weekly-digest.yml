@@ -1,0 +1,69 @@
+name: Weekly SEO digest (founder Telegram)
+
+# Sends the founder the week's SEO digest: sitemap size, broken URLs, ticker
+# universe stats. It crawls the whole sitemap to do it (11,982 URLs on
+# 2026-09-14, 4 to 14 minutes).
+#
+# THIS USED TO RUN INSIDE THE WORKER TICK, behind a process-memory latch. On a
+# Monday every deploy re-armed the latch, the next tick ran the digest inline,
+# and the 240s watchdog killed the tick: 2026-09-14 18:45Z, four minutes with no
+# price pass. The daily link audit left the worker for the same reason on
+# 2026-08-24 (see stale-link-audit.yml).
+#
+# Runs DAILY, and sends once per ISO week. app.scripts.seo_weekly_digest claims
+# the week in the job_period_claims table before it crawls, so:
+#   * a run after the week's digest went out claims nothing and crawls nothing;
+#   * a run killed mid-crawl, which is what a deploy does to an ssh session,
+#     is retried by the next day's run;
+#   * a manual re-run cannot send the week twice.
+# Nothing is sent before Monday 09:00 UTC, so expect the digest on Monday
+# afternoon UTC.
+#
+# SCHEDULE IS BEST-EFFORT: GitHub Actions starts scheduled runs late, often by 1
+# to 7 hours (this repo's 08:23 audit has started between 11:52 and 15:05 UTC),
+# and can skip one under load. Never read the cron line as the time it runs.
+#
+# ON THE WORKER: `-g worker` pins the ssh session to the worker process group.
+# Unpinned, `flyctl ssh console` may land on an api machine, which serves every
+# page this crawl requests. On the worker it is a separate process from the
+# tick (4 concurrent fetches, mostly waiting on the network), not tick work.
+#
+# A red run says what to do in its ::error annotation. SEND_UNKNOWN in
+# particular means Telegram may already have the digest: check before
+# re-dispatching (the week is kept as sent, so a re-dispatch sends nothing).
+
+on:
+  schedule:
+    - cron: "7 9 * * *"
+  workflow_dispatch:        # "Send this week's digest now", if no run has
+
+# Shared with stale-link-audit.yml, so the two sitemap crawls never run at the
+# same time and double the load they put on the site they are measuring.
+concurrency:
+  group: sitemap-crawl
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    # Above seo_health.DIGEST_BUDGET (45 min), which is what actually bounds a
+    # run: it sends nothing once its budget is spent. This only stops a hung
+    # ssh session from holding the concurrency group.
+    timeout-minutes: 55
+    steps:
+      # Pinned to the same immutable SHA as every other workflow that holds the
+      # production Fly token.
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+
+      - name: Send the week's digest if no run has
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "::error title=No token::FLY_API_TOKEN secret is not set."
+            exit 1
+          fi
+          flyctl ssh console -a tapeline-backend -g worker \
+            -C "python -m app.scripts.seo_weekly_digest"

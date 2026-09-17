@@ -23,6 +23,19 @@ name: Stale-link audit (daily sitemap crawl)
 # Mirrors prod-pulse.yml: the audit is exec'd inside the prod backend's Python
 # via `flyctl ssh console`, so it uses the live DB and the configured alert
 # channel, and always runs current code without waiting for a deploy.
+#
+# SCHEDULE IS BEST-EFFORT: GitHub Actions starts scheduled runs late, often by 1
+# to 7 hours (this repo's 08:23 audit has started between 11:52 and 15:05 UTC),
+# and can skip one under load. Never read the cron line as the time it runs.
+#
+# ON THE WORKER: `-g worker` pins the ssh session to the worker process group.
+# Unpinned, `flyctl ssh console` may land on an api machine, which serves every
+# page this crawl requests. On the worker it is a separate process from the
+# tick (4 concurrent fetches, mostly waiting on the network), not tick work.
+#
+# An unreadable sitemap is a RED run, not a clean one: the audit checked 0 URLs,
+# and "no broken URLs" would be false. seo_health raises SitemapUnavailableError and
+# the step exits 1 with an ::error annotation.
 
 on:
   schedule:
@@ -32,9 +45,10 @@ on:
   workflow_dispatch:        # Manual "run one now" from the Actions tab
 
 # A crawl that overruns must never overlap itself. This is the failure mode
-# that caused the incident; the in-worker version had no such guard.
+# that caused the incident; the in-worker version had no such guard. The group
+# is shared with seo-weekly-digest.yml, which crawls the same sitemap.
 concurrency:
-  group: stale-link-audit
+  group: sitemap-crawl
   cancel-in-progress: false
 
 jobs:
@@ -44,7 +58,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # Pinned to the same immutable SHA as every other workflow that holds the
+      # production Fly token.
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
 
       - name: Crawl the sitemap and alert only on broken URLs
         env:
@@ -53,19 +69,30 @@ jobs:
           set -euo pipefail
           cat > /tmp/stale_audit.py <<'PY'
           import asyncio
+          import sys
 
           from app.db import session_scope
-          from app.services.seo_health import run_stale_audit_alert
+          from app.services.seo_health import SitemapUnavailableError, run_stale_audit_alert
 
 
-          async def main() -> None:
-              async with session_scope() as session:
-                  alerted = await run_stale_audit_alert(session)
+          async def main() -> int:
+              try:
+                  async with session_scope() as session:
+                      alerted = await run_stale_audit_alert(session)
+              except SitemapUnavailableError as exc:
+                  print(f"stale_audit.sitemap_unavailable {exc}", flush=True)
+                  print(
+                      "::error title=Sitemap unavailable::The sitemap could not be read, "
+                      "so no URL was checked. This is not a clean audit.",
+                      flush=True,
+                  )
+                  return 1
               print(f"stale_audit.ran alerted={alerted}")
+              return 0
 
 
-          asyncio.run(main())
+          sys.exit(asyncio.run(main()))
           PY
           B64=$(base64 -w0 /tmp/stale_audit.py)
-          flyctl ssh console -a tapeline-backend \
+          flyctl ssh console -a tapeline-backend -g worker \
             -C "python -c \"import base64;exec(base64.b64decode('$B64').decode())\""

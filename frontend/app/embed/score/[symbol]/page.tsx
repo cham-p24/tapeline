@@ -36,6 +36,7 @@ import { notFound } from "next/navigation";
 
 import { trackEmbedImpression } from "@/lib/embedImpression";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+import { PRICE_DELAY_MINUTES } from "@/lib/freshness";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -358,7 +359,7 @@ export default async function EmbedScorePage({
           Powered by <span style={{ color: accent, fontWeight: 600 }}>tapeline.io</span> · 6 named
           factors
         </span>
-        <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>Live</span>
+        <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>Delayed ~{PRICE_DELAY_MINUTES}m</span>
       </div>
     </a>
   );

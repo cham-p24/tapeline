@@ -13,6 +13,7 @@
  */
 import { ImageResponse } from "next/og";
 import { loadInter } from "@/lib/og-fonts";
+import { PRICE_DELAY_MINUTES } from "@/lib/freshness";
 
 export const ogSize = { width: 1200, height: 630 } as const;
 
@@ -35,7 +36,7 @@ export async function ogResponse({
   eyebrow,
   title,
   subtitle,
-  footerLeft = "Six named factors · Public scorecard · Live sub-60s refresh",
+  footerLeft = `Six named factors · Public scorecard · Prices delayed ${PRICE_DELAY_MINUTES} min`,
   footerRight = "tapeline.io",
   accent = "#3b82f6",
 }: OgParams) {
