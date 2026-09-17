@@ -16,7 +16,7 @@ export default function Image() {
     eyebrow: "Daily Picks",
     headline: "Today's highest-scoring setups.",
     subhead:
-      "The names topping the Tapeline score right now, refreshed daily and logged to a public, back-checked scorecard.",
+      "The names topping the Tapeline score each day, logged to a public, back-checked scorecard.",
     footerNote: "No cherry-picking. Public track record.",
     path: "tapeline.io/daily-picks",
   });

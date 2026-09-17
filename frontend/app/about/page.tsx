@@ -178,7 +178,7 @@ export default function AboutPage() {
               <h3 className="mt-1 font-semibold">Engine running in production for personal use</h3>
               <p className="mt-1 text-sm text-muted">
                 The scoring engine that powers Tapeline ran for ~12 months as a personal
-                trading bot, paper-trading against live market data, fundamentals,
+                trading bot, paper-trading against market data, fundamentals,
                 macro indicators, and SEC filings.
               </p>
             </li>
@@ -237,7 +237,7 @@ export default function AboutPage() {
           <h2 className="text-2xl font-bold tracking-tight">See the public scorecard.</h2>
           <p className="mt-3 text-sm text-muted">
             The receipts are at /scorecard. The methodology is at /how-it-works. Signing up takes an
-            email and a password and lands on the free plan, which runs the live scanner on the top
+            email and a password and lands on the free plan, which runs the scanner on the top
             ten scored rows of any scan. Adding a card is what starts the 30-day Premium trial — $0
             charged that day, first charge on day 30, one click to cancel.
           </p>

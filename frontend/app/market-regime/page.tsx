@@ -11,9 +11,9 @@ const API_BASE =
   "https://api.tapeline.io";
 
 export const metadata = pageMeta({
-  title: "Market Regime Indicator — Live VIX + Advancers | Tapeline",
+  title: "Market Regime Indicator — VIX + Advancers | Tapeline",
   description:
-    "Tapeline's market regime label is set by the VIX against four fixed thresholds. We publish it next to the advancer count, rate direction and SPY momentum, and show exactly which of those feed the label. Cached snapshot, refreshed hourly.",
+    "Tapeline's market regime label is set by the VIX against four fixed thresholds. We publish it next to the advancer count, rate direction and SPY momentum, and show exactly which of those feed the label. Cached snapshot that can be an hour old or more.",
   path: "/market-regime",
 });
 
@@ -96,7 +96,7 @@ export default async function MarketRegimePage() {
     <SeoFeaturePage
       slug="market-regime"
       eyebrow="Feature · Market regime"
-      h1="Market Regime Indicator — Live VIX, Advancers, Rates"
+      h1="Market Regime Indicator — VIX, Advancers, Rates"
       lede="Every individual scoring decision is downstream of the macro state. Tapeline's regime label is set by one input: the VIX, against four fixed thresholds — below 15 BULL (risk on), 15–20 NEUTRAL, 20–25 CAUTIOUS, 25 and above BEAR (risk off). We publish the other macro figures we track next to it — advancers today, rate direction (10Y yield slope from FRED), and short-window SPY momentum — and we tell you plainly that they are context, not inputs. The Fear &amp; Greed dial is the number here that does blend all four into the familiar 0–100 sentiment scale."
       methodology={{
         heading: "How the regime is computed",
@@ -134,8 +134,9 @@ export default async function MarketRegimePage() {
             <p>
               The macro figures come from FRED via the free-tier API: VIX
               (VIXCLS), 10Y yield (DGS10), USD broad index (DTWEXBGS). The
-              advancer count and the sector ranking are computed live each
-              worker tick across the Tapeline universe. Full live regime panel
+              advancer count and the sector ranking are computed on each worker
+              pass across the Tapeline universe, from prices delayed about 15
+              minutes. Full regime panel
               + Fear &amp; Greed dial at{" "}
               <Link href="/app/regime" className="link">
                 /app/regime
@@ -156,7 +157,7 @@ export default async function MarketRegimePage() {
         },
         {
           q: "How often does the regime update?",
-          a: "Every worker tick — sub-60 seconds during US market hours. The underlying FRED series (VIX, 10Y) update once a day at end-of-day, so the regime label only moves when that daily VIX close crosses a threshold; the advancer count and SPY momentum are live; the Fear & Greed composite recomputes on each tick.",
+          a: "It is recalculated on each worker pass, about every 60 seconds during US market hours. The underlying FRED series (VIX, 10Y) update once a day at end-of-day, so the regime label only moves when that daily VIX close crosses a threshold. The advancer count and SPY momentum are re-read each pass from prices delayed about 15 minutes, and the Fear & Greed composite recomputes on each pass. This public page is a saved snapshot that can be an hour old or more.",
         },
         {
           q: "Does the regime change scoring weights?",
@@ -164,7 +165,7 @@ export default async function MarketRegimePage() {
         },
         {
           q: "What is 'advancers today' exactly?",
-          a: "Of the names that moved today, the share that closed up: advancers ÷ (advancers + decliners), computed live from the Tapeline scoring universe each tick. Names with no price read for the day, and names that closed unchanged, are excluded from both sides. It is a same-day advance/decline ratio, so 50% means advancers and decliners were balanced. It is not the percentage of stocks above their 200-day moving average — that is a different measure, and we do not currently publish it. One session's ratio describes that session only; it is not a trend reading.",
+          a: "Of the names that moved today, the share that closed up: advancers ÷ (advancers + decliners), computed from the Tapeline scoring universe on each worker pass, from prices delayed about 15 minutes. Names with no price read for the day, and names that closed unchanged, are excluded from both sides. It is a same-day advance/decline ratio, so 50% means advancers and decliners were balanced. It is not the percentage of stocks above their 200-day moving average — that is a different measure, and we do not currently publish it. One session's ratio describes that session only; it is not a trend reading.",
         },
         {
           q: "What tier do I need?",
@@ -187,8 +188,8 @@ export default async function MarketRegimePage() {
           </div>
           <p className="mt-2 text-5xl font-bold tracking-tight text-accent">{data.regime}</p>
           <p className="mt-3 text-xs text-muted leading-relaxed">
-            Set by the VIX against four fixed thresholds. Updated each worker
-            tick (~60s).
+            Set by the VIX against four fixed thresholds. The VIX input is a
+            daily close, so the label changes at most about once a day.
           </p>
           <p className="mt-4 text-[11px] uppercase tracking-wider text-subtle">
             Highest-scoring sectors (our composite)
@@ -226,12 +227,12 @@ export default async function MarketRegimePage() {
       </div>
 
       <p className="mt-3 text-xs text-subtle">
-        {live ? "Cached snapshot — refreshes hourly." : "Snapshot example."} The{" "}
+        {live ? "Cached snapshot — can be an hour old or more." : "Snapshot example."} The{" "}
         <Link href="/app/regime" className="text-accent hover:underline">
-          live regime panel
+          in-app regime panel
         </Link>{" "}
-        updates every 60s with the live Fear &amp; Greed dial and full
-        component-score breakdown.
+        shows the latest reading when you open it, with the Fear &amp; Greed
+        dial and full component-score breakdown.
       </p>
     </SeoFeaturePage>
   );

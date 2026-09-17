@@ -183,8 +183,9 @@ export default function RegimePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Market Regime</h1>
           <p className="mt-1 text-sm text-muted">
-            One macro classification of the US equity market, refreshed each
-            worker tick (~60s). The regime acts as a multiplier on every
+            One macro classification of the US equity market, recalculated on
+            each worker pass. Its VIX, 10-year and dollar inputs are daily
+            readings, so the label usually changes at most once a day. The regime acts as a multiplier on every
             Tapeline score — names that look great in BULL get marked down
             during CAUTIOUS, and vice-versa.
           </p>
@@ -276,7 +277,7 @@ export default function RegimePage() {
               the numbers explaining the regime live" */}
           <div className="mt-8 mb-3 flex items-baseline justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Inputs feeding the regime</h2>
-            <span className="text-[11px] text-subtle">All live, refreshed each tick</span>
+            <span className="text-[11px] text-subtle">Re-read each pass · VIX, 10Y and USD are daily readings</span>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -18,6 +18,6 @@ export default async function OG({ params }: { params: Promise<{ sector: string 
   return ogResponse({
     eyebrow: "SECTOR RANKING",
     title: `${display}, ranked by the Tapeline Score.`,
-    subtitle: `Live six-factor composite for every ${display.toLowerCase()} ticker in the scoring universe. Updated sub-60s during US market hours.`,
+    subtitle: `Six-factor composite for every ${display.toLowerCase()} ticker in the scoring universe. Prices delayed about 15 minutes.`,
   });
 }

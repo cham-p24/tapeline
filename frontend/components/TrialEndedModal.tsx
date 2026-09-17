@@ -46,7 +46,7 @@ function freeTierKeeps(): string[] {
     // which follows the open-access lift while that window is open. Saying
     // "top 10" to someone who can see 1,000 rows would read as a lie about
     // the product they are looking at.
-    `The top ${freeScannerRows({ authenticated: true })} scanner rows, live — no delay`,
+    `The top ${freeScannerRows({ authenticated: true })} scanner rows`,
     // #683: Free carries no alerts on any channel, so this "what you keep"
     // list must not name one. Guarded on the constant in case it returns.
     ...(FREE_LIMITS.webPushAlerts > 0

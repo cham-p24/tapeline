@@ -113,8 +113,7 @@ export function UpgradeNudge() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
         <span className="text-fg">
           Your Premium trial ended, so you&apos;re back on <strong>Free</strong> — the
-          top {nudge.scanner_cap} rows of any scan, and prices {nudge.delayed_hours}h
-          behind. What stopped: every matching row instead of the top{" "}
+          top {nudge.scanner_cap} rows of any scan. What stopped: every matching row instead of the top{" "}
           {nudge.scanner_cap}, alerts when a screen changes, and CSV export.{" "}
           <strong>{usd(PRICING.premium.monthly)}/month</strong>, cancel in one click.
         </span>
@@ -140,12 +139,12 @@ export function UpgradeNudge() {
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2.5 text-sm">
       <span className="text-fg">
-        You&apos;re on <strong>Free</strong> — live scores for the top {nudge.scanner_cap} tickers
+        You&apos;re on <strong>Free</strong> — scores for the top {nudge.scanner_cap} tickers
         {/* Watchlist is Pro-and-up from the 2026-08-02 cutover: for a Free user
             the cap is 0, so drop the "N-ticker watchlist" clause and instead
             sell the saved watchlist as one of the Pro perks below. */}
         {nudge.watchlist_cap > 0 ? `, a ${nudge.watchlist_cap}-ticker watchlist.` : "."}{" "}
-        Go Pro for the full real-time universe with unlimited look-ups
+        Go Pro for every row of the full universe with unlimited look-ups
         {nudge.watchlist_cap > 0 ? "" : ", a saved watchlist"}, plus regime &amp; heatmap.
       </span>
       <span className="flex shrink-0 items-center gap-2">

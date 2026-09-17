@@ -196,6 +196,137 @@ export function expandKnownConstants(text) {
 }
 
 
+/* ------------------------------------------------------------------ *
+ * FALSE DATA FRESHNESS — integrity wave, founder-approved 2026-09-14.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * ~170 surfaces said the data was "real-time", "live, not delayed",
+ * "refreshed sub-60 seconds" or "updated every minute", and a pulsing "Live"
+ * badge sat on public pages. Measured during the US session on Mon 14 Sep
+ * 2026:
+ *   - the price vendor's data was ~15 minutes behind (AAPL snapshot 899 s
+ *     old at 13:59 UTC; SPY/AAPL/NVDA/MSFT 15.0 min at 13:41 UTC);
+ *   - worker passes landed about 60 s apart since #843 (fixed-rate loop; 22 gaps of 59.99-60.02 s measured 14 Sep 18:45-19:12 UTC);
+ *   - scores barely move intraday (38 of ~11,546 changed in 2.5 minutes);
+ *   - the public heatmap was served ~60 minutes old under "Live".
+ * The true wording lives in frontend/lib/freshness.ts and
+ * backend/app/services/freshness.py. This rule keeps a growth edit from
+ * putting the false wording back.
+ *
+ * WHAT IT DOES NOT FIRE ON (precision, deliberately narrow)
+ * ---------------------------------------------------------
+ *   - A negated claim ("not a real-time record", "no live data source") —
+ *     the shared negation guard.
+ *   - A dated correction that QUOTES the old claim (this line used to say
+ *     Free had "live scores (no delay)") — see `isDatedCorrection`. The match
+ *     has to sit inside a double-quoted string that opens after the "used to
+ *     say/call/read/claim" token, in the same paragraph. Dated history is
+ *     corrected with a dated note, not silently rewritten, and the note has
+ *     to be able to name what changed. A bare "Updated <date>" is NOT enough,
+ *     and neither is an unquoted "used to say otherwise. Now real-time."
+ *   - A term MENTIONED as a quoted term on its own ('"Real-time" means
+ *     different things at different price tiers'): the quote must close right
+ *     after the matched term.
+ *   - Competitor descriptions are NOT suppressed by the rule (review of #842):
+ *     each one carries a line-specific inline
+ *     `copy-compliance-allow false-data-freshness -- <reason>` marker, which
+ *     covers its own line and the line after it, so a Tapeline claim next to
+ *     a competitor's name elsewhere cannot slip through.
+ * "live" on its own is NOT matched: "your account is live", "a live
+ * scorecard", "Live checks" on /status are ordinary English. Only the data
+ * phrasings the measurements made false are.
+ * ------------------------------------------------------------------ */
+const DATED_CORRECTION = /\bused\s+to\s+(?:say|said|call|read|claim)\b/gi;
+
+// Double-quote shapes only. A straight or curly single quote is also an
+// apostrophe ("Tapeline's", "can’t"), so it cannot say where a quote opens.
+const DQ_TOKEN = /&ldquo;|&rdquo;|&quot;|\\"|[“”"]/g;
+
+/** True when `segment` ends inside a double-quoted string that opened in it. */
+function endsInsideQuote(segment) {
+  let open = false;
+  for (const m of segment.matchAll(DQ_TOKEN)) {
+    const t = m[0];
+    if (t === "“" || t === "&ldquo;") open = true;
+    else if (t === "”" || t === "&rdquo;") open = false;
+    else open = !open;
+  }
+  return open;
+}
+
+function isDatedCorrection(text, matchIndex) {
+  // Same paragraph only: a blank line (or a closing paragraph tag) resets it.
+  const before = text.slice(Math.max(0, matchIndex - 320), matchIndex);
+  const cut = Math.max(before.lastIndexOf("\n\n"), before.lastIndexOf("</p>"), before.lastIndexOf("</li>"));
+  const scope = cut === -1 ? before : before.slice(cut);
+  // The old claim has to be QUOTED after the "used to say" token: the match
+  // must sit inside a double-quoted string that opened after that token.
+  // "Our old page used to say otherwise. Tapeline is now real-time." quotes
+  // nothing, so it is a fresh claim (review round 2 of #842).
+  for (const m of scope.matchAll(DATED_CORRECTION)) {
+    if (endsInsideQuote(scope.slice(m.index + m[0].length))) return true;
+  }
+  return false;
+}
+
+const QUOTE_OPEN = /(?:["“'‘]|&quot;|&ldquo;|\\")$/;
+const QUOTE_CLOSE = /^(?:["”'’]|&quot;|&rdquo;|\\")/;
+function isQuotedMention(text, matchIndex, matchText) {
+  // The quoted string must be just the term: an opening quote right before it
+  // AND a closing quote right after it. `"Sub-60-second refresh during market
+  // hours",` is a claim in a string literal, not a mention.
+  const before = text.slice(Math.max(0, matchIndex - 7), matchIndex);
+  const after = text.slice(matchIndex + matchText.length, matchIndex + matchText.length + 8);
+  return QUOTE_OPEN.test(before) && QUOTE_CLOSE.test(after);
+}
+
+export const FALSE_FRESHNESS_RULE = {
+  id: "false-data-freshness",
+  brief:
+    "Integrity 2026-09-14 — never claim data is real-time, undelayed, sub-60s or refreshed every minute",
+  message:
+    "Measured 14 Sep 2026: prices are delayed about 15 minutes (vendor plan), a " +
+    "worker pass runs about every 60 seconds, scores usually change about once a " +
+    "day, and public pages are cached snapshots that can be an hour old or more. " +
+    "Interpolate the true wording from frontend/lib/freshness.ts (PRICE_DELAY_NOTE, " +
+    "PASS_CADENCE_PHRASE, SCORE_CADENCE_SENTENCE) or backend services/freshness.py. " +
+    "No \"Live\" badge on data. A dated correction quoting the old claim is fine " +
+    "(\"this line used to say ...\"). Do not assume a real-time vendor " +
+    "upgrade: that is a founder decision.",
+  suppress(text, index, matchText = "") {
+    // The two badge patterns start AT the ">" or the quote, so the character
+    // before them says nothing about whether the word is being mentioned.
+    const isBadge = /^[>"'`]/.test(matchText);
+    return (
+      isDatedCorrection(text, index) ||
+      (!isBadge && isQuotedMention(text, index, matchText))
+    );
+  },
+  patterns: [
+    /\bsub-?\s?60(?:\s*-?\s*s(?:ec(?:ond)?s?)?)?\b/i,
+    /\bsub-?minute\b/i,
+    /\bunder\s+(?:60|sixty)\s+sec(?:ond)?s?\b/i,
+    /\breal[\s-]?time\b/i,
+    /\bevery\s+(?:single\s+)?minute\b/i,
+    /\blive\s+(?:market\s+)?(?:data|quotes?|prices?|feeds?)\b/i,
+    /\blive,?\s+(?:not|rather\s+than)\s+delayed\b/i,
+    /\bnot\s+delayed\b/i,
+    /\b(?:no|zero)\s+delay\b/i,
+    /\bundelayed\b/i,
+    /\blive[\s-]updating\b/i,
+    /\blive\s+scores?\b/i,
+    /\b(?:updates?|updated|updating|refresh(?:es|ed|ing)?|scored|streams?)\s+live\b/i,
+    /\bstreaming\s+(?:data|quotes?|prices?|feeds?|updates?|scores?|ticks?)\b/i,
+    /\b(?:data|quotes?|prices?|scores?)\s+(?:are\s+|is\s+)?streaming\b/i,
+    // A "Live" / "LIVE" badge: a JSX text node or a string literal that is
+    // exactly the word. Case-sensitive on purpose — status === "live" is a
+    // state value, not copy.
+    />\s*(?:LIVE|Live)\s*</,
+    /(?<![\w$])["'`](?:LIVE|Live)["'`]/,
+  ],
+};
+
 export const RULES = [
   {
     id: "performance-claim",
@@ -621,6 +752,7 @@ export const RULES = [
       /\bwith\s+(?:the|its)\s+original\s+reasoning\b/i,
     ],
   },
+  FALSE_FRESHNESS_RULE,
 ];
 
 /* ------------------------------------------------------------------ *
@@ -1349,6 +1481,8 @@ export function scanSource(text, filePath = "<input>", options = {}) {
     // record-never-edited claims are negations themselves ("no edits",
     // "never edited"), so the negation guard would suppress the claim it polices.
     if (!rule.skipNegationGuard && isNegated(code, index)) return;
+    // Rule-specific precision guards (see FALSE DATA FRESHNESS).
+    if (typeof rule.suppress === "function" && rule.suppress(code, index, matchText)) return;
     const finding = {
       file: filePath,
       line,

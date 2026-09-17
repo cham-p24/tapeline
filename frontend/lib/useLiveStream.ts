@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *   - `hello` once on connect, `ping` after 25s of quiet. Neither says any
  *     data changed. They only prove the connection is open.
  *   - `update` when the API's live bridge (backend/app/services/live_bridge.py)
- *     sees a new database write, about once per worker pass (~70-80s apart).
+ *     sees a new database write, about once per worker pass (~60s apart).
  *     The worker writes around the clock (it does not pause when the market
  *     is closed), but the bridge forwards writes only during the US extended
  *     session, 04:00-20:00 ET on trading days, because off-hours passes carry

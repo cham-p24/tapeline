@@ -41,7 +41,7 @@ export const metadata = pageMeta({
   title: "Free Stock Screener List — Every US Stock, by Sector",
   description:
     "Browse every US stock we score on a published six-factor methodology, grouped " +
-    "by sector. Each links to its live 0–100 score and breakdown. Free, no signup.",
+    "by sector. Each links to its 0–100 score and breakdown. Free, no signup.",
   path: "/stocks",
 });
 
@@ -175,7 +175,7 @@ export default async function StocksDirectoryPage() {
     description:
       "Complete index of every US stock actively scored by the Tapeline " +
       "6-factor scanner, grouped by GICS sector. Each entry links to a " +
-      "per-ticker page with the live composite score and factor breakdown.",
+      "per-ticker page with the composite score and factor breakdown.",
     isPartOf: { "@type": "WebSite", url: "https://tapeline.io", name: "Tapeline" },
     isAccessibleForFree: true,
   };
@@ -205,7 +205,7 @@ export default async function StocksDirectoryPage() {
         <p className="mt-4 max-w-3xl text-lg text-muted">
           A free, complete index of every US stock we actively score
           {total > 0 ? <> — <span className="font-semibold text-fg">{total.toLocaleString()}</span> tickers today</> : null}, grouped by
-          GICS sector. No login, no paywall. Every name links to its live
+          GICS sector. No login, no paywall. Every name links to its
           0–100{" "}
           <Link href="/how-it-works" className="link">6-factor score</Link> and
           factor breakdown — the same six named factors run on every row. See
@@ -218,7 +218,7 @@ export default async function StocksDirectoryPage() {
           <div className="mt-10 rounded-xl border border-border bg-panel p-8 text-center">
             <p className="text-muted">The coverage directory is refreshing.</p>
             <p className="mt-3 text-sm text-subtle">
-              This page rebuilds hourly — check back shortly, or browse the live{" "}
+              This page rebuilds hourly — check back shortly, or browse the{" "}
               <Link href="/signals" className="text-accent hover:underline">
                 signals universe
               </Link>{" "}
@@ -314,7 +314,7 @@ export default async function StocksDirectoryPage() {
               <p className="mt-3 text-sm text-muted leading-relaxed">
                 Yes. This directory lists every US stock in our coverage universe,
                 and each ticker links to its full score page — no account, no
-                paywall. To filter and sort the same universe live, use the{" "}
+                paywall. To filter and sort the same universe, use the{" "}
                 <Link href="/signals" className="text-accent hover:underline">signals view</Link>.
               </p>
             </details>
@@ -338,9 +338,11 @@ export default async function StocksDirectoryPage() {
                 <span className="text-muted transition-transform group-open:rotate-45">+</span>
               </summary>
               <p className="mt-3 text-sm text-muted leading-relaxed">
-                The list of covered tickers rebuilds hourly as the universe
-                changes. Individual scores refresh in under 60 seconds during US
-                market hours on each ticker&rsquo;s page.
+                The list of covered tickers rebuilds about hourly as the universe
+                changes. Individual scores usually change about once a day, because
+                most of their inputs are daily readings, and prices are delayed
+                about 15 minutes. Each ticker&rsquo;s page is itself a cached
+                snapshot that can be an hour old or more.
               </p>
             </details>
           </div>
@@ -353,7 +355,7 @@ export default async function StocksDirectoryPage() {
           className="mt-14 flex flex-wrap gap-x-6 gap-y-2 pt-6 text-sm text-muted"
         >
           <Link href="/signals" className="hover:text-fg underline-offset-4 hover:underline">
-            Live signals universe
+            Signals universe
           </Link>
           <Link href="/best-stocks-for/swing-traders" className="hover:text-fg underline-offset-4 hover:underline">
             Swing-trade candidates
@@ -379,8 +381,8 @@ export default async function StocksDirectoryPage() {
         </nav>
 
         <p className="mt-8 text-xs text-subtle">
-          Directory rebuilds hourly. Scores update sub-60s during US market
-          hours on each ticker&rsquo;s page. Descriptive analytics, not
+          Directory rebuilds about hourly. Scores usually change about once a
+          day; prices are delayed about 15 minutes. Descriptive analytics, not
           investment advice — see{" "}
           <Link href="/legal/risk" className="text-accent hover:underline">
             risk disclosure

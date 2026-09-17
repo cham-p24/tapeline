@@ -9,6 +9,7 @@ import { NewsletterCapture } from "@/components/NewsletterCapture";
 import { ExitIntentModal } from "@/components/ExitIntentModal";
 import { POSTS } from "./blog/posts";
 import { REFUND } from "@/lib/pricing";
+import { PRICE_DELAY_MINUTES } from "@/lib/freshness";
 import { formatTrackedSince, type CitableSummary } from "@/lib/scorecardCitation";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
@@ -104,11 +105,13 @@ export default async function LandingPage() {
             under the CTAs, above the fine-print. */}
         <div className="mx-auto grid max-w-6xl gap-6 sm:gap-12 lg:grid-cols-5 lg:gap-x-10 lg:gap-y-0">
           <div className="order-1 lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-1 lg:pt-6">
-            {/* Static dot on purpose — the hero table refreshes on a 30-min
-                ISR cadence, so nothing here should pulse like a stream. */}
+            {/* Static dot on purpose — the hero table is a cached snapshot
+                (30-min ISR with serve-stale), so nothing here should pulse
+                like a stream, and the label must not say "live": prices are
+                vendor-delayed about 15 minutes (measured 14 Sep 2026). */}
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-panel px-3 py-1 text-xs text-muted">
               <span className="h-1.5 w-1.5 rounded-full bg-up" />
-              Live market scanning
+              US stock &amp; ETF scanner
             </div>
             <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-6xl">
               Every pick on the public record.
@@ -212,7 +215,7 @@ export default async function LandingPage() {
               the desktop layout is unchanged). */}
           <p className="order-3 mt-3 text-xs leading-relaxed text-muted lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-2">
             Signing up takes an email and a password, and lands on the free plan
-            &mdash; the live scanner, top ten scored rows a scan. Adding a card is
+            &mdash; the scanner, top ten scored rows a scan. Adding a card is
             what starts the trial: 30 days of Premium, and nothing is charged that day
             &mdash; the first charge is on day 30 at the plan you pick, we email you
             about 7 days before, and one click cancels before then. The scorecard and
@@ -500,9 +503,10 @@ export default async function LandingPage() {
             .
           </Faq>
           <Faq q="What data do you use?">
-            US equities and commodity ETFs from live market data feeds, plus
-            macro indicators, fundamentals, SEC Form 4 insider filings, and a
-            real-time news wire. Categories and refresh cadences listed on{" "}
+            US equities and commodity ETFs from a market data feed whose prices
+            are delayed about {PRICE_DELAY_MINUTES}{" "}minutes, plus macro indicators,
+            fundamentals, SEC Form 4 insider filings, and a news feed. Categories
+            and refresh cadences listed on{" "}
             <Link href="/data-sources" className="link">
               data sources
             </Link>

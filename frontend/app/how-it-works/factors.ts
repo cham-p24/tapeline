@@ -109,9 +109,9 @@ export const FACTORS: Factor[] = [
     ],
     feeds: [
       {
-        name: "Live market data",
+        name: "Market data",
         detail:
-          "Adjusted daily and intraday OHLC bars. Refreshed sub-60 seconds during US market hours.",
+          "Adjusted daily OHLC bars, read about once a day, so the Trend reading usually changes about once a day. Intraday prices are delayed about 15 minutes.",
       },
     ],
     caveat:
@@ -157,9 +157,9 @@ export const FACTORS: Factor[] = [
     ],
     feeds: [
       {
-        name: "Live market data",
+        name: "Market data",
         detail:
-          "Prices for the ticker and for the broad-market benchmark. Sub-60 seconds during US market hours.",
+          "Daily price history for the ticker and for the broad-market benchmark, read about once a day.",
       },
     ],
     caveat:
@@ -303,7 +303,7 @@ export const FACTORS: Factor[] = [
       {
         name: "Macro indicators",
         detail:
-          "A single market-wide regime classification, resolved from the macro series tracked upstream in Tapeline's scoring pipeline and refreshed on the worker tick.",
+          "A single market-wide regime classification, resolved from the macro series tracked upstream in Tapeline's scoring pipeline. It is re-read on each worker pass, but its inputs are daily readings.",
       },
     ],
     caveat:
@@ -315,7 +315,7 @@ export const FACTORS: Factor[] = [
       "Handling an unrecognised classification as missing data is deliberately quiet. It keeps scoring running rather than failing the tick, but it means an upstream wording change shows up as an unremarkable mid-range reading instead of as a visible error.",
       "Resolving free text by matching wording is inherently approximate. It is tolerant by design, and tolerance is not the same as correctness.",
       "The underlying macro series that inform any regime view are published on a lag and are revised after publication.",
-      "Tapeline separately publishes a live macro dashboard on the market-regime page. Read that as a descriptive view of current conditions; it is presented on its own terms and is not a restatement of this factor's input.",
+      "Tapeline separately publishes a macro dashboard on the market-regime page. Read that as a descriptive view of current conditions; it is presented on its own terms and is not a restatement of this factor's input.",
     ],
     faq: [
       {
@@ -349,8 +349,8 @@ export const FACTORS: Factor[] = [
     ],
     feeds: [
       {
-        name: "Live market data",
-        detail: "Daily and intraday bars. Sub-60 seconds during US market hours.",
+        name: "Market data",
+        detail: "Daily bars, read about once a day. Intraday prices are delayed about 15 minutes.",
       },
       {
         name: "Upstream signal system",

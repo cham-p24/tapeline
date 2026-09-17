@@ -31,6 +31,7 @@ import {
 import { SECTORS } from "@/app/sector/sectors";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
+import { CRYPTO_CADENCE_SENTENCE, PASS_CADENCE_PHRASE, PRICE_DELAY_NOTE, PRICE_DELAY_PHRASE } from "@/lib/freshness";
 import {
   buildScoreRestatement,
   countedLocks,
@@ -165,8 +166,8 @@ async function fetchTicker(symbol: string): Promise<TickerFetch> {
   for (let attempt = 1; attempt <= TICKER_FETCH_ATTEMPTS; attempt++) {
     try {
       const res = await fetch(url, {
-        // Cache for 60s — matches the worker tick cadence so the page is fresh
-        // without hammering the API on every social-card crawl.
+        // Cached server-side (see the revalidate below) so a social-card crawl
+        // doesn't hammer the API; the page can be up to an hour old or more.
         next: { revalidate: 1800 },
         // Identify this as our own SSR so the backend skips the per-IP limit
         // that all server rendering would otherwise share (see lib/ssrHeaders).
@@ -252,7 +253,7 @@ function buildEditorialCommentary(d: TickerData): string {
   if (b.momentum?.value != null) factors.push({ key: "momentum", value: b.momentum.value, label: "Momentum" });
 
   if (factors.length === 0) {
-    return `${name} (${sym}) is in the Tapeline scanner universe but doesn't have enough factor data right now for a six-factor composite read. Data backfills run continuously — check back during the next US market session for the live read.`;
+    return `${name} (${sym}) is in the Tapeline scanner universe but doesn't have enough factor data right now for a six-factor composite read. Data backfills run continuously — check back during the next US market session.`;
   }
 
   const sorted = [...factors].sort((a, b) => b.value - a.value);
@@ -492,7 +493,7 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
   const data = result.data;
   const score = data.score?.toFixed(0) ?? "—";
   const signal = data.signal ?? "—";
-  const why = data.reason ?? "Six-factor synthesis updated live.";
+  const why = data.reason ?? "Six-factor synthesis.";
   const title = `${sym} Stock Score & 6-Factor Analysis · Tapeline`;
   // Meta description: front-loaded and hard-capped at ~155 chars so it renders
   // in full in the SERP.
@@ -590,7 +591,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
   return [
     {
       q: `What is the Tapeline Score for ${sym}?`,
-      a: `${sym} (${name}) currently scores ${score}/100 with the signal label ${signal}. The score is a weighted blend of six quantitative factors and updates sub-60 seconds during US market hours.`,
+      a: `${sym} (${name}) currently scores ${score}/100 with the signal label ${signal}. The score is a weighted blend of six quantitative factors. It is recalculated ${PASS_CADENCE_PHRASE} during US market hours, but most of its inputs are daily readings, so it usually changes about once a day. Prices are ${PRICE_DELAY_PHRASE}.`,
     },
     {
       q: `How is ${sym}'s score calculated?`,
@@ -602,7 +603,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `How often does the ${sym} score update?`,
-      a: `${sym}'s score re-ticks every minute during US market hours and persists between sessions. Price and momentum data refresh sub-60s; fundamentals refresh on company filing cadence; insider Form 4 filings are re-checked about every two days for stocks (about monthly for ETFs), through a data vendor whose filings can run weeks behind SEC EDGAR.`,
+      a: `${sym}'s score is recalculated ${PASS_CADENCE_PHRASE} during US market hours and persists between sessions, but it usually changes about once a day: trend, relative strength and momentum come from daily price bars, and prices themselves are ${PRICE_DELAY_PHRASE}; fundamentals refresh on company filing cadence; insider Form 4 filings are re-checked about every two days for stocks (about monthly for ETFs), through a data vendor whose filings can run weeks behind SEC EDGAR.`,
     },
     {
       q: `Where can I see the historical track record for Tapeline scores?`,
@@ -624,7 +625,7 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
       // is published and states the refusal rule when it isn't, never
       // pointing at a line that isn't there.
       a: rankLine
-        ? `${rankLine} Peer percentiles are computed across every ticker in the peer group Tapeline holds a composite score for, always print the covered-peer count (n) they were computed against, and update as scores re-tick during US market hours.`
+        ? `${rankLine} Peer percentiles are computed across every ticker in the peer group Tapeline holds a composite score for, always print the covered-peer count (n) they were computed against, and move when the peers' scores change, which is usually about once a day.`
         : `Tapeline publishes a peer rank only when at least 30 covered peers exist to rank against — a percentile computed over a handful of rows would claim precision the data cannot support. ${sym}'s peer group is currently below that floor, so no rank line is shown on this page right now.`,
     },
     {
@@ -633,11 +634,11 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
     },
     {
       q: `Why does ${sym}'s score change between visits?`,
-      a: `Scores re-tick every minute during US market hours. Trend and Relative Strength move with price; Momentum reflects recent rate-of-change; Macro responds to changes in the market-wide regime classification; Smart Money updates on filing cadence; Fundamentals on quarterly earnings cycle. Across a single trading session ${sym}'s composite can drift 5-15 points in either direction even without major news — that's normal factor breathing, not data error.`,
+      a: `Scores are recalculated ${PASS_CADENCE_PHRASE} during US market hours, but most inputs are daily readings, so a score usually changes about once a day. Trend, Relative Strength and Momentum come from daily price bars; Macro responds to changes in the market-wide regime classification, whose inputs are daily; Smart Money updates on filing cadence; Fundamentals on the quarterly earnings cycle. This page is also a saved snapshot that can be an hour old or more, so two visits can show different readings.`,
     },
     {
       q: `Can I get alerts when ${sym}'s score changes?`,
-      a: `Yes, on a paid plan — Pro gets email alerts on configurable triggers (score crosses a threshold, market regime changes, news on a ticker), and Premium removes the daily email-alert cap. Alerts are one of the lines between the plans: the free plan sends none, on any channel. What it does give you is live scores on the top ${FREE_LIMITS.scannerRows} scanner rows, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""} and ${FREE_LIMITS.dailyLookups} look-ups a day, so ${sym} alerts specifically need the 30-day Premium trial or a paid plan.`,
+      a: `Yes, on a paid plan — Pro gets email alerts on configurable triggers (score crosses a threshold, market regime changes, news on a ticker), and Premium removes the daily email-alert cap. Alerts are one of the lines between the plans: the free plan sends none, on any channel. What it does give you is scores on the top ${FREE_LIMITS.scannerRows} scanner rows, one saved screen${freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist` : ""} and ${FREE_LIMITS.dailyLookups} look-ups a day, so ${sym} alerts specifically need the 30-day Premium trial or a paid plan.`,
     },
     {
       q: `How does ${sym}'s Tapeline Score compare to a Finviz screener result?`,
@@ -827,6 +828,17 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
                 {change.toFixed(2)}% today
               </div>
             )}
+            {/* Delay disclosure (integrity wave 2026-09-14). Measured: vendor
+                prices ~15 min delayed; this page's data fetch is cached, and
+                /t/AAPL served price data 49m47s old at 14:09 UTC. Crypto is a
+                daily price, so it says that instead. */}
+            {data.price != null && (
+              <div className="mt-1 text-[11px] text-subtle" data-testid="price-delay-note">
+                {data.asset_class === "crypto"
+                  ? CRYPTO_CADENCE_SENTENCE
+                  : `${PRICE_DELAY_NOTE} · cached page, can be an hour old or more`}
+              </div>
+            )}
           </div>
         </div>
 
@@ -891,7 +903,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
                 <p className="mt-3 text-xs text-subtle">
                   Updated{" "}
                   <time dateTime={data.updated_at ?? undefined}>{updatedDay}</time>
-                  {" · "}scores re-tick during US market hours
+                  {" · "}scores usually change about once a day
                 </p>
               )}
             </div>
@@ -1054,8 +1066,8 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
               {buildEditorialCommentary(data)}
             </p>
             <p className="mt-4 text-xs text-subtle">
-              Generated from the live six-factor breakdown above. Updates as the
-              underlying scores re-tick during US market hours. Methodology
+              Generated from the six-factor breakdown above. Changes when the
+              underlying scores do, usually about once a day. Methodology
               detail at{" "}
               <Link href="/how-it-works" className="text-accent hover:underline">
                 /how-it-works
@@ -1067,7 +1079,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
 
         {/* CTA */}
         <div className="mt-10 sm:mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-5 sm:p-8">
-          <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">See {sym} in the live scanner</h2>
+          <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">See {sym} in the scanner</h2>
           <p className="mt-2 max-w-xl text-sm text-muted">
             {/* CARD HONESTY, restated 2026-08-30. The wall at first sign-in is
                 gone: signing up takes an email and a password and lands on a
@@ -1077,7 +1089,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
                 gets today, not a grandfather clause for old accounts. */}
             This page, the daily Top 10, the whole scorecard and the raw CSV/JSON record are free to
             read with no account at all. Signing up takes an email and a password: a free account
-            runs the live scanner on the top {FREE_LIMITS.scannerRows}{" "}scored rows of any scan,
+            runs the scanner on the top {FREE_LIMITS.scannerRows}{" "}scored rows of any scan,
             keeps one saved screen{freeHasWatchlist() ? `, a ${FREE_LIMITS.watchlistTickers}-ticker watchlist,` : ""} and opens {FREE_LIMITS.dailyLookups}{" "}ticker deep-pages a day.
             The card is what starts a 30-day Premium trial — $0 that day, the first charge on day 30
             at the plan you pick, one click to cancel before then — and that is what turns on every
@@ -1191,7 +1203,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
               })}
             </ul>
             <p className="mt-3 text-xs text-subtle">
-              News refreshes every 5 minutes during US market hours.
+              Saved snapshot; the news and prices on this page can be an hour old or more.
             </p>
           </section>
         )}
@@ -1212,7 +1224,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
             <p className="mt-2 text-sm text-muted max-w-2xl">
               Six {data.sector ? `${data.sector.toLowerCase()} ` : ""}tickers with
               composite scores closest to {data.symbol}&rsquo;s {data.score?.toFixed(0) ?? "—"} —
-              same factor environment, sortable on the live scanner.
+              same factor environment, sortable on the scanner.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {related.map((r) => {
@@ -1251,7 +1263,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
             </div>
             <p className="mt-4 text-xs text-subtle">
               Sorted by closeness to {data.symbol}&rsquo;s composite score within{" "}
-              {data.sector ?? "sector"}. Refreshed every 5 minutes.{" "}
+              {data.sector ?? "sector"}. Saved snapshot; can be an hour old or more.{" "}
               <Link href="/app/scanner" className="text-accent hover:underline">
                 Run the full scanner →
               </Link>
@@ -1296,7 +1308,7 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
 
         {/* Trust line */}
         <p className="mt-10 text-xs text-subtle text-center">
-          Score updated live (sub-60s). Public methodology. Public scorecard.
+          {PRICE_DELAY_NOTE}; scores usually change about once a day. Public methodology. Public scorecard.
           Not investment advice — see <Link href="/legal/risk" className="text-accent hover:underline">risk disclosure</Link>.
         </p>
 

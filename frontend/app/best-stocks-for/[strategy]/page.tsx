@@ -7,7 +7,7 @@
  * so the table is unique per strategy (no duplicate-content risk) and the
  * H1/copy/FAQ are strategy-specific.
  *
- * The five-minute snapshot caches server-side; the live scanner is at
+ * The snapshot caches server-side (up to an hour or more); the scanner is at
  * /app/scanner.
  */
 import Link from "next/link";
@@ -24,6 +24,7 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript, tickerItemListJsonLd } from "@/lib/jsonld";
 import { findStrategy, STRATEGIES } from "./strategies";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+import { PUBLIC_SNAPSHOT_FOOTER } from "@/lib/freshness";
 
 // Render on-demand and cache for 1 hour (ISR). Matches the per-fetch
 // `revalidate: 3600` below (data rolls daily; hourly is plenty), and
@@ -128,7 +129,7 @@ export default async function BestStocksForStrategyPage({
     { name: s.display, url },
   ]);
 
-  // ItemList JSON-LD with the actual ranked tickers from the live scanner.
+  // ItemList JSON-LD with the actual ranked tickers from the scanner.
   // Critical for the "discovered/crawled not indexed" 496-page backlog —
   // Google's quality filter rejects templated pages without unique structured
   // data per slug; emitting different ItemList content per strategy proves
@@ -211,7 +212,7 @@ export default async function BestStocksForStrategyPage({
                 {lo != null && hi != null ? (
                   <>
                     {" "}
-                    — live composites across the list currently range from{" "}
+                    — composites across the list range from{" "}
                     {lo.toFixed(0)} to {hi.toFixed(0)} out of 100.
                   </>
                 ) : (
@@ -236,16 +237,16 @@ export default async function BestStocksForStrategyPage({
             The live ranking table right below is the product proof, so
             showPreview is off here. from="screener" message-matches the
             signup H1 for scanner-intent visitors. */}
-        <LandingCta from="screener" showPreview={false} primaryLabel="Run the live scanner — free account" />
+        <LandingCta from="screener" showPreview={false} primaryLabel="Run the scanner — free account" />
 
         <section className="mt-10">
           {rows.length === 0 ? (
             <div className="rounded-xl border border-border bg-panel p-8 text-center">
-              <p className="text-muted">No live snapshot available right now.</p>
+              <p className="text-muted">No snapshot available right now.</p>
               <p className="mt-3 text-sm text-subtle">
-                This ranking refreshes hourly — check back shortly, or{" "}
+                This ranking is rebuilt at most about once an hour — check back later, or{" "}
                 <Link href="/app/scanner" className="text-accent hover:underline">
-                  open the full live scanner
+                  open the full scanner
                 </Link>
                 .
               </p>
@@ -438,11 +439,11 @@ export default async function BestStocksForStrategyPage({
         {/* CTA */}
         <section className="mt-12 rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-panel to-panel p-6 sm:p-8 text-center">
           <h2 className="text-2xl font-bold tracking-tight">
-            Run this scan live + every other strategy.
+            Run this scan yourself + every other strategy.
           </h2>
           <p className="mt-3 text-sm text-muted">
             The published record — daily Top 10, full scorecard, raw CSV/JSON — stays free with no
-            account. An account takes an email and a password, and runs this scan live ten scored
+            account. An account takes an email and a password, and runs this scan ten scored
             rows at a time. A card starts the 30-day Premium trial: $0 today, first charge on day
             30, one click to cancel — every matching row across the scored universe (about 11,500 US stocks and ETFs), every
             sort/filter combination, watchlist + alerts. Pro from {usd(PRICING.pro.annualPerMonth)}/mo
@@ -473,7 +474,7 @@ export default async function BestStocksForStrategyPage({
         </section>
 
         <p className="mt-10 text-xs text-subtle text-center">
-          Snapshot cached hourly. Sub-60s tick during US market hours. Not investment advice — see{" "}
+          {PUBLIC_SNAPSHOT_FOOTER} Not investment advice — see{" "}
           <Link href="/legal/risk" className="text-accent hover:underline">
             risk disclosure
           </Link>

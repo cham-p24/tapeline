@@ -17,7 +17,7 @@ import { TickerSearch } from "@/components/TickerSearch";
 import { pageMeta } from "@/lib/seo";
 
 export const metadata = pageMeta({
-  title: "Search Tapeline — Look up any US ticker's live score",
+  title: "Search Tapeline — Look up any US ticker's score",
   description:
     "Type a US ticker symbol to jump straight to its Tapeline score page — composite, six-factor breakdown, signal label, recent price action.",
   path: "/search",
@@ -56,7 +56,7 @@ export default async function SearchPage({
           Search Tapeline
         </h1>
         <p className="mt-4 text-lg text-muted">
-          Type any US ticker symbol — Tapeline jumps straight to its live score,
+          Type any US ticker symbol — Tapeline jumps straight to its score,
           six-factor breakdown, and signal label.
         </p>
         <div className="mt-8 rounded-2xl border border-border bg-panel/40 p-5">

@@ -2,9 +2,9 @@ import { pageMeta } from "@/lib/seo";
 
 // status/page.tsx is a client component (live polling), so metadata is here.
 export const metadata = pageMeta({
-  title: "Tapeline System Status — Live Uptime + Data Feed Health",
+  title: "Tapeline System Status — Uptime + Data Feed Health",
   description:
-    "Live status of Tapeline systems: scanner engine, public API, upstream data feeds, and live worker tick. Updated in real time.",
+    "Status of Tapeline systems: scanner engine, public API, upstream data feeds, and the worker pass. Checked from your browser every 30 seconds while the page is open.",
   path: "/status",
 });
 

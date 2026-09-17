@@ -9,14 +9,14 @@ import { sectionCard } from "@/lib/og/sectionCard";
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const alt = "Tapeline live scanner - every US ticker, one 0-100 score";
+export const alt = "Tapeline scanner - every US ticker, one 0-100 score";
 
 export default function Image() {
   return sectionCard({
-    eyebrow: "Live Scanner",
+    eyebrow: "Scanner",
     headline: "Every US ticker, one 0-100 score.",
     subhead:
-      "The full scored universe on one published methodology — six named factors — updated through the trading day.",
+      "The full scored universe on one published methodology — six named factors. Prices delayed about 15 minutes.",
     footerNote: "Named factors. Public scorecard.",
     path: "tapeline.io/signals",
   });

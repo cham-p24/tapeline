@@ -17,7 +17,7 @@ export default function Image() {
     headline: "Which sectors are leading right now.",
     subhead:
       "Every GICS sector ranked by its average Tapeline score, so you can see where the strength is before you drill in.",
-    footerNote: "Ranked by live composite score.",
+    footerNote: "Ranked by composite score.",
     path: "tapeline.io/sectors",
   });
 }

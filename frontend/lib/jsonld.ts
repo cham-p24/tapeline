@@ -9,6 +9,7 @@
  */
 
 import { PRICING } from "@/lib/pricing";
+import { PASS_CADENCE_PHRASE, PRICE_DELAY_PHRASE } from "@/lib/freshness";
 
 // Schema.org wants prices as strings with up to 2 decimals. Derived from the
 // single source of truth in lib/pricing.ts so the rich-result price can never
@@ -262,7 +263,7 @@ export function organizationJsonLd() {
     alternateName: "Tapeline.io",
     slogan: "Read the tape",
     description:
-      "Tapeline is a transparent quantitative stock scanner for US equities and ETFs. Every actively-traded ticker gets one 0-100 composite score from six named, publicly-documented factors (trend, relative strength, fundamentals, smart money, macro, momentum), refreshed sub-60 seconds during US market hours. Every top-10 daily pick is logged to a public scorecard and back-checked against SPY the next session.",
+      `Tapeline is a transparent quantitative stock scanner for US equities and ETFs. Every actively-traded ticker gets one 0-100 composite score from six named, publicly-documented factors (trend, relative strength, fundamentals, smart money, macro, momentum). Prices are ${PRICE_DELAY_PHRASE}; during US market hours every covered stock and ETF is re-read ${PASS_CADENCE_PHRASE}, and most score inputs are daily readings, so a score usually changes about once a day. Every top-10 daily pick is logged to a public scorecard and back-checked against SPY the next session.`,
     url: "https://tapeline.io",
     logo: "https://tapeline.io/favicon.svg",
     foundingDate: "2026",
@@ -361,7 +362,7 @@ export function softwareApplicationJsonLd() {
     applicationSubCategory: "Stock Scanner",
     operatingSystem: "Web",
     description:
-      "Live quantitative market scanner for retail stock pickers. One 0-100 score and one plain-English sentence per US ticker, plus market regime and a public scorecard.",
+      "Quantitative market scanner for retail stock pickers. One 0-100 score and one plain-English sentence per US ticker, plus market regime and a public scorecard.",
     offers: [
       {
         "@type": "Offer",
@@ -940,7 +941,7 @@ export function compareJsonLd(a: CompareArgs) {
       operatingSystem: "Web",
       url: "https://tapeline.io",
       description:
-        "Live transparent six-factor scanner with named factors, a published methodology, and a public daily scorecard back-checked vs SPY.",
+        "Transparent six-factor scanner with named factors, a published methodology, and a public daily scorecard back-checked vs SPY.",
       offers: [
         { "@type": "Offer", name: "Pro · monthly", price: PRO_MONTHLY, priceCurrency: "USD", url: "https://tapeline.io/pricing" },
         { "@type": "Offer", name: "Pro · annual", price: PRO_ANNUAL, priceCurrency: "USD", url: "https://tapeline.io/pricing" },
@@ -950,7 +951,7 @@ export function compareJsonLd(a: CompareArgs) {
       featureList: [
         "Six named factors (Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum), weighted most toward Trend and Relative Strength and least toward Momentum",
         "Public scorecard — every top-10 daily pick back-checked vs SPY next session",
-        "Sub-60-second refresh during market hours",
+        `Prices ${PRICE_DELAY_PHRASE}, re-read for every covered stock and ETF ${PASS_CADENCE_PHRASE} during market hours`,
         "A one-sentence plain-English read per scored ticker (free tier included)",
         "Market-regime detection",
         "Insider buys via SEC Form 4 (Premium)",

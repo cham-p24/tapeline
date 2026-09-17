@@ -4,6 +4,7 @@ import { PRICING, FREE_LIMITS, usd, usdCompact, annualSaving, billedAnnuallyNote
 import { useBillingPeriod } from "@/components/BillingToggle";
 import { BestValueBadge } from "@/components/BestValueBadge";
 import { ACTIVE_SCORED_TICKERS } from "@/lib/universe";
+import { PRICE_DELAY_MINUTES } from "@/lib/freshness";
 
 /**
  * Three-column comparison: Free / Pro ($9.99/mo or $8.25/mo annual) /
@@ -46,9 +47,11 @@ const SECTIONS: Section[] = [
     name: "Data & coverage",
     rows: [
       { label: "Scanner rows", free: `Top ${FREE_LIMITS.scannerRows}`, pro: `Full ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker universe`, premium: `Full ~${ACTIVE_SCORED_TICKERS.toLocaleString("en-US")}-ticker universe` },
-      { label: "Data freshness", free: "Live — no delay", pro: "Live, sub-60s refresh", premium: "Live, sub-60s refresh" },
+      // Same vendor feed on every plan (measured 14 Sep 2026): the delay is
+      // not a tier difference, so all three cells say the same thing.
+      { label: "Price delay", free: `About ${PRICE_DELAY_MINUTES} min`, pro: `About ${PRICE_DELAY_MINUTES} min`, premium: `About ${PRICE_DELAY_MINUTES} min` },
       { label: "Ticker look-ups per day", free: `${FREE_LIMITS.dailyLookups} · unmetered first ${FREE_LIMITS.firstSessionGraceHours}h`, pro: "Unlimited", premium: "Unlimited" },
-      { label: "News feed", free: "Headlines only", pro: "Real-time news + sentiment", premium: "Real-time news + sentiment" },
+      { label: "News feed", free: "Headlines only", pro: "Headlines + sentiment", premium: "Headlines + sentiment" },
     ],
   },
   {
