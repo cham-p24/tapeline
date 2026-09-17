@@ -468,6 +468,8 @@ export type TickerInsiderResponse = {
   symbol: string;
   days_back: number;
   transactions: TickerInsiderRow[];
+  /** True when the window held more lines than the tab returns (2,000). */
+  truncated?: boolean;
 };
 
 export type EmailPrefKey =
@@ -510,7 +512,7 @@ export type InsiderTxn = {
   share_change: number;     // negative = sale, positive = buy
   transaction_price: number;
   transaction_value: number; // abs(shares * price), pre-computed
-  code: string;              // SEC Form 4 code: P=open-market buy, S=sale, A=grant, M=option exercise, G=gift
+  code: string;              // SEC Form 4 code: P=open-market or private purchase, S=sale, A=grant, M=option exercise, G=gift
 };
 
 // Re-exported for backwards-compat with components that imported the old name.

@@ -102,7 +102,7 @@ describe("HoldingsPage", () => {
     expect(screen.getByText("AMD")).toBeInTheDocument();
     // Locked section states the real backend count…
     expect(
-      screen.getByText("Showing 3 of 1,842 tracked filings — full feed on Premium"),
+      screen.getByText("Showing 3 of 1,842 tracked Form 4 transactions — full feed on Premium"),
     ).toBeInTheDocument();
     // …and deep-links to billing with the premium intent pre-selected.
     expect(screen.getByRole("link", { name: /Upgrade to Premium/ }))
@@ -118,9 +118,9 @@ describe("HoldingsPage", () => {
     });
     render(<HoldingsPage />);
     await waitFor(() => {
-      expect(screen.getByText("Free shows the 3 most recent filings")).toBeInTheDocument();
+      expect(screen.getByText("Free shows the 3 most recent transactions")).toBeInTheDocument();
     });
-    expect(screen.queryByText(/of 0 tracked filings/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/of 0 tracked/)).not.toBeInTheDocument();
   });
 
   it("shows an error state with retry — not a false empty feed — on failure", async () => {
@@ -133,5 +133,46 @@ describe("HoldingsPage", () => {
     expect(screen.getByText("backend unreachable")).toBeInTheDocument();
     expect(screen.queryByText(/Backfilling insider feed/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Try again/ })).toBeInTheDocument();
+  });
+
+  it("calls only P a buy and S a sale; other codes are acquired or disposed", async () => {
+    setUser("premium");
+    const at = `${new Date().getUTCFullYear()}-03-04`;
+    mockedHoldings.mockResolvedValue({
+      count: 4, feed_size: 4, items: [
+        { ...fullRow, symbol: "PPPP", code: "P", share_change: 100, transaction_date: at },
+        { ...fullRow, symbol: "MMMM", code: "M", share_change: 5000, transaction_date: at },
+        { ...fullRow, symbol: "FFFF", code: "F", share_change: -700, transaction_date: at },
+        { ...fullRow, symbol: "SSSS", code: "S", share_change: -900, transaction_date: at },
+      ],
+    });
+    render(<HoldingsPage />);
+    await waitFor(() => expect(screen.getByText("MMMM")).toBeInTheDocument());
+    expect(screen.getByText("BUY · P")).toBeInTheDocument();
+    expect(screen.getByText("ACQUIRED · M")).toBeInTheDocument();
+    expect(screen.getByText("DISPOSED · F")).toBeInTheDocument();
+    expect(screen.getByText("SELL · S")).toBeInTheDocument();
+    expect(screen.queryByText("BUY · M")).not.toBeInTheDocument();
+    // The filter is code P, and says so.
+    expect(screen.getByText("Purchases only (P)")).toBeInTheDocument();
+    expect(screen.queryByText("Buys only")).not.toBeInTheDocument();
+  });
+
+  it("prints the year on a trade from another year", async () => {
+    setUser("premium");
+    const thisYear = new Date().getUTCFullYear();
+    mockedHoldings.mockResolvedValue({
+      count: 2, feed_size: 2, items: [
+        { ...fullRow, symbol: "OLDY", transaction_date: "2019-11-03" },
+        { ...fullRow, symbol: "NOWY", transaction_date: `${thisYear}-03-04` },
+      ],
+    });
+    const { container } = render(<HoldingsPage />);
+    await waitFor(() => expect(screen.getByText("OLDY")).toBeInTheDocument());
+    const cells = Array.from(container.querySelectorAll("tbody tr")).map(
+      (tr) => tr.querySelector("td")!.textContent ?? "",
+    );
+    expect(cells[0]).toMatch(/2019/);
+    expect(cells[1]).not.toMatch(new RegExp(String(thisYear)));
   });
 });

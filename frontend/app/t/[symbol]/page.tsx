@@ -323,7 +323,13 @@ function buildEditorialCommentary(d: TickerData): string {
       case "fundamentals":
         return `The weakest factor is Fundamentals at ${v.toFixed(0)}/100 — ${tier} reported profitability and growth figures. A low fundamentals score is the canonical "value trap" warning: technical setups on broken fundamentals don't tend to compound.`;
       case "smart_money":
-        return `The weakest factor is Smart Money at ${v.toFixed(0)}/100 — ${tier} net of disclosed SEC Form 4 insider transactions. Could mean nobody with edge is positioning here, or just that the disclosure data is sparse for ${sym}.`;
+        return `The weakest factor is Smart Money at ${v.toFixed(0)}/100 — ${tier} net of disclosed SEC Form 4 insider transactions. ${
+          v < 50
+            ? `The insider transactions disclosed for ${sym} in the window net toward selling`
+            : v > 50
+              ? `The insider transactions disclosed for ${sym} in the window net toward buying, but less strongly than the other factors read`
+              : `The insider transactions disclosed for ${sym} in the window balance out, or none were disclosed`
+        }; on a thinly filed name a few filings can set this reading.`;
       case "macro":
         return `The weakest factor is Macro at ${v.toFixed(0)}/100 — ${tier} backdrop. A macro headwind drags every name in the cohort; if ${sym} is still scoring well on the composite despite this, the company-specific factors must be doing heavy lifting.`;
       case "momentum":

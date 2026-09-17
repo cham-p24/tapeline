@@ -88,8 +88,34 @@ const STALE_CLAIMS = [
 
 const TWO_DAYS = /about every two days/i;
 const MONTHLY = /about monthly/i;
-/** The source every cadence statement must name since #835/#837. */
-const FROM_EDGAR = /(read from|read directly from|straight from|on) SEC EDGAR/;
+/**
+ * The source every cadence statement must name since #835/#837. A bare "on SEC
+ * EDGAR" is not enough ("filings appear on SEC EDGAR" names no source of OURS):
+ * it has to be what Tapeline re-checks.
+ */
+const FROM_EDGAR = /(read from|read directly from|straight from) SEC EDGAR|re-check(s|ing|ed)? each stock('s Form 4 filings)? on SEC EDGAR/;
+
+/** Past-tense vendor history, the only form the vendor may still appear in. */
+const DATED_VENDOR_HISTORY = /Until 14 September 2026[^.]*\./g;
+
+/** No PRESENT-tense vendor claim once the dated history is taken out. */
+function expectNoPresentVendor(text: string) {
+  const present = text.replace(DATED_VENDOR_HISTORY, "");
+  expect(present).not.toMatch(/\bvendor\b|Finnhub|data provider/i);
+}
+
+/** The FAQPage JSON-LD answer whose question matches `question`. */
+function faqAnswer(container: HTMLElement, question: RegExp): string {
+  const faq = Array.from(container.querySelectorAll('script[type="application/ld+json"]'))
+    .map((s) => JSON.parse(s.innerHTML) as Record<string, unknown>)
+    .find((g) => g["@type"] === "FAQPage") as
+    | { mainEntity: { name: string; acceptedAnswer: { text: string } }[] }
+    | undefined;
+  expect(faq, "no FAQPage JSON-LD on the page").toBeDefined();
+  const entry = faq!.mainEntity.find((e) => question.test(e.name));
+  expect(entry, `no FAQ entry matching ${question}`).toBeDefined();
+  return entry!.acceptedAnswer.text;
+}
 
 // ── The numbers the copy quotes, read from the backend ──────────────────────
 
@@ -181,7 +207,7 @@ describe("/app/holdings", () => {
     expect(header.textContent).toMatch(FROM_EDGAR);
     expect(header.textContent).not.toMatch(/live data/i);
 
-    const filterBar = screen.getByText(/tracked · /);
+    const filterBar = screen.getByText(/tracked transactions · /);
     expect(filterBar.textContent).toMatch(TWO_DAYS);
 
     const note = screen.getByText(/Source: SEC Form 4 filings/);
@@ -307,18 +333,35 @@ describe("/insider-buying, /how-it-works and the Smart Money factor", () => {
     const text = container.textContent ?? "";
 
     const methodology = screen.getByText(/re-checking each stock about/);
-    expect(methodology.textContent).toMatch(TWO_DAYS);
-    expect(methodology.textContent).toMatch(FROM_EDGAR);
-    expect(methodology.textContent).toMatch(/a filing can take two to three days\s+to reach this list/);
-    expect(methodology.textContent).toMatch(/non-derivative/);
+    const how = methodology.textContent ?? "";
+    expect(how).toMatch(TWO_DAYS);
+    expect(how).toMatch(FROM_EDGAR);
+    // A filing reaches our DATA in two to three days; this page shows ten rows,
+    // so most filings never reach the page at all.
+    expect(how).toMatch(/a new filing usually reaches our\s+data within two to three days of appearing on EDGAR/);
+    expect(how).toMatch(/shows only the ten purchases with the newest trade dates/);
+    expect(how).not.toMatch(/reach(es)? this list/);
+    expect(how).toMatch(/non-derivative/);
+    expect(how).toMatch(/replaces the original filing it restates/);
+    expect(how).toMatch(/not a\s+complete record of insider trading/);
+    expectNoPresentVendor(how);
 
-    // The freshness FAQ keeps the vendor measurement as DATED history, visibly
-    // and in JSON-LD, and states how long EDGAR filings take to arrive now.
+    // Nothing on the page says the filing date is not STORED: the filings have
+    // one, the rows this page reads do not carry it.
+    expect(text).not.toMatch(/do not store the filing date/i);
+    expect(text).toMatch(/do not carry the filing date/);
+
+    // The freshness FAQ keeps the vendor measurement as DATED history and states
+    // how long EDGAR filings take to arrive now - in the JSON-LD answer itself,
+    // and the visible FAQ says the same.
     const measured = /Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR: that day its newest Form 4 filing for Apple, NVIDIA and Meta was 14, 67 and 30 days older than the newest one on EDGAR/;
-    expect(text).toMatch(TWO_DAYS);
-    expect(text).toMatch(/usually reaches this list within two to three days of appearing on EDGAR/);
-    expect(text).toMatch(measured);
-    expect(container.innerHTML.match(new RegExp(measured.source, "g"))?.length).toBeGreaterThanOrEqual(2);
+    const answer = faqAnswer(container, /How often does the list update/);
+    expect(answer).toMatch(TWO_DAYS);
+    expect(answer).toMatch(FROM_EDGAR);
+    expect(answer).toMatch(/usually reaches our data within two to three days of appearing on EDGAR; this page shows only the ten purchases with the newest trade dates/);
+    expect(answer).toMatch(measured);
+    expectNoPresentVendor(answer);
+    expect(text).toContain(answer);
     expectNoStaleClaim(container.innerHTML);
   });
 
@@ -330,11 +373,20 @@ describe("/insider-buying, /how-it-works and the Smart Money factor", () => {
   });
 
   it("the Smart Money factor copy states the cadence, the source and what is read", () => {
-    const copy = JSON.stringify(FACTORS.find((f) => f.slug === "smart-money"));
-    expect(copy).toMatch(TWO_DAYS);
-    expect(copy).toMatch(FROM_EDGAR);
-    expect(copy).toMatch(/non-derivative/);
-    expect(copy).toMatch(/Until 14 September 2026 these filings came through a data vendor/);
-    expectNoStaleClaim(copy);
+    const factor = FACTORS.find((f) => f.slug === "smart-money")!;
+    // Field by field: a match in one field must not stand in for another.
+    const detail = factor.feeds[0].detail;
+    expect(detail).toMatch(TWO_DAYS);
+    expect(detail).toMatch(MONTHLY);
+    expect(detail).toMatch(FROM_EDGAR);
+    expect(detail).toMatch(/non-derivative/);
+    expect(detail).toMatch(/replaces the original filing it restates/);
+    expect(detail).toMatch(/Until 14 September 2026 these filings came through a data vendor/);
+    expectNoPresentVendor(detail);
+
+    expect(factor.caveat).toMatch(FROM_EDGAR);
+    expectNoPresentVendor(factor.caveat);
+
+    expectNoStaleClaim(JSON.stringify(factor));
   });
 });

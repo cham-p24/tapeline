@@ -137,10 +137,16 @@ describe("/insider-buying — labels and claims", () => {
     }
   });
 
-  it("describes the Premium list as the full Form 4 list, not a longer list of buys", async () => {
+  it("describes the Premium list as the newest 200 Form 4 transactions, not every filing or a longer list of buys", async () => {
     mockFeed([row("AAAA", "2026-08-31")]);
     const { text, html } = await renderInsider();
-    expect(text).toContain("(all transaction codes, with a buys-only filter)");
+    // /app/holdings asks for 200 rows; its lookback tops out at 90 days.
+    expect(text).toContain(
+      "shows up to 200 of the newest Form 4 transactions in our data (all transaction codes), filterable by ticker, by a lookback of up to 90 days and to purchases only",
+    );
+    expect(text).not.toMatch(/buys-only filter/);
+    // Code P is a purchase on the open market OR in a private sale.
+    expect(text).not.toMatch(/open-market buys/i);
     // Tier FAQ price reads as a sentence, in the visible FAQ and the JSON-LD.
     expect(text).toContain(
       `${usd(PRICING.premium.monthly)} a month, or ${usd(PRICING.premium.annualPerMonth)} a month ${billedAnnuallyNote(PRICING.premium)}.`,

@@ -256,7 +256,7 @@ export const FACTORS: Factor[] = [
     feeds: [
       {
         name: "SEC filings",
-        detail: "Form 4 insider transactions read directly from SEC EDGAR, re-checked about every two days per stock (about monthly for ETFs). Only non-derivative transactions (shares, not options) count, and an amended filing replaces the one it amends. Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR.",
+        detail: "Form 4 insider transactions read directly from SEC EDGAR, re-checked about every two days per stock (about monthly for ETFs). Only non-derivative transactions (shares, not options) count, and an amended filing (4/A) replaces the original filing it restates. Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR.",
       },
     ],
     caveat:

@@ -102,11 +102,13 @@ beforeEach(() => vi.unstubAllGlobals());
 afterEach(() => vi.unstubAllGlobals());
 
 describe("a lock states its count", () => {
-  it("names the real number of Form 4 filings and the window", async () => {
+  it("names the real number of Form 4 transactions and the window", async () => {
     const { container } = await renderTicker(tickerPayload());
     const lock = container.querySelector('[data-testid="counted-lock"]')!;
 
-    expect(lock.textContent).toContain("128 SEC Form 4 insider filings");
+    // The backend counts transaction LINES; one filing often holds several.
+    expect(lock.textContent).toContain("128 SEC Form 4 insider transactions");
+    expect(lock.textContent).not.toMatch(/insider filings/);
     expect(lock.textContent).toContain("last 90 days");
     expect(lock.textContent).toContain("Premium");
   });
@@ -176,6 +178,34 @@ describe("a lock is NEVER a factor's em-dash", () => {
   });
 });
 
+describe("the weakest-factor sentence when Smart Money is weakest", () => {
+  const factors = (smart: number) => ({
+    trend: { value: 70, label: "Trend" },
+    rs: { value: 66, label: "Relative strength" },
+    fundamentals: { value: 60, label: "Fundamentals" },
+    smart_money: { value: smart, label: "Smart money" },
+    macro: { value: 55, label: "Macro" },
+    momentum: { value: 58, label: "Momentum" },
+  });
+
+  it("a low reading says the disclosed transactions net toward selling", async () => {
+    const { container } = await renderTicker(tickerPayload({ breakdown: factors(20) }));
+    const text = container.textContent ?? "";
+    expect(text).toMatch(/The weakest factor is Smart Money at 20\/100/);
+    expect(text).toMatch(/The insider transactions disclosed for LOCKCO in the window net toward selling/);
+    // It used to guess at motive: "nobody with edge is positioning here".
+    expect(text).not.toMatch(/nobody with edge/);
+  });
+
+  it("a weakest reading above 50 still nets toward buying", async () => {
+    const { container } = await renderTicker(tickerPayload({ breakdown: factors(52) }));
+    const text = container.textContent ?? "";
+    expect(text).toMatch(/The weakest factor is Smart Money at 52\/100/);
+    expect(text).toMatch(/net toward buying, but less strongly than the other factors read/);
+    expect(text).not.toMatch(/net toward selling/);
+  });
+});
+
 describe("countedLocks() — the rule, unit-level", () => {
   it("emits a line only above zero", () => {
     expect(countedLocks({ insider_form4: 1, insider_form4_window_days: 90 })).toHaveLength(1);
@@ -183,10 +213,10 @@ describe("countedLocks() — the rule, unit-level", () => {
     expect(countedLocks(null)).toEqual([]);
   });
 
-  it("singularises a lone filing", () => {
+  it("singularises a lone transaction", () => {
     const [only] = countedLocks({ insider_form4: 1, insider_form4_window_days: 90 });
-    expect(only.text).toContain("1 SEC Form 4 insider filing in");
-    expect(only.text).not.toContain("filings");
+    expect(only.text).toContain("1 SEC Form 4 insider transaction in");
+    expect(only.text).not.toContain("transactions");
   });
 
   it("refuses to state a window it was not given", () => {
