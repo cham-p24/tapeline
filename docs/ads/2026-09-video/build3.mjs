@@ -1,11 +1,37 @@
 // Voice-over cuts of concepts B, D and E.
 //
+// ===========================================================================
+// DO NOT UPLOAD WHAT THIS SCRIPT RENDERS (withdrawn 17 September 2026)
+// ---------------------------------------------------------------------------
+// All 18 videos (voiceover/ 9 long cuts, voiceover-15s/ 9 short cuts, concepts
+// B2, D and E), their captions, and the older silent tapeline-*.mp4 cuts and
+// stills/4x5/03-proof.png from build.mjs, are withdrawn. Every one of them burns in a product
+// frame cropped from shot-ticker.png, an NVDA ticker page captured on
+// 8 September 2026. Its pixels show "SIGNAL", "STRONG SETUP",
+// "86% data confidence" and "As of 8 September 2026"; the long cuts and the
+// silent cuts also show "scores re-tick during US market hours". The --ads
+// rules ban the first two, the reading is stale, and no gate here reads
+// pixels, so re-running this script reproduces the same frame. Concept E and
+// the 15 s cuts are not exceptions: they do not carry the scene-02 "re-scored
+// through the US session" line (#839), but they carry this frame.
+//
+// The founder asked for a new direction: background music, a more energetic
+// voice, open on the problem and the value, disclaimer on the end card only.
+// That re-shoot is being built as a separate ad-bench PR. DO_NOT_UPLOAD below
+// writes this notice into vo-script.md and meta-copy-2026-09.md, so it
+// survives regeneration; remove it only in the PR that replaces the frame.
+// ===========================================================================
+//
 //   2026-09-11  Long cuts (26-29 s) in 9:16, 4:5 and 1:1.
 //   2026-09-14  Concept E rewritten: its record lines were false. The shared
 //               CTA no longer says "no account and no card" beside the trial.
 //               The money scene carries "card required", price and interval.
 //               Added <=15 s cuts, verbatim .en_US.srt captions, and the Meta
 //               text fields (generated here, so they read the same constants).
+//   2026-09-15  E's scorecard line said each score sits "next to" the following
+//               session's move and SPY's. Not every entry has one, so it now
+//               says "where recorded"; the record-claim gate rejects "each next to".
+//   2026-09-17  Every output withdrawn (see the block above). Nothing re-rendered.
 //
 // THE TIMING RULE THAT MATTERS
 // ----------------------------
@@ -235,7 +261,7 @@ const LONG = {
       vo: "Anyone can show you their good weeks." },
     { id: "02-turn", base: 3.2,
       screen: () => "<h1>Our scorecard shows<br>the <em>misses</em> too.</h1>" +
-        '<p class="sub">Top-ten scores by date, each next to the following session&rsquo;s price move and SPY&rsquo;s.</p>',
+        '<p class="sub">Top-ten scores by date, with the following session&rsquo;s price move and SPY&rsquo;s where recorded.</p>',
       vo: "Our public scorecard shows the misses too." },
     PROOF,
     { id: "04-sentence", base: 3.4,
@@ -381,6 +407,10 @@ const RECORD_CLAIMS = [
   /\bnothing\s+(?:is\s+|gets\s+)?(?:deleted|removed|edited)\b/i,
   /\bwe\s+publish\s+every\b/i,
   /\bscore\s+in\s+the\s+archive\b/i,
+  // "each next to the following session's price move" says every entry has
+  // one. On 2026-09-14, 34 entries older than the publication delay had no
+  // move and no SPY figure on the page, so the line says "where recorded".
+  /\beach\s+(?:next\s+to|beside|alongside|with|paired)\b/i,
   // No figures from the record, in any concept.
   /\d\s*%/,
   /\bhit\s+rate\b/i,
@@ -426,7 +456,7 @@ const META = {
   e: {
     name: "E - The record (VO)",
     primary: OPENER + " Anyone can show you their good weeks. Tapeline's public scorecard lists top-ten scores by " +
-      "date, each next to the following session's price move and SPY's, misses included. Gaps and corrections " +
+      "date, with the following session's price move and SPY's where recorded, misses included. Gaps and corrections " +
       "are dated on the page. Reading it needs no account. Without Pro or Premium, entries show on a " + DELAY_DAYS +
       "-day delay.",
     headline: "Read the record first.",
@@ -464,6 +494,22 @@ function lintAds(file) {
   }
 }
 
+// Written into every generated file, so a rebuild cannot quietly present the
+// withdrawn videos as ready. See the block at the top of this file.
+const DO_NOT_UPLOAD = [
+  "> [!WARNING]",
+  "> **Do not upload these videos: withdrawn 17 September 2026.** All 18 (`voiceover/` long cuts and",
+  "> `voiceover-15s/` 15 s cuts of B2, D and E) and their captions are withdrawn, concept E included.",
+  "> Every one burns in a product frame cropped from an NVDA ticker page captured on 8 September 2026.",
+  "> <!-- copy-compliance-allow * -- names words visible in the withdrawn product frame in order to flag them; not ad copy -->",
+  "> Its pixels show \"SIGNAL\", \"STRONG SETUP\", \"86% data confidence\" and \"As of 8 September 2026\".",
+  "> The `--ads` rules ban the first two, the reading is stale, and no gate reads pixels, so a rebuild",
+  "> reproduces the same frame. A re-shoot in a new direction is being built as a separate ad-bench PR;",
+  "> see `README.md`. This notice is written by `build3.mjs`: remove it there, and only in the PR that",
+  "> replaces the frame.",
+  "",
+];
+
 function writeScript() {
   const lines = [
     "# Voice-over script and on-screen text",
@@ -476,6 +522,7 @@ function writeScript() {
     "`frontend/lib/trial.ts`, `frontend/lib/pricing.ts` and",
     "`backend/app/routers/scorecard.py` at build time.",
     "",
+    ...DO_NOT_UPLOAD,
   ];
   const wordCount = (t) => t.split(/\s+/).filter(Boolean).length;
   for (const key of ["b", "d", "e"]) {
@@ -499,6 +546,10 @@ function writeMetaCopy() {
   const L = [
     "# Meta ad copy -- relaunch 2026-09 (regenerated 2026-09-14)",
     "",
+    ...DO_NOT_UPLOAD,
+    "The text fields below were written for those videos and are not ready to publish: they are",
+    "kept as a record of what passed the gates, not as copy approved for the re-shoot.",
+    "",
     "Generated by `build3.mjs`; edit the `META` object there, not this file. Trial",
     "length and prices are read from `frontend/lib/trial.ts` and `frontend/lib/pricing.ts`.",
     "",
@@ -513,8 +564,8 @@ function writeMetaCopy() {
     "  required\".",
     "- Everything below passes `node scripts/lint-copy-compliance.mjs --ads` and the build's record-claim check.",
     "",
-    "Each ad carries both cuts of its concept in all three ratios, with one caption file per video.",
-    "See `README.md` for which file goes to which placement.",
+    "Each ad was built to carry both cuts of its concept in all three ratios, with one caption file",
+    "per video. Every one of those videos is withdrawn (see the notice above).",
     "",
   ];
   const assetList = (key) => ["voiceover", "voiceover-15s"].flatMap((dir) => RATIOS.map((r) => {
@@ -530,7 +581,7 @@ function writeMetaCopy() {
       "; card, $0, price, interval and cancel all within the first " + OPENER.length + " | " + m.primary + " |");
     L.push("| Headline | " + m.headline.length + " | " + m.headline + " |");
     L.push("| Description | " + (m.description ? m.description.length : 0) + " | " + (m.description || "(omit)") + " |");
-    L.push("", "Videos:", "", ...assetList(key), "");
+    L.push("", "Videos (withdrawn 17 September 2026, do not upload):", "", ...assetList(key), "");
   }
   const file = join(OUT, "meta-copy-2026-09.md");
   writeFileSync(file, L.join("\n"), "utf8");
@@ -816,7 +867,7 @@ if (COPY_ONLY) {
 // --only=short:b:9x16 (any prefix) renders a subset while iterating on layout.
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "--only=").slice(7).split(":").filter(Boolean);
 const wanted = (...parts) => ONLY.every((o, i) => parts[i] === undefined || parts[i] === o);
-const report = { VOICE, RATE, TRIAL_DAYS, PREMIUM_M, PREMIUM_Y, DELAY_DAYS, cuts: {}, probes: [] };
+const report = { WITHDRAWN: "17 September 2026: do not upload any output; see the top of build3.mjs", VOICE, RATE, TRIAL_DAYS, PREMIUM_M, PREMIUM_Y, DELAY_DAYS, cuts: {}, probes: [] };
 for (const [cut, set] of [["long", LONG], ["short", SHORT]]) {
   for (const key of ["b", "d", "e"]) {
     if (!wanted(cut, key)) continue;
