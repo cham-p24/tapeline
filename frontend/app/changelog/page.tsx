@@ -41,6 +41,19 @@ type LogEntry = {
 };
 
 const METHODOLOGY_LOG: LogEntry[] = [
+  // #851 made the correction below out of date four minutes after it merged,
+  // and added no entry of its own. Rule 1: said by a new entry, not an edit.
+  // Verified 2026-09-17: routers/ticker.py's insider endpoint reads
+  // get_recent_insider_transactions_db (no Finnhub call), and every stored
+  // insider_transactions row in production has source 'edgar'.
+  {
+    date: "2026-09-15",
+    kind: "correction",
+    title: "The app's Insider tab now lists the filings we read from SEC EDGAR",
+    body:
+      "Added on 17 September 2026. The entry titled \"Corrections to the entry on the switch to SEC EDGAR\" says the Insider tab on a ticker's page in the app still lists filings from the data vendor. That stopped being true on 15 September 2026 (#851): the tab now lists the Form 4 filings we store from SEC EDGAR, the same filings behind the Smart Money factor and the insider pages, instead of asking the data vendor when it opens. When we checked on 17 September 2026, every insider filing line we store came from SEC EDGAR. No recorded entry was changed.",
+    ref: "#851",
+  },
   // Corrects the #835 entry below, which was already published when a review
   // found these problems. Rule 1: corrected by a new entry, not by editing it.
   // Verified 2026-09-14: routers/ticker.py still serves the Insider tab from

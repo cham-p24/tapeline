@@ -238,6 +238,10 @@ describe("rendered static pages", () => {
       // Correction to the #835 entry (append-only: the entry itself is unchanged).
       "Corrections to the entry on the switch to SEC EDGAR",
       "Added on 15 September 2026, the day after the entry below",
+      // #851: the Insider tab left the vendor four minutes after that correction.
+      "The app's Insider tab now lists the filings we read from SEC EDGAR",
+      "That stopped being true on 15 September 2026 (#851)",
+      "every insider filing line we store came from SEC EDGAR",
       "the Insider tab on a ticker's page in the app still lists filings from the data vendor",
       "the whole non-derivative table of each filing is counted",
       "A ticker whose re-check fails is tried again on its usual schedule",
