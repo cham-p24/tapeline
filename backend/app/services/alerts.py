@@ -331,7 +331,8 @@ async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
     `baseline_score` is captured once, when the item is added, and never moves,
     so an item that had drifted past its delta stayed past it and re-alerted
     every day: in production 11 of 16 alerted (user, symbol) pairs had been
-    sent the same alert 2-4 times, and the same 6 went out on 14, 15 and 16 Sep.
+    sent the same alert 2-4 times, and 6 a day went out on 14, 15 and 16 Sep
+    for the same 2 tickers.
 
     The zone is recorded for every item, entitled or not, so a user who
     upgrades is not sent one alert for every item that crossed while they
