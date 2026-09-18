@@ -568,6 +568,17 @@ async def set_recent_insider_transactions_db(
     # key, in source order, which keeps the rows unique under
     # `uq_insider_natural` (migration 0071). A repeated key is logged, so how
     # often it happens stays visible.
+    # ONE timestamp for the whole fetch, taken here rather than left to the
+    # database default. The boot rebuild trusts a symbol's rows only when they
+    # share a single fetched_at (`insider_rows_are_the_stamped_fetch`). The ORM
+    # sends one INSERT per row, and SQLite reads CURRENT_TIMESTAMP per statement
+    # at one-second resolution, so a second boundary between a fetch's first and
+    # last row used to store it under two timestamps and the rebuild refused it
+    # - the flake that failed #866's deploy gate. Postgres fixes now() for the
+    # transaction, so production only held by that accident. Taking it here also
+    # puts fetched_at on the same clock as the last_smart_money_at stamp it is
+    # compared with, instead of the database server's.
+    fetched_at = datetime.now(UTC)
     rows: list[InsiderTransaction] = []
     seen: dict[tuple[str, str, int], int] = {}
     repeated = 0
@@ -592,6 +603,7 @@ async def set_recent_insider_transactions_db(
                 code=(t.get("code") or "")[:4],
                 source=source,
                 line_seq=line_seq,
+                fetched_at=fetched_at,
             )
         )
     if repeated:
