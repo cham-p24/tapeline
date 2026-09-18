@@ -730,6 +730,58 @@ async def test_a_restart_no_longer_loses_a_reading_the_pass_computed(
     assert row.sub_smart_money == expected
 
 
+async def test_one_fetch_is_stored_under_one_fetched_at_across_a_second_boundary() -> None:
+    """The rebuild above only trusts a symbol whose rows share ONE fetched_at
+    (`insider_rows_are_the_stamped_fetch`: first_fetch == last_fetch). The writer
+    used to leave fetched_at to the database default. The ORM sends one INSERT
+    per row, and SQLite's CURRENT_TIMESTAMP is read per statement at one-second
+    resolution, so whenever a second boundary fell between a fetch's first and
+    last row, the fetch was stored under two timestamps and the rebuild refused
+    it. That is how test_a_restart_no_longer_loses_a_reading_the_pass_computed
+    failed the deploy gate for #866 (2026-09-17 22:23Z) and passed on re-run: a
+    loaded runner widened the gap between the inserts. Postgres fixes now() for
+    the transaction, so production held only by that accident of the database.
+
+    This forces the boundary: before the LAST row's INSERT it sleeps until the
+    next wall-clock second, so the first and last statements land in different
+    seconds on every run. Mutation: let the database stamp fetched_at again -
+    two distinct values come back."""
+    import time
+
+    from sqlalchemy import event
+
+    from app import db
+
+    engine = db.engine.sync_engine if hasattr(db.engine, "sync_engine") else db.engine
+    inserts = 0
+
+    def _straddle_a_second(conn, cursor, statement, params, context, executemany):
+        nonlocal inserts
+        if statement.lstrip().upper().startswith("INSERT INTO INSIDER_TRANSACTIONS"):
+            inserts += 1
+            if inserts == 3:
+                time.sleep(1.0 - (time.time() % 1.0) + 0.02)
+
+    txns = [
+        {"filer_name": "Jane Q Insider", "transaction_date": f"2026-09-0{d}",
+         "share_change": -1_000, "transaction_price": 50.0, "code": "S"}
+        for d in (1, 2, 3)
+    ]
+    event.listen(engine, "before_cursor_execute", _straddle_a_second)
+    try:
+        await finnhub_feed.set_recent_insider_transactions_db("OXY", txns)
+    finally:
+        event.remove(engine, "before_cursor_execute", _straddle_a_second)
+
+    assert inserts == 3, "the boundary was never forced, so this proved nothing"
+    async with session_scope() as s:
+        stamps = [ts for (ts,) in (await s.execute(
+            select(InsiderTransaction.fetched_at).where(InsiderTransaction.symbol == "OXY")
+        )).all()]
+    assert len(stamps) == 3
+    assert len(set(stamps)) == 1, f"one fetch stored under {len(set(stamps))} timestamps: {stamps}"
+
+
 async def _seed_insider(symbol: str, fetched: datetime, lines: int = 2) -> None:
     async with session_scope() as s:
         for i in range(lines):
