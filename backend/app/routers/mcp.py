@@ -55,7 +55,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session, session_scope
 from app.models import McpToolCall, Ticker
-from app.services.freshness import PRICE_DELAY_MINUTES, PRICE_DELAY_PHRASE
+from app.services.freshness import (
+    CRYPTO_CADENCE_PHRASE,
+    CRYPTO_CADENCE_SENTENCE,
+    PRICE_DELAY_MINUTES,
+    PRICE_DELAY_PHRASE,
+)
 from app.services.symbols import clean_symbol
 
 logger = logging.getLogger(__name__)
@@ -90,8 +95,8 @@ INSTRUCTIONS = (
     # worker passes about 60 s apart since #843, scores changing about once a day.
     f"Prices are {PRICE_DELAY_PHRASE}; do not describe them as real-time or live. "
     "Scores are recalculated through US market hours, but most of their inputs are "
-    "daily readings, so a score usually changes about once a day. Crypto prices and "
-    "scores update once a day. `as_of` is when Tapeline last wrote the row, not the "
+    "daily readings, so a score usually changes about once a day. "
+    f"{CRYPTO_CADENCE_SENTENCE} `as_of` is when Tapeline last wrote the row, not the "
     "time of the last trade."
 )
 
@@ -128,7 +133,7 @@ TOOLS: list[dict[str, Any]] = [
         "description": (
             "Tapeline's current six-factor score (0-100), signal label, "
             "confidence and one-line reason for a single US ticker, plus its "
-            f"price, which is {PRICE_DELAY_PHRASE} (crypto: a daily price). Use "
+            f"price, which is {PRICE_DELAY_PHRASE} (crypto: {CRYPTO_CADENCE_PHRASE}). Use "
             "when asked what Tapeline says about a specific stock."
         ),
         "inputSchema": _symbol_schema("US ticker symbol, e.g. NVDA or BRK.B"),
@@ -224,10 +229,12 @@ async def _tool_ticker_score(args: dict, session: AsyncSession) -> dict:
         "price": ticker.price,
         "change_pct_1d": ticker.change_pct_1d,
         # The price above is the vendor's delayed price, not a live quote
-        # (measured ~15 min behind on 14 Sep 2026); crypto is a daily bar.
+        # (measured ~15 min behind on 14 Sep 2026). Crypto is a daily close,
+        # and on 2026-09-17 43% of pairs carried one written over 25h earlier,
+        # so the note says several days rather than "a daily price".
         "price_delay_minutes": None if ticker.asset_class == "crypto" else PRICE_DELAY_MINUTES,
         "price_note": (
-            "Daily price (crypto updates once a day)."
+            CRYPTO_CADENCE_SENTENCE
             if ticker.asset_class == "crypto"
             else f"Price {PRICE_DELAY_PHRASE}; not a real-time quote."
         ),

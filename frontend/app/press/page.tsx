@@ -47,7 +47,7 @@ const FACT_SHEET = [
   // "Premium trial", never "Free trial": the trial is the one thing that takes a card,
   // and its length comes from lib/trial.ts so this line cannot say two numbers at once again.
   { label: "Premium trial",   value: `${TRIAL_DAYS}-day Premium; card required, $0 charged today, first charge on day ${TRIAL_DAYS}` },
-  { label: "Universe scored", value: "About 11,500 US-listed stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs scored separately and updated once a day" },
+  { label: "Universe scored", value: "About 11,500 US-listed stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs scored separately from daily closes, which can be several days old" },
   // Measured 14 Sep 2026 (integrity wave): vendor prices ~15 min delayed,
   // worker passes about 60 s apart since #843 (70-74 s before it), scores
   // change about once a day.
@@ -432,9 +432,10 @@ export default function PressPage() {
             <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
               <strong className="text-fg">Not options.</strong>{" "}
               About 11,500 US-listed stocks and ETFs are scored. About 100
-              crypto pairs are scored in a separate list, updated once a day,
-              from four of the six factors, and are never ranked against
-              stocks.
+              crypto pairs are scored in a separate list from daily closes
+              (refreshed about once a day, and several days old when the daily
+              pass misses a pair), from four of the six factors, and are never
+              ranked against stocks.
             </li>
           </ul>
         </section>
