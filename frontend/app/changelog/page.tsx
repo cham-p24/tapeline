@@ -41,6 +41,19 @@ type LogEntry = {
 };
 
 const METHODOLOGY_LOG: LogEntry[] = [
+  // Corrects the 2026-09-17 entry below. The original check was scoped
+  // to the 179 symbols in the attribution fan-out and did not cover the record
+  // as a whole, which is what the sentence claimed. Re-checked on 2026-09-17 by
+  // joining every one of the 439 symbols ever listed in daily_scorecard against
+  // its stored name: BHFAO is the only one.
+  {
+    date: "2026-09-18",
+    kind: "correction",
+    title: "An entry added on 17 September said no preferred listing had ever been on the record. One has",
+    body:
+      "Added on 18 September 2026, the day after the entry below titled \"Insider filings counted for every security listed under the same SEC filer\". That entry says \"No preferred listing, note or exchange-traded note has ever appeared on it\". That is wrong, and this entry corrects it. BHFAO, Brighthouse Financial's 6.75% non-cumulative preferred depositary shares, was listed fourth on 23 June 2026. We have now checked every one of the 439 symbols ever listed against what our records say each listing is, and it is the only one. The check behind the original sentence was narrower than the sentence: it covered only the symbols caught up in the filing-attribution problem that entry describes, and BHFAO was not one of them. What that entry says about those symbols is unchanged and still holds. The 23 June listing has nothing to do with insider filings, which until 14 September 2026 were read per symbol from a data vendor and could not be spread between one company's listings that way. It happened because preferred shares, notes and similar listings are scored on the same six factors as common stock, and nothing stopped one being listed. Whether they should be scored at all is an open question we are looking at, and it is recorded under Gaps and known limitations on the scorecard page and in the downloads. No recorded entry was changed.",
+    ref: "#873",
+  },
   // #862 changed what the Smart Money factor reads (attribution, amendments,
   // future-dated lines); #849 carried the copy, including the attribution rule
   // on /how-it-works/smart-money that rule 4 requires beside this entry.

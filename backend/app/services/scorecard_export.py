@@ -251,6 +251,19 @@ _FORBIDDEN_KEY_SUBSTRINGS: tuple[str, ...] = (
 #: COMPUTED from the rows, so a new gap appears without anyone editing this.
 KNOWN_LIMITATIONS: list[dict[str, str]] = [
     {
+        "date": "2026-06-23",
+        "period": "the list for 2026-06-23",
+        "limitation": (
+            "One listed name is not a common stock. BHFAO is Brighthouse "
+            "Financial's 6.75% non-cumulative preferred depositary shares, and "
+            "it was listed fourth on 2026-06-23. Preferred shares, notes and "
+            "similar listings are scored on the same six factors as common "
+            "stock, and nothing made one ineligible to be listed. Checked on "
+            "2026-09-17 across all 439 symbols ever listed; it is the only one."
+        ),
+        "status": "Stated, not corrected; the list stands as recorded.",
+    },
+    {
         "date": "2026-06-15",
         "period": "sessions 2026-05-18 to 2026-06-12 (190 rows)",
         "limitation": (

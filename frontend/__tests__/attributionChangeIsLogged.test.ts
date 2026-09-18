@@ -65,6 +65,11 @@ describe("the Form 4 attribution change is logged beside its factor page", () =>
     expect(CHANGELOG).toMatch(
       /No preferred listing, note or exchange-traded note has ever appeared on it/i,
     );
+    // That sentence was wrong: BHFAO, a preferred, was listed on 23 June 2026.
+    // Rule 1 keeps the original entry in place, so the correction beside it is
+    // the only thing standing between a reader and a false statement. If the
+    // correction is ever dropped, the false sentence is what remains.
+    expect(CHANGELOG).toMatch(/BHFAO[\s\S]{0,600}listed fourth on 23 June 2026/);
   });
 
   it("does not claim the record is never edited", () => {

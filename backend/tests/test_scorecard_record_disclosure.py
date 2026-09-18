@@ -175,6 +175,11 @@ def test_known_limitations_are_dated_and_cover_the_verified_defects():
         # The guard is 80 days on the transaction date, not the 90-day window.
         "records a transaction in the last 80 days",
         "ahead of other Smart Money re-checks",
+        # A preferred was listed on 2026-06-23 (#873). The changelog once said
+        # none ever had been; the correction is only worth something if the
+        # download a reader cites carries the same fact.
+        "2026-06-23", "BHFAO", "preferred depositary shares",
+        "all 439 symbols ever listed",
     ):
         assert must in blob, f"known_limitations does not mention {must!r}"
     smart = next(k for k in lims if "#824" in k["status"])
