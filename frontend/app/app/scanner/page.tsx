@@ -18,7 +18,7 @@ import {
   openAccessJustEnded,
 } from "@/lib/pricing";
 import { SECTOR_SLUG_TO_CANONICAL, TodaysTape } from "@/components/TodaysTape";
-import { IN_APP_REFRESH_SENTENCE, PASS_CADENCE_PHRASE, priceDelayNote } from "@/lib/freshness";
+import { CRYPTO_CADENCE_PHRASE, IN_APP_REFRESH_SENTENCE, PASS_CADENCE_PHRASE, priceDelayNote } from "@/lib/freshness";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { HoverCard } from "@/components/HoverCard";
@@ -724,7 +724,7 @@ export default function ScannerPage() {
               cadence is stated once, inside IN_APP_REFRESH_SENTENCE. */}
           <p className="text-xs text-subtle" data-testid="price-delay-note">
             {priceDelayNote(meta?.delayMinutes)}, re-read on each pass (see below) during US market
-            hours (crypto: once a day). {IN_APP_REFRESH_SENTENCE}
+            hours (crypto: {CRYPTO_CADENCE_PHRASE}). {IN_APP_REFRESH_SENTENCE}
           </p>
         </div>
         <div className="flex items-center gap-3">

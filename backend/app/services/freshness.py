@@ -50,6 +50,25 @@ SCORE_CADENCE_SENTENCE = (
     "often) change at most about once a day, so a score usually changes about once a day."
 )
 
+# Crypto is daily for BOTH price and score, and its tail is much older than
+# that. The refresh is one detached job per worker process, latched at 24h and
+# set before dispatch, so a failed run is not retried for a day; a pair that
+# drops out of the 120 the job fetches keeps its last close until it comes back.
+# The price itself is a completed UTC-day close, so a day is added on top.
+#
+# Measured in production 2026-09-17 22:45 UTC, across 118 crypto rows: 51
+# carried a price written more than 25 hours earlier, 39 more than two days
+# earlier, and 23 more than four days earlier. The oldest was written
+# 2026-09-13 13:53 UTC, four days and nine hours before the reading. "Updated
+# once a day" was true of the job, and false of the data on 43% of pairs.
+CRYPTO_CADENCE_SENTENCE = (
+    "Crypto prices and scores come from daily closes, refreshed about once a "
+    "day; a pair the daily pass misses keeps its last close for several days."
+)
+
+# The same fact where only a parenthetical fits.
+CRYPTO_CADENCE_PHRASE = "daily closes, sometimes several days old"
+
 
 def data_delayed_minutes(tier_delay_minutes: int | None) -> int:
     """The true delay behind a price a caller sees, in minutes.
