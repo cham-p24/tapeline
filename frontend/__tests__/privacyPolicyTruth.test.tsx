@@ -113,6 +113,23 @@ describe("privacy policy — what our servers send Meta (blueprint P1-P3, 2026-0
       expect(text).toMatch(/most recent IP address and browser user agent/i);
     }
   });
+
+  it("says the click's capture time is stored along with it — in BOTH states", async () => {
+    // The stored `_fbc` is `fb.1.<ms>.<click id>`, and the backend reads that
+    // time back to tell a newer click from an older one, so it is data we hold
+    // about the visit, not formatting. The storage list must keep saying so.
+    for (const id of [undefined, "123456789"]) {
+      vi.resetModules();
+      const text = await renderPolicyWith({ NEXT_PUBLIC_META_PIXEL_ID: id });
+      const start = text.indexOf("What we store while you use the product");
+      const end = text.indexOf("What we explicitly do not collect");
+      expect(start, "the policy lost its storage list").toBeGreaterThan(-1);
+      expect(end).toBeGreaterThan(start);
+      expect(text.slice(start, end)).toMatch(
+        /most recent Meta click identifier[^.]*_fbc[^.]*when your browser first saw that click/i,
+      );
+    }
+  });
 });
 
 describe("privacy policy — the other trackers too", () => {

@@ -358,6 +358,7 @@ def client_context(request: Any) -> tuple[str | None, str | None]:
         from app.services.rate_limit import client_ip
 
         addr = ipaddress.ip_address(client_ip(request).strip())
+        addr = getattr(addr, "ipv4_mapped", None) or addr  # ::ffff:10.0.0.1 is 10.0.0.1
         if not (
             addr.is_loopback or addr.is_unspecified or addr.is_link_local
             or addr.is_multicast or addr.is_reserved
@@ -380,37 +381,44 @@ def client_context(request: Any) -> tuple[str | None, str | None]:
     return (ip if ip and len(ip) <= CLIENT_IP_MAX else None), ua
 
 
+# Every click time the browser supplies, whether the `_fbc` cookie's own stamp
+# or a reported `fbclid_at`, has to be a plausible wall-clock instant: after
+# 2001 (when 13-digit epoch ms began) and no more than a day ahead of us. That
+# allows for a skewed client clock without letting one park a click in the
+# future where nothing could ever replace it, since a stored click is only
+# ever replaced by one shown to be newer.
+_CLICK_MS_FLOOR = 1_000_000_000_000
+_CLICK_MS_SKEW_ALLOWANCE = 86_400_000
+
+
+def _plausible_click_ms(ms: int) -> int | None:
+    now_ms = int(datetime.now(UTC).timestamp() * 1000)
+    if ms < _CLICK_MS_FLOOR or ms > now_ms + _CLICK_MS_SKEW_ALLOWANCE:
+        return None
+    return ms
+
+
 def click_time_ms(value: str | None) -> int | None:
     """The click instant inside an `fb.<n>.<ms>.<token>` value, or None.
 
     Every stored `fbc` carries the time of the click it describes — the
     pixel's cookie because Meta wrote it there, ours because `fbc_value`
     builds it that way. That field is the only thing that can order two
-    clicks, so it is parsed rather than trusted by arrival order."""
+    clicks, so it is parsed rather than trusted by arrival order, and an
+    implausible one (`_plausible_click_ms`) reads as no time at all."""
     if not isinstance(value, str):
         return None
     parts = value.split(".")
     if len(parts) < 4 or not parts[2].isdigit():
         return None
-    return int(parts[2])
-
-
-# A capture time the browser reports has to be a plausible wall-clock instant:
-# after 2001 (when 13-digit epoch ms began) and no more than a day ahead of us,
-# which allows for a skewed client clock without letting one park a click in
-# the future where nothing could ever replace it.
-_CLICK_MS_FLOOR = 1_000_000_000_000
-_CLICK_MS_SKEW_ALLOWANCE = 86_400_000
+    return _plausible_click_ms(int(parts[2]))
 
 
 def _reported_click_ms(raw: Any) -> int | None:
     """When the browser says it first saw a bare `fbclid`, in epoch ms."""
     if not isinstance(raw, int) or isinstance(raw, bool):
         return None
-    now_ms = int(datetime.now(UTC).timestamp() * 1000)
-    if raw < _CLICK_MS_FLOOR or raw > now_ms + _CLICK_MS_SKEW_ALLOWANCE:
-        return None
-    return raw
+    return _plausible_click_ms(raw)
 
 
 def remember_browser(
@@ -438,11 +446,16 @@ def remember_browser(
       shown to be newer, comparing the click instants the values carry:
       - an `_fbc` cookie arrives with its own timestamp and is preferred over
         any bare `fbclid` in the same request, but still has to be at least as
-        recent as what is stored;
+        recent as what is stored, and its stamp has to be plausible
+        (`_plausible_click_ms`) or the cookie is ignored;
       - a bare `fbclid` is stamped with `fbclid_at`, when the browser saw it,
         and may replace a stored click only when that is later. With nothing
         stored it is taken as-is (falling back to now, which Meta documents,
-        when the browser sent no time).
+        when the browser sent no time). The current frontend always sends
+        `fbclid_at` with `fbclid` (`metaCheckoutIds` in `lib/utm.ts` reads
+        both from one stored payload), so an untimed one only comes from a
+        build older than this change, during a deploy, or a direct API
+        caller.
       `signup_fbclid` — first-touch, and a different question — is never
       written here and never replaces a stored click.
 
@@ -461,9 +474,12 @@ def remember_browser(
         stored = getattr(user, "meta_fbc", None) or ""
         stored_ms = click_time_ms(stored)
         fbc_cookie = browser_id(fbc, max_len=FBC_MAX)
-        if fbc_cookie:
-            cookie_ms = click_time_ms(fbc_cookie)
-            if stored_ms is None or (cookie_ms is not None and cookie_ms >= stored_ms):
+        cookie_ms = click_time_ms(fbc_cookie)
+        # A well-formed cookie whose stamp is implausible is treated like a
+        # malformed one: never stored, and the request's bare fbclid, if any,
+        # is weighed below as though no cookie had come.
+        if fbc_cookie and cookie_ms is not None:
+            if stored_ms is None or cookie_ms >= stored_ms:
                 user.meta_fbc = fbc_cookie
             return
         click = fbclid.strip() if isinstance(fbclid, str) else ""

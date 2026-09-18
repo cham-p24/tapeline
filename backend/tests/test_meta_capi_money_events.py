@@ -935,6 +935,40 @@ async def test_a_click_seen_after_the_stored_one_replaces_it_at_its_own_time(mon
     )
 
 
+@pytest.mark.parametrize("stamp", ["9999999999999", "1758000000"], ids=["far-future", "pre-2001"])
+async def test_an_implausible_cookie_stamp_cannot_park_a_click(monkeypatch, meta_on, stamp):
+    """A cookie's own stamp gets the same bound as a reported `fbclid_at`.
+
+    `_BROWSER_ID_RE` accepts 10-16 digits, so a cookie stamped years ahead (a
+    device clock set wrong when the pixel wrote it, or a crafted POST to one's
+    own checkout) is well-formed. Stored, it outranks every real click for as
+    long as the account exists, because a click only replaces one it can be
+    shown to be newer than. A stamp before 2001 is not a millisecond time at
+    all. Either way the cookie is treated like a malformed one."""
+    u = await _user(linked=False)
+    await _checkout_request(monkeypatch, u["id"], body={"fbc": f"fb.1.{stamp}.SkewedClock"})
+    assert getattr(await _row(u["id"]), "meta_fbc", "unset") is None, (
+        "an implausible click stamp was stored"
+    )
+
+    # A real click from today still lands, from the cookie ...
+    today_ms = _now() * 1000
+    await _checkout_request(monkeypatch, u["id"], body={"fbc": f"fb.1.{today_ms}.RealClickToday"})
+    assert getattr(await _row(u["id"]), "meta_fbc", None) == f"fb.1.{today_ms}.RealClickToday"
+
+    # ... the implausible cookie cannot displace it afterwards ...
+    await _checkout_request(monkeypatch, u["id"], body={"fbc": f"fb.1.{stamp}.SkewedClock"})
+    assert getattr(await _row(u["id"]), "meta_fbc", None) == f"fb.1.{today_ms}.RealClickToday"
+
+    # ... and a later bare click in the same request as one is still weighed
+    # on its own capture time, as if no cookie had come at all.
+    later_ms = today_ms + 60_000
+    await _checkout_request(monkeypatch, u["id"], body={
+        "fbc": f"fb.1.{stamp}.SkewedClock", "fbclid": "LaterClick", "fbclid_at": later_ms,
+    })
+    assert getattr(await _row(u["id"]), "meta_fbc", None) == f"fb.1.{later_ms}.LaterClick"
+
+
 async def test_malformed_or_non_browser_values_are_neither_stored_nor_sent(monkeypatch, meta_on, ip_ua_on):
     st = Stripe(monkeypatch)
     u = await _user(linked=False, signup_fbclid="FirstTouchClick")
@@ -1046,7 +1080,8 @@ def test_an_internal_hop_is_not_a_visitors_address(ip_ua_on):
     def _req(ip: str) -> SimpleNamespace:
         return SimpleNamespace(headers=httpx.Headers({"Fly-Client-IP": ip, "user-agent": BROWSER_UA}))
 
-    for private in ("10.1.2.3", "172.16.4.5", "192.168.0.7", "100.64.9.9", "fdaa:0:1::3"):
+    # Including the IPv4-mapped IPv6 spelling a dual-stack proxy could hand on.
+    for private in ("10.1.2.3", "172.16.4.5", "192.168.0.7", "100.64.9.9", "fdaa:0:1::3", "::ffff:10.1.2.3"):
         assert meta_capi.client_context(_req(private))[0] is None, private
     # A real public address still goes through, including the documentation
     # ranges the rest of this file tests with.

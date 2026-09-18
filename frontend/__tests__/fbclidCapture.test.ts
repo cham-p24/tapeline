@@ -191,8 +191,11 @@ describe("metaCheckoutIds", () => {
     });
     expect(getStoredFbclidCapturedAt()).toBe(threeWeeksAgo);
 
-    // Expired, malformed or absent: the click goes without a time rather than
-    // with a made-up one, and an untimed click never displaces a stored one.
+    // Expired, malformed or absent: a click with no usable capture time is not
+    // sent at all. `getStoredFbclid()` treats a non-number `captured_at` as
+    // expired and clears it, so the browser never sends a click with a
+    // made-up time. (The backend separately keeps an untimed click from
+    // displacing a stored one, for older builds and direct API callers.)
     window.localStorage.setItem(
       KEY,
       JSON.stringify({ fbclid: "IwAR0-Old", captured_at: "yesterday" }),
