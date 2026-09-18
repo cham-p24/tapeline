@@ -316,6 +316,12 @@ describe("insider posts say what the Smart Money factor and /app/holdings do", (
     expect(body).not.toMatch(/directional certainty/);
     // Descriptive only: no forecast, no call to act, on an indexed page.
     expect(body).not.toMatch(/Worth a watchlist add|before the market has rerated/);
+    // The post's own dated note says no combination of factors gives certainty,
+    // and the sibling post says we have no evidence Form 4 filings predict price
+    // moves. A heading asking what a filing "actually predicts", and a claim that
+    // each source has its own "predictive horizon", contradict both — on a page
+    // search traffic lands on, against a record with no detectable edge.
+    expect(body).not.toMatch(/actually predicts|predictive horizon/);
     expect(post("what-smart-money-actually-means")).toMatch(/Corrected 17 September 2026: the examples below said a high reading means "institutions are positioning"/);
   });
 
