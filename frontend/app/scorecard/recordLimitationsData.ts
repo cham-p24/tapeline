@@ -118,6 +118,12 @@ export type Limitation = {
 /** Conditions that affected past lists without changing any stored value. */
 export const LIMITATIONS: Limitation[] = [
   {
+    date: "2026-06-23",
+    period: "The list for 23 June 2026",
+    body:
+      "One listed name is not a common stock. BHFAO is Brighthouse Financial's 6.75% non-cumulative preferred depositary shares, and it was listed fourth. Preferred shares, notes and similar listings are scored on the same six factors as common stock, and nothing made one ineligible to be listed. Checked on 17 September 2026 across all 439 symbols ever listed; it is the only one. Stated, not corrected: the list stands as recorded.",
+  },
+  {
     date: "2026-08-23",
     period: "Lists recorded before 24 August 2026",
     body:
