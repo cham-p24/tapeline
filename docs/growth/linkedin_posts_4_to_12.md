@@ -235,7 +235,7 @@ A few things I've learned building Tapeline solo from Melbourne over the last fe
 
 2. The time zone is a feature, not a bug. The US market closes at 6 AM AEST. I wake up to a fully back-checked scorecard with overnight data already populated. By the time US-East-Coast traders are at their desks, the last close's top 10 is recorded and back-checked.
 
-3. The hardest part wasn't the scoring formula — it was the data plumbing. Polygon (now Massive) for prices, Finnhub for fundamentals + insider Form 4 + news, FRED for macro indicators, SEC EDGAR for 8-K filings. Each one has its own auth pattern, rate limits, and failure modes. Half the codebase is reconciling sources.
+3. The hardest part wasn't the scoring formula — it was the data plumbing. Polygon (now Massive) for prices, Finnhub for fundamentals + news, SEC EDGAR for insider Form 4 filings and 8-Ks, FRED for macro indicators. Each one has its own auth pattern, rate limits, and failure modes. Half the codebase is reconciling sources.
 
 4. There's no support team to fall back on. Every bug is mine. Every customer email is mine. Every regulatory decision is mine. That's the trade for not having a co-founder yet.
 
@@ -377,9 +377,9 @@ company's stock — and assume any large purchase is bullish.
 A lot of Form 4 activity isn't a directional trade at all. What
 to check before reading anything into one:
 
-1. The transaction code. P is an open-market buy, S an open-market
-   sale. Grants, vestings, withholdings and exercises
-   — those are HR paperwork, not decisions about the stock.
+1. The transaction code. P is a purchase — on the open market or in a
+   private transaction — and S the corresponding sale. Grants, vestings,
+   withholdings and exercises are HR paperwork, not decisions about the stock.
 
 2. 10b5-1 plan sales. These are pre-arranged schedules executives
    use to sell systematically. A CFO who set up a 10b5-1 in March

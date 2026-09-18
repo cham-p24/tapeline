@@ -154,7 +154,7 @@ RESEND_API_KEY=<paste from resend.com/api-keys>
 # 2. WITHDRAWN — do not run. The Quiver subscription was cancelled; quiver_feed.py,
 #    the _refresh_elite_13f worker task, the InstitutionalHolding model and the
 #    quiver_api_key config are all deleted, so this secret activates nothing.
-#    Smart-money inputs are SEC Form 4 insider data via Finnhub.
+#    Smart-money inputs are SEC Form 4 insider data read from SEC EDGAR (#835).
 # fly secrets set QUIVER_API_KEY=<paste from quiverquant.com> -a tapeline-backend
 ```
 

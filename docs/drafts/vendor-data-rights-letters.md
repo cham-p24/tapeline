@@ -4,6 +4,12 @@
 >
 > - **Coverage.** About 11,500 US stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs updated once a day. 2,500 was a snapshot setting, fixed by #763/#765 and corrected in copy by #826.
 >
+> - **The Finnhub letter asks about data we no longer take from them.** It was sent
+>   on 2026-09-05 asking for commercial pricing covering fundamentals, insider Form 4
+>   and calendars. Insider Form 4 moved to SEC EDGAR on 14 September 2026
+>   (#835/#837), so when Finnhub replies — the chase date is 2026-09-26 — the ask
+>   should be narrowed to fundamentals and calendars rather than priced as sent.
+>
 > Measurements, times and approved wording: `docs/COPY_FACTS.md`.
 
 **Status: BOTH SENT 2026-09-05.** Massive → support@massive.com (Gmail thread `1a06d446b4f5baac`).

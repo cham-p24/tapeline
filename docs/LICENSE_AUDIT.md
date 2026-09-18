@@ -9,6 +9,16 @@ Continuing as-is = TOS breach on each. This is bigger than just Quiver.
 
 Tapeline → real customer at $9.99-19.99/mo → customer sees data on screen → that data came from a personal-use-only feed.
 
+> **Correction added 17 September 2026 — read before the consult.** The table below
+> records what was true on 2026-05-17 and is kept as written, but one row has since
+> changed and it changes the exposure being assessed. **Insider Form 4 data no longer
+> comes from Finnhub.** Since 14 September 2026 (#835/#837) it is read directly from
+> SEC EDGAR, which is a public record with no commercial-use restriction, and by
+> 17 September every stored insider row came from EDGAR. Finnhub's remaining use is
+> fundamentals, calendars and sector backfill. So the Finnhub row below overstates
+> the exposure: do not brief or price the consult on insider Form 4 being a
+> personal-use-only feed, because it is not one any more.
+
 | API | Tier | Use in Tapeline | Commercial use allowed? |
 |---|---|---|---|
 | Polygon / Massive | Stocks Starter $29/mo | Core: live prices, OHLC, snapshots for entire universe | ❌ Personal/non-business only |
