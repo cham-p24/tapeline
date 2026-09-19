@@ -14,9 +14,29 @@ from app.services.tier import Tier, effective_limit, has_feature
 
 router = APIRouter()
 
+#: Rule types nobody may CREATE any more, with the plain reason given back.
+#: There is no real squeeze data source (#818) and no real congressional trade
+#: data (#820), both since 2026-09-14, so a new rule of either type cannot fire
+#: on real data. The endpoint used to accept them anyway, and a Free or Pro
+#: user asking for a congress alert got a 403 that read as an upsell for a feed
+#: that does not exist. Rules users already hold are not touched: they still
+#: list and still delete (tests/test_free_alert_taste.py).
+_UNAVAILABLE_RULE_TYPES: dict[str, str] = {
+    "squeeze": (
+        "Squeeze alerts are not available. No real squeeze data source is "
+        "configured, so a squeeze alert cannot fire."
+    ),
+    "congress": (
+        "Congress trade alerts are not available. Tapeline has no source of "
+        "congressional trade disclosures, so this alert cannot fire."
+    ),
+}
+
 
 class AlertRuleCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=80)
+    # squeeze and congress stay in the pattern on purpose: create_rule refuses
+    # them with a sentence (_UNAVAILABLE_RULE_TYPES), not a schema error.
     rule_type: str = Field(..., pattern="^(score|squeeze|regime|congress|news)$")
     symbol: str | None = Field(None, max_length=20)
     threshold: float | None = None
@@ -41,6 +61,12 @@ async def create_rule(
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    # First, before any tier gate, so no plan is offered for a rule type that
+    # cannot fire on any plan.
+    refusal = _UNAVAILABLE_RULE_TYPES.get(body.rule_type)
+    if refusal:
+        raise HTTPException(422, refusal)
+
     # Feature gate: email = Pro+, web_push = Free+
     # (the free "alert taste" channel — see tier.FREE_WEB_PUSH_ALERTS).
     # Discord + SMS channels were retired 2026-05-04; Telegram 2026-08-11.
@@ -63,12 +89,11 @@ async def create_rule(
     # `score` is the base product and stays ungated (it's the Free web-push
     # "taste"); the paid signal types map to the same features the scanner
     # enforces. Enforced server-side because a forked/old client can't be
-    # trusted.
+    # trusted. (squeeze and congress no longer reach this point: see
+    # _UNAVAILABLE_RULE_TYPES.)
     rule_type_feature = {
-        "squeeze": "squeeze.full",
         "regime": "regime.full",
         "news": "news.full",
-        "congress": "congress.feed",
     }.get(body.rule_type)
     if rule_type_feature and not has_feature(Tier(user.tier), rule_type_feature):
         raise HTTPException(

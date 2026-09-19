@@ -15,7 +15,7 @@ Every data source used in production must be documented here with license terms,
   - Aggregates API (`/v2/aggs/ticker/{symbol}/range/...`) — historical bars for scoring
   - Reference data — ticker lists, splits, dividends
 - **Populates:** `tickers`, `snapshots`, `scores` (via aggregates)
-- **Rate limit:** Starter 5 calls/min, Developer unlimited
+- **Rate limit:** the vendor's pricing page (massive.com/pricing, read 19 September 2026) lists Stocks Starter and Developer with "Unlimited API Calls"; 5 calls a minute is the free Basic tier. The pacing in `squeeze_detection` (12 s between calls), `historical_bars` (5 calls per 60 s) and `rederive_scorecard` (12 s default) is our own choice, not a plan limit
 - **Renewal:** Monthly auto-renew via card
 
 ### Finnhub — Fundamentals, calendars, sector backfill (insider Form 4 moved to SEC EDGAR in #835, 14 September 2026)

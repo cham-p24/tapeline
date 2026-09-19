@@ -1,6 +1,18 @@
 # Customer survey — September 2026
 
-**Status: DRAFTED, NOT SENT.** Nothing in this document has been emailed to anyone.
+**Status: SENT, 0 real responses as of 19 Sep 2026.** (Recorded 19 Sep 2026; this line
+read "DRAFTED, NOT SENT" until then.)
+
+- **Survey:** went out 10 Sep 2026 between 15:59 and 16:00 UTC (Resend's send log). The
+  `survey_2026_09` token is on 25 accounts.
+- **Reminder (§4b), once:** sent 16 Sep 2026 at 20:02 UTC, which is 06:02 on 17 Sep in
+  Melbourne, by `survey-reminder.yml` (scheduled for 17:07 UTC; Actions ran it late).
+  Result: 21 accounts and 13 newsletter-only subscribers reminded, 3 accounts held back
+  by the frequency governor, 0 failed. The `survey_2026_09_r` token is on 21 accounts.
+- **Responses:** 0 real. `survey_responses` holds one row, the smoke test from 7 Sep
+  14:52 UTC, and nothing since. Replies sent by email go to the founder-alias mailbox,
+  which nobody had read by 19 Sep, so any emailed replies are not in this count.
+
 Five decisions in §7 are the founder's and are not made here.
 
 > ## ⚠️ THE INSTRUMENT IN §2 IS SUPERSEDED — read `SURVEY_METHODOLOGY.md` first

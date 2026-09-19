@@ -54,9 +54,13 @@ THREE THINGS THIS GETS RIGHT THAT ARE EASY TO GET WRONG
    date and re-commits the exact bug it exists to fix — and the result would
    depend on the wall-clock time of the run.
 
-3. RATE LIMIT. `polygon_feed` documents the Starter tier at 5 requests/min, and
-   the same key serves the per-tick fundamentals, calendars, insider Form 4,
-   analyst ratings and the sector backfill. Default pacing is 12s (= 5/min).
+3. PACING. Default pacing is 12s between vendor calls (5 a minute). That is
+   this script's own default, not the plan's limit: 5 calls a minute is the
+   vendor's free Basic tier, and its pricing page lists Stocks Starter, the
+   plan in use, with unlimited API calls (massive.com/pricing, read
+   2026-09-19). The same key serves the live worker's price snapshots,
+   daily-bar aggregates, news, crypto rows and scorecard back-check, so try a
+   smaller --pace on a short --since window first.
    See the cost estimate the script prints before it does anything.
 
 SAFETY
@@ -109,10 +113,13 @@ from app.services.scorecard_export import RESTATEMENTS
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("rederive")
 
-#: 12s => 5 requests/min, the documented Starter-tier ceiling. An earlier 0.25s
-#: was ~48x over it: the run would 429-storm itself into a silent partial repair
-#: AND starve the live worker for its whole duration. Override with --pace only
-#: on a Developer-tier key (unlimited req/min).
+#: 12s => 5 requests/min. This is the script's own default, not a plan limit:
+#: 5 calls a minute is the vendor's free Basic tier, and Stocks Starter, the
+#: plan in use, is listed with unlimited API calls (massive.com/pricing, read
+#: 2026-09-19). It replaced an earlier 0.25s because the plan was wrongly
+#: believed to allow only 5 calls a minute. The key is shared with the live
+#: worker, so a smaller --pace is allowed but is best tried on a short window
+#: first.
 _DEFAULT_PACE_SECONDS = 12.0
 
 #: Mirrors routers/scorecard._OUTLIER_PCT_THRESHOLD, so the before/after numbers
@@ -508,7 +515,8 @@ def main() -> None:
     p.add_argument(
         "--pace", type=float, default=_DEFAULT_PACE_SECONDS,
         help=f"seconds between vendor calls (default {_DEFAULT_PACE_SECONDS} = 5/min, "
-             "the Starter-tier ceiling). Lower ONLY on a Developer-tier key.",
+             "the script's own default, not a plan limit). The key is shared "
+             "with the live worker, so try a smaller value on a short window.",
     )
     p.add_argument(
         "--estimate", action="store_true",

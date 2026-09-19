@@ -63,7 +63,7 @@ Prices and limits mirror `frontend/lib/pricing.ts` and `backend/app/services/tie
 
 - **Free** $0, no card — top-10 scanner rows, 12 ticker look-ups per UTC day, watchlist of 5, 1 saved screen, no alert rules. Anonymous look-ups are not metered.
 - **Pro** $9.99/mo or $8.25/mo billed annually ($99/yr) — every matching scanner row (1,000 per request; paging reaches the rest), regime + heatmap, watchlist 50, email alerts (10/day), browser push alerts, CSV export.
-- **Premium** $19.99/mo or $16.58/mo billed annually ($199/yr) — everything in Pro plus per-ticker SEC Form 4 insider filings, unlimited email alerts, watchlist 200, saved scans 100, public API (1,000 req/day).
+- **Premium** $19.99/mo or $16.58/mo billed annually ($199/yr) — everything in Pro plus per-ticker SEC Form 4 insider filings, email alerts up to 50/day instead of Pro's 10 (every alert channel is capped at 50 per UTC day on every plan), watchlist 200, saved scans 100, public API (1,000 req/day).
 
 Signing up is free and needs no card. Adding a card starts a 30-day Premium trial: $0 that day, first charge on day 30, one click to cancel, and an email about 7 days before the first charge. (A card wall on new accounts ran from 22 to 30 August 2026; #683 removed it.) The public record — scorecard, daily picks, per-ticker pages, the CSV/JSON exports and the public API — needs no account and no card. Without Pro or Premium the scorecard's per-day entries are on a 7-day delay, and the CSV/JSON export stops 7 days back for every caller; the summary figures are current.
 

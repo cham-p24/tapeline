@@ -103,9 +103,10 @@ from app.services.historical_bars import BarData
 from app.services.mock_feed import TICKER_UNIVERSE
 
 # Top-N universe size for live mode. Fixed at 100 (top 100 by $-volume seed)
-# per the v2 spec — large enough to make alpha meaningful, small enough to
-# stay inside the Massive Starter rate budget on a back-test that fetches
-# bars per symbol over the window.
+# per the v2 spec — large enough to make alpha meaningful, small enough that
+# a cold-cache run (one bar fetch per symbol) takes about 20 minutes at
+# historical_bars' own 5-calls-a-minute pace. That pace is not a plan limit:
+# Stocks Starter, the plan in use, lists unlimited API calls.
 LIVE_UNIVERSE_TOP_N = 100
 
 # INTERNAL weight vector — NOT published, and must never be written into any
@@ -669,7 +670,7 @@ def _header_comment(report: BacktestReport) -> list[str]:
     if report.data_source == "massive_live":
         price_caveat = [
             "# - Prices sourced from Massive (formerly Polygon) historical daily aggregates",
-            "#   24h on-disk cache; rate-limited to 5 calls/min on Starter tier",
+            "#   24h on-disk cache; paced at 5 calls/min by the provider (our own pace)",
         ]
     elif report.data_source == "synthetic_fallback":
         price_caveat = [
@@ -825,7 +826,7 @@ def parse_args(argv: Sequence[str] | None = None) -> BacktestConfig:
                    help="mock: deterministic GBM-style synthetic prices on the full "
                    "TICKER_UNIVERSE (~112 names). live: top-100 names from TICKER_UNIVERSE "
                    "with real daily bars pulled from Massive (formerly Polygon) via the "
-                   "historical_bars provider — 24h on-disk cache, 5/min rate limit, "
+                   "historical_bars provider — 24h on-disk cache, paced at 5 calls/min, "
                    "synthetic GBM fallback when no MASSIVE_API_KEY is set.")
 
     ns = p.parse_args(argv)

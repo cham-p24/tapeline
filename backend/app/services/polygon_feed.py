@@ -1043,14 +1043,24 @@ async def fetch_aggregates(
 
 async def fetch_squeezes() -> list[dict[str, Any]]:
     """
-    Detect BB squeeze + volume expansion setups across the universe.
+    Detect BB squeeze + volume expansion setups across DEFAULT_UNIVERSE.
 
-    This is a background job — for each ticker we pull 60 days of aggregates,
-    compute BB width percentile, ATR contraction, volume ratio, OBV trend,
-    and emit a spike score.
+    UNUSED: nothing calls this function. The worker imports
+    ``mock_feed.fetch_squeezes`` instead (workers/signal_publisher.py), and
+    ``_mock_feed_writes_enabled()`` keeps that call switched off in
+    production. No real squeeze source is configured either
+    (services/squeeze_integrity: SPIKE_INTELLIGENCE_CSV_URL was unset on the
+    worker when checked on 2026-09-14). No squeeze setup Tapeline stores or
+    shows comes from here.
 
-    On Starter tier (5 req/min) this takes ~15 minutes to sweep the full
-    universe, so squeeze detection runs on a slower cadence than snapshots.
+    What it would do if called: squeeze_detection.detect_squeezes_batch pulls
+    daily bars for each symbol through fetch_aggregates, scores Bollinger
+    Band width percentile, squeeze days, volume multiple and OBV trend, and
+    keeps setups scoring 50 or more. It waits 12 s between vendor calls. That
+    pause is the function's own choice, not the plan's limit: 5 calls a
+    minute is the vendor's free Basic tier, and its pricing page lists Stocks
+    Starter, the plan in use, with unlimited API calls (massive.com/pricing,
+    read 2026-09-19).
     """
     from app.services.squeeze_detection import detect_squeezes_batch
     return await detect_squeezes_batch(DEFAULT_UNIVERSE)
@@ -1296,7 +1306,8 @@ async def discover_active_us_tickers(
                     "symbol": sym,
                     "name": t.get("name") or sym,
                     # Sector requires a per-ticker /v3/reference/tickers/{sym}
-                    # call — too rate-limited on Starter to do for every name.
+                    # call, one extra request per name, which this listing pass
+                    # does not make.
                     # Worker can backfill sectors lazily for tickers users actually look at.
                     "sector": "Unknown",
                     "asset_class": asset_class,
