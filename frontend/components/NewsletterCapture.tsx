@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Input } from "@/components/Input";
 import { trackEvent } from "@/lib/gtag";
+import { trackMetaLead } from "@/lib/metaConversions";
 import { getStoredUtm } from "@/lib/utm";
 
 /**
@@ -24,6 +25,10 @@ import { getStoredUtm } from "@/lib/utm";
  * GA4-only engagement event — deliberately NOT the `sign_up` event, so an
  * email opt-in is never miscounted as a Google Ads account-signup
  * conversion (which would inflate paid-search ROAS).
+ *
+ * A brand-new subscription (server status "new") also fires Meta `Lead` from
+ * the browser — no email, no hash — for the free-email ad set to optimise on.
+ * See `lib/metaConversions.trackMetaLead`.
  */
 type Props = {
   /** Where on the site this instance is rendered. Logged to the row's
@@ -100,6 +105,12 @@ export function NewsletterCapture({
         // already records this exact moment — remapping it would only
         // double-count list growth. `source` is preserved as a param instead.
         trackEvent("newsletter_signup", { method: "newsletter", source });
+        // Meta `Lead` counts SUBSCRIBERS, so it is narrower than the GA4 event
+        // above: "new" only, never "resubscribed". The server says "new" once
+        // per address, ever, which is the whole de-duplication story — see
+        // trackMetaLead. Fire-and-forget: it resolves to null when the pixel
+        // is off or blocked, and never throws into the form.
+        if (body.status === "new") void trackMetaLead();
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Sign up failed";
