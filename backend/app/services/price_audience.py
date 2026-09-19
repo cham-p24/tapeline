@@ -59,6 +59,10 @@ PRICE_FIELDS: tuple[str, ...] = (
     "change_pct_1m",
     "volume",
     "market_cap",
+    # The vendor's time for the withheld price (#880). Without the price it
+    # says nothing; with it gone it would read as a quote time for nothing.
+    "quote_at",
+    "quote_timeframe",
 )
 
 #: `key_stats` fields stripped for keyless callers: the price block, the

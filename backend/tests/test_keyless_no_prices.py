@@ -194,6 +194,8 @@ async def test_ticker_detail_serves_no_prices_to_a_keyless_caller(seeded, client
     assert body["score"] == 88.0
     assert body["breakdown"]["trend"]["value"] == 90.0
     assert body["prices_served"] is False
+    # #880's quote time describes the withheld price, so it goes with it.
+    assert "quote_at" not in body and "quote_timeframe" not in body
     # The whole payload, not just the two known containers: no 123.45 anywhere.
     assert "123.45" not in r.text
 
