@@ -295,7 +295,21 @@ def _key_stats_payload(t: Ticker, next_earnings_date: date | None) -> dict:
 
     `next_earnings_date` is passed in because it is the only stat here that does
     not live on the ticker row — see the earnings read in ticker_detail.
+
+    A listing that is not the company's common shares (a note, preferred,
+    warrant, right or unit; Ticker.is_non_common, services/non_common.py) shows
+    none of the company-wide figures: market cap, beta, P/E, EPS, dividend yield
+    and ex-dividend date. The vendor answers such a symbol with its ISSUER's
+    figures (AGNCO, an AGNC preferred, carried AGNC's $12.9B cap and its common
+    stock's 16.5% yield against its own 6.50% coupon; measured 2026-09-19), so
+    printing them beside the listing states them as its own. Blanked here, at
+    read time, so the page is right whatever the row still holds; the worker
+    also stops writing them (_backfill_key_statistics) and clears what it
+    wrote (_clear_non_common_issuer_stats). `is_non_common` ships so the page
+    can say why the fields are empty. The listing's own trading figures
+    (prices, ranges, volumes) are its own and stay.
     """
+    issuer = bool(t.is_non_common)
     return {
         "price": t.price,
         "previous_close": t.previous_close,
@@ -309,19 +323,21 @@ def _key_stats_payload(t: Ticker, next_earnings_date: date | None) -> dict:
         "week52_high": t.week52_high,
         "volume": t.volume,
         "avg_volume_30d": t.avg_volume_30d,
-        "market_cap": t.market_cap,
-        "beta": t.beta,
-        "pe_ttm": t.pe_ttm,
-        "eps_ttm": t.eps_ttm,
+        "market_cap": None if issuer else t.market_cap,
+        "beta": None if issuer else t.beta,
+        "pe_ttm": None if issuer else t.pe_ttm,
+        "eps_ttm": None if issuer else t.eps_ttm,
         # Dates are ISO strings, matching how updated_at and news.published_at
         # are already serialised on this endpoint.
         "next_earnings_date": (
             next_earnings_date.isoformat() if next_earnings_date is not None else None
         ),
-        "dividend_yield": t.dividend_yield,
+        "dividend_yield": None if issuer else t.dividend_yield,
         "ex_dividend_date": (
-            t.ex_dividend_date.isoformat() if t.ex_dividend_date is not None else None
+            t.ex_dividend_date.isoformat()
+            if t.ex_dividend_date is not None and not issuer else None
         ),
+        "is_non_common": issuer,
     }
 
 
@@ -1022,10 +1038,18 @@ async def ticker_financials(symbol: str, request: Request) -> dict:
         # an anonymous caller costs neither a Finnhub request nor a cache file.
         await current_user_required(request, session)
         known = (
-            await session.execute(select(Ticker.symbol).where(Ticker.symbol == sym))
-        ).scalar_one_or_none()
+            await session.execute(
+                select(Ticker.symbol, Ticker.is_non_common).where(Ticker.symbol == sym)
+            )
+        ).one_or_none()
     if known is None:
         raise HTTPException(404, f"Ticker {sym} not found")
+
+    # A note, preferred, warrant, right or unit: the vendor would answer with
+    # its ISSUER's financials, which are not this listing's own. Said so, and
+    # not fetched at all. See _key_stats_payload and services/non_common.py.
+    if known.is_non_common:
+        return {"symbol": sym, "available": False, "metrics": {}, "reason": "non_common"}
 
     metrics = await fetch_basic_financials(sym)
     return {
