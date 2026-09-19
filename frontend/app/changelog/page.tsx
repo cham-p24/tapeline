@@ -73,15 +73,15 @@ const METHODOLOGY_LOG: LogEntry[] = [
   // stocks or ETFs. How many are retired is only known after the first
   // complete pass in production, so no count is stated. Placed below #878
   // rather than on top only to keep a parallel PR's rebase mechanical; the
-  // dates are equal. The ref must be this PR's number: set it when the PR is
-  // opened (rule 2).
+  // dates are equal.
+  // The date must equal the merge date (rule 2).
   {
     date: "2026-09-19",
     kind: "scope",
     title: "Tickers that stop trading are retired instead of staying ranked",
     body:
       "Until 19 September 2026 nothing removed a ticker that had stopped trading. It kept its last price, a daily score and its place in the scanner, search, the public signals list and the pool the daily record is drawn from. GREE, for example, was renamed VIP on 24 July 2026, and on 19 September its old symbol still scored 75.8, labelled STRONG SETUP. From this date, when a complete pass over our data vendor's list of active US listings no longer includes a stock or ETF under any listing type, that ticker is retired. It leaves the scanner, search, the heatmap, the public signals list, the API, the MCP server and the site map, it no longer triggers score or watchlist alerts, it can no longer be listed on the daily record, and its page says it is no longer trading and the date its absence was first seen. A symbol stored under a spelling our data vendor does not use, such as BRK-B for the share class the vendor lists as BRK.B, is never retired this way, because its absence from the vendor's list says nothing about whether it trades. A retired ticker that reappears on the vendor's list is restored. A pass that stops partway, or that lists far fewer tickers than the market holds, retires nothing, and a pass that would retire an unusually large number at once retires none of them until the list has been checked by hand. Crypto pairs are not affected. Watchlists keep retired tickers. How many tickers this retires is known only after the first complete pass. No recorded entry was changed: entries already on the record for a ticker that is later retired stay as listed.",
-    ref: "#TBD",
+    ref: "#895",
   },
   // #875 changed what may enter the record, the same kind of change as #761
   // (2026-09-06). Counts measured read-only against production on 2026-09-18:
