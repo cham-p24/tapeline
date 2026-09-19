@@ -180,6 +180,67 @@ SNAPSHOT_BATCH_SIZE = 250
 #: retry storm from turning into a thundering herd.
 SNAPSHOT_CONCURRENCY = int(os.environ.get("SNAPSHOT_CONCURRENCY", "6"))
 
+#: Consecutive snapshot passes in which at least one batch failed, and the
+#: streak length at which that stops being a WARNING and pages.
+#:
+#: A failed batch withholds only its own symbols, so the healthy batches keep
+#: max(Ticker.updated_at) moving and /health's worker_last_tick stays "ok" (the
+#: old whole-pass abort tripped that check instead). That is right for a blip
+#: and wrong for a failure that REPEATS: `_request` retries only 429 and 5xx,
+#: so a 4xx, a timeout or a connect error fails the batch at once, and the
+#: batches are cut in the same order every tick, so one bad request could pin
+#: the same ~250 symbols to an old price for days while every health check
+#: read green. 5 passes is ~5 minutes at the 60s tick, the same 300s /health
+#: allows before it calls the worker stale. In-memory and per-process on
+#: purpose: a restart resets it, and a failure that survives the restart pages
+#: again five passes later.
+SNAPSHOT_FAILURE_STREAK_ALERT = 5
+#: While the streak lasts, repeat the page this often (~hourly) rather than on
+#: every pass, so a stuck batch is one Sentry issue, not 60 an hour.
+SNAPSHOT_FAILURE_STREAK_REPEAT = 60
+_snapshot_failure_streak = 0
+
+
+def _note_snapshot_failures(
+    failures: list[tuple[list[str], Exception]], total: int,
+) -> None:
+    """Advance or reset the failed-batch streak; page once it is a pattern.
+
+    Runs before the all-fail re-raise, so a full outage counts toward the
+    streak too. Logs counts and exception TYPES only, never str(exc): an
+    HTTPStatusError's message embeds the request URL.
+    """
+    global _snapshot_failure_streak
+    if not failures:
+        _snapshot_failure_streak = 0
+        return
+    _snapshot_failure_streak += 1
+    streak = _snapshot_failure_streak
+    if streak < SNAPSHOT_FAILURE_STREAK_ALERT or (
+        (streak - SNAPSHOT_FAILURE_STREAK_ALERT) % SNAPSHOT_FAILURE_STREAK_REPEAT
+    ):
+        return
+    types = ",".join(sorted({type(e).__name__ for _, e in failures}))
+    logger.error(
+        "polygon.snapshot_batches_failing_streak passes=%d failed=%d of=%d "
+        "types=%s — the same symbols may be sitting on an old price while "
+        "/health reads ok",
+        streak, len(failures), total, types,
+    )
+    # Mirrors tick.timeout_streak: capture explicitly so the streak pages, not
+    # just a log line. A no-op when SENTRY_DSN is unset (sentry_sdk.init never
+    # ran), and never allowed to break the pass.
+    try:
+        import sentry_sdk
+
+        sentry_sdk.capture_message(
+            f"snapshot batches failing {streak} passes in a row "
+            f"(failed={len(failures)} of {total}, types={types})",
+            level="error",
+        )
+    except Exception:
+        logger.exception("polygon.snapshot_streak.sentry_capture_failed")
+
 
 async def fetch_snapshots(
     symbols: list[str] | None = None,
@@ -268,6 +329,9 @@ async def fetch_snapshots(
     # Pull real prices + volumes from Massive in batched calls.
     syms = [r["symbol"] for r in base_rows] if symbols is None else symbols
     real_by_sym: dict[str, dict[str, Any]] = {}
+    # Symbols whose batch FAILED this pass. Their rows are dropped from the
+    # result below (not NULL-priced), so the upsert never touches them.
+    withheld: set[str] = set()
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -277,31 +341,67 @@ async def fetch_snapshots(
             ]
             sem = asyncio.Semaphore(SNAPSHOT_CONCURRENCY)
 
-            async def _one(batch: list[str]) -> dict[str, Any]:
+            async def _one(batch: list[str]) -> dict[str, Any] | Exception:
                 async with sem:
                     # Massive's v3 snapshot endpoint (the v2 path returned the
                     # legacy {day,prevDay,lastTrade} shape that parsed to zeros
                     # after the 2026-Q1 schema migration to
                     # {session,last_minute}).
-                    return await _request(
-                        client,
-                        "/v3/snapshot",
-                        params={
-                            "ticker.any_of": ",".join(batch),
-                            "limit": len(batch),
-                        },
-                    )
+                    try:
+                        return await _request(
+                            client,
+                            "/v3/snapshot",
+                            params={
+                                "ticker.any_of": ",".join(batch),
+                                "limit": len(batch),
+                            },
+                        )
+                    except Exception as exc:
+                        # `except Exception`, never BaseException: a watchdog
+                        # kill arrives as CancelledError, which must still
+                        # cancel the pass rather than be recorded as one
+                        # failed batch.
+                        return exc
 
-            # gather, not as_completed: one failing batch must abort the whole
-            # fetch so the handler below can publish NOTHING rather than a
-            # partial universe. A partial result would look like a normal tick
-            # and quietly leave the missing names on yesterday's prices.
-            bodies = await asyncio.gather(*(_one(b) for b in batches))
-            for body in bodies:
-                for t in body.get("results", []):
+            # Each batch is isolated. This used to be a bare gather, so one
+            # batch still failing after _request's retries aborted the whole
+            # pass and the tick published NOTHING: all ~48 batches (~11,600
+            # symbols, 2026-09 universe) lost that minute's price because of
+            # one bad 250-symbol request. The reasoning was that a partial
+            # result "looks like a normal tick" — but the failed batch's rows
+            # are now DROPPED, not NULL-priced, so the upsert leaves them
+            # exactly as stored and does not advance their updated_at (the
+            # live-data stamp). Staleness stays visible per row, and is
+            # confined to the 250 symbols that actually failed.
+            outcomes = await asyncio.gather(*(_one(b) for b in batches))
+            failures: list[tuple[list[str], Exception]] = []
+            for batch, outcome in zip(batches, outcomes, strict=True):
+                if isinstance(outcome, Exception):
+                    failures.append((batch, outcome))
+                    withheld.update(batch)
+                    continue
+                for t in outcome.get("results", []):
                     naive = _to_scanner_row(t)
                     if naive is not None:
                         real_by_sym[naive["symbol"]] = naive
+            _note_snapshot_failures(failures, len(batches))
+            if failures and len(failures) == len(batches):
+                # Every batch failed: a vendor outage, not a bad request.
+                # Re-raise into the handler below so the whole-pass contract
+                # is exactly what it was.
+                raise failures[0][1]
+            if failures:
+                # Exception TYPE only, never str(exc): an HTTPStatusError's
+                # message embeds the request URL. The key rides in the
+                # Authorization header (see auth_headers), but the log line
+                # has no business carrying 250 symbols per failure either.
+                logger.warning(
+                    "polygon.snapshot_batches_failed failed=%d of=%d "
+                    "batch_size=%d withheld_symbols=%d types=%s",
+                    len(failures), len(batches), SNAPSHOT_BATCH_SIZE,
+                    len(withheld),
+                    ",".join(sorted({type(e).__name__ for _, e in failures})),
+                )
     except Exception:
         # Same reasoning as the no-key exit above: a vendor outage must not be
         # laundered into a universe of fabricated quotes and scores. Returning
@@ -313,6 +413,13 @@ async def fetch_snapshots(
             return []
         logger.exception("polygon.fetch_snapshots_failed — returning mock-only rows")
         return base_rows
+
+    if withheld:
+        # Drop the failed batches' rows entirely. Keeping them would fall into
+        # the "vendor answered but had nothing for this symbol" branch below
+        # and write NULL over a perfectly good stored price — the opposite of
+        # what a failed request tells us.
+        base_rows = [r for r in base_rows if r["symbol"] not in withheld]
 
     # Merge: real price/volume + real fundamentals + recomputed composite
     for r in base_rows:
