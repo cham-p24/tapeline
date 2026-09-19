@@ -15,11 +15,13 @@ cadence) rather than as a time.
 Additive: two nullable columns, no backfill (there is no honest value to
 backfill with).
 
-Numbered 0075 because a parallel change takes 0074; whichever merges second
-re-points its down_revision so CI's single-head assertion holds.
+Numbered 0075 but chained after 0076_ticker_is_non_common (#875), which merged
+first from the same parent (0073); the id is only a label, and CI asserts a
+single head. A parallel change numbered 0074 must likewise chain after
+whichever of these is head when it merges.
 
 Revision ID: 0075_ticker_quote_at
-Revises: 0073_edgar_issuer_symbol
+Revises: 0076_ticker_is_non_common
 """
 from __future__ import annotations
 
@@ -28,7 +30,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0075_ticker_quote_at"
-down_revision = "0073_edgar_issuer_symbol"
+down_revision = "0076_ticker_is_non_common"
 branch_labels = None
 depends_on = None
 
