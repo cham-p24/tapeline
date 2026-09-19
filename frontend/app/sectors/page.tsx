@@ -12,11 +12,19 @@
  *   - Targets its own commercial-investigation cluster: "stock market sectors
  *     ranked", "best performing sectors 2026", "sector rotation scanner".
  *
- * Data: one unauthenticated /api/public/signals call (no tier cap, no 24h
- * delay), grouped by sector at ISR time. Cached 5 min so crawlers don't
- * hammer the API. Sectors are ranked by average Tapeline score so the page
- * reads as live editorial ("which sectors are strongest right now"), not a
- * static link list.
+ * Data: unauthenticated /api/public/signals reads (no tier cap), grouped by
+ * sector at ISR time and cached so crawlers don't hammer the API. Two reads,
+ * because the page says two different things:
+ *   - the count and average describe EVERY scored ticker in a sector, so they
+ *     page through the whole universe (lib/publicUniverse). This used to be
+ *     one limit=1000 call, so they described only each sector's slice of the
+ *     1,000 highest scores while the copy said "every scored ticker";
+ *   - the named top ticker is rank 1 of that sector's ranked page, so it comes
+ *     from a ranked read with the same filters /sector/{slug} sends: the $50k
+ *     liquidity floor, and no leveraged fund or listing that is not common
+ *     stock. It can never name a stock the sector's own page leaves out.
+ * Sectors are ranked by average Tapeline score so the page reads as live
+ * editorial ("which sectors are strongest right now"), not a static link list.
  */
 import Link from "next/link";
 import { MarketingNav } from "@/components/MarketingNav";
@@ -26,6 +34,7 @@ import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { SECTORS } from "@/app/sector/sectors";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 import { PUBLIC_SNAPSHOT_FOOTER } from "@/lib/freshness";
+import { fetchPublicUniverse } from "@/lib/publicUniverse";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -38,6 +47,10 @@ type SignalRow = {
   sector: string | null;
   score: number | null;
   signal: string | null;
+  // Structural facts the endpoint ships on every row (optional so a response
+  // from a backend deployed before them still parses).
+  is_leveraged?: boolean;
+  is_non_common?: boolean;
 };
 
 type SectorStat = {
@@ -49,26 +62,51 @@ type SectorStat = {
 };
 
 async function fetchSignals(): Promise<SignalRow[]> {
+  // Every scored ticker, paged: the counts and averages below describe all of
+  // them. Each page's fetch is bounded so a hung API can't exceed Next's
+  // per-page budget; a failed page keeps whatever was collected.
+  return fetchPublicUniverse<SignalRow>({
+    next: { revalidate: 3600 },
+    headers: ssrInternalHeaders(),
+    signal: AbortSignal.timeout(8000),
+  });
+}
+
+/** Rank 1 of each sector's ranked page, by sector name. The same filters
+ *  /sector/{slug} sends, so the top ticker named here is the one that page
+ *  lists first. Read the highest 2,000 of the filtered list: a sector with no
+ *  row there has no top ticker to name, and the card says so. */
+async function fetchSectorTops(): Promise<Map<string, SignalRow>> {
+  const tops = new Map<string, SignalRow>();
   try {
-    const res = await fetch(`${API_BASE}/api/public/signals?limit=1000`, {
-      next: { revalidate: 3600 },
-      headers: ssrInternalHeaders(),
-      // Abort a hung/slow API so static export never exceeds Next's 60s
-      // per-page budget (a hang isn't caught by the try/catch — only a
-      // thrown error is). Matches the /stocks + sitemap pattern; ISR
-      // (revalidate:300) backfills real data on the next successful fetch.
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return [];
+    const res = await fetch(
+      `${API_BASE}/api/public/signals?${new URLSearchParams({
+        limit: "2000",
+        sort: "score",
+        order: "desc",
+        min_dollar_volume: "50000",
+        exclude_leveraged: "true",
+        exclude_non_common: "true",
+      }).toString()}`,
+      {
+        next: { revalidate: 3600 },
+        headers: ssrInternalHeaders(),
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+    if (!res.ok) return tops;
     const body = (await res.json()) as { items?: SignalRow[] };
-    return body.items ?? [];
+    for (const r of body.items ?? []) {
+      if (r.sector && r.score != null && !tops.has(r.sector)) tops.set(r.sector, r);
+    }
   } catch {
-    return [];
+    // No tops: the cards still render their counts and averages.
   }
+  return tops;
 }
 
 /** Group the flat signal feed into per-GICS-sector aggregates. */
-function buildSectorStats(rows: SignalRow[]): SectorStat[] {
+function buildSectorStats(rows: SignalRow[], tops: Map<string, SignalRow>): SectorStat[] {
   const stats = SECTORS.map((s) => {
     const inSector = rows.filter((r) => r.sector === s.api && r.score != null);
     const scored = inSector
@@ -76,15 +114,11 @@ function buildSectorStats(rows: SignalRow[]): SectorStat[] {
       .filter((n) => Number.isFinite(n));
     const avg =
       scored.length > 0 ? scored.reduce((a, b) => a + b, 0) / scored.length : null;
-    // Top ticker = highest score in the sector. public/signals is already
-    // sorted desc by score, so the first match is the top — but sort
-    // defensively in case the upstream ordering ever changes.
-    const top =
-      inSector.length > 0
-        ? inSector
-            .slice()
-            .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0]
-        : null;
+    // Top ticker = rank 1 of the sector's ranked page (see fetchSectorTops),
+    // not the highest score in the breadth read above, which includes rows
+    // that page leaves out: leveraged funds, notes and preferreds, and names
+    // below its liquidity floor.
+    const top = tops.get(s.api) ?? null;
     return {
       slug: s.slug,
       display: s.display,
@@ -126,8 +160,8 @@ export const metadata = pageMeta({
 });
 
 export default async function SectorsIndexPage() {
-  const rows = await fetchSignals();
-  const stats = buildSectorStats(rows);
+  const [rows, tops] = await Promise.all([fetchSignals(), fetchSectorTops()]);
+  const stats = buildSectorStats(rows, tops);
   const url = "https://tapeline.io/sectors";
 
   const breadcrumbs = breadcrumbJsonLd([
