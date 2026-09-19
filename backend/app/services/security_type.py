@@ -15,15 +15,11 @@ issuer's insider readings.
 NO STORED FIELD STATES THE SECURITY TYPE. Discovery lets in whatever the vendor
 types CS/ADRC, which includes preferreds and notes, and the sheet ingest writes
 any symbol it receives as equity. The listing NAME and the SYMBOL GRAMMAR are
-what we hold, so this module reads those - and, like `services/leverage.py`, is
-honest about being a heuristic.
-
-Detection is by listing name and symbol grammar because no stored field states
-the security type; like `services/leverage.py`, it is written to under-claim
-rather than over-claim, so a preferred whose name and symbol say nothing
-(Strategy's STRK/STRF/STRD/STRC are named "Strategy Inc") is treated as common
-and still receives the issuer's filings - unless it is named in
-`_KNOWN_NON_COMMON` below, which exists for exactly those.
+what we hold, so this module reads those. Like `services/leverage.py` it is an
+honest heuristic written to under-claim rather than over-claim, so a preferred
+whose name and symbol say nothing (Strategy's STRK/STRF/STRD/STRC are named
+"Strategy Inc") is treated as common and still receives the issuer's filings -
+unless it is named in `_KNOWN_NON_COMMON` below, which exists for exactly those.
 
 MEASURED 2026-09-18/19, read-only against all 11,973 production `tickers` rows
 (the peer session "Clear smart-money scores after Form 4 ages out" built and
@@ -71,7 +67,15 @@ _EQUITY_CLASSES = ASSET_CLASS_SYNONYMS["equity"]
 #: sales. CIG (CEMIG's preferred ADR) and PBR.A (Petrobras's preferred ADR) are
 #: named like their commons CIG.C and PBR; they are listed for completeness and
 #: are harmless either way, since foreign private issuers file no Form 4.
-_KNOWN_NON_COMMON: frozenset[str] = frozenset({"STRK", "STRC", "STRF", "STRD", "CIG", "PBR.A"})
+#:
+#: PPLC is PPL Corporation's Equity Units (a unit, per its NYSE listing) and
+#: BBD is Bradesco's PREFERRED ADR (BBDO is the common ADR); production stores
+#: both under their issuer's plain name ("PPL Corp", "Banco Bradesco SA",
+#: read-only 2026-09-19), so without this list PPLC would pick up PPL's lines
+#: and BBD would keep the 14 rows and 38.2 reading it held that day.
+_KNOWN_NON_COMMON: frozenset[str] = frozenset(
+    {"STRK", "STRC", "STRF", "STRD", "CIG", "PBR.A", "PPLC", "BBD"}
+)
 
 _SYM_TEST = re.compile(r"^Z[A-Z]ZZT$")
 _SYM_SUFFIX = re.compile(r"(\.PR[A-Z]?|-P[A-Z]?|[.-](U|UN|W|WS|WT|R|RT))$")
@@ -140,9 +144,11 @@ def is_common_stock(
     """True for a listing in the equity bucket that is not evidently a
     preferred, note, ETN, warrant, unit or right; see the module docstring.
 
-    Outside the equity bucket the answer is False: an ETF or ETN (stored as
-    "etf") has no insiders of its own, and a row whose class is unknown is not
-    KNOWN to be common stock."""
+    Outside the equity bucket the answer is False. A fund can have Section 16
+    filers of its own (USO held 21 EDGAR rows on 2026-09-19), but a fund's
+    Form 4s are not a view on an operating company, so the Smart Money factor
+    does not read them; and a row whose class is unknown is not KNOWN to be
+    common stock."""
     if (asset_class or "").strip().lower() not in _EQUITY_CLASSES:
         return False
     return not is_non_common_listing(symbol, name, universe)

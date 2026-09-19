@@ -45,7 +45,7 @@ describe("InsiderTab", () => {
     expect(screen.queryByTestId("insider-truncated")).toBeNull();
   });
 
-  it("says a preferred or note never lists filings, rather than calling empty normal", async () => {
+  it("says a preferred or note shows no filings, hedged, rather than calling empty normal", async () => {
     // Since 2026-09-19 a company's filings are listed under every class of
     // its common stock (GOOG and GOOGL alike) and under none of its preferred
     // shares, notes or ETNs. #862's note - "listed under the ticker it names",
@@ -56,7 +56,10 @@ describe("InsiderTab", () => {
     render(<InsiderTab symbol="STRK" />);
     const note = await waitFor(() => screen.getByText(/No Form 4 filings for STRK/));
     expect(note.textContent).toMatch(/listed under every class of its common\s+stock/);
-    expect(note.textContent).toMatch(/never under its preferred shares, notes, warrants, rights, units\s+or exchange-traded notes/);
+    expect(note.textContent).toMatch(/Its preferred shares, notes, warrants, rights and exchange-traded notes\s+show none, where their name or ticker tells them apart from the common stock/);
+    // Not an absolute: the detector reads names and tickers and has known
+    // misses (OBTC's units; an MLP's common units are its equity on purpose).
+    expect(note.textContent).not.toMatch(/never under|always show none/);
     expect(note.textContent).not.toMatch(/the ticker it names/);
     expect(note.textContent).not.toMatch(/another of its tickers/);
     expect(note.textContent).not.toMatch(/Empty here is normal/);

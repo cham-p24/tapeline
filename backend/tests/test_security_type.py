@@ -233,6 +233,10 @@ REAL_COMMON = [
     # An MLP's common units are its equity.
     ("CAPL", "CrossAmerica Partners LP Common units representing limited partner interests", "equity"),
     ("STLN", "Starling Oncology, Inc. Common Stock", "equity"),
+    # Stored under the same plain names as PPLC and BBD below.
+    ("PPL", "PPL Corp", "equity"),
+    ("BBDO", "Banco Bradesco S.A. American Depositary Shares (Each representing one  Common Share, "
+             "no par value)", "equity"),
 ]
 
 REAL_NON_COMMON = [
@@ -255,6 +259,10 @@ REAL_NON_COMMON = [
     ("OIMAU", "OneIM Acquisition Corp. Units", "equity"),
     ("HAVAR", "Harvard Ave Acquisition Corporation Rights that convert on a 1/10th of 1 basis "
               "to Class A ordinary Shares", "equity"),
+    # Named like their issuer's common stock: only the explicit list catches
+    # these. PPLC is PPL's Equity Units; BBD is Bradesco's preferred ADR.
+    ("PPLC", "PPL Corp", "equity"),
+    ("BBD", "Banco Bradesco SA", "equity"),
 ]
 
 

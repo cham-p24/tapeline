@@ -394,13 +394,16 @@ describe("/insider-buying, /how-it-works and the Smart Money factor", () => {
     expect(detail).not.toMatch(/counts only for the ticker it names/);
     const attribution = factor.limitations.find((l) => /GOOGL/.test(l));
     expect(attribution, "no attribution limitation on the Smart Money page").toBeDefined();
-    expect(attribution).toMatch(/From 19 September 2026 a filing's transactions count for every listed common-stock class/);
+    expect(attribution).toMatch(/A filing's transactions count for every listed common-stock class/);
+    // No start date for the current rule: it takes effect at deploy, and a
+    // hard-coded day is false the moment the merge slips past it.
+    expect(attribution).not.toMatch(/From 19 September 2026|to 19 September 2026/);
     expect(attribution).toMatch(/GOOG carries the same reading/);
     expect(attribution).toMatch(/preferred shares, notes, warrants, rights, units and exchange-traded notes have no reading rather than a borrowed one/);
     // The rule is a name-and-ticker judgement, and the page says so.
     expect(attribution).toMatch(/judged from its name and ticker/);
     // Both earlier rules stay stated, dated, as history.
-    expect(attribution).toMatch(/From 17 to 19 September 2026 a filing counted only for the ticker it named/);
+    expect(attribution).toMatch(/From 17 September 2026 until this rule replaced it, a filing counted only for the ticker it named/);
     expect(attribution).toMatch(/Before 17 September every ticker of the issuer received all of them/);
     // A ticker moves to the rule at its next re-check, so the page cannot
     // imply the change is instant everywhere.
