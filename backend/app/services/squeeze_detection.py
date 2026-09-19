@@ -98,7 +98,8 @@ async def detect_squeezes_batch(symbols: list[str]) -> list[dict[str, Any]]:
     from app.services.polygon_feed import fetch_aggregates
 
     setups = []
-    # Sequential fetches — Starter tier is rate-limited
+    # Sequential fetches, paced by the sleep below. The pause is our own
+    # choice, not a plan limit: Stocks Starter lists unlimited API calls.
     for sym in symbols:
         try:
             bars = await fetch_aggregates(sym)
@@ -107,7 +108,7 @@ async def detect_squeezes_batch(symbols: list[str]) -> list[dict[str, Any]]:
                 setups.append({"symbol": sym, **feat})
         except Exception:
             logger.exception("squeeze_detection.failed symbol=%s", sym)
-        # Rate-limit safety: ~12s between calls ~= 5/min
+        # ~12s between calls ~= 5/min
         await asyncio.sleep(12)
 
     # Sort highest spike first

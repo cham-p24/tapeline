@@ -170,9 +170,10 @@ MASSIVE_API_KEY=your_key python -m app.scripts.walk_forward_backtest \
     --output backtest_live_2024.csv
 ```
 
-The first run hits the network for every (symbol, window) and is throttled
-to 5 calls/min on Starter tier — expect ~20 min for a fresh fetch of 100
-symbols. Subsequent runs over the same window read from
+The first run hits the network for every (symbol, window) and is paced at
+5 calls/min by the provider's own limiter — expect ~20 min for a fresh fetch
+of 100 symbols. That pace is ours, not the plan's: Stocks Starter lists
+unlimited API calls. Subsequent runs over the same window read from
 `~/.cache/tapeline/historical_bars/` and complete in seconds.
 
 ---
@@ -293,12 +294,14 @@ back-test is essentially free.
 - **Corrupt files:** treated as a miss + silently dropped. The next call
   repopulates.
 
-### Rate limits
+### Pacing
 
-Massive Starter is 5 calls/min. The provider uses a sliding-window token
-bucket (`_RateLimiter` in `historical_bars.py`) that blocks via `time.sleep`
-until a fresh slot is available — we never let a 429 leak through. Tests
-inject a no-op `sleep_fn` so the bucket is logically exercised without
+The provider paces itself at 5 calls/min. That is our own choice, not the
+plan's limit: 5 calls a minute is Massive's free Basic tier, and its pricing
+page (read 19 September 2026) lists Stocks Starter, the plan in use, with
+unlimited API calls. The pacing is a sliding-window limiter (`_RateLimiter`
+in `historical_bars.py`) that blocks via `time.sleep` until a slot is free.
+Tests inject a no-op `sleep_fn` so the bucket is logically exercised without
 actually pausing CI.
 
 ### Auth + fallback

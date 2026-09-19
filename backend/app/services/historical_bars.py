@@ -9,8 +9,8 @@ process, cache-first reader that doesn't depend on the worker being up.
 
 Why a dedicated module:
     - Backtests are CLI-invoked, often re-run repeatedly on overlapping windows.
-      Hitting the network every time would be slow + would burn the free-tier
-      rate budget. A 24h on-disk cache means the second run of a 2-year
+      Hitting the network every time would be slow + would spend vendor calls
+      for nothing. A 24h on-disk cache means the second run of a 2-year
       back-test is essentially free.
     - The runtime adapter (`polygon_feed.fetch_aggregates`) is async; the
       backtest is a sync script. Bridging async into a sync CLI for every bar
@@ -26,10 +26,12 @@ Auth:
     - Both unset → falls back to the deterministic GBM-style synthetic series
       that the walk-forward backtest used in v1.
 
-Rate limits:
-    - Massive Starter tier: 5 calls/min. Token-bucket throttling enforced via
-      `_acquire_slot()` — sleeps until a fresh slot is available rather than
-      letting a 429 leak through.
+Pacing:
+    - 5 calls a minute, enforced by the module-level sliding-window limiter
+      (`_LIMITER.acquire()`), which sleeps until a slot is free. That is our
+      own pace, not the plan's limit: 5 calls a minute is the vendor's free
+      Basic tier, and its pricing page lists Stocks Starter, the plan in use,
+      with unlimited API calls (massive.com/pricing, read 2026-09-19).
 
 Cache:
     - 24h TTL. Files at $TAPELINE_BAR_CACHE_DIR (default
@@ -67,8 +69,8 @@ DEFAULT_CACHE_DIR = Path.home() / ".cache" / "tapeline" / "historical_bars"
 # any newly-completed bar without manual cache eviction.
 CACHE_TTL_SECONDS = 24 * 3600
 
-# Massive Starter rate limit: 5 calls / minute. Token bucket enforces this
-# at the call site so we never get 429'd.
+# Our own pace: 5 calls / minute, enforced at the call site by _LIMITER. Not a
+# plan limit (see "Pacing" in the module docstring).
 RATE_LIMIT_CALLS = 5
 RATE_LIMIT_WINDOW_SECONDS = 60.0
 
@@ -351,7 +353,8 @@ def fetch_daily_bars(
     Order of resolution:
         1. On-disk cache (24h TTL) — exact (symbol, start, end) match
         2. Massive `/v2/aggs/ticker/{sym}/range/1/day/{from}/{to}` — if a key
-           is set. Rate-throttled to 5 calls/min on the module-level limiter.
+           is set. Paced at 5 calls/min by the module-level limiter (our own
+           pace; the plan in use lists unlimited API calls).
         3. Synthetic GBM-style fallback — no key required, deterministic per
            symbol so a backtest is reproducible across machines.
 

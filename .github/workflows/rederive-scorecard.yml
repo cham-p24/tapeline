@@ -16,9 +16,10 @@ name: Re-derive scorecard from real closes
 # not the plan's limit: 5 calls a minute is the vendor's free Basic tier, and
 # its pricing page lists Stocks Starter, the plan in use, with unlimited API
 # calls (massive.com/pricing, read 2026-09-19). The SAME key serves the live
-# worker's per-tick fundamentals, calendars, insider Form 4, analyst ratings
-# and the daily sector backfill, so every call this job makes shares the key
-# with the tick.
+# worker's price snapshots, daily-bar aggregates, news, crypto rows and
+# scorecard back-check, so every call this job makes shares the key with the
+# worker. (Fundamentals, analyst ratings and the sector backfill use Finnhub,
+# and insider Form 4 comes from SEC EDGAR, not this key.)
 #
 # Two ways to make that acceptable:
 #   * Use `since` to repair in chunks (a month at a time), off-hours.

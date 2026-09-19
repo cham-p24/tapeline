@@ -15,8 +15,11 @@ plausible-looking but wrong published numbers.
   3. It rounded `pct` and THEN subtracted to get alpha, while the worker
      subtracts from the unrounded `pct`. Different numbers from identical
      prices, so already-correct rows were rewritten and miscounted as damage.
-  4. It paced at 0.25s — about 48x over the documented Starter-tier limit of
-     5 requests/min, on the key the live worker shares.
+  4. It paced at 0.25s on the key the live worker shares. The review counted
+     that as ~48x over a Starter limit of 5 requests/min; there is no such
+     limit (the vendor lists Stocks Starter with unlimited API calls, read
+     2026-09-19; 5 a minute is the free Basic tier). The 12s default stays as
+     a deliberate choice for a shared key, and this test pins it.
   5. Its before/after headline was not the statistic /scorecard publishes
      (wrong population: no outlier filter).
 """
@@ -165,11 +168,14 @@ def test_no_double_rounded_alpha_expression_remains():
 # --------------------------------------------------------------------------
 
 
-def test_default_pace_respects_the_documented_rate_limit():
-    """polygon_feed documents Starter at 5 requests/min."""
+def test_default_pace_stays_at_twelve_seconds():
+    """12s (5 calls a minute) is the script's own default, not a plan limit.
+    It is pinned so that lowering it is a decision, made with this test,
+    because the key is shared with the live worker."""
     assert rs._DEFAULT_PACE_SECONDS >= 12.0, (
-        f"default pacing {rs._DEFAULT_PACE_SECONDS}s exceeds 5 req/min — the "
-        f"run would 429-storm itself and starve the live worker's shared key"
+        f"default pacing {rs._DEFAULT_PACE_SECONDS}s is faster than 5 calls a "
+        f"minute; the key is shared with the live worker, so change this test "
+        f"deliberately if that is intended"
     )
 
 
@@ -361,7 +367,7 @@ def test_flag_mismatch_is_counted_and_reported_not_silently_swallowed():
 
 @pytest.mark.asyncio
 async def test_until_bounds_the_window_inclusively():
-    """A full Starter-tier pass is ~2.6h and the `flyctl ssh console` stream
+    """A full pass at the default 12s pace is ~2.6h and the `flyctl ssh console` stream
     does not survive that — a real run was torn down at ~45 minutes, leaving
     the PUBLIC record half repaired with no record of where it stopped.
 
