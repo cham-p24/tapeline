@@ -100,6 +100,70 @@ describe("PricingTable", () => {
     expect(screen.queryByText(usd(PRICING.premium.annualPerMonth))).not.toBeInTheDocument();
   });
 
+  it("sells exactly three self-serve plans — the Trader card is gone", () => {
+    // Founder, 2026-09-19: "The trading option is shit". It was a hand-sold
+    // fourth card whose yearly price saved nothing ($588 = $49×12).
+    render(<PricingTable />);
+    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+      "Free",
+      "Pro",
+      "Premium",
+    ]);
+    expect(screen.queryByText(/trader/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /talk to us/i })).not.toBeInTheDocument();
+  });
+
+  it("switches with one sliding thumb: Monthly | Yearly, Yearly by default", () => {
+    render(<PricingTable />);
+    const group = screen.getByRole("group", { name: /billing period/i });
+    const [monthly, yearly] = Array.from(group.querySelectorAll("button"));
+    expect(monthly).toHaveTextContent(/^Monthly$/);
+    expect(yearly).toHaveTextContent(/^Yearly/);
+    expect(yearly).toHaveAttribute("aria-pressed", "true");
+    const thumb = screen.getByTestId("billing-toggle-thumb");
+    expect(thumb.style.transform).toBe("translateX(100%)");
+    fireEvent.click(monthly);
+    expect(monthly).toHaveAttribute("aria-pressed", "true");
+    expect(thumb.style.transform).toBe("translateX(0)");
+    // Same thumb element, moved — not a new one swapped in.
+    expect(screen.getByTestId("billing-toggle-thumb")).toBe(thumb);
+  });
+
+  it("never pops anything in or out when switching", () => {
+    // The old toggle showed a "−17%" chip only on monthly and a "Save 2
+    // months" line only on annual, so the cards jumped a line on every
+    // switch. Now each of those slots is filled in both states.
+    render(<PricingTable />);
+    const chip = () => screen.getByText(/^Save \d+%$/);
+    const saveLine = () => screen.getByText(/save 2 months/i);
+    const notes = () =>
+      ["Pro", "Premium"].map((n) => screen.getByText(n).closest("div")!.querySelectorAll("p").length);
+    const before = { chip: chip().textContent, notes: notes() };
+    saveLine();
+    fireEvent.click(screen.getByRole("button", { name: /monthly/i }));
+    expect(chip().textContent).toBe(before.chip);
+    saveLine();
+    expect(notes()).toEqual(before.notes);
+  });
+
+  it("states a yearly saving that is true of every paid plan", () => {
+    render(<PricingTable />);
+    const pct = Number(screen.getByText(/^Save \d+%$/).textContent!.match(/\d+/)![0]);
+    expect(pct).toBeGreaterThan(0);
+    for (const p of [PRICING.pro, PRICING.premium]) {
+      const real = (1 - p.annual / (p.monthly * 12)) * 100;
+      expect(pct, `chip overstates the saving on a $${p.monthly} plan`).toBeLessThanOrEqual(real);
+    }
+  });
+
+  it("eases prices in on a switch, but not on first paint", () => {
+    render(<PricingTable />);
+    const proPrice = () => screen.getByText(usd(PRICING.pro.annualPerMonth));
+    expect(proPrice()).not.toHaveClass("animate-price-in");
+    fireEvent.click(screen.getByRole("button", { name: /monthly/i }));
+    expect(screen.getByText(usd(PRICING.pro.monthly))).toHaveClass("animate-price-in");
+  });
+
   it("shows a sales contact line for B2B / lifetime instead of a third row of cards", () => {
     // Anchor cards (Team / Enterprise / Lifetime) were retired 2026-05-04
     // for visual cleanup — sales-curious buyers email instead.

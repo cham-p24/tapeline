@@ -19,7 +19,7 @@ import {
   usdCompact,
 } from "@/lib/pricing";
 import { trackEvent } from "@/lib/gtag";
-import { BillingToggle, useBillingPeriod } from "@/components/BillingToggle";
+import { BillingToggle, useBillingChanged, useBillingPeriod } from "@/components/BillingToggle";
 import { BestValueBadge } from "@/components/BestValueBadge";
 import { useChargeDisclosure, chargeDisclosureLine } from "@/lib/chargeDisclosure";
 import { ACTIVE_SCORED_TICKERS } from "@/lib/universe";
@@ -127,36 +127,11 @@ const PLANS = [
     highlight: false,
     skipTrial: true,
   },
-  {
-    name: "Trader",
-    tagline: "Early access — for desks & power users.",
-    prices: {
-      monthly: PRICING.trader.monthly,
-      annual: PRICING.trader.annual,
-      annualPerMonth: PRICING.trader.annualPerMonth,
-    },
-    // Concierge / early-access tier — NOT self-serve. The differentiators are
-    // built with early customers, so the CTA is "Talk to us" (→ /contact), not
-    // a Stripe checkout. Its price is the high anchor that reframes Premium as
-    // the sensible choice. No proPlus strip (that hardcodes "Everything in
-    // Pro"); the first highlight states "Everything in Premium" instead.
-    highlights: [
-      "Everything in Premium",
-      // "Your full track record + per-factor attribution" removed 2026-09-02:
-      // that is the PER-USER watchlist record, held dark pending item 3 of
-      // docs/launch/LAWYER_CONSULT_EMAIL.md. Selling a feature that is switched
-      // off at every tier is the kind of claim the copy linter exists to stop.
-      "Per-factor attribution on every score",
-      // "webhooks" was removed 2026-09-06: no webhook dispatch exists in
-      // services/alerts.py or routers/alerts.py. Promise only what ships.
-      "Get your data out — API & bulk export",
-      "Desk-grade watchlists, scans & alerts",
-      "A hand in what we build next",
-    ],
-    cta: "Talk to us",
-    ctaHref: "/contact",
-    highlight: false,
-  },
+  // A fourth "Trader" card ($49/mo yearly, "Talk to us") was removed on
+  // 2026-09-19 at the founder's call. It was a hand-sold tier whose yearly
+  // price saved nothing ($588 = $49×12), so it was the one card the
+  // Monthly | Yearly switch made no sense for. Bigger buyers still have the
+  // sales@ line under the cards.
 ];
 
 export function PricingTable({ now }: { now?: Date } = {}) {
@@ -165,6 +140,8 @@ export function PricingTable({ now }: { now?: Date } = {}) {
   // ComparisonTable header on the same page can never disagree with these
   // cards; standalone renders fall back to the same annual default.
   const { billing, setBilling } = useBillingPeriod();
+  // Prices ease in only after a real switch, never on first paint.
+  const priceAnim = useBillingChanged(billing) ? " animate-price-in" : "";
   // Open-access month (backend tier.py free_open_access, mirrored in
   // lib/pricing.ts): while the window runs, a SIGNED-IN Free account's
   // scanner row cap lifts from the top 10 to the Pro cap. Date-gated so the
@@ -195,13 +172,16 @@ export function PricingTable({ now }: { now?: Date } = {}) {
       <p className="mt-1 text-center text-xs text-muted" data-testid="price-delay-note">
         {PRICE_DELAY_NOTE} on every plan, re-read {PASS_CADENCE_PHRASE} during US market hours.
       </p>
-      {billing === "annual" && (
-        <p className="mt-1 text-center text-xs text-up/90">Save 2 months · your rate, locked in</p>
-      )}
+      {/* One line tall whichever period is picked, so switching never nudges
+          the cards below up or down. */}
+      <p key={billing} className={`mt-1 min-h-[1rem] text-center text-xs text-up/90${priceAnim}`}>
+        {billing === "annual"
+          ? "Save 2 months · your rate, locked in"
+          : "Pay yearly to save 2 months"}
+      </p>
 
-      {/* Plans — Free / Pro / Premium self-serve, plus the Trader early-access
-          anchor. 2-up on tablet, 4-up on desktop. */}
-      <div className="mx-auto mt-10 grid max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-6">
+      {/* Plans — Free / Pro / Premium, all self-serve. 3-up from tablet. */}
+      <div className="mx-auto mt-10 grid max-w-5xl gap-4 md:grid-cols-3 md:gap-6">
         {PLANS.map((p) => {
           const price = p.prices[billing];
           // Annual advertises the exact per-month equivalent from
@@ -232,24 +212,37 @@ export function PricingTable({ now }: { now?: Date } = {}) {
                 <BestValueBadge className="absolute -top-3 left-1/2 -translate-x-1/2" />
               )}
               <h3 className="text-xl font-semibold">{p.name}</h3>
-              <p className="mt-1 text-sm text-muted">{p.tagline}</p>
+              {/* Two lines tall side by side, so every card's price sits on the
+                  same baseline even when one tagline wraps. */}
+              <p className="mt-1 text-sm text-muted md:min-h-[2.5rem]">{p.tagline}</p>
               <div className="mt-6">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-5xl font-bold nums tracking-tight">
+                  {/* Keyed on the period so a switch re-mounts the number and
+                      it eases in (animate-price-in, globals.css) instead of
+                      snapping. Only one price is ever in the DOM. */}
+                  <span
+                    key={`${p.name}-${billing}`}
+                    className={`inline-block text-5xl font-bold nums tracking-tight${price > 0 ? priceAnim : ""}`}
+                  >
                     {price === 0 ? "$0" : `$${perMonth.toFixed(2)}`}
                   </span>
                   <span className="text-muted">/ month</span>
                 </div>
                 {/* An annual per-month figure never renders without the
-                    explicit billed-annually qualifier + the real total. */}
-                {billing === "annual" && price > 0 && (
-                  <p className="mt-1.5 text-xs text-muted">
-                    {billedAnnuallyNote(p.prices)} · save ${annualSaving(p.prices)}/yr
-                  </p>
-                )}
-                {billing === "monthly" && price > 0 && (
-                  <p className="mt-1.5 text-xs text-muted">billed monthly</p>
-                )}
+                    explicit billed-annually qualifier + the real total. The
+                    line holds its height on every card and both periods (the
+                    Free card's is empty) so no card resizes on a switch. */}
+                <p
+                  key={`${p.name}-note-${billing}`}
+                  aria-hidden={price === 0 ? true : undefined}
+                  className={`mt-1.5 min-h-[1rem] text-xs text-muted${price > 0 ? priceAnim : ""}`}
+                >
+                  {price === 0
+                    ? null
+                    : billing === "annual"
+                    ? `${billedAnnuallyNote(p.prices)} · save $${annualSaving(p.prices)}/yr`
+                    : "billed monthly"}
+                </p>
               </div>
 
               {/* Premium card: "Everything in Pro" anchor strip above the

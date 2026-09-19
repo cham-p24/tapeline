@@ -316,6 +316,25 @@
       animation: none;
     }
   }
+
+  /*
+   * `.animate-price-in` — a price that just changed eases up into place
+   * (opacity + a short rise + a touch of blur) instead of snapping. Used by
+   * the pricing cards when the Monthly | Yearly switch flips; the element is
+   * keyed on the period, so each flip re-runs it.
+   */
+  .animate-price-in {
+    animation: price-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes price-in {
+    from { opacity: 0; transform: translateY(0.3em); filter: blur(3px); }
+    to   { opacity: 1; transform: translateY(0); filter: blur(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-price-in {
+      animation: none;
+    }
+  }
   /* iOS-style pill button — fully rounded, generous horizontal padding,
      subtle scale + opacity on press. */
   .btn {
