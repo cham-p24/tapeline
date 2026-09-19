@@ -209,45 +209,45 @@ async def test_premium_user_unaffected_by_free_web_push_cap():
 
 # ── rule_type CONTENT gate (not just the delivery channel) ────────────────────
 #
-# create_rule used to gate only the channel. But a congress/squeeze/regime/news
-# rule carries PAID CONTENT regardless of how it's delivered, and web_push is a
-# free channel — so a free user could subscribe to a `congress` rule on
-# web_push and receive Premium congressional-trade detail at $0 (also readable
-# via GET /api/alerts/events). These pin the content gate.
+# create_rule used to gate only the channel. But a regime/news rule carries
+# PAID CONTENT regardless of how it's delivered, and web_push is a free
+# channel — so a free user could subscribe to a paid rule type on web_push and
+# receive paid content at $0 (also readable via GET /api/alerts/events). These
+# pin the content gate. (Squeeze and congress rules are not gated any more:
+# nobody can create them, see the section after these.)
 
 @pytest.mark.asyncio
-async def test_free_user_cannot_create_premium_rule_type_on_free_channel():
-    """Free + congress (Premium content) on web_push → 403 on the CONTENT gate.
+async def test_free_user_cannot_create_paid_rule_type_on_free_channel():
+    """Free + news / regime (Pro content) on web_push → 403 on the CONTENT gate.
 
     Since 2026-08-30 a free account cannot create any alert rule at all (the
     count cap is 0), so the base `score` type is refused as well — but for a
     different reason, and the message says which. This test pins that the
     content gate still fires independently of the count cap, so tightening the
     count did not quietly become the only thing standing between a free user
-    and Premium-only content.
+    and paid content.
     """
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         try:
             await _set_tier(c, "free")
 
-            congress = await c.post(
+            news = await c.post(
                 "/api/alerts/rules",
-                json={"name": "C", "rule_type": "congress", "symbol": "NVDA",
+                json={"name": "N", "rule_type": "news", "symbol": "NVDA",
                       "threshold": None, "channel": "web_push"},
                 headers=_AUTH,
             )
-            assert congress.status_code == 403, congress.text
-            assert "congress" in congress.text.lower()
+            assert news.status_code == 403, news.text
+            assert "news" in news.text.lower()
 
-            # Pro-gated content (squeeze) is also blocked for Free on web_push.
-            squeeze = await c.post(
+            regime = await c.post(
                 "/api/alerts/rules",
-                json={"name": "S", "rule_type": "squeeze", "symbol": "NVDA",
+                json={"name": "R", "rule_type": "regime", "symbol": "BEAR",
                       "threshold": None, "channel": "web_push"},
                 headers=_AUTH,
             )
-            assert squeeze.status_code == 403, squeeze.text
+            assert regime.status_code == 403, regime.text
 
             # And `score` — the BASE rule type on the free channel — is now
             # refused too, on the count cap rather than the content gate.
@@ -268,15 +268,15 @@ async def test_free_user_cannot_create_premium_rule_type_on_free_channel():
 
 
 @pytest.mark.asyncio
-async def test_pro_user_gets_pro_rule_types_but_not_premium_congress():
-    """A Pro user can create squeeze/regime/news (Pro content) but NOT congress
-    (Premium) — the content gate is tier-accurate, not all-or-nothing."""
+async def test_pro_user_gets_pro_rule_types():
+    """A Pro user can create regime/news (Pro content): the content gate lets
+    an entitled tier through."""
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         try:
             await _set_tier(c, "pro")
 
-            for rt in ("squeeze", "regime", "news"):
+            for rt in ("regime", "news"):
                 r = await c.post(
                     "/api/alerts/rules",
                     json={"name": rt, "rule_type": rt, "symbol": "NVDA",
@@ -284,32 +284,78 @@ async def test_pro_user_gets_pro_rule_types_but_not_premium_congress():
                     headers=_AUTH,
                 )
                 assert r.status_code == 200, f"{rt}: {r.text}"
+        finally:
+            await _restore_dev_user()
 
-            congress = await c.post(
+
+# ── squeeze + congress: no data behind them, so no NEW rules ─────────────────
+#
+# There is no real squeeze data source (#818) and no real congressional trade
+# data (#820), both since 14 Sep 2026, so a rule of either type cannot fire on
+# real data. create_rule still accepted them, and to a Free or Pro user it
+# answered a congress rule with a 403 that read as an upsell ("congress alerts
+# require congress.feed. Upgrade at /app/billing") for a feed that does not
+# exist. Now every tier, on every channel, gets the same plain refusal, before
+# any tier gate can turn it into a sales line. Rules users already hold are
+# left alone: they still list and still delete.
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tier", ["free", "pro", "premium"])
+@pytest.mark.parametrize("channel", ["web_push", "email"])
+@pytest.mark.parametrize("rule_type", ["squeeze", "congress"])
+async def test_no_tier_can_create_a_squeeze_or_congress_rule(tier, channel, rule_type):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        try:
+            await _set_tier(c, tier)
+            r = await c.post(
                 "/api/alerts/rules",
-                json={"name": "C", "rule_type": "congress", "symbol": "NVDA",
-                      "threshold": None, "channel": "web_push"},
+                json={"name": "X", "rule_type": rule_type, "symbol": "NVDA",
+                      "threshold": 70, "channel": channel},
                 headers=_AUTH,
             )
-            assert congress.status_code == 403, congress.text
+            assert r.status_code == 422, r.text
+            detail = r.json()["detail"]
+            assert isinstance(detail, str), detail  # a sentence, not a schema error
+            assert "not available" in detail.lower(), detail
+            # Nothing in the refusal may sell a plan or name an entitlement key.
+            for word in ("upgrade", "billing", "premium", "pro ", "congress.feed", "squeeze.full"):
+                assert word not in detail.lower(), f"{word!r} in {detail!r}"
+
+            async with session_scope() as s:
+                rows = (await s.execute(
+                    select(AlertRule).where(AlertRule.user_id == "dev_user")
+                )).scalars().all()
+            assert rows == [], "a refused rule was written anyway"
         finally:
             await _restore_dev_user()
 
 
 @pytest.mark.asyncio
-async def test_premium_user_can_create_congress_rule():
-    """Premium is entitled to congress content — it must go through."""
+async def test_existing_squeeze_and_congress_rules_still_list_and_delete():
+    """Refusing NEW rules must not strand the ones users already have: they
+    stay visible in GET /rules and DELETE still removes them."""
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         try:
             await _set_tier(c, "premium")
-            r = await c.post(
-                "/api/alerts/rules",
-                json={"name": "C", "rule_type": "congress", "symbol": "NVDA",
-                      "threshold": None, "channel": "web_push"},
-                headers=_AUTH,
-            )
-            assert r.status_code == 200, r.text
+            async with session_scope() as s:
+                s.add(AlertRule(user_id="dev_user", name="Old squeeze", rule_type="squeeze",
+                                symbol="NVDA", threshold=70.0, channel="email"))
+                s.add(AlertRule(user_id="dev_user", name="Old congress", rule_type="congress",
+                                symbol="NVDA", threshold=None, channel="web_push"))
+                await s.commit()
+
+            listed = await c.get("/api/alerts/rules", headers=_AUTH)
+            assert listed.status_code == 200, listed.text
+            items = listed.json()["items"]
+            assert sorted(i["rule_type"] for i in items) == ["congress", "squeeze"]
+
+            for item in items:
+                d = await c.delete(f"/api/alerts/rules/{item['id']}", headers=_AUTH)
+                assert d.status_code == 200, d.text
+            after = await c.get("/api/alerts/rules", headers=_AUTH)
+            assert after.json()["count"] == 0
         finally:
             await _restore_dev_user()
 

@@ -1049,8 +1049,12 @@ async def fetch_squeezes() -> list[dict[str, Any]]:
     compute BB width percentile, ATR contraction, volume ratio, OBV trend,
     and emit a spike score.
 
-    On Starter tier (5 req/min) this takes ~15 minutes to sweep the full
-    universe, so squeeze detection runs on a slower cadence than snapshots.
+    detect_squeezes_batch waits 12 s between vendor calls (5 a minute), so
+    DEFAULT_UNIVERSE (78 symbols on 2026-09-19) takes ~15 minutes to sweep,
+    and squeeze detection runs on a slower cadence than snapshots. That pacing is our own
+    choice, not the plan's limit: 5 calls a minute is the vendor's free Basic
+    tier, and its pricing page lists Stocks Starter with unlimited API calls
+    (massive.com/pricing, read 2026-09-19).
     """
     from app.services.squeeze_detection import detect_squeezes_batch
     return await detect_squeezes_batch(DEFAULT_UNIVERSE)

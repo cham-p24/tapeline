@@ -11,16 +11,20 @@ name: Re-derive scorecard from real closes
 # a Windows dev box at all: psycopg refuses the ProactorEventLoop.)
 #
 # ── READ THIS BEFORE CHOOSING `apply` ────────────────────────────────────────
-# COST. polygon_feed documents the Starter tier at 5 requests/min, and the SAME
-# key serves the per-tick fundamentals, calendars, insider Form 4, analyst
-# ratings and the daily sector backfill. A full pass is roughly 790 vendor calls
-# => ~2.6 HOURS at the 12s default pacing, during which the live worker is
-# competing for that budget.
+# COST. A full pass is roughly 790 vendor calls => ~2.6 HOURS at the 12s
+# default pacing (5 calls a minute). That pacing is the script's own default,
+# not the plan's limit: 5 calls a minute is the vendor's free Basic tier, and
+# its pricing page lists Stocks Starter, the plan in use, with unlimited API
+# calls (massive.com/pricing, read 2026-09-19). The SAME key serves the live
+# worker's per-tick fundamentals, calendars, insider Form 4, analyst ratings
+# and the daily sector backfill, so every call this job makes shares the key
+# with the tick.
 #
 # Two ways to make that acceptable:
 #   * Use `since` to repair in chunks (a month at a time), off-hours.
-#   * Or upgrade to the Developer tier (unlimited req/min) and pass a small
-#     `pace`, which turns the whole job into minutes.
+#   * Or pass a smaller `pace` (no plan change is needed), which turns the
+#     whole job into minutes. Try it on a short `since` window first, because
+#     the key is shared with the live worker.
 #
 # Run `estimate` FIRST — it reads the DB, makes zero vendor calls, and prints
 # the exact call count and wall-clock for the window you chose.
@@ -52,7 +56,7 @@ on:
         required: false
         default: ""
       pace:
-        description: "Seconds between vendor calls. 12 = 5/min (Starter ceiling). Lower ONLY on Developer tier."
+        description: "Seconds between vendor calls. 12 = 5/min, the script default (not a plan limit; the key is shared with the live worker)."
         required: false
         default: "12"
       slice_days:
@@ -75,7 +79,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    # A full Starter-tier pass is ~2.6h; leave headroom but stay under the
+    # A full pass at the default 12s pace is ~2.6h; leave headroom but stay under the
     # 6h job ceiling so a wedged run fails loudly rather than hanging.
     timeout-minutes: 330
     steps:
@@ -127,8 +131,8 @@ jobs:
 
           echo "mode=$MODE  args='$args'"
           echo "--------------------------------------------------------------"
-          # -C runs one command and streams its output back. A FULL Starter-tier
-          # pass is ~2.6h and the stream does not survive that: an earlier run
+          # -C runs one command and streams its output back. A FULL pass at the
+          # default pace is ~2.6h and the stream does not survive that: an earlier run
           # was torn down at ~45 minutes with "ssh shell: wait: remote command
           # exited without exit status", which left the PUBLIC record half
           # repaired and no record of where it stopped.
