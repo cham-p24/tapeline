@@ -30,6 +30,7 @@ import {
 } from "@/lib/jsonld";
 import { SECTORS } from "@/app/sector/sectors";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+import { COMMODITY_ETFS, notCovered } from "@/lib/coverage";
 import { ALERT_DAILY_CEILING, FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
 import { CRYPTO_CADENCE_SENTENCE, PASS_CADENCE_PHRASE, PRICE_DELAY_NOTE, PRICE_DELAY_PHRASE } from "@/lib/freshness";
 import {
@@ -489,6 +490,17 @@ async function fetchRelatedTickers(
 export async function generateMetadata({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol } = await params;
   const sym = symbol.toUpperCase();
+  // Not covered (continuous futures, hyphen-spelled class shares): no fetch,
+  // no index. See lib/coverage.ts.
+  const uncovered = notCovered(sym);
+  if (uncovered) {
+    return {
+      title: `${sym} — Not covered · Tapeline`,
+      description: uncovered.message,
+      alternates: { canonical: `https://tapeline.io/t/${sym}` },
+      robots: { index: false, follow: true },
+    };
+  }
   const result = await fetchTicker(sym);
   if (result.status !== "ok") {
     // `missing` → the noindex "not in universe" stub is correct. `error`
@@ -662,6 +674,18 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
 export default async function PublicTickerPage({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol } = await params;
   const sym = symbol.toUpperCase();
+
+  // Symbols nothing we hold can price (2026-09-19): 27 continuous futures and
+  // the BRK-A / BRK-B hyphen twins. The backend answers them with a 404 whose
+  // detail is this same message; rendering it here, before any fetch, keeps
+  // the page from spending an API call to learn what the symbol already says.
+  // A record entry (PA=F on 26 June 2026) can still link here, so this must
+  // render a page, not a 404.
+  const uncovered = notCovered(sym);
+  if (uncovered) {
+    return <NotCoveredPage sym={sym} message={uncovered.message} coveredAs={uncovered.coveredAs} />;
+  }
+
   const result = await fetchTicker(sym);
 
   // Only a definitive backend 404 (symbol genuinely absent from the universe)
@@ -1346,6 +1370,52 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
         </div>
       </section>
 
+      <MarketingFooter />
+    </main>
+  );
+}
+
+/**
+ * The page for a symbol we do not cover (lib/coverage.ts). noindex via
+ * generateMetadata; links to the covered alternatives instead of a dead end.
+ */
+function NotCoveredPage({
+  sym,
+  message,
+  coveredAs,
+}: {
+  sym: string;
+  message: string;
+  coveredAs: string | null;
+}) {
+  return (
+    <main id="main" className="min-h-screen">
+      <MarketingNav />
+      <article className="mx-auto max-w-2xl px-4 sm:px-6 py-16">
+        <p className="eyebrow">Not covered</p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight">{sym}</h1>
+        <p className="mt-4 text-muted leading-relaxed">{message}</p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {coveredAs ? (
+            <Link href={`/t/${encodeURIComponent(coveredAs)}`} className="btn-primary text-sm">
+              {coveredAs}
+            </Link>
+          ) : (
+            COMMODITY_ETFS.map((etf) => (
+              <Link key={etf} href={`/t/${etf}`} className="btn-ghost text-sm">
+                {etf}
+              </Link>
+            ))
+          )}
+        </div>
+        <p className="mt-8 text-sm text-subtle">
+          Any entry this symbol already has on the{" "}
+          <Link href="/scorecard" className="underline hover:text-fg">
+            public record
+          </Link>{" "}
+          stays there unchanged.
+        </p>
+      </article>
       <MarketingFooter />
     </main>
   );

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import logging
-import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -55,6 +54,8 @@ from app.services.news_health import (
     NEWS_INGEST_STALE_SECONDS,
     news_wire_canary_seconds,
 )
+from app.services.price_audience import INTERNAL_SSR_HEADER as INTERNAL_SSR_HEADER
+from app.services.price_audience import is_trusted_ssr
 from app.services.ticker_ordering import ORDER_PATTERN, SORT_PATTERN
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -176,9 +177,6 @@ app.add_middleware(
 )
 
 
-INTERNAL_SSR_HEADER = "x-tapeline-internal"
-
-
 def _is_trusted_ssr(request: Request) -> bool:
     """True when this request carries our own SSR shared secret.
 
@@ -197,14 +195,13 @@ def _is_trusted_ssr(request: Request) -> bool:
     so a missing/mis-set secret degrades to today's behaviour rather than
     removing rate limiting. The token is server-only on the frontend (never
     NEXT_PUBLIC_*), so it is not reachable from a browser bundle.
+
+    The check itself has lived in services/price_audience.py since 2026-09-19:
+    the keyless-price gate trusts the same secret (our own SSR keeps prices,
+    an anonymous JSON caller does not), and one definition means the rate
+    limiter and the price gate can never disagree about which caller is us.
     """
-    token = settings.internal_ssr_token
-    if not token:
-        return False
-    presented = request.headers.get(INTERNAL_SSR_HEADER)
-    if not presented:
-        return False
-    return secrets.compare_digest(presented, token)
+    return is_trusted_ssr(request)
 
 
 @app.middleware("http")
@@ -442,6 +439,7 @@ async def public_top_tickers(limit: int = 500) -> dict[str, object]:
 
     from app.db import session_scope
     from app.models import Ticker
+    from app.services.coverage import covered_clauses
 
     capped = max(1, min(limit, 1000))
     async with session_scope() as session:
@@ -453,15 +451,22 @@ async def public_top_tickers(limit: int = 500) -> dict[str, object]:
         # crawled-not-indexed problem):
         #   • space/emoji-in-symbol rows ("🏆 IVV") — sheet annotations ingested
         #     as symbols; broken /t/🏆 IVV URLs + dupes of real ETFs. notlike(
-        #     "% %") keeps legit futures like CL=F.
+        #     "% %") tests for a space only (futures are excluded separately,
+        #     below).
         #   • score > 100 — impossible for the clamped composite, so it can only
         #     be a legacy pre-clamp ghost (e.g. MCW=104) that dropped out of the
         #     universe. A real ticker never exceeds 100, so breadth is unharmed.
+        #   • symbols we do not cover (2026-09-19): the 27 continuous-futures
+        #     rows (CL=F ...) and the hyphen-spelled BRK-A/BRK-B twins. None can
+        #     be priced, and routers.ticker now answers "Not covered" for them,
+        #     so a sitemap URL would point Google at a page with nothing on it.
+        #     See services/coverage.py.
         result = await session.execute(
             select(Ticker.symbol)
             .where(Ticker.score.is_not(None))
             .where(Ticker.score <= 100)
             .where(Ticker.symbol.notlike("% %"))
+            .where(*covered_clauses())
             .order_by(desc(Ticker.score))
             .limit(capped)
         )
@@ -469,8 +474,13 @@ async def public_top_tickers(limit: int = 500) -> dict[str, object]:
     return {"count": len(symbols), "symbols": symbols}
 
 
+#: Sorts that would publish the ordering of a withheld market-data column.
+_PRICE_SORTS = frozenset({"change_pct_1d", "change_pct_5d", "change_pct_1m", "volume"})
+
+
 @app.get("/api/public/signals")
 async def public_signals(
+    request: Request,
     limit: int = 1000,
     offset: int = 0,
     min_score: float = 0,
@@ -507,11 +517,34 @@ async def public_signals(
     ACTIVE_UNIVERSE_SIZE names by dollar-volume (services/universe.py),
     which is env-tunable — so use the row count you get back rather than
     assuming one call returns the whole universe.
+
+    PRICES ARE AUDIENCE-GATED (2026-09-19). This endpoint is the widest
+    keyless exposure we had: the whole universe's vendor prices and daily moves
+    as JSON, 2,000 rows a request, no account, no key. Our Massive plan is
+    individual-use, and redistributing its prices this way is exactly what that
+    plan does not cover. So a caller that is neither signed in nor our own SSR
+    (services/price_audience) gets every row WITHOUT price and change_pct_*,
+    plus `prices_served: false` and a note saying so; scores, labels, ranks
+    and the six sub-scores are unchanged. `max_price` is refused for those
+    callers with a 403 rather than silently ignored: a price filter answered
+    for anyone is a price oracle, one bisection away from the number itself. A
+    sort on a daily move or on volume is refused the same way, since the order
+    it returns publishes the ranking of the number withheld. The public SEO
+    pages fetch server-side with the SSR token, so they still get the prices,
+    the filter and the sorts. `min_dollar_volume` stays open: it is a
+    liquidity floor that ~30 SEO pages pass, it recovers no price, and refusing
+    it would empty those pages whenever the SSR token is missing.
     """
+    from fastapi import HTTPException
     from sqlalchemy import func, or_, select
 
     from app.db import session_scope
     from app.models import Ticker
+    from app.services.price_audience import (
+        KEYLESS_PRICE_NOTE,
+        may_see_prices,
+        strip_price_fields,
+    )
     from app.services.ticker_freshness import live_clauses
     from app.services.ticker_ordering import deterministic_order_by
 
@@ -549,6 +582,14 @@ async def public_signals(
         )
 
     async with session_scope() as session:
+        prices_ok = await may_see_prices(request, session)
+        if not prices_ok and (max_price is not None or sort in _PRICE_SORTS):
+            raise HTTPException(
+                403,
+                "Price filters and price sorts are not available without a "
+                "signed-in session: this endpoint does not serve prices to "
+                "anonymous callers.",
+            )
         # Freshness + data-quality floor — drop stale "ghost" rows (delisted
         # tickers still carrying a pre-refresh raw score that outranks fresh
         # composites) AND corrupt rows (score>100, emoji-in-symbol annotations,
@@ -569,34 +610,39 @@ async def public_signals(
         result = await session.execute(stmt)
         rows = result.scalars().all()
 
-    return {
+    items = [
+        {
+            "symbol": r.symbol,
+            "name": r.name,
+            "sector": r.sector,
+            "asset_class": r.asset_class,
+            "score": r.score,
+            "signal": r.signal,
+            "price": r.price,
+            "change_pct_1d": r.change_pct_1d,
+            "change_pct_5d": r.change_pct_5d,
+            "change_pct_1m": r.change_pct_1m,
+            "confidence_pct": r.confidence_pct,
+            "sub_trend": r.sub_trend,
+            "sub_rs": r.sub_rs,
+            "sub_fundamentals": r.sub_fundamentals,
+            "sub_momentum": r.sub_momentum,
+            "sub_macro": r.sub_macro,
+            "sub_smart_money": r.sub_smart_money,
+            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+        }
+        for r in rows
+    ]
+    out: dict[str, object] = {
         "count": len(rows),
         "limit": capped,
         "offset": offset,
-        "items": [
-            {
-                "symbol": r.symbol,
-                "name": r.name,
-                "sector": r.sector,
-                "asset_class": r.asset_class,
-                "score": r.score,
-                "signal": r.signal,
-                "price": r.price,
-                "change_pct_1d": r.change_pct_1d,
-                "change_pct_5d": r.change_pct_5d,
-                "change_pct_1m": r.change_pct_1m,
-                "confidence_pct": r.confidence_pct,
-                "sub_trend": r.sub_trend,
-                "sub_rs": r.sub_rs,
-                "sub_fundamentals": r.sub_fundamentals,
-                "sub_momentum": r.sub_momentum,
-                "sub_macro": r.sub_macro,
-                "sub_smart_money": r.sub_smart_money,
-                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
-            }
-            for r in rows
-        ],
+        "prices_served": prices_ok,
+        "items": items if prices_ok else [strip_price_fields(i) for i in items],
     }
+    if not prices_ok:
+        out["price_note"] = KEYLESS_PRICE_NOTE
+    return out
 
 
 @app.get("/api/public/regime")
@@ -742,7 +788,7 @@ async def public_squeeze(limit: int = 5) -> dict[str, object]:
 
 
 @app.get("/api/public/heatmap")
-async def public_heatmap() -> dict[str, object]:
+async def public_heatmap(request: Request) -> dict[str, object]:
     """Public, no-auth sector-level heatmap for /stock-market-heatmap.
 
     Returns the 11 GICS sectors + Tapeline buckets with their
@@ -750,6 +796,13 @@ async def public_heatmap() -> dict[str, object]:
     drill-down stays on the Pro /app/heatmap surface. The aggregated
     sector tiles are enough to render a real heatmap on the SEO page
     without giving away the granular surface.
+
+    The 1D change is audience-gated (2026-09-19), like /api/public/signals:
+    it is computed from the vendor's per-ticker daily moves and prices, so a
+    caller that is neither signed in nor our own SSR (services/price_audience)
+    gets each sector's name and ticker count only, with `prices_served: false`.
+    /stock-market-heatmap renders server-side with the SSR token and the Free
+    teaser on /app/heatmap sends the session cookie, so both keep their tiles.
     """
     from collections import defaultdict
 
@@ -757,10 +810,12 @@ async def public_heatmap() -> dict[str, object]:
 
     from app.db import session_scope
     from app.models import Ticker
+    from app.services.price_audience import KEYLESS_PRICE_NOTE, may_see_prices
     from app.services.sector import canonical_sector
     from app.services.ticker_freshness import live_clauses
 
     async with session_scope() as session:
+        prices_ok = await may_see_prices(request, session)
         # Freshness + data-quality floor — exclude stale ghost rows AND corrupt
         # rows from the aggregate so a dropped/ghost ticker's last-known 1D move
         # can't skew a sector tile. (Ticker.score IS NOT NULL is part of the
@@ -797,7 +852,20 @@ async def public_heatmap() -> dict[str, object]:
         })
     # Sort by 1D move desc so the rendering side gets it in a usable order.
     out.sort(key=lambda s: s["change_pct_1d"], reverse=True)
-    return {"count": len(out), "sectors": out}
+    if not prices_ok:
+        # Alphabetical, not by move: an order sorted on the withheld number
+        # would still publish the ranking it came from.
+        keyless = sorted(
+            ({"sector": s["sector"], "ticker_count": s["ticker_count"]} for s in out),
+            key=lambda s: str(s["sector"]),
+        )
+        return {
+            "count": len(keyless),
+            "sectors": keyless,
+            "prices_served": False,
+            "price_note": KEYLESS_PRICE_NOTE,
+        }
+    return {"count": len(out), "sectors": out, "prices_served": True}
 
 
 @app.get("/api/health")

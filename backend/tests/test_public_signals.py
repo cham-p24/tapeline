@@ -217,13 +217,25 @@ async def test_public_signals_excludes_corrupt_rows(client):
       DROP  'ZZ WSPACE' (a space)  -> sheet annotation ingested as a symbol
                                       (the '🏆 IVV' bug), would emit broken URLs
       DROP  TEST_THIN   1 factor   -> pre-composite ghost (<2 of 6 factors)
-      KEEP  TESTOIL=F   3 factors  -> a real futures symbol ('=' but no space)
+      DROP  TESTOIL=F   futures    -> not covered since 2026-09-19: nothing we
+                                      hold can price a future (services/coverage)
+      DROP  TSTX-A      hyphen     -> a Yahoo-spelled class share, the never-
+                                      priced twin of the vendor's TSTX.A
+      KEEP  TSTX.B      separator  -> the symbol filter is space-specific, not
+                                      "any non-alphanumeric"
       KEEP  TEST_2F     2 factors  -> the >=2 threshold is inclusive
+
+    TESTOIL=F was a KEEP until 2026-09-19. It carries a daily move here on
+    purpose: in production every =F row had change_pct_1d NULL and was already
+    hidden by that clause, so only the explicit coverage clause can drop this
+    one. Mutation: remove covered_clauses() from valid_composite_clauses.
     """
     from datetime import UTC, datetime
 
     now = datetime.now(UTC)
-    seeds = ("TEST_OVER", "ZZ WSPACE", "TEST_THIN", "TESTOIL=F", "TEST_2F")
+    seeds = (
+        "TEST_OVER", "ZZ WSPACE", "TEST_THIN", "TESTOIL=F", "TSTX-A", "TSTX.B", "TEST_2F",
+    )
     async with session_scope() as s:
         existing = await s.execute(select(Ticker).where(Ticker.symbol.in_(seeds)))
         for t in existing.scalars().all():
@@ -249,11 +261,21 @@ async def test_public_signals_excludes_corrupt_rows(client):
             Ticker(symbol="TEST_THIN", name="Thin Inc", asset_class="equity",
                    score=95.0, signal="STRONG SETUP", updated_at=now,
                    sub_rs=95.0),
-            # Real commodity-future: contains '=' but NO space. Must survive —
-            # proves the symbol filter is space-specific, not "any non-alnum".
+            # A continuous future, otherwise pristine (fresh, a daily move, 3
+            # factors, no space) so ONLY the coverage clause can drop it.
             Ticker(symbol="TESTOIL=F", name="Test Oil Future", asset_class="future",
                    score=80.0, signal="STRONG SETUP", updated_at=now,
                    change_pct_1d=0.9, confidence_pct=65,
+                   sub_trend=70, sub_rs=75, sub_macro=80),
+            # The hyphen twin of a class share, likewise pristine.
+            Ticker(symbol="TSTX-A", name="Twin Class A", asset_class="equity",
+                   score=78.0, signal="STRONG SETUP", updated_at=now,
+                   change_pct_1d=0.3, confidence_pct=65,
+                   sub_trend=70, sub_rs=75, sub_macro=80),
+            # A dotted class share: a separator but no space. Must survive.
+            Ticker(symbol="TSTX.B", name="Class B Inc", asset_class="equity",
+                   score=77.0, signal="STRONG SETUP", updated_at=now,
+                   change_pct_1d=0.2, confidence_pct=65,
                    sub_trend=70, sub_rs=75, sub_macro=80),
             # Exactly two factors: the >=2 threshold is inclusive, so KEEP.
             Ticker(symbol="TEST_2F", name="Two Factor Inc", asset_class="equity",
@@ -271,8 +293,11 @@ async def test_public_signals_excludes_corrupt_rows(client):
         assert "TEST_OVER" not in symbols   # score > 100
         assert "ZZ WSPACE" not in symbols   # space in symbol
         assert "TEST_THIN" not in symbols   # < 2 factors
+        # ...symbols we do not cover excluded...
+        assert "TESTOIL=F" not in symbols   # futures, never priced
+        assert "TSTX-A" not in symbols      # hyphen twin, never priced
         # ...legit look-alikes preserved.
-        assert "TESTOIL=F" in symbols       # futures '=F' kept
+        assert "TSTX.B" in symbols          # separator without a space kept
         assert "TEST_2F" in symbols         # exactly 2 factors kept
 
     async with session_scope() as s:

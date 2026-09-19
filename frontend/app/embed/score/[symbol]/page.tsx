@@ -7,7 +7,7 @@
  * footer. The widget is intentionally:
  *   - Visually self-contained (fits a 480×140 iframe cleanly)
  *   - Brand-attributed (Tapeline logo + URL link)
- *   - Useful at face value (live score + signal + 1d change)
+ *   - Useful at face value (score + signal label)
  *   - Honest (links to the public scorecard, not a paywall)
  *
  * Compared to a screenshot, an embedded iframe stays fresh — site
@@ -25,6 +25,12 @@
  * No auth required. Caches 60s server-side (same as /t/{TICKER}) so
  * embeds on high-traffic pages don't hammer the API.
  *
+ * No price and no 1-day change (removed 2026-09-19). The widget renders on
+ * third-party sites for readers with no Tapeline account, which makes any
+ * vendor price on it a redistribution our market-data plan does not cover.
+ * It shows Tapeline's own score and label, which is what the /embed page and
+ * its licence grant now say.
+ *
  * URL params (query):
  *   ?theme=light   — default; light bg + dark text
  *   ?theme=dark    — dark bg + light text
@@ -36,7 +42,6 @@ import { notFound } from "next/navigation";
 
 import { trackEmbedImpression } from "@/lib/embedImpression";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
-import { PRICE_DELAY_MINUTES } from "@/lib/freshness";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -48,8 +53,6 @@ type TickerData = {
   name: string;
   score: number | null;
   signal: string | null;
-  price: number | null;
-  change_pct_1d: number | null;
 };
 
 async function fetchTicker(symbol: string): Promise<TickerData | null> {
@@ -127,8 +130,6 @@ export default async function EmbedScorePage({
   const score = data.score;
   const signal = data.signal ?? "—";
   const sig = signalColors(signal, isDark);
-  const change = data.change_pct_1d ?? 0;
-  const changeColor = change > 0 ? "#22c55e" : change < 0 ? "#dc2626" : muted;
   const tapelineUrl = `https://tapeline.io/t/${sym}?utm_source=embed&utm_medium=badge&utm_campaign=score_badge`;
 
   if (isCompact) {
@@ -264,7 +265,7 @@ export default async function EmbedScorePage({
         </div>
       </div>
 
-      {/* Body row: big score + signal pill + 1d change */}
+      {/* Body row: big score + signal label */}
       <div
         style={{
           marginTop: "12px",
@@ -313,30 +314,6 @@ export default async function EmbedScorePage({
           >
             {signal}
           </div>
-          {data.price != null && (
-            <div style={{ marginTop: "4px", display: "flex", alignItems: "baseline", gap: "8px" }}>
-              <span
-                style={{
-                  fontSize: "13px",
-                  fontFamily: "ui-monospace, SFMono-Regular, monospace",
-                }}
-              >
-                ${data.price.toFixed(2)}
-              </span>
-              {data.change_pct_1d != null && (
-                <span
-                  style={{
-                    fontSize: "11px",
-                    color: changeColor,
-                    fontFamily: "ui-monospace, SFMono-Regular, monospace",
-                  }}
-                >
-                  {change >= 0 ? "+" : ""}
-                  {change.toFixed(2)}%
-                </span>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
@@ -359,7 +336,7 @@ export default async function EmbedScorePage({
           Powered by <span style={{ color: accent, fontWeight: 600 }}>tapeline.io</span> · 6 named
           factors
         </span>
-        <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>Delayed ~{PRICE_DELAY_MINUTES}m</span>
+        <span style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>Score, not advice</span>
       </div>
     </a>
   );

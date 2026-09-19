@@ -47,6 +47,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.models import Ticker
+from app.services.coverage import is_futures_symbol
 from app.services.leverage import is_leveraged_fund
 from app.services.non_common import non_common_on_write
 from app.services.score import compute_tapeline_composite
@@ -67,9 +68,17 @@ def _sheet_symbol(raw_ticker: Any) -> str | None:
     spelled the vendor's way (BRK-B -> BRK.B). The order matters: mapping first
     would miss a hand-typed ' brk-b '. A guard only; the workbook spells class
     shares with a dot today. See symbols.vendor_share_class_symbol.
+
+    Continuous futures (CL=F) come back None, like any other cell we do not
+    ingest (2026-09-19). Our market-data plan covers US stocks and ETFs, not
+    futures: the 27 ``=F`` rows the workbook wrote were never priced, and two of
+    the six factors cannot exist for a future. Refusing them here covers every
+    tab at once. See services/coverage.py.
     """
     symbol = _clean_symbol(raw_ticker)
-    return vendor_share_class_symbol(symbol) if symbol is not None else None
+    if symbol is None or is_futures_symbol(symbol):
+        return None
+    return vendor_share_class_symbol(symbol)
 
 
 # Tapeline's descriptive signal labels, mapped from the composite 0-100
@@ -590,6 +599,7 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
     """
     rows: list[dict[str, Any]] = []
     skipped_crypto = 0
+    skipped_futures = 0
     reader = csv.DictReader(io.StringIO(text))
     # Once per parse, before any row: say out loud which columns the workbook
     # stopped publishing. A rename is otherwise indistinguishable from a sheet
@@ -600,6 +610,10 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
         # _clean_symbol drops the header, blanks, dividers, summary rows, and
         # emoji/space-decorated cells like "🏆 IVV". None → skip the row.
         if symbol is None:
+            # Counted separately from junk so a drop nobody asked about is
+            # visible: futures are refused on purpose (see _sheet_symbol).
+            if is_futures_symbol(_clean_symbol(_cell(raw, "Ticker"))):
+                skipped_futures += 1
             continue
 
         # Sheet's column-F "Score" is retained as `sheet_score` for transparency
@@ -727,6 +741,8 @@ def parse_all_signals_csv(text: str) -> list[dict[str, Any]]:
             "sub_macro":        subs["macro"],
             "sub_momentum":     subs["momentum"],
         })
+    if skipped_futures:
+        logger.info("sheet.futures_rows_skipped count=%d", skipped_futures)
     if skipped_crypto:
         # Logged rather than silent: a drop nobody can see is how the
         # collision survived in the first place. Counts crypto rows AND rows

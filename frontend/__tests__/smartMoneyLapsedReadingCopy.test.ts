@@ -20,7 +20,10 @@ describe("/how-it-works/smart-money", () => {
     const text = [...(factor?.computed ?? [])].join(" ");
     expect(text).toMatch(/removed at the ticker's next re-check, not at once/);
     expect(text).toMatch(/within about two days for a stock/);
-    expect(text).toMatch(/up to about a month for an ETF or futures contract/);
+    // "or futures contract" dropped 2026-09-19: continuous futures are no
+    // longer covered (backend services/coverage.py), so none is re-checked.
+    expect(text).toMatch(/up to about a month for an ETF./);
+    expect(text).not.toMatch(/futures contract/);
   });
 
   it("points to the dated correction instead of implying it was always so", () => {

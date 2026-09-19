@@ -173,11 +173,19 @@ def test_newsletter_banner_states_the_delay():
     assert "PRICE_DELAY_PHRASE" in src
 
 
-def test_mcp_text_states_the_delay_and_never_calls_prices_live():
-    assert PRICE_DELAY_PHRASE in mcp_module.INSTRUCTIONS
+def test_mcp_text_says_it_serves_no_prices_and_never_calls_anything_live():
+    """Since 2026-09-19 the keyless MCP server carries no prices at all, so its
+    text must say THAT, not describe a price delay for a price it no longer
+    returns. Mutation: the pre-change INSTRUCTIONS ("Prices are delayed about
+    15 minutes; do not describe them as real-time or live.")."""
+    assert mcp_module.PRICES_NOT_SERVED in mcp_module.INSTRUCTIONS
+    assert PRICE_DELAY_PHRASE not in mcp_module.INSTRUCTIONS
     score_tool = next(t for t in mcp_module.TOOLS if t["name"] == "get_ticker_score")
-    assert PRICE_DELAY_PHRASE in score_tool["description"]
+    assert "does not return a price" in score_tool["description"]
+    assert PRICE_DELAY_PHRASE not in score_tool["description"]
     for tool in mcp_module.TOOLS:
-        assert not re.search(r"sub-?60|every minute|not delayed", tool["description"], re.I)
-    # The instructions name "real-time" only to forbid it.
-    assert "do not describe them as real-time" in mcp_module.INSTRUCTIONS
+        assert not re.search(
+            r"sub-?60|every minute|not delayed|real-?time|live",
+            tool["description"],
+            re.I,
+        )

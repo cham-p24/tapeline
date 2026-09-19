@@ -29,8 +29,9 @@ async def aapl_row():
     The endpoint used to skip that check entirely, which is exactly the bug
     (see tests/test_financials_vendor_guard.py): an anonymous caller chose our
     vendor call volume and our on-disk cache cardinality by typing URLs. These
-    tests still assert what they always did — public access, no auth, a stable
-    envelope, uppercasing — just against a symbol that exists.
+    tests assert a stable envelope and uppercasing against a symbol that
+    exists. (Since 2026-09-19 the endpoint needs a signed-in session; it used
+    to be public.)
     """
     from datetime import UTC, datetime
 
@@ -53,12 +54,36 @@ async def aapl_row():
 
 
 @pytest.mark.asyncio
-async def test_financials_public_no_auth(client, aapl_row):
-    """Financials endpoint is public — same access surface as /{symbol}
-    and /{symbol}/history. Unauthenticated callers get 200 with the
-    standard envelope."""
+async def test_financials_refuses_an_anonymous_caller(client, aapl_row, monkeypatch):
+    """Finnhub's terms bar sharing its data with third parties, and this
+    endpoint handed its metrics to anyone who asked. Since 2026-09-19 it needs a
+    session: an anonymous caller gets 401 and costs no vendor call.
+    Mutation: drop the current_user_required line from ticker_financials."""
+    from app.routers import ticker as ticker_router
+
+    calls: list[str] = []
+
+    async def _fake(sym: str):
+        calls.append(sym)
+        return {"pe": 1.0}
+
+    monkeypatch.setattr(ticker_router, "fetch_basic_financials", _fake)
     async with client:
         r = await client.get("/api/ticker/AAPL/financials")
+    assert r.status_code == 401
+    assert "metrics" not in r.text
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_financials_signed_in_gets_the_envelope(client, aapl_row):
+    """A signed-in caller (the in-app Financials tab) gets 200 with the
+    standard envelope."""
+    async with client:
+        r = await client.get(
+            "/api/ticker/AAPL/financials",
+            headers={"Authorization": "Bearer dev-bypass"},
+        )
         assert r.status_code == 200
         body = r.json()
         assert body["symbol"] == "AAPL"
@@ -77,7 +102,10 @@ async def test_financials_uppercases_symbol(client, aapl_row):
     """Symbol is uppercased before the adapter call so /aapl and /AAPL
     return the same cached row."""
     async with client:
-        r = await client.get("/api/ticker/aapl/financials")
+        r = await client.get(
+            "/api/ticker/aapl/financials",
+            headers={"Authorization": "Bearer dev-bypass"},
+        )
         assert r.status_code == 200
         assert r.json()["symbol"] == "AAPL"
 

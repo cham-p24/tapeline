@@ -3,8 +3,13 @@
  *
  * When anyone pastes https://tapeline.io/t/NVDA into Twitter / LinkedIn /
  * Slack / iMessage, the platform fetches THIS edge function. It pulls the
- * ticker's live data from the API and renders a 1200x630 PNG showing the
- * score, signal, price, and 1-day change. That preview self-sells.
+ * ticker's current data from the API and renders a 1200x630 PNG showing the
+ * score, signal and the six-factor shape. That preview self-sells.
+ *
+ * No price and no 1-day change (removed 2026-09-19). This image is fetched and
+ * cached by every social platform and crawler that unfurls a link, and then
+ * re-served by them to anyone, so a vendor price on it is redistributed with
+ * no account and no key on our side at all. The score and label are ours.
  *
  * Cached at the CDN by Vercel for ~60s (matches the worker tick), so even a
  * tweet that gets thousands of crawls doesn't hammer the API.
@@ -31,10 +36,8 @@ type TickerData = {
   symbol: string;
   name: string;
   sector: string | null;
-  price: number | null;
   score: number | null;
   signal: string | null;
-  change_pct_1d: number | null;
   reason: string | null;
   // The score breakdown drives the small radial signature in the corner
   // of the OG image. Same shape as the /api/ticker response.
@@ -70,7 +73,6 @@ export default async function OG({ params }: { params: Promise<{ symbol: string 
   // Score-tier accent (mirrors /how-it-works tier colours)
   const score = data?.score ?? null;
   const signal = data?.signal ?? "—";
-  const change = data?.change_pct_1d ?? null;
   const accent =
     score == null
       ? "#71717a"
@@ -226,7 +228,8 @@ export default async function OG({ params }: { params: Promise<{ symbol: string 
           </div>
         )}
 
-        {/* Footer row — price + change + tagline */}
+        {/* Footer row — tagline only. No price, no daily move: see the
+            header comment. */}
         <div
           style={{
             marginTop: "auto",
@@ -235,41 +238,7 @@ export default async function OG({ params }: { params: Promise<{ symbol: string 
             alignItems: "flex-end",
           }}
         >
-          {data?.price != null ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              <span
-                style={{
-                  fontSize: "14px",
-                  color: "#71717a",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.12em",
-                  display: "flex",
-                }}
-              >
-                Last
-              </span>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "16px" }}>
-                <span style={{ fontSize: "44px", fontWeight: 700, letterSpacing: "-0.02em" }}>
-                  ${data.price.toFixed(2)}
-                </span>
-                {change != null && (
-                  <span
-                    style={{
-                      fontSize: "26px",
-                      fontWeight: 600,
-                      color: change > 0 ? "#22c55e" : change < 0 ? "#ef4444" : "#a1a1aa",
-                      display: "flex",
-                    }}
-                  >
-                    {change >= 0 ? "+" : ""}
-                    {change.toFixed(2)}%
-                  </span>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div />
-          )}
+          <div />
           <div
             style={{
               fontSize: "20px",

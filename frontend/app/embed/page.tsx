@@ -24,9 +24,20 @@ import { faqJsonLd, jsonLdScript, breadcrumbJsonLd } from "@/lib/jsonld";
 export const metadata = pageMeta({
   title: "Tapeline Score Badge — Free Embeddable Stock Widget",
   description:
-    "Embed a Tapeline Score for any US ticker in your blog, Substack, or GitHub README. Free, no auth, iframe-able, no screenshots to update. Two-line iframe snippet. MIT-permissive — link back and you're good.",
+    "Embed a Tapeline Score for any US ticker in your blog, Substack, or GitHub README. Free, no auth, iframe-able, no screenshots to update. Two-line iframe snippet. Shows the score and label only; link back.",
   path: "/embed",
 });
+
+/**
+ * The licence grant, used in the FAQ (and its JSON-LD) and the licence card.
+ *
+ * Replaced 2026-09-19. It used to end "use freely on commercial and
+ * non-commercial sites", which purported to let strangers re-use market data
+ * our vendor licenses to us for individual use only, and contradicted our own
+ * terms. The widget now carries no price, so the grant can say so.
+ */
+const EMBED_GRANT =
+  "Embed the widget and link back. It shows Tapeline's score and label only - no market data is redistributed through it. Don't proxy it to strip attribution; don't claim the score is yours.";
 
 const FAQ = [
   {
@@ -39,7 +50,7 @@ const FAQ = [
   },
   {
     q: "How fresh is the data in the badge?",
-    a: "The widget reads a cached copy of the ticker's data, refreshed at most about every 30 minutes and served stale while it refreshes, so it can be half an hour old or more. Prices in it are also delayed about 15 minutes. The score is recalculated during US market hours from a six-factor formula (trend, relative strength, fundamentals, smart money, macro, momentum), but most inputs are daily readings, so it usually changes about once a day. For most embedded use cases that is still fresher than a screenshot.",
+    a: "The widget reads a cached copy of the ticker's score, refreshed at most about every 30 minutes and served stale while it refreshes, so it can be half an hour old or more. It shows no price. The score is recalculated during US market hours from a six-factor formula (trend, relative strength, fundamentals, smart money, macro, momentum), but most inputs are daily readings, so it usually changes about once a day. For most embedded use cases that is still fresher than a screenshot.",
   },
   {
     q: "Can I customise the badge appearance?",
@@ -51,7 +62,7 @@ const FAQ = [
   },
   {
     q: "What's the licence?",
-    a: "MIT-permissive use. Embed the widget, link back. Don't proxy the widget through your own domain to strip attribution — we monitor referrers and will rate-limit. Don't claim the score is yours. Otherwise, use freely on commercial and non-commercial sites.",
+    a: EMBED_GRANT,
   },
   {
     q: "Can I link to the per-ticker page instead of embedding the widget?",
@@ -118,9 +129,9 @@ export default function EmbedDocsPage() {
           Embed a Tapeline Score in your blog, Substack, or site.
         </h1>
         <p className="mt-4 text-lg text-muted leading-relaxed">
-          Paste a two-line iframe. Get a six-factor stock-score badge for any US ticker. Its
-          data is cached, so it can be half an hour old or more, and prices in it are delayed
-          about 15 minutes. Free, no API key, no auth, no rate limits for normal use.
+          Paste a two-line iframe. Get a six-factor stock-score badge for any US ticker: the
+          score and its label, no price. Its data is cached, so it can be half an hour old or
+          more. Free, no API key, no auth, no rate limits for normal use.
         </p>
         <p className="mt-3 text-sm text-muted">
           Built for finance bloggers, Substack writers, and personal-site owners who want
@@ -144,7 +155,7 @@ export default function EmbedDocsPage() {
               style={{ maxWidth: "100%", display: "block", margin: "0 auto" }}
             />
             <p className="mt-4 text-xs text-subtle text-center">
-              Score for NVDA · cached data, can be half an hour old or more · prices delayed about 15 minutes
+              Score for NVDA · cached data, can be half an hour old or more · score and label only, no price
             </p>
           </div>
           <div className="mt-5">
@@ -240,7 +251,7 @@ export default function EmbedDocsPage() {
             <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
               <strong className="text-fg">Finance bloggers + Substack writers.</strong> Drop a
               badge inline when you mention a ticker. Reader gets a recent score; you don&rsquo;t
-              have to update screenshots when prices change.
+              have to update screenshots when scores change.
             </li>
             <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
               <strong className="text-fg">Personal trading-journal sites.</strong> Show your
@@ -270,8 +281,9 @@ export default function EmbedDocsPage() {
             to launder the attribution. Don&rsquo;t claim the score is your own analysis.
           </p>
           <p className="mt-3 text-sm text-fg leading-relaxed">
-            Otherwise — use it freely. Commercial sites welcome. We&rsquo;ll never deprecate the
-            embed URL pattern; if it ever changes, the old URLs will continue to work.
+            {EMBED_GRANT}{" "}
+            We&rsquo;ll never deprecate the embed URL pattern; if it ever changes, the old URLs
+            will continue to work.
           </p>
         </section>
 
