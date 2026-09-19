@@ -41,6 +41,21 @@ type LogEntry = {
 };
 
 const METHODOLOGY_LOG: LogEntry[] = [
+  // #879 changed what the Smart Money factor reads; its factor page changed in
+  // #879 itself (rule 4) and this is its entry. It also corrects the
+  // 2026-09-17 entry's GOOG/NWSA sentence (rule 1: a new entry, that one left
+  // as written). Counts are #879's, measured read-only against production on
+  // 2026-09-19. BBD joined PBR.A and CIG in non_common.EQUITY_LIKE_PREFERRED_ADRS
+  // in #879, which changes what the entry titled "Notes, preferred shares and
+  // warrants no longer qualify for the daily record" says stays eligible.
+  {
+    date: "2026-09-19",
+    kind: "methodology",
+    title: "Insider filings now count for every common-stock class of a company. An entry added on 17 September said GOOG and NWSA had none",
+    body:
+      "From this date a company's Form 4 filings count for every listed common-stock class of that company, and for none of its other listed securities: its preferred shares, notes, warrants, rights, units and exchange-traded notes still carry none, and neither does an ETF. This corrects the entry below titled \"Insider filings counted for every security listed under the same SEC filer\", which says \"Alphabet's insiders file under GOOGL, so GOOG has none, and News Corp's file under NWS, so NWSA has none\". Under that entry's rule a filing counted only for the ticker it named, so a company's second class of common stock had no Smart Money reading of its own while its sibling class did. From this date GOOG carries the same filings as GOOGL, and NWSA the same as NWS. Measured on 19 September 2026, 31 such second classes gain their company's filings at their next re-check, about two days for a stock; nothing is re-read early. Lists that combine several companies' filings show each transaction once, with every class it belongs to. Which listing is common stock is judged from its name and ticker, because no data field we hold states it; a short list of listings named exactly like their company's common stock is decided by symbol, such as Strategy's four preferred listings, which carry none, and Bradesco's preferred ADR (BBD). BBD, Bradesco's main traded share, now joins PBR.A and CIG as a preferred listing that stays eligible for the daily record and the default ranked view, as the entry below titled \"Notes, preferred shares and warrants no longer qualify for the daily record\" describes for those two. The rest of the 17 September entry is unchanged. No recorded entry was changed.",
+    ref: "#879",
+  },
   // Two scope changes in one PR (fix/keyless-no-prices). Counts measured
   // read-only against production on 2026-09-19: 27 rows ending "=F" and the
   // two hyphen rows BRK-A/BRK-B, price and change_pct_1d NULL on all 29;

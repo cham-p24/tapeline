@@ -86,7 +86,7 @@ describe("/scorecard server render — gaps, the June cap, limitations", () => {
     // stated as imperfect rather than complete.
     expect(text).toMatch(/From 19 September 2026 \(#875\)[\s\S]{0,200}can no longer be listed/);
     expect(text).toMatch(/does not catch every one/);
-    expect(text).toMatch(/PBR\.A and CIG, each its company's main traded share/);
+    expect(text).toMatch(/PBR\.A, CIG and BBD, each its company's main traded share/);
   });
 
   it("still lists the verified gaps when the summary API is down", async () => {
