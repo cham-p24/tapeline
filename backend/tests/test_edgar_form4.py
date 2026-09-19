@@ -149,6 +149,10 @@ class FakeSec:
         self.filings: dict[str, list[tuple[str, str, str, str]]] = {}
         #: accession (no dashes) -> XML body, or an int status
         self.documents: dict[str, str | int] = {}
+        #: symbol -> (name, asset_class) as `tickers` would store it, for a
+        #: fetch that is not handed a Listing. A symbol not named here is a
+        #: common stock, "<SYM> Inc" - what every test before 2026-09-19 read.
+        self.listings: dict[str, tuple[str | None, str | None]] = {}
         self.status: dict[str, int] = {}
         self.requests: list[httpx.Request] = []
 
@@ -202,6 +206,13 @@ def sec(monkeypatch: pytest.MonkeyPatch) -> FakeSec:
         return client
 
     monkeypatch.setattr(edgar_form4, "_client", _client)
+
+    async def _listing(symbol: str) -> edgar_form4.Listing:
+        name, asset_class = fake.listings.get(symbol, (f"{symbol} Inc", "equity"))
+        return edgar_form4.Listing(name=name, asset_class=asset_class)
+
+    # The real one reads `tickers`; see test_edgar_form4_attribution for it.
+    monkeypatch.setattr(edgar_form4, "load_listing", _listing)
     return fake
 
 
@@ -217,7 +228,7 @@ def test_parse_reads_aapls_layout() -> None:
     assert parsed["owner_cik"] == "0001780525"
     assert parsed["lines"] == [{
         "transaction_date": _d(3), "share_change": -1438,
-        "transaction_price": 317.23, "code": "S",
+        "transaction_price": 317.23, "code": "S", "security_title": "Common Stock",
     }]
 
 
@@ -229,8 +240,10 @@ def test_parse_signs_by_acquired_disposed_and_never_guesses_a_price() -> None:
         (_d(2), "", "D", "10", "S"),          # no share count: dropped
     ]))
     assert parsed["lines"] == [
-        {"transaction_date": _d(2), "share_change": 2000, "transaction_price": 25.5, "code": "P"},
-        {"transaction_date": _d(2), "share_change": 300, "transaction_price": 0.0, "code": "A"},
+        {"transaction_date": _d(2), "share_change": 2000, "transaction_price": 25.5, "code": "P",
+         "security_title": "Common Stock"},
+        {"transaction_date": _d(2), "share_change": 300, "transaction_price": 0.0, "code": "A",
+         "security_title": "Common Stock"},
     ]
 
 
@@ -264,6 +277,7 @@ async def test_reads_a_symbols_form4_lines(sec: FakeSec) -> None:
     assert txns == [{
         "filer_name": "Newstead Jennifer", "transaction_date": _d(3),
         "share_change": -1438, "transaction_price": 317.23, "code": "S",
+        "security_title": "Common Stock",
     }]
     # SEC fair access: every request declares who is asking.
     assert all("tapeline" in r.headers["user-agent"].lower() for r in sec.requests)

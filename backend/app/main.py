@@ -652,12 +652,15 @@ async def public_insider_buys(limit: int = 10) -> dict[str, object]:
     SEC EDGAR by the worker's insider pass (services/edgar_form4.py), which are
     public filings, so there is no licensing constraint on exposing a preview.
     Capped at 20 rows to keep the SEO surface a teaser, not a replacement for
-    /app/holdings (Premium).
+    /app/holdings (Premium). A purchase that several share classes of one
+    issuer carry (GOOG and GOOGL since 2026-09-19) is listed once, with every
+    class in `symbols`; see services/insider_dedup.py.
     """
     from sqlalchemy import desc, select
 
     from app.db import session_scope
     from app.models import InsiderTransaction
+    from app.services.insider_dedup import MAX_CLASS_COPIES, collapse_share_classes
 
     capped = max(1, min(limit, 20))
     today = _datetime.now(_UTC).date().isoformat()
@@ -671,24 +674,28 @@ async def public_insider_buys(limit: int = 10) -> dict[str, object]:
             # Never a future trade date: a filer's year typo sorts to the top.
             .where(InsiderTransaction.transaction_date <= today)
             .order_by(desc(InsiderTransaction.transaction_date))
-            .limit(capped)
+            .limit(capped * MAX_CLASS_COPIES)
         )
         rows = result.scalars().all()
-    return {
-        "count": len(rows),
-        "items": [
-            {
-                "symbol": r.symbol,
-                "insider_name": r.insider_name,
-                "transaction_date": r.transaction_date,
-                "share_change": r.share_change,
-                "transaction_price": r.transaction_price,
-                "transaction_value": r.transaction_value,
-                "code": r.code,
-            }
-            for r in rows
-        ],
-    }
+    lines = await collapse_share_classes([
+        {
+            "symbol": r.symbol,
+            "insider_name": r.insider_name,
+            "transaction_date": r.transaction_date,
+            "share_change": r.share_change,
+            "transaction_price": r.transaction_price,
+            "transaction_value": r.transaction_value,
+            "code": r.code,
+            "line_seq": r.line_seq,
+            "source": r.source,
+        }
+        for r in rows
+    ])
+    items = [
+        {k: v for k, v in line.items() if k not in ("line_seq", "source")}
+        for line in lines[:capped]
+    ]
+    return {"count": len(items), "items": items}
 
 
 @app.get("/api/public/squeeze")

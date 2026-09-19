@@ -2875,7 +2875,11 @@ _SMART_MONEY_EDGAR_SINCE = datetime(2026, 9, 14, 14, 10, tzinfo=UTC)
 #:   its CIK. On 2026-09-17, 70 CIKs spread 2,609 rows over 173 symbols:
 #:   Strategy's STRC/STRF/STRK/STRD preferreds carried MSTR's insider sales,
 #:   JPM's VYLD/AMJB ETNs carried JPM's, notes like GREEL and TMUSZ their
-#:   issuer's. Now only the ticker the filing names gets the lines.
+#:   issuer's. Then only the ticker the filing names got the lines; since
+#:   2026-09-19 every common-stock ticker of the issuer does, and nothing else
+#:   (edgar_form4, point 5). That change needs no second re-read: a sibling
+#:   class gains its rows at its next re-check, and a non-common listing's
+#:   rows go at its next re-check without the guard (`by_rule`).
 #: * AMENDMENTS. A 4/A dropped every Form 4 its owner filed that day, e.g. 51 of
 #:   Magnetar's CRWV sale lines. Now only the original it restates.
 #: * FUTURE DATES. A GIC filing's 2027-09-03 typo sat at the top of the Holdings
@@ -3889,7 +3893,9 @@ class EmptyAnswerContradictedError(EdgarUnavailableError):
     """
 
 
-async def _clear_smart_money_reading(symbol: str) -> tuple[bool, bool]:
+async def _clear_smart_money_reading(
+    symbol: str, *, by_rule: bool = False,
+) -> tuple[bool, bool]:
     """Retire a symbol's smart-money reading: SEC EDGAR holds no Form 4 filings
     for it in the window (or lists no filer for the ticker at all).
 
@@ -3925,6 +3931,15 @@ async def _clear_smart_money_reading(symbol: str) -> tuple[bool, bool]:
     and on such a row nothing corrects it until the sheet next changes. If every
     attempt misses, the Form 4 rows still go and the mark still lands, so the
     row's owner writes None on its next write.
+
+    `by_rule` is an empty answer decided from what we store, not by SEC: the
+    symbol is not its issuer's common stock (`edgar_form4`, point 5), so SEC
+    was never asked and there is no vendor answer for a stored filing to
+    contradict. The guard below is skipped for it. Without that, a listing that
+    held rows under the old attribution would have its correct empty answer
+    "contradicted" by exactly the rows it must lose, counted as a failure
+    forever: measured 2026-09-19, USO (an ETF, so not common stock) held 21
+    Form 4 rows fetched after _SMART_MONEY_REREAD_BEFORE, newest 2026-09-16.
 
     Raises EdgarUnavailableError, changing nothing, when a stored filing
     contradicts the empty answer; see `_INSIDER_EMPTY_CONTRADICTED_WITHIN`. Only
@@ -3977,7 +3992,7 @@ async def _clear_smart_money_reading(symbol: str) -> tuple[bool, bool]:
             .where(InsiderTransaction.symbol == sym, InsiderTransaction.source == "edgar")
         )).one()
         recent = (date.today() - _INSIDER_EMPTY_CONTRADICTED_WITHIN).isoformat()
-        if newest is not None and newest >= recent:
+        if not by_rule and newest is not None and newest >= recent:
             raise EmptyAnswerContradictedError(
                 "submissions",
                 f"empty answer contradicts a stored filing dated {newest}",
@@ -4146,7 +4161,7 @@ async def _refresh_insider_cache(
     from app.services.universe import ACTIVE_UNIVERSE_SIZE
     INSIDER_CAP = ACTIVE_UNIVERSE_SIZE if limit is None else limit
 
-    from app.services.edgar_form4 import fetch_insider_transactions
+    from app.services.edgar_form4 import Listing, fetch_insider_transactions
     from app.services.finnhub_feed import (
         compute_smart_money_score,
         insider_feed_size_db,
@@ -4159,6 +4174,21 @@ async def _refresh_insider_cache(
     symbols = await _select_factor_symbols(
         Ticker.last_smart_money_at, INSIDER_CAP,
     )
+    # What each symbol IS decides whether it carries its issuer's Form 4 lines
+    # (edgar_form4, point 5): its name and class, plus the universe for the
+    # fifth-letter unit/right/warrant rules. Read once per pass; the fetch would
+    # otherwise read the tickers table once per symbol.
+    listings: dict[str, Listing] = {}
+    if symbols:
+        async with session_scope() as session:
+            facts = (await session.execute(
+                select(Ticker.symbol, Ticker.name, Ticker.asset_class)
+            )).all()
+        universe = frozenset(r.symbol for r in facts)
+        listings = {
+            r.symbol: Listing(name=r.name, asset_class=r.asset_class, universe=universe)
+            for r in facts
+        }
 
     logger.info("insider.refresh_started count=%d", len(symbols))
     refreshed = 0
@@ -4184,9 +4214,13 @@ async def _refresh_insider_cache(
             )
             break
         sym = symbols[i]
+        # A symbol with no row left (deleted mid-pass) has no stored facts: not
+        # known to be common stock, so it is answered by rule like a preferred.
+        listing = listings.get(sym) or Listing(name=None, asset_class=None)
         try:
             txns = await fetch_insider_transactions(
                 sym, days_back=_INSIDER_WINDOW_DAYS, raise_failures=True,
+                listing=listing,
             )
             if txns:
                 score = compute_smart_money_score(txns)
@@ -4199,10 +4233,15 @@ async def _refresh_insider_cache(
                 refreshed += 1
             elif txns is not None:
                 # [] is EDGAR answering "no Form 4 filings in 90 days" (or no
-                # filer for this ticker). Failures raise above.
-                held, had_filings = await _clear_smart_money_reading(sym)
+                # filer for this ticker), or - for a listing that is not common
+                # stock - the rule answering without asking EDGAR. Failures
+                # raise above.
+                by_rule = not listing.is_common_stock(sym)
+                held, had_filings = await _clear_smart_money_reading(sym, by_rule=by_rule)
                 cleared += held
-                cleared_with_filings += held and had_filings
+                # Only EDGAR's own empty answers are evidence of a vendor
+                # fault; a rule-decided clear is not (see _insider_clear_surge).
+                cleared_with_filings += held and had_filings and not by_rule
         except VendorThrottledError as exc:
             # Same rule as the fundamentals pass: a throttle is not an answer.
             throttled_in_a_row += 1

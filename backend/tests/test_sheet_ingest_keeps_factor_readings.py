@@ -479,7 +479,7 @@ async def test_a_slow_insider_batch_is_stamped_within_the_rebuilds_window(
     answered_at: dict[str, datetime] = {}
 
     async def _heavy_filer(
-        sym: str, days_back: int = 90, *, raise_failures: bool = False,
+        sym: str, days_back: int = 90, *, raise_failures: bool = False, listing: Any = None,
     ) -> list[dict[str, Any]]:
         now[0] += timedelta(seconds=60)
         answered_at[sym] = now[0]

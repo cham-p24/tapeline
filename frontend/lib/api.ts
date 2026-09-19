@@ -519,6 +519,10 @@ export type InsiderTxn = {
   transaction_price: number;
   transaction_value: number; // abs(shares * price), pre-computed
   code: string;              // SEC Form 4 code: P=open-market or private purchase, S=sale, A=grant, M=option exercise, G=gift
+  // Every ticker the line is listed under. Since 2026-09-19 one issuer's
+  // common-stock classes all carry its lines (GOOG and GOOGL), and a list
+  // spanning tickers shows such a line once. Absent from older responses.
+  symbols?: string[];
 };
 
 // Re-exported for backwards-compat with components that imported the old name.

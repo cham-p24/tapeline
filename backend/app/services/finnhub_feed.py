@@ -716,12 +716,17 @@ async def get_recent_insider_transactions_db(
                   such rows in the 30 days to 2026-09-17.
 
     Same shape and ordering as the prior in-memory implementation so the
-    router/UI don't see any contract change.
+    router/UI don't see any contract change, plus `symbols`: every ticker the
+    line is listed under. Without a symbol filter the list spans tickers, so a
+    line one issuer's share classes all carry (GOOG and GOOGL, since
+    2026-09-19) is listed once; see `services/insider_dedup.py`. With one,
+    `symbols` is just that symbol.
     """
     from sqlalchemy import desc, select
 
     from app.db import session_scope
     from app.models import InsiderTransaction
+    from app.services.insider_dedup import MAX_CLASS_COPIES, collapse_share_classes
 
     today = date.today()
     cutoff = (today - timedelta(days=max(1, days))).isoformat()
@@ -732,7 +737,8 @@ async def get_recent_insider_transactions_db(
         .where(InsiderTransaction.transaction_date >= cutoff)
         .where(InsiderTransaction.transaction_date <= today.isoformat())
         .order_by(desc(InsiderTransaction.transaction_date))
-        .limit(limit)
+        # Across tickers, read enough copies to still fill `limit` lines.
+        .limit(limit if sym else limit * MAX_CLASS_COPIES)
     )
     if sym:
         stmt = stmt.where(InsiderTransaction.symbol == sym)
@@ -745,7 +751,7 @@ async def get_recent_insider_transactions_db(
         result = await session.execute(stmt)
         rows = result.scalars().all()
 
-    return [
+    items = [
         {
             "symbol":            r.symbol,
             "insider_name":      r.insider_name,
@@ -754,8 +760,19 @@ async def get_recent_insider_transactions_db(
             "transaction_price": r.transaction_price,
             "transaction_value": r.transaction_value,
             "code":              r.code,
+            "line_seq":          r.line_seq,
+            "source":            r.source,
         }
         for r in rows
+    ]
+    if not sym:
+        items = await collapse_share_classes(items)
+    return [
+        {
+            **{k: v for k, v in item.items() if k not in ("line_seq", "source")},
+            "symbols": item.get("symbols") or [item["symbol"]],
+        }
+        for item in items[:limit]
     ]
 
 
@@ -785,17 +802,13 @@ def get_recent_insider_transactions(
 
 
 async def insider_feed_size_db() -> int:
-    """Total rows in the DB-backed feed. Cheap COUNT(*) — runs against an
-    index'd column so it's sub-millisecond even with the full universe."""
-    from sqlalchemy import func as sa_func
-    from sqlalchemy import select as sa_select
+    """Distinct Form 4 lines in the DB-backed feed: every row, counting a line
+    that several share classes of one issuer carry once (since 2026-09-19 GOOG
+    and GOOGL both hold Alphabet's lines). The Holdings page shows it as
+    "tracked transactions"; see `insider_dedup.distinct_line_count`."""
+    from app.services.insider_dedup import distinct_line_count
 
-    from app.db import session_scope
-    from app.models import InsiderTransaction
-
-    async with session_scope() as session:
-        result = await session.execute(sa_select(sa_func.count(InsiderTransaction.id)))
-        return int(result.scalar_one() or 0)
+    return await distinct_line_count()
 
 
 def insider_feed_size() -> int:

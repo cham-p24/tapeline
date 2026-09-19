@@ -44,9 +44,9 @@ export function InsiderTab({ symbol }: { symbol: string }) {
       <p className="text-sm text-muted">
         No Form 4 filings for {symbol} in the last {data.days_back} days. That&rsquo;s
         common — insiders typically file in batches around earnings windows, then go
-        quiet. A filing is listed under the ticker it names, so where a company has
-        more than one listed share class, its insiders&rsquo; filings may sit under
-        another of its tickers.
+        quiet. A company&rsquo;s filings are listed under every class of its common
+        stock, and never under its preferred shares, notes, warrants, rights, units
+        or exchange-traded notes, so those always show none here.
       </p>
     );
 

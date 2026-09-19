@@ -19,7 +19,11 @@ Response shape (kept stable for the frontend that paginates/filters):
           "share_change": int (negative = sale, positive = buy),
           "transaction_price": float,
           "transaction_value": float (abs of shares * price),
-          "code": str (SEC Form 4 transaction code, e.g. "P"=buy, "S"=sale)
+          "code": str (SEC Form 4 transaction code, e.g. "P"=buy, "S"=sale),
+          "symbols": [str] (every ticker the line is listed under: since
+                     2026-09-19 one issuer's common-stock classes all carry
+                     its lines, and this list shows such a line once;
+                     `symbol` is the first of them)
         }
       ]
     }

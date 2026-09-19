@@ -204,7 +204,9 @@ export default function HoldingsPage() {
                   <td className="px-4 py-2 text-xs text-muted whitespace-nowrap">
                     {formatDate(t.transaction_date)}
                   </td>
-                  <td className="px-4 py-2 font-medium">{t.symbol}</td>
+                  <td className="px-4 py-2 font-medium">
+                    {(t.symbols && t.symbols.length > 1 ? t.symbols : [t.symbol]).join(" · ")}
+                  </td>
                   <td className="px-4 py-2 text-muted truncate max-w-[16ch]" title={t.insider_name}>
                     {titleCase(t.insider_name)}
                   </td>
