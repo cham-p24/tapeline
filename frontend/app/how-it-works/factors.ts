@@ -258,7 +258,7 @@ export const FACTORS: Factor[] = [
     feeds: [
       {
         name: "SEC filings",
-        detail: "Form 4 insider transactions read directly from SEC EDGAR, re-checked about every two days per stock (about monthly for ETFs). Only non-derivative transactions (shares, not options) count, and an amended filing (4/A) replaces the original filing it restates. A filing counts only for the ticker it names, so a company with more than one listed security has a reading on the one its insiders file under. Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR.",
+        detail: "Form 4 insider transactions read directly from SEC EDGAR, re-checked about every two days per stock (about monthly for ETFs). Only non-derivative transactions (shares, not options) count, and an amended filing (4/A) replaces the original filing it restates. A filing counts for every listed common-stock class of the company that filed it, and for none of its other listed securities. Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR.",
       },
     ],
     caveat:
@@ -267,7 +267,7 @@ export const FACTORS: Factor[] = [
       "Many disclosed transactions carry no view at all. Sales scheduled months in advance under a 10b5-1 plan, option exercises, vesting events and share sales made purely to cover tax withholding all arrive as Form 4 filings and are netted like any other.",
       "Smaller and less-covered companies file rarely, so the window is frequently empty and the factor is unavailable for long stretches.",
       "The factor reads corporate-insider Form 4 filings only. It has no congressional-trade input.",
-      "A company can have several listed securities under one SEC identifier — share classes, preferred shares, notes. From 17 September 2026 a filing's transactions count only for the ticker the filing itself names, so the other securities have no reading rather than a borrowed one: Alphabet's insiders file under GOOGL, News Corp's under NWS. Before that date every ticker of the issuer received all of them, and a reading borrowed that way is removed at that ticker's next re-check — about two days for a stock, up to about a month for an ETF, ETN or futures contract.",
+      "A company can have several listed securities under one SEC identifier — share classes, preferred shares, notes. A filing's transactions count for every listed common-stock class of the company, so the reading is the company's and its classes share it: Alphabet's insiders file under GOOGL, and GOOG carries the same reading. Its preferred shares, notes, warrants, rights, units and exchange-traded notes have no reading rather than a borrowed one, and neither does an ETF. Which listing is common stock is judged from its name and ticker, because no data field we hold states it, so a preferred share named and lettered like its company's common stock can be counted as common. From 17 September 2026 until this rule replaced it, a filing counted only for the ticker it named, so the other common class had no reading. Before 17 September every ticker of the issuer received all of them. Each ticker moves to the current rule at its next re-check — about two days for a stock, up to about a month for an ETF, ETN or futures contract.",
       "Netting by dollar value means one large filer can dominate a company with many reporting insiders.",
       "Insiders are not a uniformly informed group, and this factor makes no claim that they are. The name of the factor is conventional industry shorthand, not an assessment of anyone's judgement.",
     ],
@@ -278,7 +278,7 @@ export const FACTORS: Factor[] = [
       },
       {
         q: "What happens if a ticker has no insider filings?",
-        a: "The factor is unavailable and the composite substitutes a mid-range value. No filings on file for that ticker means no information, which is not the same as a negative reading — and where a company has several listed securities, the filings are on file under the one the filer names.",
+        a: "The factor is unavailable and the composite substitutes a mid-range value. No filings on file for that ticker means no information, which is not the same as a negative reading. Where a company has several listed common-stock classes, each carries the company's filings; its preferred shares, notes and similar listings carry none.",
       },
     ],
   },

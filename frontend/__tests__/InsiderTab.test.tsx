@@ -45,16 +45,23 @@ describe("InsiderTab", () => {
     expect(screen.queryByTestId("insider-truncated")).toBeNull();
   });
 
-  it("says where a second share class files, rather than calling empty normal", async () => {
-    // #862 attributes a filing to the ticker it names, so GOOG can be empty
-    // while GOOGL has filings. "Empty here is normal" would be misleading.
+  it("says a preferred or note shows no filings, hedged, rather than calling empty normal", async () => {
+    // Since 2026-09-19 a company's filings are listed under every class of
+    // its common stock (GOOG and GOOGL alike) and under none of its preferred
+    // shares, notes or ETNs. #862's note - "listed under the ticker it names",
+    // "may sit under another of its tickers" - became false with that change.
     mocked.mockResolvedValue({
-      symbol: "GOOG", days_back: 90, truncated: false, transactions: [],
+      symbol: "STRK", days_back: 90, truncated: false, transactions: [],
     });
-    render(<InsiderTab symbol="GOOG" />);
-    const note = await waitFor(() => screen.getByText(/No Form 4 filings for GOOG/));
-    expect(note.textContent).toMatch(/A filing is listed under the ticker it names/);
-    expect(note.textContent).toMatch(/more than one listed share class/);
+    render(<InsiderTab symbol="STRK" />);
+    const note = await waitFor(() => screen.getByText(/No Form 4 filings for STRK/));
+    expect(note.textContent).toMatch(/listed under every class of its common\s+stock/);
+    expect(note.textContent).toMatch(/Its preferred shares, notes, warrants, rights and exchange-traded notes\s+show none, where their name or ticker tells them apart from the common stock/);
+    // Not an absolute: the detector reads names and tickers and has known
+    // misses (OBTC's units; an MLP's common units are its equity on purpose).
+    expect(note.textContent).not.toMatch(/never under|always show none/);
+    expect(note.textContent).not.toMatch(/the ticker it names/);
+    expect(note.textContent).not.toMatch(/another of its tickers/);
     expect(note.textContent).not.toMatch(/Empty here is normal/);
   });
 

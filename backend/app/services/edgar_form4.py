@@ -23,15 +23,37 @@ Finnhub function it replaces)
     4. Only filings whose XML names THIS issuer are used: a company's
        submission list also carries Form 4s it filed as a 10% owner of some
        other company.
-    5. ATTRIBUTION. SEC lists several tickers under one CIK for many issuers:
-       preferred depositary shares, notes, warrants, ETNs and sibling share
-       classes. A filing's lines go to ONE of them - the ticker the filing
-       itself names in issuerTradingSymbol, or the CIK's first-listed SEC
-       ticker when the named symbol is not one SEC lists for the CIK. Until
-       2026-09-17 every ticker of the CIK received the issuer's whole Form 4
-       set: 70 CIKs, e.g. Strategy's STRC/STRF/STRK/STRD preferreds carried
-       MSTR's insider sales, JPM's VYLD/AMJB ETNs carried JPM's, and notes like
-       GREEL and TMUSZ carried their issuer's.
+    5. ATTRIBUTION (2026-09-19). SEC lists several tickers under one CIK for
+       many issuers: sibling share classes, preferred depositary shares,
+       notes, warrants, units, rights and ETNs. A Form 4 reports trades in the
+       issuer's equity, so its lines go to EVERY ticker of the CIK that is the
+       issuer's COMMON stock, and to nothing else. The question is asked per
+       symbol, from facts we already store: is THIS listing common stock
+       (`services/security_type.is_common_stock`, which reads the listing's
+       name, asset class and symbol grammar)? If it is, it keeps every
+       in-window filing whose issuer is its CIK; if not, it gets no rows and
+       SEC is not asked. A symbol whose CIK we carry only as a note or a
+       preferred therefore ends with nothing - it never falls back to them.
+       History, since each rule was measured wrong in turn:
+         * until 2026-09-17 every ticker of the CIK received the whole set -
+           70 CIKs, e.g. Strategy's STRC/STRF/STRK/STRD preferreds carried
+           MSTR's insider sales, JPM's VYLD/AMJB ETNs carried JPM's, and notes
+           like GREEL and TMUSZ carried their issuer's;
+         * from 2026-09-17 (#862) a filing went to ONE ticker, the one it
+           names in issuerTradingSymbol, else the CIK's first-listed SEC
+           ticker. That emptied the other common class: Alphabet's insiders
+           file under GOOGL, so on 2026-09-19 GOOG held none of the 183 lines
+           GOOGL held, and NWSA none of the 64 NWS held. The fallback also
+           guessed: production logged a filing naming TOI, a ticker SEC does
+           not list for its CIK (tickers STLN, DFPH, STLNW), put on STLN only
+           because SEC listed it first.
+       The named issuerTradingSymbol no longer decides anything. A filing that
+       names a ticker SEC does not list for the CIK is still the company's own
+       filing (its issuer CIK matches), so its lines are kept, and it is
+       logged once at INFO as `edgar_form4.named_ticker_not_listed` so how
+       often that happens stays measurable. Where lines are listed across
+       tickers, the copies the common classes now share are shown once
+       (`services/insider_dedup.py`).
     6. A 4/A replaces ONE original of the same owner: among the originals filed
        on its dateOfOriginalSubmission (or up to 4 days later, since EDGAR's
        filing date can move past the filer's submission date), the one whose
@@ -50,6 +72,11 @@ Finnhub function it replaces)
        lines are option grants and exercises priced at strike, which would
        swamp the dollar netting in `compute_smart_money_score` and double-count
        every exercise. Share change is signed by the acquired/disposed code.
+       Each line also records its securityTitle ("Class C Capital Stock") as
+       `security_title`. It was added on 2026-09-19 WITHOUT a PARSE_VERSION
+       bump - a bump would re-download every cached filing to record a field
+       nothing reads yet - so filings parsed before then carry no such key,
+       and any reader must treat it as optional.
 
 FAILURE CONTRACT (what the worker pass relies on)
     * An answer is a list, possibly empty.
@@ -82,6 +109,7 @@ import json
 import logging
 import time
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from datetime import date, timedelta
 from time import monotonic
 from typing import Any
@@ -89,6 +117,7 @@ from typing import Any
 import httpx
 
 from app.services.edgar_feed import _USER_AGENT
+from app.services.security_type import is_common_stock
 from app.services.vendor_errors import VendorThrottledError, VendorUnavailableError
 
 logger = logging.getLogger(__name__)
@@ -109,20 +138,18 @@ THROTTLED_STATUSES = frozenset({403, 429})
 
 FORM4_TYPES = frozenset({"4", "4/A"})
 
+#: Longest `security_title` kept per line; SEC's titles run to ~60 characters.
+SECURITY_TITLE_MAX = 120
+
 #: The version `parse_form4_xml`'s output is written at. Bump it when that
-#: output changes.
+#: output changes in a way older rows must not be served without (an optional
+#: per-line key, like `security_title`, is not such a change).
 PARSE_VERSION = 2
 
 #: The oldest cached version still valid for ANY filing. Raise it to
 #: PARSE_VERSION when a parse change makes every older row wrong; cached
 #: filings below it are fetched and parsed again.
 MIN_PARSE_VERSION = 1
-
-#: The first version that records `issuer_symbol` (2026-09-17). Only a CIK with
-#: more than one SEC ticker needs it for attribution, so a single-ticker CIK
-#: keeps serving version-1 rows and only ~70 issuers' filings are downloaded
-#: again (see `_fetch`).
-ISSUER_SYMBOL_PARSE_VERSION = 2
 
 #: How far past a 4/A's dateOfOriginalSubmission the original's EDGAR filing
 #: date may fall and still be the filing it amends. EDGAR dates a submission
@@ -210,8 +237,8 @@ async def _get(
 
 _TICKER_CIK: dict[str, str] = {}
 _TICKER_CIK_LOADED_AT = 0.0
-#: CIK -> its tickers in company_tickers.json order. The first entry is the one
-#: a filing is attributed to when it names no ticker SEC lists for the CIK.
+#: CIK -> its tickers in company_tickers.json order. Used only to notice a
+#: filing that names a ticker SEC does not list for its CIK; see ATTRIBUTION.
 _CIK_TICKERS: dict[str, list[str]] = {}
 
 
@@ -320,6 +347,8 @@ def parse_form4_xml(document: bytes | str) -> dict[str, Any]:
             "share_change": change,
             "transaction_price": price if price and price > 0 else 0.0,
             "code": _text(tx, "transactionCoding/transactionCode")[:4],
+            # Optional: see point 8 of the module docstring.
+            "security_title": _text(tx, "securityTitle/value")[:SECURITY_TITLE_MAX] or None,
         })
     return {
         "issuer_cik": _cik(_text(root, "issuer/issuerCik")),
@@ -353,9 +382,7 @@ def _form4_filings_in_window(submissions: Any, cutoff: str) -> list[dict[str, st
 # ---- the cache ------------------------------------------------------------------
 
 
-async def _cached_filings(
-    accessions: list[str], min_version: int = MIN_PARSE_VERSION,
-) -> dict[str, dict[str, Any]]:
+async def _cached_filings(accessions: list[str]) -> dict[str, dict[str, Any]]:
     from sqlalchemy import select
 
     from app.db import session_scope
@@ -367,7 +394,7 @@ async def _cached_filings(
         rows = (await session.execute(
             select(EdgarForm4Filing).where(
                 EdgarForm4Filing.accession.in_(accessions),
-                EdgarForm4Filing.parse_version >= min_version,
+                EdgarForm4Filing.parse_version >= MIN_PARSE_VERSION,
                 EdgarForm4Filing.parse_version <= PARSE_VERSION,
             )
         )).scalars().all()
@@ -438,8 +465,84 @@ async def _read_filing(
 # ---- the public entry point --------------------------------------------------------
 
 
-async def _fetch(symbol: str, days_back: int) -> list[dict[str, Any]]:
+@dataclass(frozen=True)
+class Listing:
+    """What we store about the symbol asked for: enough to tell whether it is
+    its issuer's common stock (`services/security_type.is_common_stock`).
+
+    `universe` is every `tickers.symbol`, or at least the four-letter root of
+    this symbol when it is listed; it only feeds the fifth-letter U/R/W rules.
+    The worker builds it once per pass, not once per symbol."""
+
+    name: str | None
+    asset_class: str | None
+    universe: frozenset[str] = frozenset()
+
+    def is_common_stock(self, symbol: str) -> bool:
+        return is_common_stock(symbol, self.name, self.asset_class, self.universe)
+
+
+async def load_listing(symbol: str) -> Listing:
+    """The Listing for a caller that holds none, read from `tickers`.
+
+    Two indexed lookups: the symbol's own row, and whether its four-letter root
+    is listed (the only part of the universe the predicate reads for it). A
+    symbol with no `tickers` row has no stored name or class, so it is not
+    KNOWN to be common stock and `fetch_insider_transactions` answers it with
+    no rows."""
+    from sqlalchemy import select
+
+    from app.db import session_scope
+    from app.models import Ticker
+
+    sym = symbol.strip().upper()
+    async with session_scope() as session:
+        rows = (await session.execute(
+            select(Ticker.symbol, Ticker.name, Ticker.asset_class)
+            .where(Ticker.symbol.in_({sym, sym[:4]}))
+        )).all()
+    own = next((r for r in rows if r.symbol == sym), None)
+    return Listing(
+        name=own.name if own else None,
+        asset_class=own.asset_class if own else None,
+        universe=frozenset(r.symbol for r in rows),
+    )
+
+
+#: Accessions already logged as naming a ticker SEC does not list for their
+#: CIK, so a filing read for GOOG and again for GOOGL is counted once. Bounded:
+#: cleared when it outgrows the cap (a re-log after that is harmless).
+_NAMED_NOT_LISTED_LOGGED: set[str] = set()
+_NAMED_NOT_LISTED_LOGGED_CAP = 20_000
+
+
+def _note_named_ticker_not_listed(
+    symbol: str, accession: str, reading: dict[str, Any], cik_tickers: list[str],
+) -> None:
+    """Log, once per filing, a filing whose issuerTradingSymbol is not one SEC
+    lists for its CIK (a rename such as TOI under STLN/DFPH/STLNW). Its lines
+    are kept - the issuer CIK matches - so this is a measurement, not a warning.
+    A version-1 cache row records no symbol and is not counted."""
+    named = reading.get("issuer_symbol") or ""
+    if not named or not cik_tickers or named in cik_tickers:
+        return
+    if accession in _NAMED_NOT_LISTED_LOGGED:
+        return
+    if len(_NAMED_NOT_LISTED_LOGGED) >= _NAMED_NOT_LISTED_LOGGED_CAP:
+        _NAMED_NOT_LISTED_LOGGED.clear()
+    _NAMED_NOT_LISTED_LOGGED.add(accession)
+    logger.info(
+        "edgar_form4.named_ticker_not_listed symbol=%s accession=%s named=%r tickers=%s",
+        symbol, accession, named, cik_tickers,
+    )
+
+
+async def _fetch(symbol: str, days_back: int, listing: Listing) -> list[dict[str, Any]]:
     cutoff = (date.today() - timedelta(days=days_back)).isoformat()
+    if not listing.is_common_stock(symbol):
+        # Point 5: only a common-stock listing carries its issuer's Form 4
+        # lines. Answered from what we store, so SEC is not asked.
+        return []
     async with _client() as client:
         cik = (await _ticker_cik_map(client)).get(sec_ticker(symbol))
         if cik is None:
@@ -455,15 +558,7 @@ async def _fetch(symbol: str, days_back: int) -> list[dict[str, Any]]:
         if not filings:
             return []
 
-        cik_tickers = _CIK_TICKERS.get(cik) or [sec_ticker(symbol)]
-        # A single-ticker CIK needs no issuer symbol, so older rows serve.
-        parsed = await _cached_filings(
-            [f["accession"] for f in filings],
-            min_version=(
-                max(MIN_PARSE_VERSION, ISSUER_SYMBOL_PARSE_VERSION)
-                if len(cik_tickers) > 1 else MIN_PARSE_VERSION
-            ),
-        )
+        parsed = await _cached_filings([f["accession"] for f in filings])
         missing = [f for f in filings if f["accession"] not in parsed]
         fresh: list[tuple[dict[str, str], dict[str, Any]]] = []
         pacing = asyncio.Lock()
@@ -491,12 +586,12 @@ async def _fetch(symbol: str, days_back: int) -> list[dict[str, Any]]:
         if failure is not None:
             raise failure
 
-    wanted = sec_ticker(symbol)
-    own = [
-        f for f in filings
-        if parsed[f["accession"]]["issuer_cik"] == cik
-        and attributed_ticker(parsed[f["accession"]], cik_tickers) == wanted
-    ]
+    # Every filing about this issuer, whichever of its tickers it names; see
+    # point 5. The issuer CIK, not the named symbol, is what decides.
+    own = [f for f in filings if parsed[f["accession"]]["issuer_cik"] == cik]
+    cik_tickers = _CIK_TICKERS.get(cik) or []
+    for meta in own:
+        _note_named_ticker_not_listed(symbol, meta["accession"], parsed[meta["accession"]], cik_tickers)
     replaced = superseded_accessions(own, parsed)
     transactions: list[dict[str, Any]] = []
     for meta in own:
@@ -520,24 +615,6 @@ async def _fetch(symbol: str, days_back: int) -> list[dict[str, Any]]:
                 continue
             transactions.append({"filer_name": reading["owner_name"], **line})
     return transactions
-
-
-def attributed_ticker(reading: dict[str, Any], cik_tickers: list[str]) -> str:
-    """The one ticker a filing's lines belong to; see "ATTRIBUTION" above.
-
-    The fallback is the only path that puts a filing on a ticker it does not
-    name, so with more than one ticker to choose from it says so: SEC's list
-    order is not documented to put common stock first, and taking the first is
-    a guess."""
-    named = reading.get("issuer_symbol") or ""
-    if named in cik_tickers:
-        return named
-    if len(cik_tickers) > 1:
-        logger.warning(
-            "edgar_form4.attribution_fallback named=%r tickers=%s attributed=%s",
-            named, cik_tickers, cik_tickers[0],
-        )
-    return cik_tickers[0]
 
 
 def _line_dates(reading: dict[str, Any]) -> set[str]:
@@ -650,14 +727,24 @@ def superseded_accessions(
 
 async def fetch_insider_transactions(
     symbol: str, days_back: int = 90, *, raise_failures: bool = False,
+    listing: Listing | None = None,
 ) -> list[dict[str, Any]] | None:
     """Form 4 non-derivative transactions for `symbol` in the last `days_back`
     days, newest filing first, as
-    {filer_name, transaction_date, share_change, transaction_price, code}.
+    {filer_name, transaction_date, share_change, transaction_price, code,
+    security_title}.
+
+    `listing` is what we store about the symbol (see `Listing`); a symbol that
+    is not its issuer's common stock is answered [] without asking SEC. The
+    worker pass supplies it, built from one read of `tickers` per pass. A
+    caller that holds none gets it read here (`load_listing`), so the answer is
+    the same either way; a symbol with no `tickers` row is answered [].
 
     See the module docstring for what counts as an answer."""
     try:
-        return await _fetch(symbol, days_back)
+        if listing is None:
+            listing = await load_listing(symbol)
+        return await _fetch(symbol, days_back, listing)
     except (EdgarThrottledError, EdgarUnavailableError):
         if raise_failures:
             raise

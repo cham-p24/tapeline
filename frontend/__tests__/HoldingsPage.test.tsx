@@ -85,6 +85,20 @@ describe("HoldingsPage", () => {
     // Premium-only filters are present; no locked section.
     expect(screen.getByPlaceholderText("e.g. NVDA")).toBeInTheDocument();
     expect(screen.queryByText(/full feed on Premium/)).not.toBeInTheDocument();
+  });
+
+  it("names every share class a shared line belongs to", async () => {
+    // One Alphabet filing line, carried by GOOG and GOOGL since 2026-09-19,
+    // arrives once with both classes in `symbols`.
+    setUser("premium");
+    mockedHoldings.mockResolvedValue({
+      count: 1, feed_size: 1,
+      items: [{ ...fullRow, symbol: "GOOG", symbols: ["GOOG", "GOOGL"] }],
+    });
+    render(<HoldingsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("GOOG · GOOGL")).toBeInTheDocument();
+    });
     expect(mockedPreview).not.toHaveBeenCalled();
   });
 

@@ -167,6 +167,9 @@ def test_real_non_common_listings_are_flagged(symbol, name, asset_class):
     # Brazilian preferred ADRs: each is its company's main traded equity line.
     ("PBR.A", "Petroleo Brasileiro SA Petrobras", "equity"),
     ("CIG", "Companhia Energetica De Minas Gerais-CEMIG", "equity"),
+    # Bradesco's preferred ADR: named in security_type's symbol list for
+    # Form 4 attribution (2026-09-19), held out of this flag like the two above.
+    ("BBD", "Banco Bradesco SA", "equity"),
     # ETNs are out of scope: they are stored as ETFs, and this flag reads the
     # equity bucket only.
     ("VXX", "iPath Series B S&P 500 VIX Short-Term Futures ETN", "etf"),

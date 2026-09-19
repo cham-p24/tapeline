@@ -155,7 +155,7 @@ def _vendor(monkeypatch: pytest.MonkeyPatch, outcome: str) -> list[str]:
     calls: list[str] = []
 
     async def _fetch(
-        sym: str, days_back: int = 90, *, raise_failures: bool = False,
+        sym: str, days_back: int = 90, *, raise_failures: bool = False, listing: Any = None,
     ) -> list[dict[str, Any]] | None:
         calls.append(sym)
         if len(calls) > 300:
@@ -884,7 +884,7 @@ def _vendor_by_prefix(monkeypatch: pytest.MonkeyPatch, outcomes: dict[str, str])
     calls: list[str] = []
 
     async def _fetch(
-        sym: str, days_back: int = 90, *, raise_failures: bool = False,
+        sym: str, days_back: int = 90, *, raise_failures: bool = False, listing: Any = None,
     ) -> list[dict[str, Any]] | None:
         calls.append(sym)
         if len(calls) > 300:

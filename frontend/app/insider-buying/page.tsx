@@ -37,6 +37,9 @@ export const metadata = pageMeta({
  */
 type InsiderRow = {
   symbol: string;
+  /** Every ticker the purchase is listed under: one company's common-stock
+   *  classes share its filings (GOOG and GOOGL), and the row is shown once. */
+  symbols?: string[];
   insider_name: string;
   transaction_date: string;
   share_change?: number | null;
@@ -253,9 +256,14 @@ export default async function InsiderBuyingPage() {
               {rows.map((r, i) => (
                 <tr key={`${r.symbol}-${i}`} className="border-b border-border/30 hover:bg-panel/40">
                   <td className="px-3 py-3 font-mono font-medium">
-                    <Link href={`/t/${r.symbol}`} className="hover:text-accent">
-                      {r.symbol}
-                    </Link>
+                    {(r.symbols && r.symbols.length > 1 ? r.symbols : [r.symbol]).map((s, j) => (
+                      <span key={s}>
+                        {j > 0 ? " · " : null}
+                        <Link href={`/t/${s}`} className="hover:text-accent">
+                          {s}
+                        </Link>
+                      </span>
+                    ))}
                   </td>
                   <td className="px-3 py-3 text-xs text-muted">{r.insider_name}</td>
                   {/* Every figure below is guarded: the Form 4 columns are NOT

@@ -388,21 +388,32 @@ describe("/insider-buying, /how-it-works and the Smart Money factor", () => {
     expectNoPresentVendor(factor.caveat);
 
     // Changelog rule 4: the factor page states the attribution rule the code
-    // applies, including that a sibling share class gets no reading.
-    expect(detail).toMatch(/counts only for the ticker it names/);
+    // applies (services/edgar_form4.py point 5, 2026-09-19): every common-stock
+    // class carries the company's filings, nothing else carries any.
+    expect(detail).toMatch(/counts for every listed common-stock class of the company that filed it, and for none of its other listed securities/);
+    expect(detail).not.toMatch(/counts only for the ticker it names/);
     const attribution = factor.limitations.find((l) => /GOOGL/.test(l));
     expect(attribution, "no attribution limitation on the Smart Money page").toBeDefined();
-    expect(attribution).toMatch(/From 17 September 2026/);
-    expect(attribution).toMatch(/no reading rather than a borrowed one/);
-    // A borrowed reading survives until that ticker's next re-check, so the
-    // page cannot imply the change is instant everywhere.
-    expect(attribution).toMatch(/removed at that ticker's next re-check/);
-    // "No filings" must mean "none on file for this ticker", now that a
-    // sibling class can hold the filings.
+    expect(attribution).toMatch(/A filing's transactions count for every listed common-stock class/);
+    // No start date for the current rule: it takes effect at deploy, and a
+    // hard-coded day is false the moment the merge slips past it.
+    expect(attribution).not.toMatch(/From 19 September 2026|to 19 September 2026/);
+    expect(attribution).toMatch(/GOOG carries the same reading/);
+    expect(attribution).toMatch(/preferred shares, notes, warrants, rights, units and exchange-traded notes have no reading rather than a borrowed one/);
+    // The rule is a name-and-ticker judgement, and the page says so.
+    expect(attribution).toMatch(/judged from its name and ticker/);
+    // Both earlier rules stay stated, dated, as history.
+    expect(attribution).toMatch(/From 17 September 2026 until this rule replaced it, a filing counted only for the ticker it named/);
+    expect(attribution).toMatch(/Before 17 September every ticker of the issuer received all of them/);
+    // A ticker moves to the rule at its next re-check, so the page cannot
+    // imply the change is instant everywhere.
+    expect(attribution).toMatch(/at its next re-check/);
     const unavailable = factor.computed.find((c) => /no reading at all/.test(c));
     expect(unavailable).toMatch(/for which we hold no disclosed filings/);
     const faq = factor.faq.find((f) => /no.*filings/i.test(f.q))!;
     expect(faq.a).toMatch(/No filings on file for that ticker/);
+    expect(faq.a).toMatch(/each carries the company's filings/);
+    expect(faq.a).not.toMatch(/the one the filer names/);
 
     expectNoStaleClaim(JSON.stringify(factor));
   });

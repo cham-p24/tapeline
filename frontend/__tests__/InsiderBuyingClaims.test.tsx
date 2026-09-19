@@ -99,6 +99,17 @@ describe("/insider-buying — labels and claims", () => {
   beforeEach(() => vi.unstubAllGlobals());
   afterEach(() => vi.unstubAllGlobals());
 
+  it("names every share class a shared purchase belongs to, each linked", async () => {
+    // Since 2026-09-19 one company's common-stock classes all carry its
+    // filings, and /api/public/insider-buys lists such a purchase once with
+    // every class in `symbols`. Showing only `symbol` would hide BRK.B's.
+    mockFeed([{ ...row("BRK.A", "2026-09-10"), symbols: ["BRK.A", "BRK.B"] }, row("AAPL", "2026-09-09")]);
+    const { container } = await renderInsider();
+    const hrefs = Array.from(container.querySelectorAll("tbody a")).map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(["/t/BRK.A", "/t/BRK.B", "/t/AAPL"]);
+    expect(container.querySelector("tbody td")?.textContent).toBe("BRK.A · BRK.B");
+  });
+
   it("labels the date column 'Trade date', never 'Filed'", async () => {
     mockFeed([row("AAAA", "2026-08-31")]);
     const { container } = await renderInsider();

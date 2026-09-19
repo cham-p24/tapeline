@@ -80,8 +80,12 @@ logger = logging.getLogger(__name__)
 
 #: Preferred ADRs that are their company's main traded equity line. See the
 #: module docstring: the shared predicate names them for Form 4 attribution,
-#: and this flag deliberately does not.
-EQUITY_LIKE_PREFERRED_ADRS: frozenset[str] = frozenset({"CIG", "PBR.A"})
+#: and this flag deliberately does not. BBD (Bradesco's preferred ADR, and
+#: its most traded US line; BBDO is the common ADR) joined the shared
+#: predicate's symbol list on 2026-09-19 for Form 4 attribution, so it is held
+#: out here for the same reason - without this it would newly leave the
+#: default scanner and the record, which that change was not about.
+EQUITY_LIKE_PREFERRED_ADRS: frozenset[str] = frozenset({"CIG", "PBR.A", "BBD"})
 
 
 def is_non_common_equity(

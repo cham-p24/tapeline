@@ -39,8 +39,11 @@ class EdgarForm4Filing(Base):
     #: for the issuer named here.
     issuer_cik: Mapped[str] = mapped_column(String(10), nullable=False, default="")
     #: issuerTradingSymbol as the filing names it, in SEC's spelling (BRK-B).
-    #: Decides which of a multi-ticker CIK's tickers the lines belong to; NULL
-    #: on rows parsed before version 2 (see edgar_form4.PARSE_VERSION).
+    #: From 2026-09-17 to 2026-09-19 it decided which of a multi-ticker CIK's
+    #: tickers the lines belonged to; it no longer decides anything (every
+    #: common-stock ticker gets them, edgar_form4 point 5) and is kept to
+    #: measure filings naming a ticker SEC does not list. NULL on rows parsed
+    #: before version 2 (see edgar_form4.PARSE_VERSION).
     issuer_symbol: Mapped[str | None] = mapped_column(String(20), nullable=True)
     owner_cik: Mapped[str] = mapped_column(String(10), nullable=False, default="")
     owner_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")

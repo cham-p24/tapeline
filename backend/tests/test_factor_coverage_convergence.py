@@ -301,7 +301,7 @@ async def test_the_insider_pass_stamps_its_own_column(
     asked: list[str] = []
 
     async def _fake_txns(
-        sym: str, days_back: int = 90, *, raise_failures: bool = False,
+        sym: str, days_back: int = 90, *, raise_failures: bool = False, listing: Any = None,
     ) -> list[dict[str, Any]]:
         asked.append(sym)
         return []

@@ -204,7 +204,7 @@ def _insider_vendor(
     calls: list[str] = []
 
     async def _fetch(
-        sym: str, days_back: int = 90, *, raise_failures: bool = False,
+        sym: str, days_back: int = 90, *, raise_failures: bool = False, listing: Any = None,
     ) -> list[dict[str, Any]] | None:
         calls.append(sym)
         if len(calls) > 200:
