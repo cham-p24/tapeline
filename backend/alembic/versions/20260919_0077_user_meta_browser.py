@@ -17,8 +17,8 @@ Adds four nullable columns to users, holding only the LATEST values:
 No backfill: existing rows stay NULL until the account's next signup-path or
 checkout request. Additive only; `signup_fbclid` (first-touch) is untouched.
 
-Revision ID: 0074_user_meta_browser
-Revises: 0073_edgar_issuer_symbol
+Revision ID: 0077_user_meta_browser
+Revises: 0075_ticker_quote_at
 """
 from __future__ import annotations
 
@@ -26,8 +26,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0074_user_meta_browser"
-down_revision = "0073_edgar_issuer_symbol"
+revision = "0077_user_meta_browser"
+down_revision = "0075_ticker_quote_at"
 branch_labels = None
 depends_on = None
 
