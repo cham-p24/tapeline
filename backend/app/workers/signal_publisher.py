@@ -190,6 +190,7 @@ FACTOR_COLUMNS: tuple[str, ...] = (
 )
 
 _SMART_MONEY_ONLY: frozenset[str] = frozenset({"sub_smart_money"})
+_FUNDAMENTALS_ONLY: frozenset[str] = frozenset({"sub_fundamentals"})
 
 
 def _merged_factor_set(
@@ -559,7 +560,14 @@ async def tick() -> None:
             Ticker.symbol, Ticker.sector,
             Ticker.sub_trend, Ticker.sub_rs, Ticker.sub_fundamentals,
             Ticker.sub_smart_money, Ticker.sub_macro, Ticker.sub_momentum,
+            Ticker.is_non_common,
         ))).all()
+        # Listings stored as stocks that are not common shares take no
+        # fundamentals reading: the vendor's figures for them are the
+        # issuer's. Written as NULL on every tick, whatever the snapshot or
+        # the row holds, so the composite, label and sentence are rebuilt
+        # without it. See finnhub_feed._NO_FUNDAMENTALS.
+        no_fundamentals = {r.symbol for r in existing_rows if r.is_non_common}
         existing_symbols = {r.symbol for r in existing_rows}
         existing_factors = {
             r.symbol: {
@@ -625,8 +633,15 @@ async def tick() -> None:
                     **_merged_factor_set(
                         snap, existing_factors.get(snap["symbol"]),
                         cleared=(
-                            _SMART_MONEY_ONLY if snap["symbol"] in sm_cleared
-                            else frozenset()
+                            (
+                                _SMART_MONEY_ONLY if snap["symbol"] in sm_cleared
+                                else frozenset()
+                            )
+                            | (
+                                _FUNDAMENTALS_ONLY
+                                if snap["symbol"] in no_fundamentals
+                                else frozenset()
+                            )
                         ),
                     ),
                 }
@@ -2982,6 +2997,11 @@ def _factor_scope_clause(stamp_col: Any) -> Any:
     """
     if stamp_col.key == "last_smart_money_at":
         return Ticker.symbol.not_like("X:%")
+    if stamp_col.key == "last_fundamentals_at":
+        # Notes, preferreds, warrants, rights and units: the vendor answers
+        # them with the issuer's financials, so asking is a wasted call whose
+        # answer must not be used. See finnhub_feed._NO_FUNDAMENTALS.
+        return Ticker.is_non_common.is_(False)
     return true()
 
 
@@ -3311,10 +3331,18 @@ async def _save_factor_readings(
 
     Crypto pairs are never written: they are scored on a different factor set.
     """
+    from app.services.finnhub_feed import no_fundamentals_symbols
     from app.services.mock_feed import _signal_from_score
     from app.services.polygon_feed import _composite_from_subs
 
-    pending = {s: v for s, v in readings.items() if not s.startswith("X:")}
+    # A listing flagged not-common-stock since its reading was fetched must not
+    # be written its issuer's value: checked here, at write time, and again in
+    # the UPDATE below against the stored flag. See finnhub_feed._NO_FUNDAMENTALS.
+    fundamentals = factor == "sub_fundamentals"
+    skip = no_fundamentals_symbols() if fundamentals else frozenset()
+    pending = {
+        s: v for s, v in readings.items() if not s.startswith("X:") and s not in skip
+    }
     unwritten = [s for s in readings if s not in pending]
     others = [c for c in FACTOR_COLUMNS if c != factor]
     for _attempt in range(_FACTOR_SAVE_ATTEMPTS):
@@ -3329,6 +3357,7 @@ async def _save_factor_readings(
                     .where(
                         Ticker.symbol == sym,
                         *(getattr(Ticker, c).is_not_distinct_from(v) for c, v in held.items()),
+                        *((Ticker.is_non_common.is_(False),) if fundamentals else ()),
                     )
                     .values({
                         factor: pending[sym],
@@ -3465,6 +3494,8 @@ async def _refresh_fundamentals_cache(
             if metrics:
                 score = compute_fundamentals_score(metrics)
                 set_cached_score(sym, score)
+                # A symbol flagged not-common-stock since the selection ran is
+                # dropped when the batch is written; see _save_factor_readings.
                 if score is not None:
                     readings[sym] = score
                 refreshed += 1
@@ -3989,6 +4020,109 @@ async def _clear_smart_money_reading(symbol: str) -> tuple[bool, bool]:
     return cleared, bool(edgar_rows)
 
 
+async def _clear_non_common_fundamentals() -> int:
+    """Retire the fundamentals reading on every listing that is not common stock.
+
+    A note, preferred, warrant, right or unit stored as a stock was scored on
+    its ISSUER's financials, because that is what the vendor answers for the
+    symbol. Measured read-only on production 2026-09-18: 99 of the 120 flagged
+    rows held one (GREEL, a Greenidge senior note, 60.2), and 66 reasons cited
+    it. The tick writes NULL for these rows on every tick from now on (see
+    `no_fundamentals` in tick()), but only for rows it snapshots; this clears
+    every flagged row still holding a value, once, wherever it sits.
+
+    Same shape as `_clear_smart_money_reading`: per row, a compare-and-set on
+    all six factors with the composite and label recomputed from the five that
+    remain, and updated_at held still. One difference: the reason is
+    re-rendered on EVERY row, sheet-owned ones included. Nothing else rewrites
+    a sheet-owned row's reason (the tick writes it only market fields, and the
+    ingest never writes one), so leaving it would keep "fundamentals among
+    this ticker's highest-scoring factors" beside a factor that is now blank.
+    confidence_pct is still left to the sheet on its rows: there it is a
+    conviction grade, not factor coverage. A row whose other
+    factors changed in between is re-read and tried again; one that loses
+    every attempt is left to its owner, which now writes NULL for it anyway.
+
+    A row that held only one other factor has no composite once this is gone
+    (MIN_FACTORS_FOR_COMPOSITE), so its score and label become None. That is
+    the correct reading, not a loss: its score rested on the issuer's figures.
+    """
+    sheet_owned = _sheet_governed_symbols if _sheet_is_scoring_source() else frozenset()
+    async with session_scope() as session:
+        symbols = (await session.execute(
+            select(Ticker.symbol).where(
+                Ticker.is_non_common.is_(True),
+                Ticker.sub_fundamentals.is_not(None),
+            )
+        )).scalars().all()
+
+    cleared = 0
+    for sym in symbols:
+        written = (
+            {"sub_fundamentals", "score", "signal", "reason"} if sym in sheet_owned
+            else {"sub_fundamentals", "score", "signal", "reason", "confidence_pct"}
+        )
+        try:
+            async with session_scope() as session:
+                for _attempt in range(_FACTOR_SAVE_ATTEMPTS):
+                    row = (await session.execute(
+                        select(
+                            Ticker.sector, Ticker.price,
+                            *(getattr(Ticker, col) for col in FACTOR_COLUMNS),
+                        ).where(Ticker.symbol == sym, Ticker.is_non_common.is_(True))
+                    )).one_or_none()
+                    if row is None or row.sub_fundamentals is None:
+                        break
+                    factors = {col: getattr(row, col) for col in FACTOR_COLUMNS}
+                    values = _merged_factor_set(
+                        {"symbol": sym, "sector": row.sector, "price": row.price},
+                        factors, cleared=_FUNDAMENTALS_ONLY,
+                    )
+                    result = await session.execute(
+                        update(Ticker)
+                        .where(
+                            Ticker.symbol == sym,
+                            *(
+                                getattr(Ticker, c).is_not_distinct_from(v)
+                                for c, v in factors.items()
+                            ),
+                        )
+                        .values({
+                            **{k: values[k] for k in written},
+                            "updated_at": Ticker.updated_at,
+                        })
+                        .execution_options(synchronize_session=False)
+                    )
+                    if result.rowcount == 1:  # type: ignore[attr-defined]
+                        cleared += 1
+                        break
+                else:
+                    logger.warning(
+                        "fundamentals.non_common_clear_contended symbol=%s", sym,
+                    )
+        except Exception:
+            logger.exception("fundamentals.non_common_clear_failed symbol=%s", sym)
+    if symbols:
+        logger.info(
+            "fundamentals.non_common_cleared rows=%d of=%d", cleared, len(symbols),
+        )
+    return cleared
+
+
+async def _settle_non_common() -> None:
+    """Reconcile the non-common flag against the whole universe, then retire
+    the fundamentals reading on every row it flags. Never raises.
+
+    The reconcile also tells this process's fundamentals cache which symbols
+    take no reading (finnhub_feed._NO_FUNDAMENTALS), so it must run before the
+    boot warm. See services/non_common.py."""
+    await reconcile_non_common_flags()
+    try:
+        await _clear_non_common_fundamentals()
+    except Exception:
+        logger.exception("fundamentals.non_common_clear_pass_failed")
+
+
 async def _refresh_insider_cache(
     limit: int | None = None, *, deadline: float | None = None,
 ) -> bool:
@@ -4326,7 +4460,7 @@ async def _backfill_sectors(cap: int = 2500) -> None:
                 backfilled, len(rows), cap)
     # Names this pass repaired can change the non-common flag either way;
     # settle it against the whole universe. See services/non_common.py.
-    await reconcile_non_common_flags()
+    await _settle_non_common()
 
 
 _MARKET_CAP_BACKFILL_BATCH = 20
@@ -4755,7 +4889,7 @@ async def _refresh_universe() -> None:
     # Rows this pass did not touch can still change: a new listing is the
     # four-letter base that makes an existing fifth-letter symbol a unit,
     # right or warrant. See services/non_common.py.
-    await reconcile_non_common_flags()
+    await _settle_non_common()
 
 
 async def _seed_calendar() -> None:
@@ -4902,8 +5036,10 @@ async def main() -> None:
 
     # Settle the non-common flag against the whole universe before the first
     # tick: writers that cannot see the universe only ever raise it. Never
-    # raises. See services/non_common.py.
-    await reconcile_non_common_flags()
+    # raises. BEFORE the warm below: it tells the fundamentals cache which
+    # listings take no reading and clears the issuer's value off their rows,
+    # so the warm cannot put it back. See services/non_common.py.
+    await _settle_non_common()
 
     # Restore the two Finnhub factor caches from the DB BEFORE the first tick.
     #
