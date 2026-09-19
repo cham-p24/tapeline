@@ -75,6 +75,20 @@ describe("privacy policy — Meta disclosure tracks the build", () => {
       expect(text).toMatch(/never on the signed-in app/i);
     }
   });
+
+  it("discloses the browser Lead sent on a daily-email subscription, in BOTH states", async () => {
+    // lib/metaConversions.trackMetaLead fires from the newsletter form. The
+    // policy must say the pixel reports that moment — and must NOT move it into
+    // the server list, because no hashed email is sent for a subscription.
+    for (const id of [undefined, "123456789"]) {
+      vi.resetModules();
+      const text = await renderPolicyWith({ NEXT_PUBLIC_META_PIXEL_ID: id });
+      expect(text).toMatch(
+        /From your browser:.*reports when you subscribe to our daily email/i,
+      );
+      expect(text).toMatch(/we do not pass it your email address/i);
+    }
+  });
 });
 
 describe("privacy policy — the other trackers too", () => {

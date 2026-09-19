@@ -22,7 +22,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { metaEventId, trackMetaCompleteRegistration } from "@/lib/metaConversions";
+import {
+  metaEventId,
+  trackMetaCompleteRegistration,
+  trackMetaLead,
+} from "@/lib/metaConversions";
 
 vi.mock("@/lib/trackers", () => ({
   trackerEnabled: { meta: true },
@@ -127,5 +131,104 @@ describe("trackMetaCompleteRegistration", () => {
     await expect(
       trackMetaCompleteRegistration({ userId: "usr_abc123" }),
     ).resolves.toBeNull();
+  });
+});
+
+/**
+ * `Lead` — the free daily-email subscription (decision "L1", 2026-09-19).
+ *
+ * Browser ONLY, by decision rather than by omission: the live privacy policy
+ * covers sending Meta a hashed email on signup / trial / charge, and a
+ * newsletter subscription is none of those. So unlike CompleteRegistration
+ * there is no server copy to dedupe against and no stable account id to derive
+ * from — the id is random per subscription, and the payload must carry nothing
+ * that could identify the subscriber. These tests pin exactly that.
+ */
+describe("trackMetaLead", () => {
+  afterEach(() => {
+    delete (window as unknown as { fbq?: unknown }).fbq;
+    window.history.replaceState({}, "", "/");
+    vi.restoreAllMocks();
+  });
+
+  it("sends Lead with empty params and only an eventID", async () => {
+    const fbq = vi.fn();
+    (window as unknown as { fbq: unknown }).fbq = fbq;
+    window.history.replaceState({}, "", "/daily-picks");
+
+    const sent = await trackMetaLead();
+
+    expect(sent).toMatch(/^lead\.[0-9a-f]{32}$/);
+    expect(fbq).toHaveBeenCalledTimes(1);
+    expect(fbq).toHaveBeenCalledWith("track", "Lead", {}, { eventID: sent });
+  });
+
+  it("sends NO personal data — no address, no advanced-matching keys", async () => {
+    const fbq = vi.fn();
+    (window as unknown as { fbq: unknown }).fbq = fbq;
+
+    await trackMetaLead();
+
+    expect(fbq.mock.calls[0]).toHaveLength(4);
+    const [, , params, options] = fbq.mock.calls[0];
+    expect(params).toEqual({});
+    expect(Object.keys(options as object)).toEqual(["eventID"]);
+
+    const payload = JSON.stringify(fbq.mock.calls[0]);
+    for (const key of ["em", "ph", "fn", "ln", "ct", "st", "zp", "country", "external_id"]) {
+      expect(payload).not.toContain(`"${key}"`);
+    }
+    expect(payload).not.toContain("@");
+  });
+
+  it("uses a fresh id for each subscription, so two people are never merged into one", async () => {
+    const fbq = vi.fn();
+    (window as unknown as { fbq: unknown }).fbq = fbq;
+
+    const a = await trackMetaLead();
+    const b = await trackMetaLead();
+
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    expect(a).not.toBe(b);
+  });
+
+  it("never fires on the signed-in app, even if the pixel is already in the document", async () => {
+    // fbevents.js survives a client-side navigation from a marketing page into
+    // /app (see MetaPixel.tsx, "HONEST LIMIT"). Its beacon carries the full URL,
+    // so a Lead sent from /app/ticker/X would tell Meta which ticker was open.
+    const fbq = vi.fn();
+    (window as unknown as { fbq: unknown }).fbq = fbq;
+    window.history.replaceState({}, "", "/app/ticker/NVDA");
+
+    await expect(trackMetaLead()).resolves.toBeNull();
+    expect(fbq).not.toHaveBeenCalled();
+  });
+
+  it("no-ops silently when the pixel is blocked or absent", async () => {
+    await expect(trackMetaLead()).resolves.toBeNull();
+  });
+
+  it("never throws when the pixel stub throws", async () => {
+    (window as unknown as { fbq: unknown }).fbq = () => {
+      throw new Error("blocked by extension");
+    };
+
+    await expect(trackMetaLead()).resolves.toBeNull();
+  });
+
+  it("sends nothing when the pixel is switched off for this build", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/trackers", () => ({ trackerEnabled: { meta: false } }));
+    const fbq = vi.fn();
+    (window as unknown as { fbq: unknown }).fbq = fbq;
+
+    try {
+      const mod = await import("@/lib/metaConversions");
+      await expect(mod.trackMetaLead()).resolves.toBeNull();
+      expect(fbq).not.toHaveBeenCalled();
+    } finally {
+      vi.doUnmock("@/lib/trackers");
+    }
   });
 });

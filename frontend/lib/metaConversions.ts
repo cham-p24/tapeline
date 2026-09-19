@@ -45,6 +45,7 @@
  * identifying stays server-side, hashed, where the privacy policy says it is.
  */
 
+import { isPixelAllowedPath } from "@/components/MetaPixel";
 import { trackerEnabled } from "./trackers";
 
 type FbqFn = (
@@ -106,6 +107,73 @@ export async function trackMetaCompleteRegistration(opts: {
     );
   } catch {
     // A blocked or stubbed pixel can throw. Never let it reach signup.
+    return null;
+  }
+  return eventID;
+}
+
+/** `lead.` + 32 random hex chars — the same shape as `metaEventId`'s output. */
+function randomLeadEventId(): string | null {
+  // getRandomValues (unlike randomUUID) exists in insecure contexts too, so
+  // this only fails in environments with no Web Crypto at all.
+  const c = typeof globalThis.crypto !== "undefined" ? globalThis.crypto : undefined;
+  if (!c || typeof c.getRandomValues !== "function") return null;
+  const bytes = c.getRandomValues(new Uint8Array(16));
+  const hex = Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `lead.${hex}`;
+}
+
+/**
+ * Fire `Lead` for a NEW subscription to the free daily email (decision "L1",
+ * 2026-09-19) — the conversion the free-email ad set optimises on.
+ *
+ * Call it only when `/api/newsletter/subscribe` answered `status: "new"`. The
+ * server gives that answer once per address, ever: a repeat submit is
+ * "already_subscribed", a return after unsubscribing is "resubscribed", and the
+ * honeypot / disposable-domain screens also answer "already_subscribed". So the
+ * status check at the call site is what makes this count subscribers rather
+ * than form submits. There is no double opt-in — the row is written
+ * `confirmed` by that one request — so there is no later step to wait for.
+ *
+ * BROWSER ONLY, AND DELIBERATELY SO
+ * ---------------------------------
+ * Unlike CompleteRegistration there is no Conversions API copy. The privacy
+ * policy covers sending Meta a hashed email when someone signs up, starts a
+ * trial or is charged; a newsletter subscription is none of those, so no email,
+ * no hash and no advanced-matching object is sent — the params are empty.
+ *
+ * WHY THE ID IS RANDOM, NOT DERIVED
+ * ---------------------------------
+ * CompleteRegistration derives its id from the account id so the server copy
+ * can arrive at the same value. Here there is no server copy and no id the
+ * browser holds except the address itself — and an id derived from the address
+ * would be a hash of the email by another name. A random id per subscription
+ * still gives Meta a unique (event_name, event_id) pair; if a server copy is
+ * ever approved, it must receive this id from the form (the standard pattern)
+ * rather than derive one.
+ *
+ * Never fires on `/app/*`: fbevents.js survives a client-side navigation into
+ * the app, and its beacon carries the full page URL (see MetaPixel.tsx).
+ *
+ * Returns the id sent, or null when nothing was sent. Every failure is silent —
+ * the subscription has already succeeded and must not care.
+ */
+export async function trackMetaLead(): Promise<string | null> {
+  if (!trackerEnabled.meta) return null;
+  if (typeof window === "undefined") return null;
+  if (!isPixelAllowedPath(window.location.pathname)) return null;
+
+  const fbq = (window as unknown as { fbq?: FbqFn }).fbq;
+  if (typeof fbq !== "function") return null;
+
+  const eventID = randomLeadEventId();
+  if (!eventID) return null;
+
+  try {
+    fbq("track", "Lead", {}, { eventID });
+  } catch {
     return null;
   }
   return eventID;
