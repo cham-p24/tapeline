@@ -4129,6 +4129,12 @@ async def _build_newsletter_payload(session) -> dict:
         )
         for _clause in await live_clauses(session):
             _mv_stmt = _mv_stmt.where(_clause)
+        # No crypto, the same universe as the scanner's default view and the daily
+        # record (asset_class.DEFAULT_EXCLUDED_CLASSES): a coin's score is built from
+        # four readings, a stock's from six. Since 2026-09-19 a coin can score up to
+        # 81.25, which is enough to rank in a mixed top-N list.
+        from app.services.asset_class import default_view_clause
+        _mv_stmt = _mv_stmt.where(default_view_clause())
         r = await session.execute(
             _mv_stmt.order_by(desc(Ticker.score)).limit(5)
         )

@@ -1857,7 +1857,7 @@ async def _ensure_daily_scorecard(today: date) -> None:
         # corrupt (score>100 / emoji-symbol / <2-factor) row into the permanent
         # public scorecard record. (score IS NOT NULL is part of the floor.)
         # See app.services.ticker_freshness.
-        from app.services.asset_class import asset_bucket_clause
+        from app.services.asset_class import default_view_clause
         from app.services.ticker_freshness import live_clauses
         _cand_stmt = select(Ticker)
         for _clause in await live_clauses(session):
@@ -1872,9 +1872,7 @@ async def _ensure_daily_scorecard(today: date) -> None:
         # can reach 81.25, and all 116 scored pairs carry every column the live
         # clauses require (1-day change, confidence, a clean class). Measured
         # read-only on 2026-09-19: no crypto row has ever been frozen.
-        _default_view = asset_bucket_clause(None)
-        if _default_view is not None:
-            _cand_stmt = _cand_stmt.where(_default_view)
+        _cand_stmt = _cand_stmt.where(default_view_clause())
         # Deterministic ordering (GAP #8): score alone is not a total order —
         # tickers tie on score every day, and the candidate pool cutoff at 80
         # (and the top-10 freeze below) then depended on whatever order the

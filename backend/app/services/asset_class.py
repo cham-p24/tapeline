@@ -86,6 +86,19 @@ ASSET_BUCKETS: tuple[str, ...] = ("equity", "etf", "crypto", "other")
 ASSET_CLASS_PATTERN = f"^({'|'.join(ASSET_BUCKETS)})$"
 
 
+def default_view_clause() -> ColumnElement[bool]:
+    """The scanner's default-view universe: everything but DEFAULT_EXCLUDED_CLASSES.
+
+    Its own function so the curated top-N lists (daily record, Top 10 digest,
+    welcome and briefing emails, the growth bot, the starter watchlist) can
+    rank the same universe as the unfiltered scanner without handling the
+    Optional that `asset_bucket_clause` returns for a named bucket.
+    """
+    return func.trim(func.lower(Ticker.asset_class)).not_in(
+        sorted(DEFAULT_EXCLUDED_CLASSES)
+    )
+
+
 def asset_bucket_clause(bucket: str | None) -> ColumnElement[bool] | None:
     """SQL for one UI bucket, or None when no filtering is asked for.
 
@@ -106,7 +119,7 @@ def asset_bucket_clause(bucket: str | None) -> ColumnElement[bool] | None:
         # unfiltered scan is still the whole ranked universe of things that
         # are comparable to each other, which is what a screener's default
         # list means.
-        return col.not_in(sorted(DEFAULT_EXCLUDED_CLASSES))
+        return default_view_clause()
     synonyms = ASSET_CLASS_SYNONYMS.get(bucket)
     if synonyms is not None:
         return col.in_(sorted(synonyms))
@@ -144,4 +157,5 @@ __all__ = [
     "ASSET_CLASS_SYNONYMS",
     "asset_bucket_clause",
     "bucket_of",
+    "default_view_clause",
 ]
