@@ -1158,8 +1158,9 @@ async def _fire(
     advance its stored side: the alert went out, or it was deliberately
     withheld (email prefs, a channel the tier is not on, a daily cap) and
     resending it later would not change that decision. False means the
-    delivery itself failed — the send raised, or the web push reached no
-    browser — and the caller should leave the side where it was so the
+    delivery itself failed — the send raised, or a live web-push subscription
+    refused it (a subscription the push service reports as gone is deleted,
+    not retried) — and the caller should leave the side where it was so the
     crossing is re-detected and retried (_settle_crossings, bounded by
     MAX_DELIVERY_ATTEMPTS). Before this returned anything, every outcome was
     treated as consumed: a send that raised wrote the event delivered=False,
@@ -1263,43 +1264,64 @@ async def _fire(
             await _record_cap_suppression(session, user, rule, "web_push")
         else:
             try:
+                from sqlalchemy import delete as _del
                 from sqlalchemy import select as _sel
 
                 from app.models import WebPushSubscription
-                from app.services.web_push import send_web_push
+                from app.services.web_push import PushStatus, send_web_push
                 subs_r = await session.execute(
                     _sel(WebPushSubscription).where(WebPushSubscription.user_id == user.id)
                 )
                 subs = subs_r.scalars().all()
-                any_delivered = False
+                delivered_n = failed_n = gone_n = 0
                 for sub in subs:
-                    ok = await send_web_push(
+                    outcome = await send_web_push(
                         {"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh_key, "auth": sub.auth_key}},
                         title=f"Tapeline · {rule.name}",
                         body=message,
                         url=f"/app/ticker/{symbol}" if symbol != _MARKET else "/app/scanner",
                     )
-                    any_delivered = any_delivered or ok
-                event.delivered = any_delivered
-                if subs and not any_delivered:
-                    # Subscriptions exist and every one of them refused the
-                    # push. That is a delivery failure (a 410 nobody cleaned up
-                    # looks the same from here), so retry a bounded number of
-                    # times rather than eat the crossing.
-                    #
-                    # NO subscriptions is a different thing and stays consumed:
-                    # there is no transport to retry against, the user has not
-                    # subscribed a browser, and re-detecting the crossing every
-                    # 15 minutes would write a row per attempt forever without
-                    # ever reaching anyone. The event records that it fired.
+                    if outcome is PushStatus.GONE:
+                        # The push service says this subscription no longer
+                        # exists (404/410). Nothing used to delete it, so one
+                        # dead browser failed every crossing for its user from
+                        # then on: three retries, then alert.crossing_dropped,
+                        # every time. It is not a delivery, and it is not a
+                        # failure worth retrying either. Delete it by id so a
+                        # concurrent unsubscribe cannot make this raise.
+                        gone_n += 1
+                        await session.execute(
+                            _del(WebPushSubscription).where(WebPushSubscription.id == sub.id)
+                        )
+                        logger.info(
+                            "web_push.subscription_gone user=%s rule=%s subscription=%s deleted=true",
+                            user.id, rule.id, sub.id,
+                        )
+                    elif outcome:
+                        delivered_n += 1
+                    else:
+                        failed_n += 1
+                event.delivered = delivered_n > 0
+                if not delivered_n and failed_n:
+                    # At least one live subscription refused the push for a
+                    # reason other than "gone". That is a delivery failure, so
+                    # retry a bounded number of times rather than eat the
+                    # crossing.
                     consumed = False
                     logger.info(
-                        "alert.web_push_undelivered user=%s rule=%s subscriptions=%s",
-                        user.id, rule.id, len(subs),
+                        "alert.web_push_undelivered user=%s rule=%s subscriptions=%s failed=%s gone=%s",
+                        user.id, rule.id, len(subs), failed_n, gone_n,
                     )
-                elif not subs:
+                elif not delivered_n:
+                    # NO live subscription, whether the user never subscribed a
+                    # browser or every one they had just came back gone. That
+                    # stays consumed: there is no transport to retry against,
+                    # and re-detecting the crossing every 15 minutes would
+                    # write a row per attempt without ever reaching anyone. The
+                    # event records that the rule fired, delivered=False.
                     logger.info(
-                        "alert.web_push_no_subscription user=%s rule=%s", user.id, rule.id,
+                        "alert.web_push_no_subscription user=%s rule=%s gone=%s",
+                        user.id, rule.id, gone_n,
                     )
             except Exception:
                 logger.exception("alert.web_push_failed user=%s rule=%s", user.id, rule.id)

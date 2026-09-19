@@ -18,8 +18,9 @@ class WebPushSubscription(Base):
     public key + auth secret needed to encrypt payload deliveries.
 
     One user can have multiple subscriptions (one per browser/device).
-    Unsubscribing on the browser side returns 410 from the endpoint;
-    the worker should delete those rows lazily.
+    Once a browser unsubscribes or its subscription expires, the push service
+    answers 404 or 410; services/alerts._fire (and the /api/me/push/test
+    sample) delete the row when it does.
     """
     __tablename__ = "web_push_subscriptions"
     __table_args__ = (UniqueConstraint("user_id", "endpoint", name="uq_web_push_user_endpoint"),)
