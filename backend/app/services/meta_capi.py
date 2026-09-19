@@ -68,9 +68,22 @@ itself, carrying no personal data of ours to protect — and Meta matches them
 by exact string. Hashing them produces NO error: the payload is accepted, the
 identifier simply never matches anything, and the account ends up with a
 permanently mediocre match rate that looks like bad luck. The same applies to
-IP and user-agent if those are ever added. `test_meta_capi.py` guards this
-both ways: raw email must never appear on the wire, and fbc/fbp must appear
-on it verbatim.
+`client_ip_address` and `client_user_agent`, which Meta also requires
+unhashed. `test_meta_capi.py` guards this both ways: raw email must never
+appear on the wire, and fbc/fbp must appear on it verbatim.
+
+Browser keys on events with no browser (blueprint P1-P3, 2026-09-17)
+-------------------------------------------------------------------
+StartTrial, Purchase and Subscribe fire from Stripe webhooks, where the
+request is Stripe's: its IP address and user agent describe Stripe, never the
+buyer, so they are never read there. Instead `remember_browser()` stores the
+LATEST values seen on the requests the visitor's own browser sends straight to
+api.tapeline.io (email signup, the OAuth callback, POST /api/billing/checkout
+— each verified to bypass the Next.js /api rewrite in production on
+2026-09-17), and `stored_match_keys()` reads them back for those events.
+Nothing is stored while Meta is not configured: the values have no other use.
+The IP address and user agent also wait for their own switch,
+`META_CAPI_SEND_IP_UA` (off by default — see `client_ip_ua_enabled`).
 
 GO-LIVE CHECKLIST (none of this is done by shipping this file)
 --------------------------------------------------------------
@@ -81,8 +94,11 @@ GO-LIVE CHECKLIST (none of this is done by shipping this file)
    Events Manager → Test Events, trigger a signup, and watch the event arrive.
    Unset it afterwards — test events do not count toward optimisation.
 5. **Update the privacy policy** to name Meta as a sub-processor and describe
-   what is sent (hashed email, hashed user id, event value). This is a legal
+   what is sent (hashed email, hashed user id, event value, and — since
+   2026-09-17 — the browser's IP address and user agent, the `_fbp`/`_fbc`
+   values, and that the latest IP/user agent are stored). This is a legal
    prerequisite, not a nicety — do not enable the secrets before it ships.
+   `app/legal/privacy/page.tsx` carries it; change it with any new field.
 6. Australian advertisers targeting financial products face a separate Meta
    verification regime (`docs/META_ADS_DECISION.md` §3). That is a founder +
    lawyer step, not an engineering one.
@@ -91,12 +107,16 @@ Env vars:
     META_PIXEL_ID=<numeric pixel id>
     META_CAPI_ACCESS_TOKEN=<Events Manager CAPI token>
     META_CAPI_TEST_EVENT_CODE=<optional, verification only — unset in prod>
+    META_CAPI_SEND_IP_UA=<1 to capture, store and send the browser's IP address
+        and user agent; off by default — see client_ip_ua_enabled()>
 """
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import logging
 import os
+import re
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -215,13 +235,17 @@ def fbc_value(fbclid: str | None, click_time: datetime | None = None) -> str | N
     involved and only the stored fbclid survives. A second construction site
     is a second thing to get wrong silently.
 
-    The cost of that choice, stated plainly: `click_time` is the caller's best
-    available proxy for the click (in practice the account's `created_at`),
-    and first-touch capture holds an fbclid for up to 30 days — so on a
-    delayed signup the timestamp can trail the real click by that much. Meta
-    documents falling back to observation time when the true click time is
-    unavailable, and matches primarily on the fbclid itself, so an approximate
-    timestamp degrades nothing; an absent or malformed `_fbc` would.
+    The cost of that choice, stated plainly: `click_time` is only as good as
+    what the caller can offer. `remember_browser` passes the instant the
+    browser reports capturing the click; the signup-time fallback is the
+    account's `created_at`, and first-touch capture holds an fbclid for up to
+    30 days, so on a delayed signup that can trail the real click by as much.
+    Meta documents falling back to observation time when the true click time
+    is unavailable, and matches primarily on the fbclid itself, so an
+    approximate timestamp degrades nothing; an absent or malformed `_fbc`
+    would. `remember_browser` does read the timestamp back, though
+    (`click_time_ms`), to order two clicks — so a proxy stamp there means a
+    replacement decision made on a proxy.
 
     Returns None for an empty fbclid so callers can omit the key entirely.
     """
@@ -250,6 +274,257 @@ def event_id_for(kind: str, stable_id: str) -> str:
     return f"{kind}.{digest[:32]}"
 
 
+# Column widths on `users` (migration 0074). A value that does not fit is
+# dropped, never truncated: a truncated cookie or user agent matches nothing.
+FBP_MAX = 200
+FBC_MAX = 500
+CLIENT_IP_MAX = 45
+CLIENT_USER_AGENT_MAX = 1024
+_FBCLID_MAX = 200  # users.signup_fbclid, and what lib/utm.ts stores
+
+# `fb.<subdomain index>.<creation ms>.<token>` — the shape the pixel writes
+# for both `_fbp` and `_fbc`. Anything else is not a Meta cookie.
+_BROWSER_ID_RE = re.compile(r'^fb\.[0-9]\.[0-9]{10,16}\.[^\s;,"\\]+$')
+_CLICK_ID_RE = re.compile(r'^[^\s;,"\\]+$')
+
+
+def browser_id(value: str | None, *, max_len: int) -> str | None:
+    """A `_fbp` or `_fbc` cookie value as Meta's pixel writes it, else None.
+
+    These arrive in a request body the browser controls, and are stored and
+    later sent to Meta verbatim, so anything not shaped like the pixel's own
+    value is dropped rather than repaired."""
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate or len(candidate) > max_len or not candidate.isascii():
+        return None
+    return candidate if _BROWSER_ID_RE.match(candidate) else None
+
+
+def client_ip_ua_enabled() -> bool:
+    """Is sending the browser's IP address and user agent switched on?
+
+    Separate from `is_configured()` and OFF unless `META_CAPI_SEND_IP_UA` is
+    set to 1/true. Storing an IP address and user agent on the account, and
+    sending them to Meta, is a new category of data: the privacy policy's
+    "Changes to this policy" section promises account holders a heads-up
+    email 14 days before a change like that takes effect, and no customer
+    email goes out without the founder's yes. So the code ships dark and the
+    switch is flipped once that notice has run. `_fbp`/`_fbc` are not behind
+    it: the policy already discloses those cookies and that Meta receives
+    them, and `fbp`/`fbc` were already sent on CompleteRegistration.
+
+    Read at call time; while off nothing is captured, stored or sent, and
+    values stored while it was on stop being sent the moment it is turned off.
+    """
+    return (os.getenv("META_CAPI_SEND_IP_UA") or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+# Address ranges that can only ever be an internal hop, never a visitor:
+# RFC1918, carrier-grade NAT, and IPv6 unique-local — which is where Fly's own
+# private 6PN network (fdaa::/16) lives. Listed explicitly rather than using
+# `is_private`, whose definition also covers the documentation ranges (192.0.2,
+# 198.51.100, 203.0.113) that are a normal, public-shaped address to test with.
+_PRIVATE_NETWORKS = (
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("fc00::/7"),
+)
+
+
+def client_context(request: Any) -> tuple[str | None, str | None]:
+    """(client_ip_address, client_user_agent) of the browser behind `request`.
+
+    ONLY for a request the visitor's browser sends straight to the API: the
+    email signup POST, the OAuth callback (a top-level navigation from the
+    provider) and POST /api/billing/checkout. Never for a Stripe webhook,
+    whose IP address and user agent are Stripe's.
+
+    The IP comes from `rate_limit.client_ip`, which reads `Fly-Client-IP` —
+    set by Fly's proxy from the real TCP peer, so a client cannot forge it.
+    A loopback, unspecified, link-local or multicast address (local dev, the
+    ASGI test client) is not a visitor and is dropped, as is a user agent that
+    is empty, overlong or carries control characters, and so is an address
+    from a private range (`_PRIVATE_NETWORKS`). In production `Fly-Client-IP`
+    is always the public peer, so that last one is defence in depth: it means
+    a future deployment behind a proxy, or a reader of the header that falls
+    back to the socket, stores nothing rather than storing an address that
+    identifies no visitor and would only ever dilute Meta's matching."""
+    ip: str | None = None
+    try:
+        from app.services.rate_limit import client_ip
+
+        addr = ipaddress.ip_address(client_ip(request).strip())
+        addr = getattr(addr, "ipv4_mapped", None) or addr  # ::ffff:10.0.0.1 is 10.0.0.1
+        if not (
+            addr.is_loopback or addr.is_unspecified or addr.is_link_local
+            or addr.is_multicast or addr.is_reserved
+            or any(addr in net for net in _PRIVATE_NETWORKS if net.version == addr.version)
+        ):
+            ip = str(addr)
+    except (ValueError, AttributeError, TypeError):
+        ip = None
+    ua: str | None = None
+    try:
+        raw_ua = (request.headers.get("user-agent") or "").strip()
+        if (
+            raw_ua
+            and len(raw_ua) <= CLIENT_USER_AGENT_MAX
+            and not any(ord(c) < 0x20 or ord(c) == 0x7F for c in raw_ua)
+        ):
+            ua = raw_ua
+    except AttributeError:
+        ua = None
+    return (ip if ip and len(ip) <= CLIENT_IP_MAX else None), ua
+
+
+# Every click time the browser supplies, whether the `_fbc` cookie's own stamp
+# or a reported `fbclid_at`, has to be a plausible wall-clock instant: after
+# 2001 (when 13-digit epoch ms began) and no more than a day ahead of us. That
+# allows for a skewed client clock without letting one park a click in the
+# future where nothing could ever replace it, since a stored click is only
+# ever replaced by one shown to be newer.
+_CLICK_MS_FLOOR = 1_000_000_000_000
+_CLICK_MS_SKEW_ALLOWANCE = 86_400_000
+
+
+def _plausible_click_ms(ms: int) -> int | None:
+    now_ms = int(datetime.now(UTC).timestamp() * 1000)
+    if ms < _CLICK_MS_FLOOR or ms > now_ms + _CLICK_MS_SKEW_ALLOWANCE:
+        return None
+    return ms
+
+
+def click_time_ms(value: str | None) -> int | None:
+    """The click instant inside an `fb.<n>.<ms>.<token>` value, or None.
+
+    Every stored `fbc` carries the time of the click it describes — the
+    pixel's cookie because Meta wrote it there, ours because `fbc_value`
+    builds it that way. That field is the only thing that can order two
+    clicks, so it is parsed rather than trusted by arrival order, and an
+    implausible one (`_plausible_click_ms`) reads as no time at all."""
+    if not isinstance(value, str):
+        return None
+    parts = value.split(".")
+    if len(parts) < 4 or not parts[2].isdigit():
+        return None
+    return _plausible_click_ms(int(parts[2]))
+
+
+def _reported_click_ms(raw: Any) -> int | None:
+    """When the browser says it first saw a bare `fbclid`, in epoch ms."""
+    if not isinstance(raw, int) or isinstance(raw, bool):
+        return None
+    return _plausible_click_ms(raw)
+
+
+def remember_browser(
+    user: Any,
+    request: Any | None = None,
+    *,
+    fbp: str | None = None,
+    fbc: str | None = None,
+    fbclid: str | None = None,
+    fbclid_at: int | None = None,
+) -> None:
+    """Store the latest browser match keys on `user` (the caller commits).
+
+    * IP address and user agent are replaced TOGETHER from `request`, so the
+      pair always describes one browser — the most recent one.
+    * `fbp` replaces the stored value only when a valid one arrived: a
+      browser with the pixel blocked sends none, and the older value still
+      identifies this person's other browser.
+    * `fbc` (P3): Meta wants the LATEST click, and "arrived most recently" is
+      not the same thing. The two browser-side captures disagree by design —
+      `lib/utm.ts` holds the FIRST click for 30 days, while the pixel's `_fbc`
+      cookie follows the latest — and Safari caps a script-written cookie at
+      7 days, so a later request routinely carries the older stored click and
+      no cookie at all. So a stored click is replaced only by one that can be
+      shown to be newer, comparing the click instants the values carry:
+      - an `_fbc` cookie arrives with its own timestamp and is preferred over
+        any bare `fbclid` in the same request, but still has to be at least as
+        recent as what is stored, and its stamp has to be plausible
+        (`_plausible_click_ms`) or the cookie is ignored;
+      - a bare `fbclid` is stamped with `fbclid_at`, when the browser saw it,
+        and may replace a stored click only when that is later. With nothing
+        stored it is taken as-is (falling back to now, which Meta documents,
+        when the browser sent no time). The current frontend always sends
+        `fbclid_at` with `fbclid` (`metaCheckoutIds` in `lib/utm.ts` reads
+        both from one stored payload), so an untimed one only comes from a
+        build older than this change, during a deploy, or a direct API
+        caller.
+      `signup_fbclid` — first-touch, and a different question — is never
+      written here and never replaces a stored click.
+
+    No-op while Meta is not configured — the values have no other use — and
+    the IP address and user agent additionally wait for
+    `client_ip_ua_enabled()`. Never raises: this sits on the signup and
+    checkout paths."""
+    if not is_configured():
+        return
+    try:
+        if request is not None and client_ip_ua_enabled():
+            user.meta_client_ip, user.meta_client_user_agent = client_context(request)
+        fbp_value = browser_id(fbp, max_len=FBP_MAX)
+        if fbp_value:
+            user.meta_fbp = fbp_value
+        stored = getattr(user, "meta_fbc", None) or ""
+        stored_ms = click_time_ms(stored)
+        fbc_cookie = browser_id(fbc, max_len=FBC_MAX)
+        cookie_ms = click_time_ms(fbc_cookie)
+        # A well-formed cookie whose stamp is implausible is treated like a
+        # malformed one: never stored, and the request's bare fbclid, if any,
+        # is weighed below as though no cookie had come.
+        if fbc_cookie and cookie_ms is not None:
+            if stored_ms is None or cookie_ms >= stored_ms:
+                user.meta_fbc = fbc_cookie
+            return
+        click = fbclid.strip() if isinstance(fbclid, str) else ""
+        if not (
+            click
+            and len(click) <= _FBCLID_MAX
+            and click.isascii()
+            and _CLICK_ID_RE.match(click)
+            and click != (getattr(user, "signup_fbclid", None) or "")
+            and not stored.endswith(f".{click}")
+        ):
+            return
+        seen_ms = _reported_click_ms(fbclid_at)
+        if stored and (seen_ms is None or stored_ms is None or seen_ms <= stored_ms):
+            # Nothing here shows this click is the later one. Keeping what we
+            # have is the safe half of the trade: a stale click id matches the
+            # wrong ad, a missing one only costs match quality.
+            return
+        seen = datetime.fromtimestamp(seen_ms / 1000, UTC) if seen_ms is not None else None
+        newer = fbc_value(click, seen)
+        if newer and len(newer) <= FBC_MAX:
+            user.meta_fbc = newer
+    except Exception:
+        logger.exception("meta_capi.remember_browser_failed")
+
+
+def stored_match_keys(user: Any) -> dict[str, str | None]:
+    """The browser keys an event with no browser present can carry.
+
+    For StartTrial, Purchase and Subscribe, which fire from Stripe webhooks.
+    `fbc` is the most recent click id stored by `remember_browser`, falling
+    back to the first-touch `signup_fbclid` stamped with the account's
+    creation time. Keyword-compatible with every `track_*` helper. The IP
+    address and user agent are included only while `client_ip_ua_enabled()`."""
+    ip_ua = client_ip_ua_enabled()
+    return {
+        "fbc": getattr(user, "meta_fbc", None) or fbc_value(
+            getattr(user, "signup_fbclid", None), getattr(user, "created_at", None),
+        ),
+        "fbp": getattr(user, "meta_fbp", None),
+        "client_ip_address": getattr(user, "meta_client_ip", None) if ip_ua else None,
+        "client_user_agent": getattr(user, "meta_client_user_agent", None) if ip_ua else None,
+    }
+
+
 async def send_event(
     *,
     event_name: str,
@@ -258,6 +533,8 @@ async def send_event(
     user_id: str | None = None,
     fbc: str | None = None,
     fbp: str | None = None,
+    client_ip_address: str | None = None,
+    client_user_agent: str | None = None,
     custom_data: dict[str, Any] | None = None,
     event_source_url: str | None = None,
     action_source: str = "website",
@@ -266,9 +543,10 @@ async def send_event(
 
     `fbc` is Meta's click identifier in `fb.1.<ms>.<fbclid>` form (build it
     with `fbc_value`); `fbp` is the `_fbp` first-party browser cookie the
-    pixel writes. Both are OPTIONAL and both go on the wire UNHASHED — see
-    the PII section of the module docstring. They are the EMQ upgrade that
-    costs no new PII (docs/PAID_ADS_METRICS_BIBLE.md §7.1).
+    pixel writes. `client_ip_address` and `client_user_agent` are the
+    browser's (see `client_context`). All four are OPTIONAL and all four go on
+    the wire UNHASHED — see the PII section of the module docstring. They are
+    the EMQ upgrade that costs no new PII (docs/PAID_ADS_METRICS_BIBLE.md §7.1).
 
     Returns True if Meta accepted the payload, False on any no-op or failure.
     Never raises — the return value is informational only.
@@ -314,6 +592,12 @@ async def send_event(
         user_data["fbc"] = fbc
     if fbp:
         user_data["fbp"] = fbp
+    # Same rule: plain strings, verbatim. Meta requires client_user_agent on
+    # website events and matches both against what its pixel saw.
+    if client_ip_address:
+        user_data["client_ip_address"] = client_ip_address
+    if client_user_agent:
+        user_data["client_user_agent"] = client_user_agent
 
     event: dict[str, Any] = {
         "event_name": event_name,
@@ -370,6 +654,8 @@ async def track_start_trial(
     currency: str = "USD",
     fbc: str | None = None,
     fbp: str | None = None,
+    client_ip_address: str | None = None,
+    client_user_agent: str | None = None,
     event_source_url: str | None = None,
 ) -> bool:
     """`StartTrial` — the card-required trial began.
@@ -377,6 +663,9 @@ async def track_start_trial(
     This is the event a Meta campaign should OPTIMISE toward: it is the
     earliest high-intent signal that has any chance of reaching the ~50
     events/ad-set/week that smart bidding needs. `Purchase` is for reporting.
+
+    Value stays unset (blueprint P6): a trial has earned nothing yet, and a
+    plan price here would put unearned revenue into ROAS columns.
     """
     custom: dict[str, Any] = {"currency": currency}
     if value is not None:
@@ -389,6 +678,8 @@ async def track_start_trial(
         custom_data=custom,
         fbc=fbc,
         fbp=fbp,
+        client_ip_address=client_ip_address,
+        client_user_agent=client_user_agent,
         event_source_url=event_source_url,
     )
 
@@ -404,9 +695,16 @@ async def track_purchase(
     billing_period: str | None = None,
     fbc: str | None = None,
     fbp: str | None = None,
+    client_ip_address: str | None = None,
+    client_user_agent: str | None = None,
     event_source_url: str | None = None,
 ) -> bool:
-    """`Purchase` — the first real charge succeeded.
+    """`Purchase` — a DIRECT paid checkout completed, with money taken at
+    checkout.
+
+    Not a trial checkout: that charges $0 and is StartTrial's (the webhook
+    skips it, blueprint P4). A trial's first real charge, about 30 days later
+    with no browser involved, is `track_subscribe`.
 
     `transaction_id` MUST be the Stripe id the browser beacon would use for
     the same checkout, so the derived `event_id` matches and Meta counts the
@@ -427,7 +725,53 @@ async def track_purchase(
         custom_data=custom,
         fbc=fbc,
         fbp=fbp,
+        client_ip_address=client_ip_address,
+        client_user_agent=client_user_agent,
         event_source_url=event_source_url,
+    )
+
+
+async def track_subscribe(
+    *,
+    user_id: str,
+    subscription_id: str,
+    email: str | None = None,
+    value: float | None = None,
+    currency: str = "USD",
+    fbc: str | None = None,
+    fbp: str | None = None,
+    client_ip_address: str | None = None,
+    client_user_agent: str | None = None,
+) -> bool:
+    """`Subscribe` — the first REAL charge of a subscription that began as a
+    trial (blueprint P5).
+
+    Stripe takes that charge on its own at trial end, so no browser and no
+    page are involved: `action_source` is `system_generated` (Meta's own
+    example for the value is an auto-pay subscription charge) and there is no
+    `event_source_url`. It lands 30 days or more after the click, outside
+    every click window, so it cannot feed optimisation; it is for reporting,
+    audiences and the fbclid -> account -> Stripe join.
+
+    `value` is what the invoice actually charged, not the plan's price: a
+    referral, win-back or save-offer coupon changes it. `event_id` derives
+    from the subscription id, hashed, so no raw Stripe id reaches Meta (which
+    is also why Meta's optional `subscription_id` parameter is not sent).
+    """
+    custom: dict[str, Any] = {"currency": currency}
+    if value is not None:
+        custom["value"] = value
+    return await send_event(
+        event_name="Subscribe",
+        event_id=event_id_for("subscribe", subscription_id),
+        email=email,
+        user_id=user_id,
+        custom_data=custom,
+        fbc=fbc,
+        fbp=fbp,
+        client_ip_address=client_ip_address,
+        client_user_agent=client_user_agent,
+        action_source="system_generated",
     )
 
 
@@ -435,6 +779,8 @@ async def track_complete_registration(*, user_id: str, email: str | None = None,
                                       method: str = "email",
                                       fbc: str | None = None,
                                       fbp: str | None = None,
+                                      client_ip_address: str | None = None,
+                                      client_user_agent: str | None = None,
                                       event_source_url: str | None = None) -> bool:
     """`CompleteRegistration` — an account was created (no card yet).
 
@@ -458,6 +804,8 @@ async def track_complete_registration(*, user_id: str, email: str | None = None,
         user_id=user_id,
         fbc=fbc,
         fbp=fbp,
+        client_ip_address=client_ip_address,
+        client_user_agent=client_user_agent,
         custom_data={"content_name": method},
         event_source_url=event_source_url,
     )

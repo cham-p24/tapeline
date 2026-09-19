@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -158,11 +158,25 @@ class CheckoutRequest(BaseModel):
     # purchase. Defaults False so every pre-existing caller (paid upgrade,
     # mid-trial card-add, win-back re-subscribe) behaves exactly as before.
     start_trial: bool = False
+    # Meta browser keys read on the page that starts the checkout (blueprint
+    # P2/P3): the `_fbp` and `_fbc` cookies Meta's pixel wrote, and the
+    # fbclid lib/utm.ts holds with the epoch-millisecond instant it captured
+    # it — which is what lets the server tell an older click from a newer one
+    # rather than believing whichever arrived last. Validated and stored by
+    # meta_capi.remember_browser; never required, and the generous limits are
+    # so an odd cookie can never 422 a checkout.
+    fbp: str | None = Field(None, max_length=4096)
+    fbc: str | None = Field(None, max_length=4096)
+    fbclid: str | None = Field(None, max_length=4096)
+    fbclid_at: int | None = None
 
 
 @router.post("/checkout", dependencies=[Depends(limit_strict)])
 async def create_checkout(
     body: CheckoutRequest,
+    # Injected by FastAPI on every real request; the default only keeps the
+    # handler callable directly (tests do), where no browser keys exist.
+    request: Request = None,
     user: User = Depends(current_user_required),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
@@ -296,6 +310,18 @@ async def create_checkout(
     user.checkout_billing_period = body.billing_period
     user.drip_state = ",".join(
         t for t in (user.drip_state or "").split(",") if t and t != "abandon1"
+    )
+    # Meta match keys for the StartTrial / Purchase / Subscribe this checkout
+    # will produce from Stripe webhooks, where no browser is present (blueprint
+    # P1-P3). This POST goes from the browser straight to api.tapeline.io, so
+    # its IP address and user agent are the buyer's. Latest values only,
+    # stored only while Meta CAPI is configured; never raises. Not done in
+    # GET /email-checkout: mail scanners prefetch that link.
+    from app.services import meta_capi
+
+    meta_capi.remember_browser(
+        user, request, fbp=body.fbp, fbc=body.fbc, fbclid=body.fbclid,
+        fbclid_at=body.fbclid_at,
     )
     await session.commit()
     # `trial_end` is echoed back so the caller can restate the first-charge

@@ -259,6 +259,28 @@ describe("scanner trial offer — the mechanism", () => {
     });
   });
 
+  it("sends Meta's browser cookies with the checkout (StartTrial fires later with no browser)", async () => {
+    Object.defineProperty(document, "cookie", {
+      value: "_fbp=fb.1.1755900000000.987654321; _fbc=fb.1.1757950000000.IwAR0-Latest",
+      configurable: true,
+      writable: true,
+    });
+    try {
+      renderOffer();
+      const panel = await screen.findByTestId("trial-offer");
+      fireEvent.click(
+        within(panel).getByRole("button", { name: new RegExp(`start the ${TRIAL_DAYS}-day trial`, "i") }),
+      );
+      await waitFor(() => expect(checkoutBodies).toHaveLength(1));
+      expect(checkoutBodies[0]).toMatchObject({
+        fbp: "fb.1.1755900000000.987654321",
+        fbc: "fb.1.1757950000000.IwAR0-Latest",
+      });
+    } finally {
+      delete (document as unknown as { cookie?: string }).cookie;
+    }
+  });
+
   it("records that this checkout is a TRIAL, so the return can't be booked as revenue", async () => {
     // The return from Stripe always lands on /app/billing, which reads this
     // record. Without it, a trial started HERE would look like a purchase the

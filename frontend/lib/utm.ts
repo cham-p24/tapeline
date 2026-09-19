@@ -338,6 +338,38 @@ export function getStoredFbclid(): FbclidPayload {
 }
 
 /**
+ * When THIS browser first saw the click id `getStoredFbclid()` returns, in
+ * epoch milliseconds — or 0 when nothing is stored or storage is unavailable.
+ *
+ * Why it has to travel with the click (blueprint P3): the capture above is
+ * FIRST-touch and holds one click for 30 days, while Meta's `_fbc` cookie
+ * follows the LATEST click and, being script-written, is capped at 7 days by
+ * Safari's tracking protection. So a later request often carries this older
+ * click and no cookie, and the server cannot tell that from a genuinely newer
+ * click unless we say when we saw it. Without this the server had to stamp
+ * the click with the moment it arrived, which made every stale click look
+ * like the freshest one there was.
+ *
+ * Deliberately separate from `getStoredFbclid()`: that payload is spread
+ * straight into the signup body and the OAuth start query, which take the
+ * attribution columns only.
+ */
+export function getStoredFbclidCapturedAt(): number {
+  if (!isStorageAvailable()) return 0;
+  try {
+    const raw = window.localStorage.getItem(FBCLID_STORAGE_KEY);
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw) as StoredFbclid;
+    if (typeof parsed !== "object" || parsed === null) return 0;
+    const at = parsed.captured_at;
+    if (typeof at !== "number" || !Number.isFinite(at) || at <= 0) return 0;
+    return Date.now() - at > TTL_MS ? 0 : at;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * If the current URL has an `?fbclid=` param, capture it to localStorage.
  * First-touch wins: if a fresh capture already exists this is a no-op, so the
  * paid click that originally brought the visitor keeps credit over a later
@@ -388,28 +420,76 @@ export function clearStoredFbclid(): void {
   }
 }
 
-/**
- * Read Meta's `_fbp` first-party browser cookie, if the pixel has written
- * one. Unlike the captures above this is NOT ours to persist: the pixel owns
- * the cookie, its own TTL and its own value, and there is no column for it —
- * it is read at submit time and forwarded straight onto the server-side
- * CompleteRegistration event as the second unhashed identifier Meta matches
- * on. Returns "" whenever the pixel was blocked or never ran, which is
- * common in this audience and must degrade silently.
- */
-export function readFbpCookie(): string {
+function readMetaCookie(name: "_fbp" | "_fbc", maxLength: number): string {
   if (typeof document === "undefined") return "";
   try {
     for (const part of document.cookie.split(";")) {
       const [rawName, ...rest] = part.split("=");
-      if (rawName.trim() !== "_fbp") continue;
+      if (rawName.trim() !== name) continue;
       const value = decodeURIComponent(rest.join("=").trim());
-      return value.slice(0, 200);
+      return value.slice(0, maxLength);
     }
   } catch {
     /* cookies unavailable — the event just goes without it */
   }
   return "";
+}
+
+/**
+ * Read Meta's `_fbp` first-party browser cookie, if the pixel has written
+ * one. The pixel owns the cookie, its TTL and its value; we only read it and
+ * send it to our own API — on the signup POST, the OAuth start link and the
+ * checkout request — where the backend stores the latest value on the
+ * account (users.meta_fbp) for the server-side Meta events, including the
+ * ones Stripe webhooks fire days later with no browser present. Returns ""
+ * whenever the pixel was blocked or never ran, which is common in this
+ * audience and must degrade silently.
+ */
+export function readFbpCookie(): string {
+  return readMetaCookie("_fbp", 200);
+}
+
+/**
+ * Read Meta's `_fbc` cookie: `fb.1.<ms>.<fbclid>`, which the pixel rewrites
+ * whenever the visitor arrives on a new Meta click — so it is the MOST RECENT
+ * click, where our own fbclid capture above is first-touch. Meta asks for the
+ * latest one (blueprint P3). The pixel runs on public pages only, but the
+ * cookie lives on tapeline.io, so the signed-in checkout page can still read
+ * it. The backend rejects anything not shaped like the pixel's value.
+ */
+export function readFbcCookie(): string {
+  return readMetaCookie("_fbc", 500);
+}
+
+/**
+ * Meta's browser keys for the checkout request body (blueprint P2/P3):
+ * `fbp`, `fbc` (the latest click, from the pixel's cookie) and `fbclid` (the
+ * click id this browser still holds) with `fbclid_at`, the instant this
+ * browser captured it. The backend compares that instant against the click it
+ * already holds, so a stale first-touch click can never displace a newer one;
+ * without it, the last request to arrive would always win. StartTrial,
+ * Purchase and Subscribe fire later from Stripe webhooks with no browser
+ * present, so the page that starts the checkout is the last place these can
+ * be read. Keys are omitted, not sent empty, when absent.
+ */
+export function metaCheckoutIds(): {
+  fbp?: string;
+  fbc?: string;
+  fbclid?: string;
+  fbclid_at?: number;
+} {
+  const out: { fbp?: string; fbc?: string; fbclid?: string; fbclid_at?: number } = {};
+  const fbp = readFbpCookie();
+  if (fbp) out.fbp = fbp;
+  const fbc = readFbcCookie();
+  if (fbc) out.fbc = fbc;
+  const { fbclid } = getStoredFbclid();
+  if (fbclid) {
+    out.fbclid = fbclid;
+    const at = getStoredFbclidCapturedAt();
+    if (at) out.fbclid_at = at;
+  }
+  return out;
 }
 
 /**

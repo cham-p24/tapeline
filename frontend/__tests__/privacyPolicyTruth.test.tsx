@@ -77,6 +77,61 @@ describe("privacy policy — Meta disclosure tracks the build", () => {
   });
 });
 
+describe("privacy policy — what our servers send Meta (blueprint P1-P3, 2026-09-17)", () => {
+  /** The server-flow paragraph of the Meta bullet, and nothing else. */
+  function serverFlow(text: string): string {
+    const start = text.indexOf("From our servers:");
+    const end = text.indexOf("From your browser:");
+    expect(start, "the Meta bullet lost its server-flow paragraph").toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    return text.slice(start, end);
+  }
+
+  it("discloses the IP address, user agent and Meta cookie values — in BOTH states", async () => {
+    for (const id of [undefined, "123456789"]) {
+      vi.resetModules();
+      const text = await renderPolicyWith({ NEXT_PUBLIC_META_PIXEL_ID: id });
+      const flow = serverFlow(text);
+      expect(flow).toMatch(/IP address/i);
+      expect(flow).toMatch(/user agent/i);
+      expect(flow).toMatch(/_fbp/);
+      expect(flow).toMatch(/_fbc/);
+      // The old denials are now false and must be gone.
+      expect(flow).not.toMatch(/do not send[^.]*IP address/i);
+      expect(flow).not.toMatch(/do not send[^.]*user-agent/i);
+      expect(flow).not.toMatch(/do not send[^.]*which page you were on/i);
+    }
+  });
+
+  it("no longer claims IP addresses are never written to the database", async () => {
+    for (const id of [undefined, "123456789"]) {
+      vi.resetModules();
+      const text = await renderPolicyWith({ NEXT_PUBLIC_META_PIXEL_ID: id });
+      expect(text).not.toMatch(/We do not store IP addresses/i);
+      expect(text).not.toMatch(/IP addresses in the database\. We use them transiently/i);
+      // …and says what is stored instead, and why.
+      expect(text).toMatch(/most recent IP address and browser user agent/i);
+    }
+  });
+
+  it("says the click's capture time is stored along with it — in BOTH states", async () => {
+    // The stored `_fbc` is `fb.1.<ms>.<click id>`, and the backend reads that
+    // time back to tell a newer click from an older one, so it is data we hold
+    // about the visit, not formatting. The storage list must keep saying so.
+    for (const id of [undefined, "123456789"]) {
+      vi.resetModules();
+      const text = await renderPolicyWith({ NEXT_PUBLIC_META_PIXEL_ID: id });
+      const start = text.indexOf("What we store while you use the product");
+      const end = text.indexOf("What we explicitly do not collect");
+      expect(start, "the policy lost its storage list").toBeGreaterThan(-1);
+      expect(end).toBeGreaterThan(start);
+      expect(text.slice(start, end)).toMatch(
+        /most recent Meta click identifier[^.]*_fbc[^.]*when your browser first saw that click/i,
+      );
+    }
+  });
+});
+
 describe("privacy policy — the other trackers too", () => {
   it("flips PostHog, Clarity and Plausible independently", async () => {
     const off = await renderPolicyWith({

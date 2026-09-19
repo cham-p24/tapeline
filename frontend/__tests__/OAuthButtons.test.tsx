@@ -21,6 +21,7 @@ import {
   getStoredLandingPath,
   getStoredReferrerHost,
   getStoredUtm,
+  readFbpCookie,
 } from "@/lib/utm";
 
 // The five first-touch captures are mocked at the module boundary so these
@@ -33,6 +34,7 @@ vi.mock("@/lib/utm", () => ({
   getStoredFbclid: vi.fn(() => ({})),
   getStoredReferrerHost: vi.fn(() => ({})),
   getStoredLandingPath: vi.fn(() => ({})),
+  readFbpCookie: vi.fn(() => ""),
 }));
 
 const ALL_PROVIDERS = { google: true, microsoft: true, apple: true };
@@ -50,6 +52,7 @@ beforeEach(() => {
   vi.mocked(getStoredFbclid).mockReturnValue({});
   vi.mocked(getStoredReferrerHost).mockReturnValue({});
   vi.mocked(getStoredLandingPath).mockReturnValue({});
+  vi.mocked(readFbpCookie).mockReturnValue("");
 });
 
 describe("OAuthButtons intent carry", () => {
@@ -161,6 +164,23 @@ describe("OAuthButtons attribution carry", () => {
     expect(qs.get("referrer_host")).toBe("chat.openai.com");
     expect(qs.get("landing_path")).toBe("/compare/finviz");
     expect(qs.get("next")).toBe(intent);
+  });
+
+  /**
+   * Meta's `_fbp` cookie has to be read HERE, on our page, before the
+   * provider redirect: the callback is the provider sending the browser back
+   * and cannot read a tapeline.io page cookie. Wire key `fbp`, matching
+   * routers/oauth.py:ATTRIBUTION_FIELDS (blueprint P2).
+   */
+  it("forwards Meta's _fbp browser cookie to every provider start link", async () => {
+    vi.mocked(readFbpCookie).mockReturnValue("fb.1.1755900000000.987654321");
+    render(<OAuthButtons />);
+
+    for (const name of [/Continue with Google/, /Continue with Microsoft/, /Continue with Apple/]) {
+      const link = await screen.findByRole("link", { name });
+      const qs = new URLSearchParams((link.getAttribute("href") ?? "").split("?")[1] ?? "");
+      expect(qs.get("fbp")).toBe("fb.1.1755900000000.987654321");
+    }
   });
 
   it("omits the keys entirely when nothing is stored (direct traffic)", async () => {

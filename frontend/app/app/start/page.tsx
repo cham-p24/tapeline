@@ -59,6 +59,7 @@ import { PRICING, DEFAULT_BILLING_PERIOD, usd, usdCompact, type BillingPeriod } 
 import { userLocale } from "@/lib/datetime";
 import { trackEvent } from "@/lib/gtag";
 import { errorMessage, handle401 } from "@/lib/api";
+import { metaCheckoutIds } from "@/lib/utm";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -220,6 +221,9 @@ export default function CardGateStartPage() {
           tier: "premium",
           billing_period: billingPeriod,
           start_trial: true,
+          // Meta's browser keys for StartTrial, which a Stripe webhook fires
+          // later with no browser present (lib/utm.ts).
+          ...metaCheckoutIds(),
         }),
       });
       const body = await res.json().catch(() => ({} as { url?: string; detail?: string }));

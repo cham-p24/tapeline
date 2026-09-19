@@ -109,10 +109,11 @@ class SignupBody(BaseModel):
     # charge outside Meta's 7-day click window) — see migration 0053.
     fbclid: str | None = Field(None, max_length=200)
     # The `_fbp` first-party cookie the Meta pixel writes on the landing
-    # visit, read from document.cookie at submit. NOT persisted — there is no
-    # column and no second use for it: it is forwarded straight onto the
-    # CompleteRegistration event as the other unhashed identifier Meta
-    # matches on. Absent whenever the pixel was blocked or never ran.
+    # visit, read from document.cookie at submit. Stored as users.meta_fbp
+    # (while Meta CAPI is configured) and sent unhashed on
+    # CompleteRegistration, and later on StartTrial, Purchase and Subscribe,
+    # which fire from Stripe webhooks with no browser present (blueprint P2).
+    # Absent whenever the pixel was blocked or never ran.
     fbp: str | None = Field(None, max_length=200)
     # Self-reported attribution — the OPTIONAL free-text "How did you hear
     # about us?" answer (gap G2). Written to users.referral_source, the same
@@ -471,6 +472,14 @@ async def signup(
     set_marketing_consent(
         user, granted=bool(body.marketing_opt_in), source="signup_form"
     )
+    # Meta match keys from THIS request (blueprint P1/P2): the browser's IP
+    # address and user agent — the signup POST goes from the browser straight
+    # to api.tapeline.io, not through the Next.js /api rewrite — and its
+    # `_fbp`. Latest values only, stored only while Meta CAPI is configured;
+    # never raises.
+    from app.services import meta_capi
+
+    meta_capi.remember_browser(user, request, fbp=body.fbp)
     session.add(user)
     # NOTE: the referrer is deliberately NOT credited here. Granting a free
     # month per signup made the balance farmable by anyone willing to submit
@@ -548,17 +557,15 @@ async def signup(
     # Fire-and-forget, env-gated, never raises — a Meta hiccup must not cost
     # someone their account.
     try:
-        from app.services import meta_capi
-
-        # fbc/fbp ride along UNHASHED (meta_capi enforces that) — they are the
-        # EMQ upgrade that costs no new PII. With only a hashed email +
-        # hashed user id, match quality caps around 5-6, and this is the event
-        # the campaign optimises toward, so it is the one whose match quality
-        # the delivery model actually learns from.
+        # fbc/fbp, IP address and user agent ride along UNHASHED (meta_capi
+        # enforces that) — the EMQ upgrade that costs no new PII. With only a
+        # hashed email + hashed user id, match quality caps around 5-6, and
+        # this is the event the campaign optimises toward, so it is the one
+        # whose match quality the delivery model actually learns from. They
+        # are the values just stored from this request (remember_browser).
         await meta_capi.track_complete_registration(
             user_id=user.id, email=user.email, method="email",
-            fbc=meta_capi.fbc_value(user.signup_fbclid, user.created_at),
-            fbp=(body.fbp or None),
+            **meta_capi.stored_match_keys(user),
             # The page this signup actually started on, straight off the user
             # row. Meta wants it for website events and derives part of Event
             # Match Quality from it; every call site omitted it until now.

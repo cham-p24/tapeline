@@ -8,6 +8,7 @@ import {
   getStoredLandingPath,
   getStoredReferrerHost,
   getStoredUtm,
+  readFbpCookie,
 } from "@/lib/utm";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -113,6 +114,11 @@ export function OAuthButtons({
       if (typeof ref === "string" && ref.length > 0) params.set("referrer_host", ref);
       const landing = getStoredLandingPath().signup_landing_path;
       if (typeof landing === "string" && landing.length > 0) params.set("landing_path", landing);
+      // Meta's `_fbp` cookie, read here because the callback is the provider
+      // sending the browser back and cannot read it (blueprint P2). Stored on
+      // a new account for its server-side Meta events.
+      const fbp = readFbpCookie();
+      if (fbp) params.set("fbp", fbp);
       setAttribution(params.toString());
     } catch {
       // Attribution is nice-to-have — never block the signup buttons.
