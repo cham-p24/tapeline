@@ -23,9 +23,11 @@ or use https://vapidkeys.com/.
 from __future__ import annotations
 
 import asyncio
+import enum
 import json
 import logging
 from typing import Any
+from urllib.parse import urlparse
 
 from app.config import get_settings
 
@@ -87,42 +89,99 @@ def _vapid_configured() -> bool:
     )
 
 
+class PushStatus(enum.Enum):
+    """What one push service said about one browser subscription.
+
+    DELIVERED  the push service accepted the message.
+    GONE       the push service answered 404 or 410: the subscription no longer
+               exists and never will again. The caller deletes the row. It is
+               not a delivery.
+    FAILED     anything else: a 5xx, a 429, a timeout, a 403 on the VAPID
+               signature, the module not configured. The row stays, and the
+               caller treats the send as failed.
+    """
+
+    DELIVERED = "delivered"
+    GONE = "gone"
+    FAILED = "failed"
+
+    def __bool__(self) -> bool:
+        # This function used to return a bool. A caller still written as
+        # `if await send_web_push(...)` must not read GONE or FAILED as a
+        # success, and both would be truthy by default.
+        return self is PushStatus.DELIVERED
+
+
+# The push service's own word that a subscription is dead. RFC 8030 section 7.3
+# says 404 or 410 for an expired subscription, and Apple, FCM and Mozilla all
+# answer one of the two once the browser has unsubscribed or rotated it.
+GONE_HTTP_STATUSES = frozenset({404, 410})
+
+
+def _endpoint_host(endpoint: str) -> str:
+    """The push service host, for logs. The rest of the URL identifies the
+    subscription itself, so it never goes in a log line."""
+    try:
+        return (urlparse(endpoint).hostname or "").lower() or "-"
+    except ValueError:
+        return "-"
+
+
+def _scrub(text: str, endpoint: str) -> str:
+    """`text` with the endpoint URL and its path removed.
+
+    requests and urllib3 put the request URL (or just its path) into their
+    exception messages, and the path is the subscription token.
+    """
+    if endpoint:
+        text = text.replace(endpoint, "<endpoint>")
+        try:
+            path = urlparse(endpoint).path
+        except ValueError:
+            path = ""
+        if len(path) > 1:
+            text = text.replace(path, "<path>")
+    return text
+
+
 async def send_web_push(
     subscription: dict[str, Any],
     title: str,
     body: str,
     url: str = "/app/scanner",
-) -> bool:
+) -> PushStatus:
     """
     Send a push notification to one browser subscription.
 
     `subscription` shape (matches what pushManager.subscribe() returns):
         {"endpoint": "...", "keys": {"p256dh": "...", "auth": "..."}}
 
-    Returns True on success. False if pywebpush isn't installed, VAPID isn't
-    configured, or the push service rejects the delivery (e.g. 410 Gone for
-    expired subscriptions — caller should delete those rows).
+    Returns PushStatus.DELIVERED on success, PushStatus.GONE when the push
+    service says the subscription no longer exists (404 or 410: the caller
+    must delete the row), and PushStatus.FAILED for everything else, including
+    pywebpush not installed and VAPID not configured. Every outcome of a real
+    send is logged as `web_push.send_result` with the HTTP status code and the
+    push service host, never the endpoint URL.
     """
+    endpoint = str(subscription.get("endpoint") or "")
+    host = _endpoint_host(endpoint)
     # Defence in depth: rows written before the subscribe-time allowlist existed
     # (or by any future path that skips it) must not turn this into an SSRF
     # egress. Validate at the point of the actual outbound request.
-    if not is_allowed_push_endpoint(str(subscription.get("endpoint") or "")):
-        logger.warning(
-            "web_push.blocked_endpoint host_not_allowlisted endpoint=%s",
-            str(subscription.get("endpoint") or "")[:80],
-        )
-        return False
+    if not is_allowed_push_endpoint(endpoint):
+        logger.warning("web_push.blocked_endpoint host_not_allowlisted host=%s", host)
+        return PushStatus.FAILED
     if not PYWEBPUSH_AVAILABLE:
         logger.warning("web_push.skipped reason=pywebpush_not_installed")
-        return False
+        return PushStatus.FAILED
     if not _vapid_configured():
         logger.warning("web_push.skipped reason=vapid_not_configured")
-        return False
+        return PushStatus.FAILED
 
     payload = json.dumps({"title": title, "body": body[:300], "url": url})
 
     try:
-        await asyncio.to_thread(
+        response = await asyncio.to_thread(
             webpush,
             subscription_info=subscription,
             data=payload,
@@ -130,17 +189,36 @@ async def send_web_push(
             vapid_claims={"sub": settings.vapid_subject},
             timeout=10,
         )
-        return True
     except WebPushException as exc:
-        # 410 Gone = subscription expired, caller should delete from DB
-        status = getattr(exc.response, "status_code", None) if exc.response else None
-        if status == 410:
-            logger.info("web_push.subscription_gone delete_recommended endpoint=%s", subscription.get("endpoint", "")[:80])
-        else:
-            logger.warning("web_push.send_failed status=%s exc=%s", status, str(exc)[:200])
-    except Exception:
-        logger.exception("web_push.send_failed_exception endpoint=%s", subscription.get("endpoint", "")[:80])
-    return False
+        # `is not None`, never a plain truth test: a requests.Response is falsy
+        # for every 4xx and 5xx (Response.__bool__ is `.ok`), so the old
+        # `... if exc.response else None` read every refusal as status None.
+        response = getattr(exc, "response", None)
+        status = getattr(response, "status_code", None) if response is not None else None
+        if status in GONE_HTTP_STATUSES:
+            logger.info(
+                "web_push.send_result outcome=gone http_status=%s host=%s", status, host,
+            )
+            return PushStatus.GONE
+        logger.warning(
+            "web_push.send_result outcome=failed http_status=%s host=%s error=%s",
+            status, host, _scrub(str(getattr(exc, "message", exc)), endpoint)[:200],
+        )
+        return PushStatus.FAILED
+    except Exception as exc:
+        # A timeout or a connection error: no HTTP status to read. Logged
+        # without the traceback, because the request URL is in it.
+        logger.warning(
+            "web_push.send_result outcome=failed http_status=None host=%s error=%s: %s",
+            host, type(exc).__name__, _scrub(str(exc), endpoint)[:200],
+        )
+        return PushStatus.FAILED
+
+    logger.info(
+        "web_push.send_result outcome=delivered http_status=%s host=%s",
+        getattr(response, "status_code", None), host,
+    )
+    return PushStatus.DELIVERED
 
 
 def public_vapid_key() -> str:

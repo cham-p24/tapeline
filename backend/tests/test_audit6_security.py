@@ -114,11 +114,11 @@ def test_ssrf_targets_are_rejected(url):
 async def test_send_web_push_refuses_a_non_allowlisted_stored_row():
     """Defence in depth: rows written before the allowlist existed must not be
     POSTed to."""
-    from app.services.web_push import send_web_push
+    from app.services.web_push import PushStatus, send_web_push
 
-    ok = await send_web_push(
+    outcome = await send_web_push(
         {"endpoint": "http://169.254.169.254/latest/meta-data/",
          "keys": {"p256dh": "x", "auth": "y"}},
         title="t", body="b",
     )
-    assert ok is False
+    assert outcome is PushStatus.FAILED

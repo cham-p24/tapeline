@@ -550,10 +550,10 @@ async def test_web_push(
     """Send a test push notification to all of the user's subscribed browsers."""
     if not has_feature(Tier(user.tier), "alerts.web_push"):
         raise HTTPException(403, "Web push alerts require Pro tier")
-    from sqlalchemy import select
+    from sqlalchemy import delete, select
 
     from app.models import WebPushSubscription
-    from app.services.web_push import send_web_push
+    from app.services.web_push import PushStatus, send_web_push
     subs_r = await session.execute(
         select(WebPushSubscription).where(WebPushSubscription.user_id == user.id)
     )
@@ -561,22 +561,42 @@ async def test_web_push(
     if not subs:
         raise HTTPException(400, "No web push subscriptions yet. Allow notifications in your browser first.")
     delivered = 0
+    gone = 0
     for sub in subs:
-        ok = await send_web_push(
+        outcome = await send_web_push(
             {"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh_key, "auth": sub.auth_key}},
             title="Sample alert · Tapeline",
             body="This is how Tapeline pings you the moment a watched ticker's score moves. Real alerts fire from your watchlist.",
             url="/app/watchlist",
         )
-        if ok:
+        if outcome is PushStatus.GONE:
+            # Same rule as alerts._fire: the push service says this
+            # subscription no longer exists, so the row goes.
+            gone += 1
+            await session.execute(
+                delete(WebPushSubscription).where(WebPushSubscription.id == sub.id)
+            )
+            logger.info(
+                "web_push.subscription_gone user=%s rule=none source=push_test subscription=%s deleted=true",
+                user.id, sub.id,
+            )
+        elif outcome:
             delivered += 1
+    if gone:
+        await session.commit()
+    if delivered == 0 and gone == len(subs):
+        raise HTTPException(
+            410,
+            "The push service reports that this subscription has expired, so it was removed. "
+            "Turn browser push on again to re-subscribe.",
+        )
     if delivered == 0:
         raise HTTPException(
             502,
             "All push deliveries failed. Either VAPID isn't configured (set VAPID_* env vars) "
             "or pywebpush isn't installed (`pip install pywebpush`).",
         )
-    return {"ok": True, "delivered": delivered, "total": len(subs)}
+    return {"ok": True, "delivered": delivered, "total": len(subs), "removed": gone}
 
 
 # ---- Email preferences ------------------------------------------------------
