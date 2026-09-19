@@ -185,7 +185,7 @@ def test_known_limitations_are_dated_and_cover_the_verified_defects():
         "PR #875", "can no longer be listed", "does not catch every one",
         # ...and the two deliberate exceptions, so a PBR.A row listed later
         # does not sit beside a status saying no preferred can be.
-        "PBR.A and CIG", "exchange-traded notes",
+        "PBR.A, CIG and BBD", "exchange-traded notes",
     ):
         assert must in blob, f"known_limitations does not mention {must!r}"
     smart = next(k for k in lims if "#824" in k["status"])
