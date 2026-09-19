@@ -41,6 +41,77 @@ type LogEntry = {
 };
 
 const METHODOLOGY_LOG: LogEntry[] = [
+  // #878 changed what the Fundamentals factor reads (rule 4: the factor page
+  // changed in the same PR). Measured read-only against production on
+  // 2026-09-18: 99 of the 120 flagged listings held an issuer's reading.
+  {
+    date: "2026-09-19",
+    kind: "methodology",
+    title: "Notes, preferred shares and warrants no longer borrow their issuer's fundamentals",
+    body:
+      "The Fundamentals factor reads reported figures such as margin, return on equity and growth. For a listing that trades like a stock but is not the company's common shares (an exchange-listed note, a preferred or depositary share, a warrant, a right or a unit), the figures a data vendor returns are the issuer's, not the listing's, and until this change they were scored as if they were its own. From this date those listings take no Fundamentals reading: the factor is unavailable for them and the composite uses a mid-range value in its place, as it does for most ETFs. Their scores and labels were recalculated without it, and where the one-line summary had cited fundamentals, it no longer does. They are recognised by listing name and symbol, the same rule as the entry below titled \"Notes, preferred shares and warrants no longer qualify for the daily record\", which does not catch every one. No recorded entry was changed.",
+    ref: "#878",
+  },
+  // #875 changed what may enter the record, the same kind of change as #761
+  // (2026-09-06). Counts measured read-only against production on 2026-09-18:
+  // 120 of the 6,012 rows stored as stocks are one of these listings, 118 of
+  // them scored. Not restated below: rule 3.
+  {
+    date: "2026-09-19",
+    kind: "scope",
+    title: "Notes, preferred shares and warrants no longer qualify for the daily record",
+    body:
+      "Some listings trade on a stock exchange without being a company's common shares: exchange-listed notes, preferred and depositary shares, warrants, rights and SPAC units. They reach our universe the way stocks do, and each is scored on the same six factors. From this date they can no longer be listed on the daily record, and the ranked scanner, its CSV export and the daily picks our MCP server returns leave them out by default. They can still be browsed: the scanner has a control that includes them, every row says whether the listing is one of them, and each keeps its own page. A saved screen now leaves them out unless that control is on. The reason is what their price follows. A note's price is anchored to its face value and a preferred share's to its dividend; a warrant is an option on the common stock, and a unit is tied to a trust. A trend or momentum reading on one of them describes that structure, not a company's shares. Detection is by listing name and symbol, plus a short list of symbols whose names say nothing, such as Strategy's four preferred listings. It is written to under-claim, so some of these listings will not be caught and can still be listed. Exchange-traded notes, which we hold as funds, are not covered by this change, and neither are PBR.A and CIG, the Petrobras and CEMIG preferred shares that are each company's main traded share. The entry below titled \"An entry added on 17 September said no preferred listing had ever been on the record. One has\" left open whether these listings should be scored at all. They still are; what changes is that they can no longer be listed on the record or appear in the default ranked view. BHFAO stays on the record as listed on 23 June 2026. No recorded entry was changed, so a comparison spanning this date crosses two definitions of what could enter the record, as one spanning 6 September 2026 already does.",
+    ref: "#875",
+  },
+  // crypto_feed._near_high_pct returned the distance below the 52-week high
+  // as a negative number; score.sub_trend reads 0-100 and clamped it to 0.
+  // Figures measured read-only against production on 2026-09-19: 116 scored
+  // pairs, max sub_trend 50.0, max score 65.0; daily_scorecard has never held
+  // an X: symbol. Weights and ceilings stay out of the body, as in #762's
+  // entry. The Trend page already describes the corrected behaviour ("how
+  // close it currently sits to the top of its own 52-week range"), so rule 4
+  // needs no page change here.
+  {
+    date: "2026-09-19",
+    kind: "correction",
+    title: "Coins could not reach STRONG SETUP because one of the two Trend measurements was on the wrong scale",
+    body:
+      "Until 19 September 2026 the Trend reading for every crypto pair left out one of its two measurements. Trend averages a multi-month price change with how close the latest price sits to the top of its own 52-week range. For coins, the second measurement was calculated on a different scale from the one the score reads, so every coin counted as being as far from its 52-week high as the scale allows, however close it actually was. That held every coin's Trend reading at 50 or below and put STRONG SETUP out of reach: no coin could score 70. Measured on 19 September 2026, before the change, all 116 scored pairs had a Trend reading of 50 or less, and the highest score among them was 65.0. From 19 September 2026 a coin's 52-week measurement is calculated on the same scale as a stock's, over its last 365 daily closes, which is 52 weeks for a market that trades every day of the week. Every coin's Trend reading and score rise at the next daily crypto run, by more for coins closer to their 52-week high. Coins are still listed separately from stocks and ETFs and are scored on four of the six factors: fundamentals and insider filings have no equivalent for a coin and still count as neutral, so a coin still cannot reach HIGH CONVICTION. No coin has ever been listed on the published record, and from the same change the daily record leaves coins out explicitly, as the scanner's default view already does. So do the other top-pick lists: the daily Top 10 email, the top picks in the welcome and briefing emails, the weekly newsletter's movers and a new account's starter watchlist. No recorded entry was changed.",
+    ref: "#876",
+  },
+  // Corrects the 2026-09-17 entry below. The original check was scoped
+  // to the 179 symbols in the attribution fan-out and did not cover the record
+  // as a whole, which is what the sentence claimed. Re-checked on 2026-09-17 by
+  // joining every one of the 439 symbols ever listed in daily_scorecard against
+  // its stored name: BHFAO is the only one.
+  {
+    date: "2026-09-18",
+    kind: "correction",
+    title: "An entry added on 17 September said no preferred listing had ever been on the record. One has",
+    body:
+      "Added on 18 September 2026, the day after the entry below titled \"Insider filings counted for every security listed under the same SEC filer\". That entry says \"No preferred listing, note or exchange-traded note has ever appeared on it\". That is wrong, and this entry corrects it. BHFAO, Brighthouse Financial's 6.75% non-cumulative preferred depositary shares, was listed fourth on 23 June 2026. We have now checked every one of the 439 symbols ever listed against what our records say each listing is, and it is the only one. The check behind the original sentence was narrower than the sentence: it covered only the symbols caught up in the filing-attribution problem that entry describes, and BHFAO was not one of them. What that entry says about those symbols is unchanged and still holds. The 23 June listing has nothing to do with insider filings, which until 14 September 2026 were read per symbol from a data vendor and could not be spread between one company's listings that way. It happened because preferred shares, notes and similar listings are scored on the same six factors as common stock, and nothing stopped one being listed. Whether they should be scored at all is an open question we are looking at, and it is recorded under Gaps and known limitations on the scorecard page and in the downloads. No recorded entry was changed.",
+    ref: "#873",
+  },
+  // #862 changed what the Smart Money factor reads (attribution, amendments,
+  // future-dated lines); #849 carried the copy, including the attribution rule
+  // on /how-it-works/smart-money that rule 4 requires beside this entry.
+  // Figures measured read-only against production at 21:57 UTC on 2026-09-17:
+  // 2,609 of 52,897 stored filing lines, across 179 symbols in 74 groups of
+  // symbols sharing an identical line. The 13 over-dropped filings, their ~110
+  // lines and their five companies come from the edgar_form4_filings parse
+  // cache. The record statements come from daily_scorecard: no preferred, note
+  // or exchange-traded note has ever appeared in it, and IMPP's filings are for
+  // its common shares (an option exercise at $3.01, against a $25-par
+  // preferred trading at $25.92).
+  {
+    date: "2026-09-17",
+    kind: "correction",
+    title: "Insider filings counted for every security listed under the same SEC filer",
+    body:
+      "Until 17 September 2026 a company's Form 4 filings counted for every security the SEC lists under the same filer. One filer often covers several listed securities: a second share class, preferred or depositary shares, notes, warrants and exchange-traded notes. Measured against our database at 21:57 UTC on 17 September 2026, 2,609 of the 52,897 stored transaction lines were held this way, across 179 of our symbols in 74 groups: Strategy's four preferred listings carried Strategy's insider sales, two notes issued by JPMorgan carried JPMorgan's, and the notes listed as GREEL and TMUSZ carried their issuers'. From 17 September 2026 a filing's transactions count only for the ticker the filing itself names, or, when it names no ticker the SEC lists for that company, the company's first-listed ticker. Every ticker's stored filings are re-read on that rule, and a borrowed reading is removed at that ticker's next successful re-check, which is about two days for a stock and up to about a month for an ETF, exchange-traded note or futures contract. Two consequences are by design. Grouped by name, about 60 of those 179 symbols are preferred or depositary shares, notes, exchange-traded notes or warrants, which should never have carried a company's insider filings: each loses its Smart Money value, and its score is recomputed with that factor counted as neutral. Grouping by name under-claims rather than over-claims, because no data field we hold states what a listing is. The rest are common stock, second share classes of a company whose insiders file under one of them, where only the class the filing names keeps a reading: Alphabet's insiders file under GOOGL, so GOOG has none, and News Corp's file under NWS, so NWSA has none. The methodology page for the factor now states this. The 14 September 2026 entry below titled \"Insider Form 4 filings now come from SEC EDGAR instead of a data vendor\" says that a ticker with no Form 4 filer of its own on EDGAR has no reading; from 17 September 2026 that is not the only case, because a ticker whose company does file has no reading when the filings name another of that company's tickers. Two further problems are corrected in the same change. From 14 September 2026, when a filer amended one Form 4, every other Form 4 its owner filed that day was dropped instead of only the filing the amendment restates, which left out 13 filings carrying about 110 transaction lines for five companies: Microchip Technology, TransDigm, CoreWeave, Kymera Therapeutics and Similarweb. An amendment now replaces the one filing it restates, together with any identical re-filing of that filing lodged under a second accession. The same 14 September entry says an amended filing replaces the filing it amends, which was the intent and not what our code did. And one stored line was dated 3 September 2027, a filer's typo, which sorted it to the top of every most-recent list; from 17 September 2026 a line dated later than the filing that reports it is dropped. Separately, the \"purchases only\" filter on the insider lists now means a Form 4 purchase, code P, where it previously also included share grants and option exercises. None of this reached the published record. No preferred listing, note or exchange-traded note has ever appeared on it. Of the symbols on the record that held shared filing lines, every one is its own company's common stock, and the only one listed since we began reading SEC EDGAR on 14 September 2026 is IMPP, whose filings are for its common shares. None of the five companies whose filings were dropped has ever appeared on the record, and nor has the company whose filing carried the 2027 date. No recorded entry was changed.",
+    ref: "#862, #849, #866",
+  },
   // Corrects five release notes further down that describe the data as
   // undelayed or the scores as live. Rule 1: said by a new entry, not an edit;
   // the old wording stays. Dated to #842's merge (17 September 2026 UTC), the

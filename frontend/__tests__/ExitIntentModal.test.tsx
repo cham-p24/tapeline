@@ -1,5 +1,5 @@
 /**
- * ExitIntentModal — last-chance email capture mounted on / and /pricing.
+ * ExitIntentModal — exit-intent email capture mounted on / and /pricing.
  * What matters:
  *   1. Renders nothing until an exit signal (it must never block the page).
  *   2. Fires when the cursor crosses the TOP viewport edge AFTER the 5s
@@ -67,6 +67,22 @@ describe("ExitIntentModal", () => {
     ).toBeInTheDocument();
     // Session flag set → won't re-fire this session.
     expect(sessionStorage.getItem(STORAGE_KEY)).toBe("1");
+  });
+
+  it("uses no pressure wording", () => {
+    // The founder asked for "Before you go" to go. The same phrases are
+    // already banned from cancellation emails (backend
+    // test_trial_email_lifecycle), so the site modal is held to them too.
+    render(<ExitIntentModal source="pricing" />);
+    passGracePeriod();
+    mouseOutAt(0);
+    const text = (screen.getByRole("dialog").textContent ?? "").toLowerCase();
+    for (const phrase of [
+      "before you go", "last chance", "are you sure", "special offer",
+      "don't miss", "don’t miss", "hurry", "reconsider",
+    ]) {
+      expect(text, `modal uses pressure wording: ${phrase}`).not.toContain(phrase);
+    }
   });
 
   it("ignores mouseouts that are not at the top edge", () => {

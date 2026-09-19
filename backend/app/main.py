@@ -652,12 +652,15 @@ async def public_insider_buys(limit: int = 10) -> dict[str, object]:
     SEC EDGAR by the worker's insider pass (services/edgar_form4.py), which are
     public filings, so there is no licensing constraint on exposing a preview.
     Capped at 20 rows to keep the SEO surface a teaser, not a replacement for
-    /app/holdings (Premium).
+    /app/holdings (Premium). A purchase that several share classes of one
+    issuer carry (GOOG and GOOGL since 2026-09-19) is listed once, with every
+    class in `symbols`; see services/insider_dedup.py.
     """
     from sqlalchemy import desc, select
 
     from app.db import session_scope
     from app.models import InsiderTransaction
+    from app.services.insider_dedup import MAX_CLASS_COPIES, collapse_share_classes
 
     capped = max(1, min(limit, 20))
     today = _datetime.now(_UTC).date().isoformat()
@@ -671,24 +674,28 @@ async def public_insider_buys(limit: int = 10) -> dict[str, object]:
             # Never a future trade date: a filer's year typo sorts to the top.
             .where(InsiderTransaction.transaction_date <= today)
             .order_by(desc(InsiderTransaction.transaction_date))
-            .limit(capped)
+            .limit(capped * MAX_CLASS_COPIES)
         )
         rows = result.scalars().all()
-    return {
-        "count": len(rows),
-        "items": [
-            {
-                "symbol": r.symbol,
-                "insider_name": r.insider_name,
-                "transaction_date": r.transaction_date,
-                "share_change": r.share_change,
-                "transaction_price": r.transaction_price,
-                "transaction_value": r.transaction_value,
-                "code": r.code,
-            }
-            for r in rows
-        ],
-    }
+    lines = await collapse_share_classes([
+        {
+            "symbol": r.symbol,
+            "insider_name": r.insider_name,
+            "transaction_date": r.transaction_date,
+            "share_change": r.share_change,
+            "transaction_price": r.transaction_price,
+            "transaction_value": r.transaction_value,
+            "code": r.code,
+            "line_seq": r.line_seq,
+            "source": r.source,
+        }
+        for r in rows
+    ])
+    items = [
+        {k: v for k, v in line.items() if k not in ("line_seq", "source")}
+        for line in lines[:capped]
+    ]
+    return {"count": len(items), "items": items}
 
 
 @app.get("/api/public/squeeze")
@@ -846,7 +853,7 @@ async def status() -> dict[str, object]:
     import time as _time
     from datetime import UTC, datetime
 
-    from sqlalchemy import func, select
+    from sqlalchemy import func, or_, select
 
     from app.db import session_scope
     from app.models import NewsItem, RegimeState, Ticker
@@ -935,6 +942,28 @@ async def status() -> dict[str, object]:
                         tick_written = tick_written.replace(tzinfo=UTC)
                     write_age = (datetime.now(UTC) - tick_written).total_seconds()
                 stale = age >= 300 or write_age is None or write_age >= 300
+                # The newest VENDOR time on any price (Ticker.quote_at), as
+                # distinct from write_age: a tick re-stamps updated_at on every
+                # row it writes, so a fresh write says nothing about how old
+                # the prices are. Reported, not used for `stale` — outside US
+                # hours an hours-old quote is normal, not a fault. None when no
+                # row carries a vendor time (the plan may send none).
+                #
+                # Stocks and ETFs only. Crypto's quote_at is the end of the UTC
+                # day of its daily close, so it is always a day or more old;
+                # with equity rows NULL (the likely state on this plan) a max
+                # over every row would report crypto's age as "the newest price
+                # quote" and StaleDataBanner would print it about equities.
+                newest_quote = (await session.execute(
+                    select(func.max(Ticker.quote_at)).where(
+                        or_(Ticker.asset_class.is_(None), Ticker.asset_class != "crypto")
+                    )
+                )).scalar_one_or_none()
+                quote_age = None
+                if newest_quote is not None:
+                    if newest_quote.tzinfo is None:
+                        newest_quote = newest_quote.replace(tzinfo=UTC)
+                    quote_age = (datetime.now(UTC) - newest_quote).total_seconds()
                 checks["worker_last_tick"] = {
                     "status": "stale" if stale else "ok",
                     "regime": regime_row.regime,
@@ -944,6 +973,12 @@ async def status() -> dict[str, object]:
                     # finishes leaves this climbing while age_seconds stays low.
                     "last_write_age_seconds": (
                         int(write_age) if write_age is not None else None
+                    ),
+                    "newest_quote_at": (
+                        newest_quote.isoformat() if newest_quote is not None else None
+                    ),
+                    "newest_quote_age_seconds": (
+                        int(quote_age) if quote_age is not None else None
                     ),
                 }
             else:

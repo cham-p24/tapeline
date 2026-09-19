@@ -216,6 +216,12 @@ export type ScannerRow = {
   // Optional in the type only so a response from a backend deployed before
   // this column existed still parses; the live API always sends it.
   is_leveraged?: boolean;
+  // Same kind of fact: true for a listing that trades like a stock but is
+  // not the company's common shares (an exchange-listed note, a preferred or
+  // depositary share, a warrant, right or unit). Derived server-side from the
+  // listing name and symbol (backend/app/services/non_common.py). Optional for
+  // the same reason as is_leveraged.
+  is_non_common?: boolean;
   score: number;
   signal: string;
   price: number;
@@ -233,6 +239,10 @@ export type ScannerRow = {
   confidence_pct?: number | null;
   reason?: string | null;
   updated_at: string | null;
+  // The VENDOR's time for `price` (backend Ticker.quote_at), UTC ISO; null
+  // when the vendor gave none. `updated_at` is Tapeline's write time, not the
+  // price's age. Optional so a response from an older backend still parses.
+  quote_at?: string | null;
 };
 
 export type TickerDetail = {
@@ -271,6 +281,11 @@ export type TickerDetail = {
     sentiment: number | null;
   }>;
   updated_at: string | null;
+  // The VENDOR's time for `price` (backend Ticker.quote_at), UTC ISO; null
+  // when the vendor gave none. `updated_at` is Tapeline's write time, not the
+  // price's age. Optional so a response from an older backend still parses.
+  quote_at?: string | null;
+  quote_timeframe?: string | null;
 };
 
 export type WatchlistItem = {
@@ -288,6 +303,8 @@ export type WatchlistItem = {
   current_score: number | null;
   signal: string | null;
   price: number | null;
+  /** The vendor's time for `price` (Ticker.quote_at); null when none. */
+  quote_at?: string | null;
   change_pct_1d: number | null;
   reason: string | null;
   score_delta: number | null;
@@ -468,6 +485,8 @@ export type TickerInsiderResponse = {
   symbol: string;
   days_back: number;
   transactions: TickerInsiderRow[];
+  /** True when the window held more lines than the tab returns (2,000). */
+  truncated?: boolean;
 };
 
 export type EmailPrefKey =
@@ -510,7 +529,11 @@ export type InsiderTxn = {
   share_change: number;     // negative = sale, positive = buy
   transaction_price: number;
   transaction_value: number; // abs(shares * price), pre-computed
-  code: string;              // SEC Form 4 code: P=open-market buy, S=sale, A=grant, M=option exercise, G=gift
+  code: string;              // SEC Form 4 code: P=open-market or private purchase, S=sale, A=grant, M=option exercise, G=gift
+  // Every ticker the line is listed under. Since 2026-09-19 one issuer's
+  // common-stock classes all carry its lines (GOOG and GOOGL), and a list
+  // spanning tickers shows such a line once. Absent from older responses.
+  symbols?: string[];
 };
 
 // Re-exported for backwards-compat with components that imported the old name.
@@ -813,6 +836,10 @@ export const api = {
       freshness?: {
         newest_updated_at: string | null;
         oldest_updated_at: string | null;
+        // The vendor's own times for the tiles' prices (Ticker.quote_at);
+        // null when no tile carries one. The two above are write times.
+        newest_quote_at?: string | null;
+        oldest_quote_at?: string | null;
         max_stale_minutes: number;
         ticker_count: number;
       };

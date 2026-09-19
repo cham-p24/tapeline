@@ -16,6 +16,7 @@ from app.services.auth import current_user_optional
 from app.services.cap_events import record_cap_hit
 from app.services.freshness import data_delayed_minutes
 from app.services.funnel_events import record_funnel_event
+from app.services.quote_time import iso_utc
 from app.services.scan_log import record_scan_log
 from app.services.ticker_freshness import live_clauses
 from app.services.ticker_ordering import (
@@ -91,6 +92,20 @@ SCANNER_MIN_DOLLAR_VOLUME = 1_000_000.0
 # 825 of 11,781 live rows qualify (415 of the 7,417 scored), so this is a
 # meaningful slice of the ETF universe, not a rounding error.
 SCANNER_INCLUDE_LEVERAGED_DEFAULT = False
+
+# Notes, preferreds, warrants, rights and units stored as stocks are OUT of the
+# ranked view unless asked for, for the reason geared funds are just above: the
+# composite reads a price series, and on a note anchored to par, a preferred
+# anchored to its coupon or a warrant geared to the common, a high reading is
+# about that structure, not about a company's shares. Measured 2026-09-18: GREEL
+# ("Greenidge Generation Holdings Inc. 8.50% Senior Notes due 2026") read STRONG
+# SETUP at 70.4. 120 of the 6,012 equity-bucket rows qualify (118 scored).
+#
+# Same terms as the leveraged exclusion: `include_non_common=true` returns them,
+# per-ticker pages and search are unchanged, and every row carries the
+# `is_non_common` fact. Nothing built on this may call them risky or advise
+# against them. See services/non_common.py.
+SCANNER_INCLUDE_NON_COMMON_DEFAULT = False
 
 # Module-level cache for /popular — recomputed every hour. The query is cheap
 # but we'd rather not run it on every empty-state render in /app/watchlist.
@@ -191,6 +206,16 @@ async def list_scanner(
             "the results. Excluded by default."
         ),
     ),
+    # Notes, preferreds, warrants, rights and units stored as stocks. Excluded
+    # by DEFAULT, like leveraged funds. See SCANNER_INCLUDE_NON_COMMON_DEFAULT.
+    include_non_common: bool = Query(
+        SCANNER_INCLUDE_NON_COMMON_DEFAULT,
+        description=(
+            "Include listings that trade like a stock but are not a company's "
+            "common shares: notes, preferreds, warrants, rights and units. "
+            "Excluded by default."
+        ),
+    ),
     q: str | None = Query(None, max_length=20, description="Symbol substring search (case-insensitive)"),
     sort: str = Query("score", pattern=SORT_PATTERN),
     order: str = Query("desc", pattern=ORDER_PATTERN),
@@ -258,6 +283,10 @@ async def list_scanner(
     # SCANNER_INCLUDE_LEVERAGED_DEFAULT.
     if not include_leveraged:
         stmt = stmt.where(Ticker.is_leveraged.is_(False))
+    # Same placement for the same reason: total_matched must count the
+    # universe the page ranks. See SCANNER_INCLUDE_NON_COMMON_DEFAULT.
+    if not include_non_common:
+        stmt = stmt.where(Ticker.is_non_common.is_(False))
     # Symbol substring search. SQL LIKE with leading wildcard prevents index use
     # but the active universe is <2,500 rows so a full scan is fine; the query
     # still returns in <50ms in production. Uppercase the query to match how
@@ -439,6 +468,7 @@ async def list_scanner(
                     "sector": sector,
                     "asset_class": asset_class,
                     "include_leveraged": include_leveraged,
+                    "include_non_common": include_non_common,
                     "q": q,
                     "sort": sort,
                     "order": order,
@@ -498,6 +528,9 @@ async def list_scanner(
                 # the MCP server can label an opted-in result rather than
                 # inferring from the absence of a key.
                 "is_leveraged": r.is_leveraged,
+                # Same kind of fact: a note, preferred, warrant, right or unit
+                # rather than the company's common shares.
+                "is_non_common": r.is_non_common,
                 "score": r.score,
                 "signal": r.signal,
                 "price": r.price,
@@ -524,6 +557,13 @@ async def list_scanner(
                     if r.updated_at and tier_delay_minutes
                     else (r.updated_at.isoformat() if r.updated_at else None)
                 ),
+                # The VENDOR's time for `price` (Ticker.quote_at), unshifted:
+                # updated_at above is when Tapeline wrote the row, which the
+                # tick re-stamps every minute and which is not the price's
+                # age. Null = no vendor time (sheet-owned row, or the plan sent
+                # none); state the delay, never updated_at, in its place.
+                "quote_at": iso_utc(r.quote_at),
+                "quote_timeframe": r.quote_timeframe,
             }
             for r in rows
         ],

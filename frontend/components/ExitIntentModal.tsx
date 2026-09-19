@@ -129,13 +129,13 @@ export function ExitIntentModal({
           </svg>
         </button>
 
-        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
-          Before you go
-        </div>
+        {/* No eyebrow label. It read "Before you go" with a pulsing dot —
+            pressure copy the founder asked to remove, and the same phrase the
+            backend already bans from cancellation emails. The heading keeps
+            right padding so it never runs under the close button. */}
         <h2
           id="exit-intent-title"
-          className="mt-4 text-2xl font-semibold tracking-tight text-fg"
+          className="pr-8 text-2xl font-semibold tracking-tight text-fg"
         >
           Free daily picks instead?
         </h2>

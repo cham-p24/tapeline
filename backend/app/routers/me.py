@@ -267,6 +267,7 @@ async def _seed_watchlist_for_new_user(
     """
     from app.models import Ticker, WatchlistItem
     from app.routers.watchlist import _resolve_or_create_default_list
+    from app.services.asset_class import default_view_clause
     from app.services.ticker_freshness import live_clauses
 
     existing = (
@@ -306,6 +307,11 @@ async def _seed_watchlist_for_new_user(
             # Fallback path: drop the freshness floor but still require a real
             # score so baseline_score is never NULL.
             stmt = stmt.where(Ticker.score.isnot(None))
+        # No crypto, the same universe as the scanner's default view and the daily
+        # record (asset_class.DEFAULT_EXCLUDED_CLASSES): a coin's score is built from
+        # four readings, a stock's from six. Since 2026-09-19 a coin can score up to
+        # 81.25, which is enough to rank in a mixed top-N list.
+        stmt = stmt.where(default_view_clause())
         if sector_label:
             stmt = stmt.where(Ticker.sector == sector_label)
         if exclude:

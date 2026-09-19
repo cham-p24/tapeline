@@ -147,6 +147,7 @@ async def _generate_sitewide(
     personalise_cta: bool = False,
 ) -> str:
     """Original briefing layout — site-wide top scores."""
+    from app.services.asset_class import default_view_clause
     from app.services.ticker_freshness import live_clauses
 
     # Freshness + data-quality floor — keep stale ghost rows AND corrupt
@@ -155,6 +156,11 @@ async def _generate_sitewide(
     _top_stmt = select(Ticker)
     for _clause in await live_clauses(session):
         _top_stmt = _top_stmt.where(_clause)
+    # No crypto, the same universe as the scanner's default view and the daily
+    # record (asset_class.DEFAULT_EXCLUDED_CLASSES): a coin's score is built from
+    # four readings, a stock's from six. Since 2026-09-19 a coin can score up to
+    # 81.25, which is enough to rank in a mixed top-N list.
+    _top_stmt = _top_stmt.where(default_view_clause())
     top = (
         await session.execute(
             _top_stmt.order_by(desc(Ticker.score)).limit(3)

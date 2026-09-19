@@ -301,7 +301,7 @@ async def test_the_insider_pass_stamps_its_own_column(
     asked: list[str] = []
 
     async def _fake_txns(
-        sym: str, days_back: int = 90, *, raise_failures: bool = False,
+        sym: str, days_back: int = 90, *, raise_failures: bool = False, listing: Any = None,
     ) -> list[dict[str, Any]]:
         asked.append(sym)
         return []
@@ -374,34 +374,26 @@ async def _factors(symbol: str) -> tuple[float | None, float | None]:
     return row.sub_fundamentals, row.sub_smart_money
 
 
-async def _set_factors(symbol: str, fund: float, smart: float) -> None:
-    from sqlalchemy import update as sa_update
-
-    async with session_scope() as s:
-        await s.execute(
-            sa_update(Ticker).where(Ticker.symbol == symbol)
-            .values(sub_fundamentals=fund, sub_smart_money=smart)
-        )
-
-
-async def test_a_cold_cache_blanks_the_sheet_paths_two_factors(
+async def test_a_cold_cache_no_longer_blanks_the_sheet_paths_two_factors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The warm is not redundant with `_merged_factor_set`. This is why.
+    """The sheet path used to take fundamentals and smart money from this
+    process's caches and write them over the row INCLUDING None, so a cold
+    cache blanked both on every sheet-governed row and re-scored it with
+    NEUTRAL in two of six slots - the hazard this test pinned until 2026-09-17,
+    and the reason the boot warm exists.
 
-    The tick's own merge keeps a stored sub-score when the incoming one is
-    None, so a cold cache cannot blank a market-fed row. The SHEET path has no
-    such protection and must not get one: `upsert_tickers` writes all six
-    sub-scores unconditionally INCLUDING None, on purpose, because writing only
-    non-None values would leave a stale 70 printed beside a composite computed
-    as if that factor were 50 (PRs #225/#226).
+    Since #825/#829 the factor passes write those two onto the row themselves,
+    so the row is their owner. `upsert_tickers` now keeps the row's two beside
+    the workbook's four and publishes the composite of all six: a factor
+    measured yesterday survives a cold cache, and the printed numbers still add
+    up (the PR #225 desync cannot come back through this path).
 
-    So for every sheet-governed symbol the cache is the only thing between "we
-    measured this yesterday" and NEUTRAL 50 in two of six slots — and the
-    process that serves the sheet-changed webhook is the API, where the daily
-    Finnhub chain never runs at all.
+    Mutation: taking the two from the parse again (setting all six from the
+    parsed row) - the refresh writes (None, None).
     """
     from app.services import finnhub_feed
+    from app.services.score import composite_from_factors
     from app.services.sheet_feed import parse_all_signals_csv, upsert_tickers
 
     monkeypatch.setattr(finnhub_feed, "_FUND_SCORE_CACHE", {})
@@ -411,24 +403,23 @@ async def test_a_cold_cache_blanks_the_sheet_paths_two_factors(
         {"symbol": "OXY", "sub_fundamentals": 77.5, "sub_smart_money": 61.0},
     ])
 
-    # THE HAZARD. Cold cache -> the refresh writes None over both.
-    async with session_scope() as s:
-        await upsert_tickers(s, parse_all_signals_csv(_SHEET_CSV))
-    assert await _factors("OXY") == (None, None), (
-        "the sheet refresh is expected to write None on a cache miss — if this "
-        "ever stops being true the warm below is guarding nothing, and the "
-        "stale-sub-score desync of PR #225 is back"
-    )
-
-    # THE FIX. Same refresh, cache warmed from the row first.
-    await _set_factors("OXY", 77.5, 61.0)
-    await finnhub_feed.warm_factor_caches_from_db()
     async with session_scope() as s:
         await upsert_tickers(s, parse_all_signals_csv(_SHEET_CSV))
     assert await _factors("OXY") == (77.5, 61.0), (
         "a factor measured yesterday and still stored on the row was written "
-        "away as NEUTRAL by a sheet refresh"
+        "away as NEUTRAL by a sheet refresh with a cold cache"
     )
+
+    from sqlalchemy import select
+
+    async with session_scope() as s:
+        row = (await s.execute(select(Ticker).where(Ticker.symbol == "OXY"))).scalar_one()
+    stored = {
+        k: getattr(row, f"sub_{k}")
+        for k in ("trend", "rs", "fundamentals", "smart_money", "macro", "momentum")
+    }
+    assert row.sub_trend is not None, "the workbook's own factors were written"
+    assert row.score == composite_from_factors(stored)
 
 
 # ---------------------------------------------------------------------------

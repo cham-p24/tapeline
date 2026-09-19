@@ -17,6 +17,7 @@ import { ScoreSparkline } from "@/components/ScoreSparkline";
 import { KeyStatistics, type KeyStats } from "@/components/KeyStatistics";
 import { useCountUp } from "@/lib/useCountUp";
 import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
+import { parseQuoteAt, quoteTimeNote } from "@/lib/freshness";
 import { EarningsPill } from "@/components/EarningsPill";
 import { useEarningsCalendar } from "@/lib/useEarningsCalendar";
 import { trackEvent, trackFirstTickerAdded, trackCapHit } from "@/lib/gtag";
@@ -377,7 +378,15 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
         <div>
           <div className="flex items-center gap-3">
             <Link href="/app/scanner" className="text-muted hover:text-fg text-sm">&larr; Scanner</Link>
-            <LiveBadge status={status} lastUpdate={lastUpdate} />
+            {/* quoteAt: the vendor's time for the price below, so the
+                badge's "Updated HH:MM" (when this page loaded) is never read
+                as the price's time. */}
+            <LiveBadge
+              status={status}
+              lastUpdate={lastUpdate}
+              quoteAt={data.quote_at ?? null}
+              crypto={data.asset_class === "crypto"}
+            />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <h1 className="text-4xl font-bold tracking-tight font-mono">{data.symbol}</h1>
@@ -415,17 +424,35 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
               ? "—"
               : `${data.change_pct_1d >= 0 ? "+" : ""}${data.change_pct_1d.toFixed(2)}% today`}
           </div>
-          {/* Explicit as-of stamp. The LiveBadge says whether the stream is
-              connected; this says how old the numbers under it actually are,
-              which is the thing a reader needs before treating any of them as
-              current. Absolute time on hover, relative in the flow. */}
-          <div className="mt-1 text-xs text-muted">
-            {data.updated_at ? (
-              <span title={formatAbsolute(data.updated_at)}>
-                As of {formatRelativeOrAbsolute(data.updated_at)}
+          {/* Explicit as-of stamp: how old the PRICE is, from the vendor's own
+              time for it (quote_at). It used to read updated_at, Tapeline's
+              write time, which the worker re-stamps every pass even when the
+              vendor returned nothing, so a price about 15 minutes old read as
+              "just now". With no vendor time it states the no-time note, and
+              the write time is only offered on hover, labelled as what it is.
+              Crypto gets its own wording both ways: its time is the end of a
+              daily close's UTC day, and a pair with none can be days old, so
+              the stock delay note would be false there.
+              Relative in the flow, absolute on hover. */}
+          <div className="mt-1 text-xs text-muted" data-testid="quote-as-of">
+            {parseQuoteAt(data.quote_at) ? (
+              <span title={formatAbsolute(data.quote_at as string)}>
+                {quoteTimeNote(data.quote_at, (d) => formatRelativeOrAbsolute(d), {
+                  crypto: data.asset_class === "crypto",
+                })}
               </span>
             ) : (
-              <span>As of &mdash; (no update stamp on this ticker)</span>
+              <span
+                title={
+                  data.updated_at
+                    ? `Tapeline last refreshed this ticker ${formatAbsolute(data.updated_at)}; the vendor gave no time for this price.`
+                    : undefined
+                }
+              >
+                {quoteTimeNote(null, (d) => formatRelativeOrAbsolute(d), {
+                  crypto: data.asset_class === "crypto",
+                })}
+              </span>
             )}
           </div>
           {/* Share opens X with the public /t/[symbol] URL pre-filled. The

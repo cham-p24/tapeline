@@ -440,6 +440,8 @@ async def test_the_executed_statements_compile_for_postgres_psycopg_unchanged(
             if col in CACHE_DERIVED_COLUMNS:
                 assert f"{col}=coalesce(%(v_{col})s, tickers.{col})" in sql, (col, sql)
             else:
-                assert re.search(rf"\b{col}=%\(v_{col}\)s(::\w+)?(,| WHERE)", sql), (col, sql)
+                # The cast can be several words (quote_at renders
+                # ::TIMESTAMP WITH TIME ZONE).
+                assert re.search(rf"\b{col}=%\(v_{col}\)s(::\w+(?: \w+)*)?(,| WHERE)", sql), (col, sql)
         assert "updated_at=now()" in sql and "?" not in sql, sql
         assert sql.endswith("WHERE tickers.symbol = %(b_symbol)s::VARCHAR"), sql

@@ -214,6 +214,7 @@ class TopPick:
 
 async def pull_top_picks(session: AsyncSession, limit: int = 5) -> list[TopPick]:
     """Top N tickers by current composite score, score-not-null only."""
+    from app.services.asset_class import default_view_clause
     from app.services.ticker_freshness import live_clauses
 
     # Freshness + data-quality floor — never auto-post a stale ghost ticker or
@@ -224,6 +225,11 @@ async def pull_top_picks(session: AsyncSession, limit: int = 5) -> list[TopPick]
     )
     for _clause in await live_clauses(session):
         _stmt = _stmt.where(_clause)
+    # No crypto, the same universe as the scanner's default view and the daily
+    # record (asset_class.DEFAULT_EXCLUDED_CLASSES): a coin's score is built from
+    # four readings, a stock's from six. Since 2026-09-19 a coin can score up to
+    # 81.25, which is enough to rank in a mixed top-N list.
+    _stmt = _stmt.where(default_view_clause())
     rows = (
         await session.execute(
             _stmt.order_by(desc(Ticker.score)).limit(limit),

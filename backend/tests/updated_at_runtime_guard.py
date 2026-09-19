@@ -82,9 +82,14 @@ LIVE_DATA_WRITERS: dict[tuple[str, str], str] = {
 #: 2026-09-13 as the only app callers whose UPDATE moved updated_at.
 ORM_LIVE_DATA_WRITERS: dict[tuple[str, str], str] = {
     ("app/services/sheet_feed.py", "upsert_tickers"):
-        "the ALL SIGNALS sheet: score, signal, price and the six factors",
+        "the ALL SIGNALS sheet: price and change_pct_1m (the six factors, score "
+        "and signal go through _write_factor_sets, which holds updated_at)",
     ("app/services/sheet_feed.py", "upsert_smart_money"):
-        "the SMART MONEY sheet tab: the sub_smart_money factor",
+        "the SMART MONEY sheet tab: the sub_smart_money factor (not called "
+        "since 2026-09-17)",
+    ("app/services/sheet_feed.py", "upsert_etfs"):
+        "the ETF BENCHMARKS sheet: change_pct_1m beside name, sector and asset "
+        "class; first exercised on an existing row 2026-09-17",
     ("app/workers/signal_publisher.py", "_refresh_crypto_universe"):
         "the daily crypto refresh: price, score and factors for each pair",
 }

@@ -23,18 +23,41 @@
 > cherry-picked out, because posting from it is how the flagged line escapes.
 
 
-> **WHERE THE CARD SITS — updated 2026-09-05. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-09-15. Check every claim below against `docs/COPY_FACTS.md` and `docs/PRICING.md` before posting.**
+>
+> **WHAT CHANGED ON 14 SEPTEMBER 2026 — read before posting anything below.**
+> The founder approved an integrity wave on 14 September 2026 that corrected the
+> product and the site. Drafts below were written before it. False lines found
+> on 15 September 2026 were corrected in place, but check each one against
+> `docs/COPY_FACTS.md`, which has the measurements and times:
+>
+> - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
+>   covered stock and ETF about every 60 seconds during US market hours (longer
+>   around a deploy), and a score usually changes about once a day. Never call
+>   the data live: not real-time, not sub-60s, not "every minute".
+> - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
+>   updated once a day. Not ~2,500.
+> - **Congressional trades and squeeze detection do not exist today.** Do not
+>   offer either as a feature, a Premium benefit or a score input.
+> - **The record:** entries are not re-ranked or deleted. We have corrected
+>   recorded values twice, and said so: prices on 25 August 2026, and scores from
+>   18 May to 12 June capped on 15 June 2026. No top 10 was recorded for
+>   31 August, 2 September, 4 September or 9 September 2026.
+> - **The pre-charge email** goes about 7 days before the first charge.
 >
 > **Signing up takes an email and a password.** The account it makes lands on
-> the Free plan and opens the live scanner — the top ten scored rows of any
+> the Free plan and opens the scanner — the top ten scored rows of any
 > scan, one saved screen. **A card is what starts the 30-day Premium trial**
 > (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
-> than the first ten, plus alerts, CSV export and the Congressional and insider
-> feeds.
+> than the first ten, plus alerts, CSV export and per-ticker SEC Form 4
+> filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -156,9 +179,9 @@ Tapeline's Smart Money factor reads Form 4 (officers/directors, 2-business-day f
 ```
 The Smart Money factor reads one disclosed-trade stream: SEC Form 4 insider transactions.
 
-Congressional disclosures (STOCK Act) are ingested too and published as their own Premium feed — but they are not an input to this sub-score.
+It does not read congressional disclosures. Tapeline has no source for them and does not publish them.
 
-Form 4 lands in days; Congressional disclosures take weeks.
+Form 4 lands in days; congressional disclosures take weeks.
 ```
 
 **Tweet 3** (~260 chars):
@@ -192,9 +215,9 @@ Target: Mon 2026-05-26, 8 AM ET. Refresh the numbers from /api/scorecard at post
 
 **Tweet 1** (~270 chars):
 ```
-The Tapeline scorecard has been freezing top-10 picks at every US market close for a week.
+The Tapeline scorecard has been recording the day's top 10 at the US close for a week.
 
-I'm posting the live numbers because the point of /scorecard is that it's auditable. Even when the early weeks look mediocre.
+I'm posting the current numbers because the point of /scorecard is that it's auditable. Even when the early weeks look mediocre.
 ```
 
 **Tweet 2** (~270 chars — REFRESH NUMBERS BEFORE POSTING):
@@ -225,7 +248,7 @@ In 60-90 days the sample will mean something. The numbers will say either:
 (a) the model holds up, or
 (b) the model needs work
 
-Either way the data is published. The /changelog tracks any methodology revision — no retroactive edits.
+Either way the data is published. The /changelog tracks any methodology revision, and any correction to recorded values is dated there.
 ```
 
 **URL reply**:
@@ -245,32 +268,32 @@ Most SaaS free tiers cripple core functionality. Fewer rows, no exports, no filt
 
 It teaches users the product is annoying.
 
-Tapeline's free tier instead shows the real product, live — just fewer rows and a daily look-up cap.
+Tapeline's free tier instead shows the real product — just fewer rows and a daily look-up cap.
 ```
 
 **Tweet 2** (~270 chars):
 ```
 The Free tier on Tapeline:
 
-– Top 10 rows, live
+– Top 10 rows
 – 12 ticker look-ups a day
 – Full 6-factor breakdown and "Why" sentence on every row
-– Full scorecard
+– Public scorecard
 – Watchlist of 5 names
 
-Pro adds the full ~2,500-ticker universe, unlimited look-ups, email alerts, CSV export and saved scans.
+Pro adds all ~11,500 stocks and ETFs, unlimited look-ups, email alerts, CSV export and saved scans.
 ```
 
 **Tweet 3** (~250 chars):
 ```
 The published record is free to read with no account and no card at all — if that's all you need, stay there.
 
-If you want live scanning across the full universe, Pro is $8.25/mo billed annually. Same scoring engine, same scorecard, plus smart watchlist alerts.
+If you want every row of the scan, Pro is $8.25/mo billed annually. Same scoring engine, same scorecard, plus smart watchlist alerts.
 ```
 
 **Tweet 4** (~270 chars):
 ```
-The 30-day Premium trial gives the full live universe + Congressional trades + insider Form 4. It takes a card, charges $0 today, and cancels in one click.
+The 30-day Premium trial adds every row, SEC Form 4 filings and the API. A card starts it, $0 today, one-click cancel.
 
 I'd rather you understand what Tapeline does, decide it doesn't fit, and not pay than have you upgrade because the free tier was deliberately broken.
 ```
@@ -288,7 +311,7 @@ Target: Wed 2026-06-11, 8 AM ET.
 
 **Tweet 1** (~270 chars):
 ```
-Every market day, Tapeline freezes the top-10 composite scores at close.
+At the close, Tapeline freezes the day's top-10 composite scores.
 
 The next session's close gets recorded the next day, alongside the SPY close for the same dates.
 
@@ -301,7 +324,7 @@ Wins stay. Losses stay.
 ```
 What the back-check explicitly DOESN'T do:
 
-– No retroactive picking (the top-10 at close is locked once recorded)
+– No retroactive picking (recorded entries are not re-ranked or deleted; corrections are dated)
 – No survivor bias filter (delisted tickers stay on the historical page)
 – No methodology adjustment after the fact (changelog tracks every change in markdown)
 ```
@@ -321,12 +344,12 @@ All of this is documented on the methodology page.
 ```
 The reason it's still worth running is that it's the only honest version of "did the model work."
 
-Everything else in the SaaS scanner space is back-tests (gameable) or testimonials (cherry-picked). A live forward test, auditable from day one, is the actual control.
+Everything else in the SaaS scanner space is back-tests (gameable) or testimonials (cherry-picked). A forward test, auditable from day one, is the actual control.
 ```
 
 **URL reply**:
 ```
-The full record so far: https://tapeline.io/scorecard
+The public record so far: https://tapeline.io/scorecard
 ```
 
 ---
@@ -400,7 +423,7 @@ I can publish quantitative analysis on US stocks without a financial services li
 ```
 2. The time zone is a feature.
 
-US markets close 6 AM AEST. I wake up to a fully back-checked scorecard with overnight data already populated. By the time East Coast traders are at their desks, the next picks are frozen.
+US markets close 6 AM AEST. I wake up to a fully back-checked scorecard with overnight data already populated. By the time East Coast traders are at their desks, the last close's top 10 is recorded and back-checked.
 
 This isn't a bug to work around — it's literally why it works.
 ```
@@ -568,7 +591,7 @@ It's the column most retail traders ignore. Don't.
 
 **URL reply**:
 ```
-See it live: https://tapeline.io/app/scanner
+See it: https://tapeline.io/app/scanner
 ```
 
 ---

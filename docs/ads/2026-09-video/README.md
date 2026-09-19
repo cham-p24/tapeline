@@ -29,6 +29,10 @@
 > `.en_US.srt`. Ad text: `meta-copy-2026-09.md`.** Everything else in this folder is
 > superseded and must not be uploaded. See
 > [Update 2026-09-14](#update-2026-09-14--concept-e-rewritten-15-s-cuts-captions) at the end.
+>
+> **15 September 2026:** the long cuts of B2 and D in `voiceover/` show a scene-02 line that
+> implies scores move through the session. Do not upload those six files until they are
+> re-rendered; the 15 s cuts and concept E are unaffected. See "Superseded: do not upload".
 
 Three ad videos and six stills, plus what the competition is actually running.
 
@@ -287,6 +291,16 @@ and Reels, so if only one cut can go in, use the 15 s cut.
   and no card" CTA.
 - `stills/4x5/06-cta.png` and `build.mjs`. The same old CTA line is in the still, and
   `build.mjs` would regenerate it.
+- `stills/4x5/02-turn.png` (added 15 September 2026). It still shows "Six named factors, one
+  0–100 composite, re-scored through the US session." Scores are recalculated on every
+  pass, but most inputs are daily readings, so a score usually changes about once a day;
+  the line implies scores move through the session. The silent `tapeline-*.mp4` cuts carry
+  the same line.
+- **The long cuts of B2 and D** (`voiceover/tapeline-concept-b-vo-{1x1,4x5,9x16}.mp4` and
+  `voiceover/tapeline-concept-d-vo-{1x1,4x5,9x16}.mp4`), added 15 September 2026, for the
+  same scene-02 line (it comes from `build3.mjs`). Use the 15 s cuts of B2 and D, which do
+  not carry it, or re-render the long cuts after that line is changed. See the note at the
+  top of `vo-script.md`.
 
 ### Regenerate
 

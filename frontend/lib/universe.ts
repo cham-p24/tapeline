@@ -117,6 +117,13 @@
  * Not 11,852 (rows we merely TRACK, most of them unscored) and not 5,130 (the
  * DEFAULT view, which applies a $1M/day liquidity floor the user can switch
  * off). The claimable number is what an unfiltered scan actually returns.
+ *
+ * SINCE 2026-09-19 (#875) the default view also leaves out listings that are
+ * not common stock (notes, preferreds, warrants, rights, units: 118 scored on
+ * 2026-09-18), so the unfiltered scan needs a third switch:
+ * `/api/scanner?limit=1&min_dollar_volume=0&include_leveraged=true&include_non_common=true`.
+ * The 11,501 above was measured before that exclusion existed and counts them.
+ * Re-measure with all three switches before changing this number.
  */
 export const ACTIVE_SCORED_TICKERS = 11500;
 

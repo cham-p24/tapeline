@@ -379,31 +379,40 @@ export const POSTS: BlogPost[] = [
       Tapeline has no current source of congressional disclosures, no plan
       includes a congressional trades feed, and the factor reads SEC Form 4
       filings.</em></p>
+      <p><em>Corrected 17 September 2026: the examples below said a high
+      reading means "institutions are positioning", and that the factor
+      combined with others "becomes directional certainty". The factor reads
+      corporate insiders' SEC Form 4 filings only, not institutional
+      positions, and no combination of factors gives certainty.</em></p>
       <p>Smart Money is a 0–100 sub-score built from one data stream,
       with its own lag and signal-to-noise characteristics:</p>
       <ol>
         <li><strong>Insider Form 4 filings</strong> — required by the
         SEC within 2 business days of any insider transaction
-        (executives, directors, 10%+ owners). The signal: insiders are
-        the only buyers who know more about the company than the
-        market, by definition. Clusters of buying — multiple insiders
-        in the same window — are a stronger signal than single-buyer
-        events.</li>
+        (executives, directors, 10%+ owners). Insiders are the one group
+        the law treats as knowing more about the company than the
+        market does, which is why the filings exist at all. Clusters of
+        buying — multiple insiders in the same window — are what
+        readers tend to weigh most heavily; the factor itself simply
+        nets the disclosed dollar value.</li>
       </ol>
 
-      <h2>What "smart money buying" actually predicts</h2>
-      <p>Each data source has a different predictive horizon. Let me
-      walk through the cases that matter:</p>
+      <h2>What a Form 4 filing does and does not tell you</h2>
+      <p>A filing is a disclosure, not a forecast. What it carries, and
+      what it leaves out:</p>
 
-      <p><strong>Insider Form 4 filings</strong> have the shortest lag
-      (1–3 business days) and the highest signal-to-noise for cluster
-      events. Single-insider buys are weak — executives buy for
-      compensation reasons, exercising options is mechanical, charity
-      donations get filed too. Multi-insider buys in the same window,
-      where the executives have no scheduled compensation event, are the
-      higher-signal case. Selling clusters are harder to read (they
-      can mean tax planning, diversification, or genuine signal — hard
-      to disambiguate).</p>
+      <p><strong>Insider Form 4 filings</strong> are disclosed quickly
+      — generally within two business days of the trade — so they
+      describe something recent. What they do not carry is a reason. A
+      single purchase can be compensation-driven, an option exercise is
+      mechanical, and charity donations are filed the same way. Several
+      insiders buying in the same window, none of them on a scheduled
+      compensation event, is the case readers usually treat as more
+      meaningful, though nothing in the filing says so. Selling is
+      harder to read again: tax planning, diversification and a view on
+      the company all look identical on the form. We have no evidence
+      that any of these patterns predicts a price move, and the factor
+      makes no such claim — it nets what was disclosed.</p>
 
       <h2>Why Smart Money isn't one of the biggest factors</h2>
       <p>A natural retail-trader question: if Smart Money is so
@@ -418,8 +427,8 @@ export const POSTS: BlogPost[] = [
       Smart money flow is most useful in confluence with the other
       factors — when Trend, Relative Strength, and Smart Money all
       agree, that's the highest-conviction setup. Smart Money alone is
-      late information; combined with leading factors it becomes
-      directional certainty.</p>
+      late information; combined with the other factors it adds context,
+      not certainty.</p>
 
       <p><strong>Survivorship and crowding.</strong> The fund managers
       most retail tools point at — Buffett, Burry, Tepper — are also
@@ -450,13 +459,13 @@ export const POSTS: BlogPost[] = [
       a confluence multiplier:</p>
       <ul>
         <li>A 90 Smart Money sub-score on a 40 composite is a value
-        signal — institutions are positioning before the market has
-        rerated it. Worth a watchlist add.</li>
+        divergence — disclosed insider transactions net toward buying
+        while the composite is low.</li>
         <li>A 90 Smart Money sub-score on a 75 composite is confirmation
-        — the smart money is in a setup that's already showing up in
+        — disclosed insider buying lines up with a setup that's already showing up in
         Trend, RS, and Momentum. Standard signal-of-signals.</li>
         <li>A 30 Smart Money sub-score on a 75 composite is a yellow
-        flag — strong setup, but institutions and insiders aren't
+        flag — strong setup, but insiders' disclosed transactions aren't
         confirming. Worth understanding why before sizing up.</li>
         <li>A 90 Smart Money sub-score with no other factor confirming
         is curious but not actionable. Maybe insiders are buying for a
@@ -673,6 +682,12 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
   Macro                65
   Momentum             87</pre>
 
+      <p><em>Corrected 17 September 2026: this walkthrough described the
+      Smart Money reading as accumulation and institutional buying. The factor
+      reads corporate insiders' SEC Form 4 transactions, not institutional
+      buying, and its Form 4 calculation today gives values from 10 to 90, so
+      the 97 shown here is outside the range that calculation can produce.</em></p>
+
       <p>That's where the actual signal lives. Now we read it.</p>
 
       <h2>Step 2 — Look for the contradictions</h2>
@@ -681,8 +696,8 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
       out. NVDA doesn't do that. Look at the spread:</p>
 
       <ul>
-        <li><strong>Smart Money 97</strong> (top 3%) — the factor was
-        reading strong accumulation.</li>
+        <li><strong>Smart Money 97</strong> — the factor was
+        reading strong net insider buying.</li>
         <li><strong>Momentum 87</strong> (top 13%) — short-term price action
         is accelerating, volume is confirming, breakouts are recent.</li>
         <li><strong>Trend 41</strong> (below median) — but the multi-timeframe
@@ -692,10 +707,10 @@ NVDA — composite 57.9 (CONSTRUCTIVE)
         name is actually <em>lagging</em> tech peers on the multi-week view.</li>
       </ul>
 
-      <p>That's a contradiction. Smart money is in. Short-term price is
+      <p>That's a contradiction. Disclosed insider buying is strong. Short-term price is
       ripping. But the longer-timeframe trend hasn't confirmed yet, and the
       sector is running ahead of it on a 1M view. You read that as: the
-      institutional buying may be early to a move that hasn't fully started,
+      insider buying may be early to a move that hasn't fully started,
       OR it's catching a bounce inside a chop and the bigger trend won't
       cooperate. The score can't tell you which. You have to overlay your
       own read of where we are in the regime.</p>
@@ -1624,7 +1639,7 @@ RSI = 100 - (100 / (1 + RS))</pre>
     title: "How to read SEC Form 4 insider buying (and what's actually a signal).",
     metaTitle: "How to read SEC Form 4 insider buying",
     excerpt:
-      "SEC Form 4 — the filing every corporate insider must submit within 2 business days of a trade — is the rawest 'smart money' signal retail traders can access. But 90% of Form 4 activity is noise. Here's how to filter for the 10% that matters, and how Tapeline's Smart Money sub-score does it automatically.",
+      "SEC Form 4 — the filing every corporate insider must submit within 2 business days of a trade — is the rawest 'smart money' signal retail traders can access. But 90% of Form 4 activity is noise. Here's how to filter for the 10% that matters, and what Tapeline's Smart Money sub-score does with the filings.",
     publishedAt: "2026-05-20",
     author: "Tapeline",
     body: `
@@ -1638,12 +1653,26 @@ RSI = 100 - (100 / (1 + RS))</pre>
       what kills retail traders.</p>
 
       <p>This post is the field guide: what Form 4 actually contains,
-      which 90% of filings to ignore, and what the remaining 10%
-      reliably predicts. Tapeline's Smart Money sub-score — one of the six
+      which 90% of filings to ignore, and which of the remaining 10% are
+      worth reading closely. Tapeline's Smart Money sub-score — one of the six
       named factors in the composite
-      (<a href="/how-it-works">see the methodology</a>) — does
-      this filtering automatically, but the underlying logic is worth
-      understanding regardless of what tool you use.</p>
+      (<a href="/how-it-works">see the methodology</a>) — does not
+      apply these filters: it nets every disclosed transaction in its window.
+      The logic below is for reading the filings yourself, whatever tool you
+      use.</p>
+
+      <p><em>Corrected 17 September 2026: an earlier version of this post
+      said the Smart Money sub-score does this filtering automatically, that
+      Tapeline Premium shows "filtered" Form 4 activity across the full
+      universe, that a trade is at most 48 hours old when its Form 4 reaches
+      you, and that the filings reliably predict something. The sub-score nets
+      every disclosed non-derivative Form 4 transaction in its window by signed
+      dollar value, without filtering out 10b5-1 plan sales, option exercises
+      or small trades; /app/holdings lists the newest Form 4 transactions for
+      the stocks we score, with a purchases-only filter; a filing can reach
+      Tapeline a few days after the trade; we have no evidence that Form 4
+      filings predict price moves; and it called codes P and S "open-market"
+      purchases and sales, when each covers a private transaction too.</em></p>
 
       <h2>What Form 4 actually is</h2>
 
@@ -1654,16 +1683,16 @@ RSI = 100 - (100 / (1 + RS))</pre>
         director, 10%+ owner. Role matters; we'll get to why.</li>
         <li><strong>Transaction code</strong> — a one-letter code from
         a fixed table. The ones that matter for "is this a signal":
-        <code>P</code> (open-market purchase), <code>S</code>
-        (open-market sale), <code>A</code> (grant — almost never
+        <code>P</code> (a purchase on the open market or in a private
+        sale), <code>S</code> (a sale of either kind), <code>A</code> (grant — almost never
         meaningful), <code>F</code> (tax-withholding sale — almost
         never meaningful).</li>
         <li><strong>Number of shares</strong> — raw count, not dollar
         amount. You compute the $ from price.</li>
         <li><strong>Price per share</strong> — the executed price.</li>
         <li><strong>Date of trade</strong> — not the filing date. The
-        filing window is 2 business days, so the trade is up to 48
-        hours older than the filing.</li>
+        filing window is 2 business days, so the trade can be up to
+        two business days older than the filing.</li>
         <li><strong>Shares held after transaction</strong> — total
         post-trade. This is the field most retail traders ignore and
         the one that determines whether the trade is a signal or
@@ -1679,8 +1708,8 @@ RSI = 100 - (100 / (1 + RS))</pre>
       market activity. An insider getting shares via an automatic
       restricted-stock vesting tells you nothing about their view of
       the company's valuation. They didn't choose to acquire the
-      shares; the comp plan did. Filter to code P (open-market buy)
-      and code S (open-market sale) only. Everything else is HR
+      shares; the comp plan did. Filter to code P (a purchase)
+      and code S (a sale) only. Everything else is HR
       paperwork dressed as a filing.</p>
 
       <h3>2. 10b5-1 sales</h3>
@@ -1767,9 +1796,11 @@ RSI = 100 - (100 / (1 + RS))</pre>
       <p>Three honest caveats:</p>
 
       <ul>
-        <li><strong>2-day filing lag</strong>. By the time you see the
-        Form 4, the insider's trade is up to 48 hours old. The market
-        often already moved.</li>
+        <li><strong>Filing lag</strong>. By the time a Form 4 is filed,
+        the trade can be up to two business days old, and Tapeline
+        re-checks each stock on SEC EDGAR about every two days, so on
+        Tapeline it can be a few days older still. The market often
+        already moved.</li>
         <li><strong>Selling is less informative than buying</strong>.
         Insiders sell for personal reasons (diversification, house
         purchase, divorce) that aren't tied to their view of the
@@ -1777,22 +1808,25 @@ RSI = 100 - (100 / (1 + RS))</pre>
         is mixed.</li>
         <li><strong>Small-cap signal-to-noise is worse than
         large-cap</strong>. Microcap insiders trade more frequently
-        for personal-liquidity reasons. The cluster filter helps but
-        doesn't eliminate the noise.</li>
+        for personal-liquidity reasons. Looking for cluster buying helps
+        but doesn't eliminate the noise.</li>
       </ul>
 
       <h2>The pitch</h2>
 
-      <p>Form 4 is one of the few real edges retail traders have
-      access to — the raw data is public, the filing is mandatory,
+      <p>Form 4 is one of the few insider disclosures retail traders
+      can read in full — the raw data is public, the filing is mandatory,
       and most retail traders don't read it. The hard part isn't
-      access; it's filtering. Tapeline Premium does the filtering
-      and surfaces it as both (1) a sub-score in the composite and
-      (2) raw filtered transactions at /app/holdings.</p>
+      access; it's filtering, and that part stays with you. Tapeline
+      surfaces the filings as (1) a sub-score in the composite, which
+      nets every disclosed transaction without the filters above, and
+      (2) on Premium, the transactions themselves at /app/holdings,
+      where you can narrow the list to purchases (code P).</p>
 
       <p><a href="/signup?utm_source=blog&utm_medium=post&utm_campaign=form_4_insider_buying">30-day
-      Premium trial — $0 today</a>. Read 90 days of filtered Form 4
-      activity across the full universe. The trial takes a card; the first
+      Premium trial — $0 today</a>. Browse the most recent Form 4
+      transactions across the stocks we score, or filter to one ticker for
+      its last 90 days. The trial takes a card; the first
       charge is on day 30 and one click cancels before then.</p>
     `,
   },

@@ -109,7 +109,7 @@ function scenes(w, h, sTop, sBot) {
       html: shell(w, h, sTop, sBot,
         '<div class="stage">' + brand +
         "<h1>Tapeline hands you<br><em>one number.</em></h1>" +
-        '<p class="sub">Six named factors, one 0&ndash;100 composite, re-scored through the US session.</p></div>'),
+        '<p class="sub">Six named factors, one 0&ndash;100 composite. Most inputs are daily readings.</p></div>'),
     },
     {
       id: "03-proof", hold: 3.4,

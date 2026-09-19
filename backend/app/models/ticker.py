@@ -41,6 +41,18 @@ class Ticker(Base):
         Boolean, default=False, server_default=text("false"), nullable=False,
     )
 
+    # True for a row stored as a stock that is not the company's common
+    # shares: a note, preferred, warrant, right or SPAC unit (GREEL, a
+    # Greenidge 8.50% senior note, read STRONG SETUP on 2026-09-18). Same
+    # shape and the same job as `is_leveraged` above: out of the scorecard
+    # freeze and the default ranked view, `include_non_common=true` puts them
+    # back, and the fact ships on the row. Derived from symbol, name and
+    # asset_class by services/non_common.py, which also says why CIG and PBR.A
+    # are not flagged and how the column is kept right.
+    is_non_common: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False,
+    )
+
     # Latest score snapshot (denormalized for fast scanner reads)
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     signal: Mapped[str | None] = mapped_column(String(30), nullable=True)
@@ -180,6 +192,32 @@ class Ticker(Base):
     last_smart_money_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
+    # The time the VENDOR attached to `price`, and the vendor's own timeframe
+    # flag ("DELAYED" / "REAL-TIME") when it sends one. Migration 0075.
+    #
+    # `updated_at` below is OUR write time, and the tick re-stamps it every
+    # minute on every row it writes, even a row the vendor returned nothing
+    # for. Every in-app "As of" used to read it, so on the 15-minute-delayed
+    # Stocks Starter plan (measured 14 Sep 2026: AAPL's snapshot 899 s old) a
+    # quarter-hour-old price read as seconds old.
+    #
+    # Written only from vendor-provided fields
+    # (services/quote_time.extract_quote_time: last trade, then last quote,
+    # then minute-bar end — never our clock). A row the vendor skipped on a
+    # tick has its price written NULL, and its quote_at goes NULL with it: a
+    # quote time must never outlive the price it describes.
+    # NULL means "no vendor time": sheet-owned rows (the Google Sheet wrote or
+    # may have written the price), rows never priced, and every equity row
+    # whenever the plan sends no timestamp field at all — the UI then states
+    # the plan's delay ("or more"), never a time. Crypto rows carry the end of
+    # the UTC day their daily close came from, written only by the daily
+    # crypto job; a crypto row with none is described by its daily-close
+    # cadence, never by the stock delay.
+    quote_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    quote_timeframe: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     # When this row's LIVE DATA — price, score, factors — was last refreshed.
     #
     # Readers depend on exactly that meaning: services/ticker_freshness.py

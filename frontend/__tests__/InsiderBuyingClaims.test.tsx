@@ -99,6 +99,17 @@ describe("/insider-buying — labels and claims", () => {
   beforeEach(() => vi.unstubAllGlobals());
   afterEach(() => vi.unstubAllGlobals());
 
+  it("names every share class a shared purchase belongs to, each linked", async () => {
+    // Since 2026-09-19 one company's common-stock classes all carry its
+    // filings, and /api/public/insider-buys lists such a purchase once with
+    // every class in `symbols`. Showing only `symbol` would hide BRK.B's.
+    mockFeed([{ ...row("BRK.A", "2026-09-10"), symbols: ["BRK.A", "BRK.B"] }, row("AAPL", "2026-09-09")]);
+    const { container } = await renderInsider();
+    const hrefs = Array.from(container.querySelectorAll("tbody a")).map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(["/t/BRK.A", "/t/BRK.B", "/t/AAPL"]);
+    expect(container.querySelector("tbody td")?.textContent).toBe("BRK.A · BRK.B");
+  });
+
   it("labels the date column 'Trade date', never 'Filed'", async () => {
     mockFeed([row("AAAA", "2026-08-31")]);
     const { container } = await renderInsider();
@@ -115,7 +126,7 @@ describe("/insider-buying — labels and claims", () => {
     const source = screen.getByTestId("insider-source-line");
     expect(source.textContent).toContain("Source: SEC Form 4");
     expect(source.textContent).toContain(
-      "Source: SEC Form 4 filings via our data vendor. Insiders must file within 2 business days of a trade.",
+      "Source: SEC Form 4 filings, read from SEC EDGAR. Insiders must file within 2 business days of a trade.",
     );
     expect(source.textContent).toContain("Newest trade shown: Aug 31, 2026.");
     expect(text).toContain("Trade date");
@@ -137,10 +148,18 @@ describe("/insider-buying — labels and claims", () => {
     }
   });
 
-  it("describes the Premium list as the full Form 4 list, not a longer list of buys", async () => {
+  it("describes the Premium list as the newest 200 Form 4 transactions, not every filing or a longer list of buys", async () => {
     mockFeed([row("AAAA", "2026-08-31")]);
     const { text, html } = await renderInsider();
-    expect(text).toContain("(all transaction codes, with a buys-only filter)");
+    // /app/holdings asks for 200 rows; its lookback tops out at 90 days.
+    expect(text).toContain(
+      "shows up to 200 of the newest Form 4 transactions in our data (all transaction codes), filterable by ticker, by a lookback of up to 90 days and to purchases only",
+    );
+    expect(text).not.toMatch(/buys-only filter/);
+    // 200 rows of 52,897 is not "the full list".
+    expect(text).not.toMatch(/full Form 4 list|full insider feed|full list of/i);
+    // Code P is a purchase on the open market OR in a private sale.
+    expect(text).not.toMatch(/open-market buys/i);
     // Tier FAQ price reads as a sentence, in the visible FAQ and the JSON-LD.
     expect(text).toContain(
       `${usd(PRICING.premium.monthly)} a month, or ${usd(PRICING.premium.annualPerMonth)} a month ${billedAnnuallyNote(PRICING.premium)}.`,
@@ -181,8 +200,8 @@ describe("/how-it-works — insider freshness and the daily record", () => {
     expect(html).not.toMatch(/every daily top-10/i);
     // The qualification is stated where the record claim is made.
     expect(html).toMatch(/four trading days have no list: 31 August, 2 September, 4 September and 9 September 2026/);
-    // Measured 14-67 days on 2026-09-14; see insiderRefreshCadenceCopy.test.tsx.
-    expect(html).toMatch(/filings can run weeks behind SEC EDGAR/);
+    // Read from SEC EDGAR since #835/#837; see insiderRefreshCadenceCopy.test.tsx.
+    expect(html).toMatch(/read from SEC EDGAR/);
 
     const meta = JSON.stringify(howMeta);
     expect(meta).not.toMatch(/every pick logged/i);
@@ -198,6 +217,6 @@ describe("/how-it-works — insider freshness and the daily record", () => {
     // #822 made the cadence specific; pinned against the backend in
     // insiderRefreshCadenceCopy.test.tsx.
     expect(copy).toMatch(/about every two days/i);
-    expect(copy).toMatch(/weeks behind SEC EDGAR/);
+    expect(copy).toMatch(/read directly from SEC EDGAR/);
   });
 });

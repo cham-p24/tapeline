@@ -54,8 +54,10 @@
 ## 4. Data licensing
 Every data source used in production MUST have explicit commercial/redistribution rights.
 
-- [ ] **Polygon.io Starter or higher** — $29/mo, includes commercial redistribution
-  - NOT the free tier (that's personal use only)
+- [ ] **Massive (formerly Polygon.io) — a plan licensed for display to customers.** OPEN.
+  - The plan in use, Stocks Starter ($29/mo), is 15-minute delayed and licensed for individual, non-business use. It does NOT include commercial redistribution, and displaying its prices to Tapeline's customers is not licensed on it. (This line used to say Starter "includes commercial redistribution"; it does not.)
+  - Which plan, if any, licenses display to customers is an open question with the vendor. See `docs/LICENSE_AUDIT.md` and `docs/DATA_SOURCES.md`.
+  - The free tier is personal use only as well.
 - [ ] Remove ALL `yfinance` / Yahoo Finance calls from production paths
 - [ ] Remove Alpaca data calls from production (personal-use license for your bot only)
 - [ ] Congressional trade data: source from official House/Senate STOCK Act feeds (public domain) OR licensed QuiverQuant API

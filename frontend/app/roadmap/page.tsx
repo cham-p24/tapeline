@@ -15,7 +15,7 @@ const ITEMS: RoadmapItem[] = [
   // SHIPPED
   { slug: "live-data",              title: "Market data",               detail: "Prices (delayed about 15 minutes), volumes, and intraday updates across the universe.",   status: "shipped" },
   { slug: "live-macro",             title: "Macro indicators",          detail: "DXY, 10-year yield, VIX pulled as daily readings; classified into RISING / FALLING / SIDEWAYS for the regime factor.",             status: "shipped" },
-  { slug: "recent-insider-buys",    title: "Recent insider buys",       detail: "SEC Form 4 transactions (officers, directors, 10%+ owners) across the tickers we track. Each stock re-checked about every two days; ETFs about monthly. Our data vendor's filings can run weeks behind SEC EDGAR.", status: "shipped" },
+  { slug: "recent-insider-buys",    title: "Recent insider buys",       detail: "SEC Form 4 transactions (officers, directors, 10%+ owners) across the tickers we track, read from SEC EDGAR. Each stock re-checked about every two days; ETFs about monthly.", status: "shipped" },
   { slug: "browser-push",           title: "Browser push notifications", detail: "Lock-screen alerts on desktop and Android. Free, one click to enable.",                 status: "shipped" },
   { slug: "commodity-universe",     title: "Commodity ETF universe",    detail: "32 commodity ETFs (gold, silver, oil, gas, ag, copper, uranium, miners) with their own sector filter.", status: "shipped" },
   { slug: "annual-pricing",         title: "Annual pricing with savings", detail: "Pro and Premium offered monthly or annually, with the annual price locked forever once subscribed.", status: "shipped" },

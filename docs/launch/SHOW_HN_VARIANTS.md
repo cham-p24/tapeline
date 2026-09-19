@@ -1,24 +1,61 @@
-> ⚠️ **SUPERSEDED (2026-07-26) — use [`FIRE_NOW.md`](FIRE_NOW.md) instead.**
+> ⚠️ **SUPERSEDED (2026-07-26) — use [`FIRE_NOW.md`](FIRE_NOW.md) instead. Do not paste from this file.**
 > The scorecard numbers in these variants ("first week", "35 clean entries",
-> "-0.7% alpha") are stale — the live record is 52 days / 478 calls / ~47%
-> beat-SPY. The Free-tier "top 20, 24h delay" line is also outdated (Free is
-> now live, 12 look-ups/day). `FIRE_NOW.md` has the corrected Show HN post.
+> "-0.7% alpha") are stale — pull current figures from `/api/scorecard`. The
+> Free-tier "top 20, 24h delay" line is also outdated (Free is the top-10 rows
+> and 12 look-ups/day). `FIRE_NOW.md` has the corrected Show HN post.
+>
+> **Updated 2026-09-15:** false lines below (congressional trades, "live",
+> "nothing gets quietly removed", a card at sign-in) were corrected in place.
+> Every plan's prices are delayed about 15 minutes. Check `docs/COPY_FACTS.md`
+> before posting anything.
 
 # Show HN — alternative variants
 
-> **CARD GATE — 2026-08-22. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-09-15. Check every claim below against `docs/COPY_FACTS.md` and `docs/PRICING.md` before posting.**
 >
-> From 2026-08-22 a **new account must put a card on file at first sign-in**
-> before it can use the logged-in product (Stripe Checkout, $0 charged that day,
-> 30-day Premium trial, first charge on day 30, one click to cancel before then).
-> Accounts created **before** that date are grandfathered: they keep the free
-> access they signed up for and are never asked for a card.
+> **WHAT CHANGED ON 14 SEPTEMBER 2026 — read before posting anything below.**
+> The founder approved an integrity wave on 14 September 2026 that corrected the
+> product and the site. Drafts below were written before it. False lines found
+> on 15 September 2026 were corrected in place, but check each one against
+> `docs/COPY_FACTS.md`, which has the measurements and times:
 >
-> So: **no line in this file may say an account is free, that there is a free
-> tier a new user can sign up for, or that signing up needs no card.** What is
-> still true and should be said instead — the **published record is free with no
-> account at all**: the daily Top 10, the complete scorecard, a page per scored
-> ticker, and the raw CSV/JSON export.
+> - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
+>   covered stock and ETF about every 60 seconds during US market hours (longer
+>   around a deploy), and a score usually changes about once a day. Never call
+>   the data live: not real-time, not sub-60s, not "every minute".
+> - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
+>   updated once a day. Not ~2,500.
+> - **Congressional trades and squeeze detection do not exist today.** Do not
+>   offer either as a feature, a Premium benefit or a score input.
+> - **The record:** entries are not re-ranked or deleted. We have corrected
+>   recorded values twice, and said so: prices on 25 August 2026, and scores from
+>   18 May to 12 June capped on 15 June 2026. No top 10 was recorded for
+>   31 August, 2 September, 4 September or 9 September 2026.
+> - **The pre-charge email** goes about 7 days before the first charge.
+>
+> **Signing up takes an email and a password.** The account it makes lands on
+> the Free plan and opens the scanner — the top ten scored rows of any
+> scan, one saved screen. **A card is what starts the 30-day Premium trial**
+> (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
+> cancel before then), and the trial is what turns on every matching row rather
+> than the first ten, plus alerts, CSV export and per-ticker SEC Form 4
+> filings.
+>
+> The **published record is free with no account at all**: the daily Top 10, the
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
+>
+> So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
+> IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
+> this order: the record needs no account; signing up takes an email and a
+> password; a card starts the trial.
+>
+> _History: until 15 September 2026 this block was headed "CARD GATE —
+> 2026-08-22" and described the card wall on new accounts, and told writers
+> that no line may call an account free. That was true only while the wall
+> ran (#548, 2026-08-22, to #683, 2026-08-30)._
 >
 > **DISCLOSURE BOUNDARY — never publish the exact factor weights or the scoring
 > equation.** `/how-it-works` names the six factors and their weight *ordering*
@@ -61,16 +98,17 @@ for 60 min answering every comment).
 ```
 I built Tapeline (https://tapeline.io) because every stock scanner I'd ever paid for had the same dishonest pattern: they show you a leaderboard of picks but never show you what happened next.
 
-So Tapeline does the opposite. Every market day at close, we freeze the top 10 ranked tickers. Next day at close, we record each name's actual return vs SPY and the result goes on /scorecard. Wins stay. Losses stay. Nothing gets quietly removed when a pick goes badly.
+So Tapeline does the opposite. At the close, we freeze the day's top 10 ranked tickers. Next day at close, we record each name's actual return vs SPY and the result goes on /scorecard. Wins stay. Losses stay. Entries are not re-ranked or deleted, and the two corrections we made to recorded values are dated on the page.
 
 The score itself is a 6-factor composite — Trend, Relative Strength, Fundamentals, Smart Money, Macro, Momentum — weighted most toward Trend and Relative Strength and least toward Momentum. The factor set and ordering are on /how-it-works and don't change without a changelog entry. Every score comes with one plain-English sentence explaining what's driving it (the "Why" column).
 
 The scorecard is the part I want HN to tear apart. It's the only thing I've ever seen in this space that's auditable from day one. Currently in its first week of forward-testing — early data on /scorecard shows median 1D alpha around -0.7% on 35 clean entries (4 vendor-data outliers excluded; the filter logic is in the public Python source). I expect those numbers to swing both directions as the sample grows. The transparency is the point, not the early hit rate.
 
-Free tier: top-10 rows, live, 12 ticker look-ups a day, 5-name watchlist.
-Pro $8.25/mo billed annually: full live universe + smart alerts.
-Premium $19.99/mo: + Congress trades + SEC Form 4.
-30-day Premium trial — a new account adds a card at first sign-in, $0 charged that day, first charge on day 30, cancel in one click before then. The daily Top 10 and the full public scorecard are readable with no account.
+Free tier: top-10 rows, 12 ticker look-ups a day, 5-name watchlist.
+Pro $8.25/mo billed annually: every row of the scan (about 11,500 US stocks and ETFs) + alerts.
+Premium $19.99/mo: + per-ticker SEC Form 4 filings.
+Prices are delayed about 15 minutes.
+30-day Premium trial — a card starts it, $0 charged that day, first charge on day 30, cancel in one click before then. The daily Top 10 and the public scorecard (per-day entries on a 7-day delay) are readable with no account.
 
 Built solo over the last few months from Melbourne. Genuinely interested in what HN finds wrong with the methodology — and what factors I'm under-weighting.
 ```
@@ -105,11 +143,11 @@ The methodology is on /how-it-works — six factors, listed with the heaviest-we
 - Macro — a single market-wide regime classification; the same reading for every ticker on a tick
 - Momentum — a momentum-quality reading plus a short-horizon return, deliberately the lightest factor
 
-The scoring is version-controlled, so a change is a change on the record. /scorecard is uneditable history. /changelog logs every methodology revision.
+The scoring is version-controlled, so a change is a change on the record. Entries on /scorecard are not re-ranked or deleted; corrections are dated. /changelog logs every methodology revision.
 
 Stack: Next.js 16 + FastAPI + Massive (formerly Polygon) + Finnhub + FRED, deployed on Fly.io. The methodology — the six factors, what each measures, and their weight ordering — is published on /how-it-works; the exact weights and the parameter recipe are not.
 
-Free tier: top-10 rows, live, 12 ticker look-ups a day. Pro $8.25/mo annual. Premium $16.58/mo annual. 30-day Premium trial takes a card — $0 today, first charge on day 30, one click to cancel.
+Free tier: top-10 rows, 12 ticker look-ups a day. Pro $8.25/mo annual. Premium $16.58/mo annual. 30-day Premium trial takes a card — $0 today, first charge on day 30, one click to cancel.
 
 What I want HN to break: the methodology. The Smart Money sub-score in particular — it reads SEC Form 4 insider transactions and doesn't score 13F at all, because the 45-day filing lag means the position is usually already priced by the time you see it. I'd love to be argued out of that.
 ```

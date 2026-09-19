@@ -1,5 +1,13 @@
 # The SaaS Optimisation Playbook
 
+> **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
+>
+> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 60 seconds (gaps of 59.99 to 60.02 seconds measured on 14 September 2026 after #843; longer around a deploy), and most score inputs are daily, so a score usually changes about once a day. The scanner and the other auto-refreshing in-app pages reload about once per pass during the US session (04:00 to 20:00 ET on trading days), and public pages are cached snapshots that can be an hour or more old. It is not real-time, not sub-60s and not "every minute".
+> - **Squeeze detection.** No real squeeze data source is configured. The squeeze pages show an empty state, squeeze alerts cannot fire, and squeeze is not sold (#818).
+> - **Trial and card.** Signing up is free and needs no card (the card wall ran from 22 to 30 August 2026, #548 to #683). A card starts the 30-day Premium trial, and the pre-charge email goes about 7 days before the first charge.
+>
+> Measurements, times and approved wording: `docs/COPY_FACTS.md`.
+
 *Final version, 2026-08-19. Written for Tapeline (tapeline.io) — 20 users, 0 paying, ~5 live no-card trials, solo founder in Melbourne, Free / Pro $9.99 / Premium $19.99 — but stated so that it holds for any SaaS. It consolidates eight lever sweeps (foundations · positioning/ICP · acquisition · activation/onboarding · pricing/monetisation · retention/expansion · product-ops · proof/trust/brand), an adversarial stage-fit review, and a line-by-line fact-check into one operating system. It builds on, cites, and does not contradict `docs/PAID_MARKETING_PLAYBOOK.md`, `docs/COMPETITOR_GAP_ANALYSIS.md`, `docs/GROWTH_RESEARCH_DOSSIER.md`, and `docs/PAID_ADS_PATHWAY.md`; where it adds something those documents do not contain, it says so. Every Tapeline copy line in it is descriptive-only (no buy / sell / recommend / beat / guaranteed / urgency; no exact weights). Repo facts are as read on `origin/main` @ **b57b081** (2026-08-19), which includes PR #504/#506 (Chrome/Edge ticker-overlay extension) and PR #507 (gap-analysis fixes: survey removed from the signup path, alerts picker, mobile "Why", fold CTA, scorecard qualifier above the numbers, deterministic scanner sort). Nothing in this document is a recommendation to trade any security.*
 
 **How to read it.**

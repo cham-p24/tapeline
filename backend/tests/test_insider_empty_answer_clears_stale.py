@@ -155,7 +155,7 @@ def _vendor(monkeypatch: pytest.MonkeyPatch, outcome: str) -> list[str]:
     calls: list[str] = []
 
     async def _fetch(
-        sym: str, days_back: int = 90, *, raise_failures: bool = False,
+        sym: str, days_back: int = 90, *, raise_failures: bool = False, listing: Any = None,
     ) -> list[dict[str, Any]] | None:
         calls.append(sym)
         if len(calls) > 300:
@@ -536,6 +536,8 @@ async def test_the_webhook_warm_does_not_hand_the_sheet_a_retired_reading(
     _vendor(monkeypatch, "empty")
     await sp._refresh_insider_cache(limit=1)  # the worker, another machine
     monkeypatch.setattr(finnhub_feed, "_SMART_MONEY_SCORE_CACHE", api_process_cache)
+    # The API process runs no factor pass, so it has learned nothing itself.
+    monkeypatch.setattr(finnhub_feed, "_PASS_READINGS", {})
     monkeypatch.setattr(finnhub_feed, "_SMART_MONEY_CLEARED", set(), raising=False)
 
     await finnhub_feed.warm_factor_caches_from_db()  # the next webhook
@@ -882,7 +884,7 @@ def _vendor_by_prefix(monkeypatch: pytest.MonkeyPatch, outcomes: dict[str, str])
     calls: list[str] = []
 
     async def _fetch(
-        sym: str, days_back: int = 90, *, raise_failures: bool = False,
+        sym: str, days_back: int = 90, *, raise_failures: bool = False, listing: Any = None,
     ) -> list[dict[str, Any]] | None:
         calls.append(sym)
         if len(calls) > 300:

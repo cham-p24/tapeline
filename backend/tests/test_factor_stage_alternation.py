@@ -208,7 +208,7 @@ async def test_limit_bounds_the_insider_pass(
     seen: list[str] = []
 
     async def _fake(
-        sym: str, days_back: int = 90, *, raise_failures: bool = False,
+        sym: str, days_back: int = 90, *, raise_failures: bool = False, listing: Any = None,
     ) -> list[dict[str, Any]]:
         seen.append(sym)
         return []

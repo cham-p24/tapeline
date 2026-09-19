@@ -54,6 +54,11 @@ from app.services.mock_feed import (
     universe,
 )
 from app.services.news_feed import fetch_latest_news
+from app.services.non_common import (
+    is_non_common_equity,
+    non_common_on_write,
+    reconcile_non_common_flags,
+)
 from app.services.polygon_feed import fetch_regime, fetch_snapshots
 from app.services.pubsub import broker
 from app.services.scorecard_backcheck import backcheck_all_pending, is_trading_day
@@ -174,6 +179,21 @@ def _score_upsert_params(
     ]
 
 
+def _split_by_column_set(rows: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    """`rows` grouped by their exact key set, first-seen order kept.
+
+    tick()'s score upsert binds every column of a batch from every row
+    (`_score_upsert_params`), so a batch must share one key set. Rows differ
+    only in whether they carry the quote-time pair: polygon_feed sets it on
+    every row it returns (None on a row the vendor skipped), while a row with
+    no such key at all (the dev mock feed's) leaves the column untouched.
+    """
+    groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    for row in rows:
+        groups.setdefault(tuple(row), []).append(row)
+    return list(groups.values())
+
+
 #: Ceiling on ONE whole tick before the watchdog kills it. See the watchdog in
 #: main() for why this moved off 60 and why raising it is safe.
 TICK_TIMEOUT_SECONDS: int = int(os.environ.get("TICK_TIMEOUT_SECONDS", "240"))
@@ -185,6 +205,7 @@ FACTOR_COLUMNS: tuple[str, ...] = (
 )
 
 _SMART_MONEY_ONLY: frozenset[str] = frozenset({"sub_smart_money"})
+_FUNDAMENTALS_ONLY: frozenset[str] = frozenset({"sub_fundamentals"})
 
 
 def _merged_factor_set(
@@ -554,7 +575,14 @@ async def tick() -> None:
             Ticker.symbol, Ticker.sector,
             Ticker.sub_trend, Ticker.sub_rs, Ticker.sub_fundamentals,
             Ticker.sub_smart_money, Ticker.sub_macro, Ticker.sub_momentum,
+            Ticker.is_non_common,
         ))).all()
+        # Listings stored as stocks that are not common shares take no
+        # fundamentals reading: the vendor's figures for them are the
+        # issuer's. Written as NULL on every tick, whatever the snapshot or
+        # the row holds, so the composite, label and sentence are rebuilt
+        # without it. See finnhub_feed._NO_FUNDAMENTALS.
+        no_fundamentals = {r.symbol for r in existing_rows if r.is_non_common}
         existing_symbols = {r.symbol for r in existing_rows}
         existing_factors = {
             r.symbol: {
@@ -609,6 +637,25 @@ async def tick() -> None:
                 "avg_volume_30d": snap.get("avg_volume_30d"),
             }
             is_sheet_owned = snap["symbol"] in sheet_owned
+            # The vendor's own time for the price (services/quote_time.py).
+            #
+            # polygon_feed.fetch_snapshots sets the key on every row it
+            # returns: the vendor's time when it priced the row, None when it
+            # priced it without a usable time, and None when it skipped the
+            # row, because the price is written NULL then too and a quote time
+            # must never outlive the price it describes. A row with no key at
+            # all (the dev mock feed's) leaves the column out of its UPDATE.
+            #
+            # Sheet-governed rows get an explicit None every tick. Their price
+            # is also written by sheet_feed from the Google Sheet (which clears
+            # these two columns itself), so no vendor time can be vouched for
+            # on them; the UI states the plan's delay instead.
+            if is_sheet_owned:
+                market_only["quote_at"] = None
+                market_only["quote_timeframe"] = None
+            elif "quote_at" in snap:
+                market_only["quote_at"] = snap["quote_at"]
+                market_only["quote_timeframe"] = snap.get("quote_timeframe")
             if is_sheet_owned:
                 # Sheet-governed: price/volume/changes come from the market feed,
                 # but the composite, the six sub-scores and confidence stay
@@ -620,8 +667,15 @@ async def tick() -> None:
                     **_merged_factor_set(
                         snap, existing_factors.get(snap["symbol"]),
                         cleared=(
-                            _SMART_MONEY_ONLY if snap["symbol"] in sm_cleared
-                            else frozenset()
+                            (
+                                _SMART_MONEY_ONLY if snap["symbol"] in sm_cleared
+                                else frozenset()
+                            )
+                            | (
+                                _FUNDAMENTALS_ONLY
+                                if snap["symbol"] in no_fundamentals
+                                else frozenset()
+                            )
                         ),
                     ),
                 }
@@ -667,7 +721,14 @@ async def tick() -> None:
         tickers_table = Ticker.__table__
         _upsert_started = monotonic()
         _rows_written = 0
-        for batch in (full_updates, market_updates):
+        # Split each batch by column set: a row with no quote_at key (see
+        # above) must not share a statement with one that has it. With the
+        # key on every row, or on none, this is the same two batches as before.
+        for batch in (
+            group
+            for rows_ in (full_updates, market_updates)
+            for group in _split_by_column_set(rows_)
+        ):
             if not batch:
                 continue
             columns = [k for k in batch[0] if k != "symbol"]
@@ -1686,6 +1747,39 @@ Set to False to restore the old behaviour; the scanner default is separate
 (routers/scanner.SCANNER_INCLUDE_LEVERAGED_DEFAULT) and unaffected."""
 
 
+_EXCLUDE_NON_COMMON_FROM_SCORECARD = True
+"""⚠️ CHANGES WHAT ENTERS THE PERMANENT PUBLIC RECORD, from 2026-09-19 forward.
+
+Notes, preferreds, warrants, rights and units stored as stocks no longer
+qualify for the daily top-10 freeze. See services/non_common.py for what is
+flagged, what deliberately is not (ETNs, CIG, PBR.A) and how.
+
+This changes only what is added from here on; no recorded entry is changed.
+Exactly one such row is on the record: BHFAO, a Brighthouse 6.75%
+non-cumulative preferred, listed fourth on 2026-06-23 and disclosed on
+2026-09-18 (#873). It stays as recorded, and a comparison spanning this date
+crosses two definitions of what could enter, as one across 2026-09-07 does.
+
+WHY. The same consistency argument as _EXCLUDE_LEVERAGED_FROM_SCORECARD: the
+ranked scanner now leaves these out by default
+(routers/scanner.SCANNER_INCLUDE_NON_COMMON_DEFAULT), and the record is the
+auditable record of what the scanner said. Second, the composite reads a price
+series, and on a note anchored to par or a preferred anchored to its coupon a
+high reading describes that structure. Freezing it into a permanent record
+labelled STRONG SETUP asserts something the model was not measuring about a
+company's shares. The risk was live, not hypothetical: GREEL, a Greenidge
+8.50% senior note, scored above the day's cutoff on 2026-09-14 and tied it on
+2026-09-17, and only the liquidity floor kept it out.
+
+Do NOT justify this with the record's returns. Exactly one such row was ever
+listed, which says nothing either way about how they perform.
+
+The freeze re-derives the flag for its own candidates against the whole
+universe rather than trusting the stored column alone, so a row a blind writer
+has not flagged yet still cannot enter. Set to False to restore the old
+behaviour; the scanner default is separate and unaffected."""
+
+
 def _macro_gate_active() -> bool:
     """The macro gate only applies when Ticker.sub_macro is the Tapeline
     composite's regime-derived value (set by sheet_feed.refresh_from_workbook).
@@ -1768,6 +1862,8 @@ async def _ensure_daily_scorecard(today: date) -> None:
     Since 2026-09-07 leveraged/inverse funds are also skipped, which CHANGED
     what enters this permanent record — see _EXCLUDE_LEVERAGED_FROM_SCORECARD
     for the argument and for the measurement that rules out the obvious one.
+    Since 2026-09-19 so are notes, preferreds, warrants, rights and units
+    stored as stocks — see _EXCLUDE_NON_COMMON_FROM_SCORECARD.
 
     Concentration controls (2026-06-01, fix 3 of SCORING_AUDIT_2026-06-01.md):
     - At most _MAX_PER_SECTOR picks from any single sector
@@ -1817,10 +1913,22 @@ async def _ensure_daily_scorecard(today: date) -> None:
         # corrupt (score>100 / emoji-symbol / <2-factor) row into the permanent
         # public scorecard record. (score IS NOT NULL is part of the floor.)
         # See app.services.ticker_freshness.
+        from app.services.asset_class import default_view_clause
         from app.services.ticker_freshness import live_clauses
         _cand_stmt = select(Ticker)
         for _clause in await live_clauses(session):
             _cand_stmt = _cand_stmt.where(_clause)
+        # Same universe as the scanner's default view: no crypto. A coin's score
+        # is built from four readings where a stock's is built from six (see
+        # asset_class.DEFAULT_EXCLUDED_CLASSES), and this record is the auditable
+        # account of what that default view ranked. Until 2026-09-19 the rule
+        # went unstated here because a scale bug in crypto_feed._near_high_pct
+        # held every coin to 68.75 or below, under the ~77 the tenth pick needs
+        # (tenth-place score 77.0-78.3 on 8-18 Sep 2026). With it fixed a coin
+        # can reach 81.25, and all 116 scored pairs carry every column the live
+        # clauses require (1-day change, confidence, a clean class). Measured
+        # read-only on 2026-09-19: no crypto row has ever been frozen.
+        _cand_stmt = _cand_stmt.where(default_view_clause())
         # Deterministic ordering (GAP #8): score alone is not a total order —
         # tickers tie on score every day, and the candidate pool cutoff at 80
         # (and the top-10 freeze below) then depended on whatever order the
@@ -1830,6 +1938,12 @@ async def _ensure_daily_scorecard(today: date) -> None:
         candidates = await session.execute(
             _cand_stmt.order_by(desc(Ticker.score), Ticker.symbol.asc()).limit(80)
         )
+        # Every stored symbol, for the non-common gate's fifth-letter rules
+        # (PTACU is a unit only because PTAC is listed). Read once, here, so
+        # the gate below does not depend on the stored flag being current.
+        _universe = frozenset(
+            (await session.execute(select(Ticker.symbol))).scalars().all()
+        )
 
         sector_counts: dict[str, int] = {}
         skipped_zero_price = 0
@@ -1837,6 +1951,7 @@ async def _ensure_daily_scorecard(today: date) -> None:
         skipped_sector_cap = 0
         skipped_illiquid = 0
         skipped_leveraged = 0
+        skipped_non_common = 0
         rank = 0
 
         for t in candidates.scalars().all():
@@ -1849,6 +1964,17 @@ async def _ensure_daily_scorecard(today: date) -> None:
             # would guess.
             if _EXCLUDE_LEVERAGED_FROM_SCORECARD and t.is_leveraged:
                 skipped_leveraged += 1
+                continue
+
+            # Notes, preferreds, warrants, rights and units. READ
+            # _EXCLUDE_NON_COMMON_FROM_SCORECARD first: this also changes what
+            # enters the permanent record. The stored flag OR the live
+            # predicate, so a row no writer has flagged yet cannot slip in.
+            if _EXCLUDE_NON_COMMON_FROM_SCORECARD and (
+                t.is_non_common
+                or is_non_common_equity(t.symbol, t.name, t.asset_class, _universe)
+            ):
+                skipped_non_common += 1
                 continue
 
             if not t.price or t.price <= 0:
@@ -1952,9 +2078,11 @@ async def _ensure_daily_scorecard(today: date) -> None:
         logger.info(
             "scorecard.snapshot saved for %s rows=%d "
             "skipped_zero_price=%d skipped_macro_hostile=%d skipped_sector_cap=%d "
-            "skipped_illiquid=%d skipped_leveraged=%d sector_mix=%s",
+            "skipped_illiquid=%d skipped_leveraged=%d skipped_non_common=%d "
+            "sector_mix=%s",
             today, rank, skipped_zero_price, skipped_macro_hostile,
-            skipped_sector_cap, skipped_illiquid, skipped_leveraged, sector_counts,
+            skipped_sector_cap, skipped_illiquid, skipped_leveraged,
+            skipped_non_common, sector_counts,
         )
 
 
@@ -2011,10 +2139,18 @@ async def _refresh_workbook_tabs() -> None:
                 logger.exception("asset_class.repair_failed")
 
             if settings.signal_sheet_csv_url:
-                counts = await refresh_from_workbook(sheet_session)
                 # Which symbols the sheet owns — consumed by the snapshot
                 # upsert so the market feed can't clobber their composite.
+                # BEFORE the ingest, which takes minutes. After it, the ticks
+                # that ran between the ingest's write and this refresh wrote
+                # their own composite over sheet-owned rows - after every
+                # restart, when the set starts empty, and for any symbol the
+                # sheet had just added - and it stayed until the sheet next
+                # changed. The first ticks after a restart still write those
+                # rows before this runs; the boot ingest, which always runs
+                # (the content hashes start empty), then writes them back.
                 await _refresh_sheet_governed_symbols()
+                counts = await refresh_from_workbook(sheet_session)
                 if counts.get("total"):
                     logger.info(
                         "sheet_feed.tick rows=%d ins=%d upd=%d",
@@ -2756,34 +2892,6 @@ _EQUITY_FACTOR_DUE_AFTER: dict[str, timedelta] = {
 #: symbol that does gain coverage is still picked up within a month.
 _NON_EQUITY_FACTOR_DUE_AFTER = timedelta(days=30)
 
-#: Fundamentals stamped before this instant, with no reading on the row, are due
-#: NOW instead of when their horizon passes. Every asset class but crypto.
-#:
-#: Until #825 (worker restarted on it at 22:58 UTC on 2026-09-13) a stamp could
-#: land without its reading: the pass cached the value and a deploy took it
-#: before the row's owner saved it. See `_save_factor_readings`. Those rows
-#: cannot be told apart from rows Finnhub does not cover, and they were hidden
-#: until their stamp aged out: 1,548 sheet-owned equities with Finnhub key
-#: statistics sat at NEUTRAL 50 (ADBE, JPM, COST, V, CAT among them), plus 457
-#: owned by the tick from the 09-06..09-11 outage. Stamps ran 09-07..09-13, so
-#: the horizon alone would have taken until 09-21.
-#:
-#: So every such row is asked once more. A re-read stamps the row after this
-#: instant, so the rule retires row by row. Once it matches nothing it is dead
-#: code: remove it then, with the fixture that disables it in
-#: tests/test_factor_refresh_what_is_due.py.
-#:
-#: #828 asked equities only; the equities drained 2026-09-14 (3,134 of 3,358
-#: re-reads came back with a reading). ETFs and futures were added on 2026-09-17.
-#: Their 30-day horizon would have hidden the lost ones until 2026-10-13, and
-#: sheet-owned ETFs held fundamentals at 2.2% against 14.5% for the tick's own:
-#: about 150 lost readings. That costs ~5,100 re-reads, once, served after every
-#: due equity. The run it lands in had no smart money due, so it fits the phase
-#: budget.
-#:
-#: Crypto is never asked: no pair has ever answered /stock/metric.
-_FUNDAMENTALS_UNSAVED_BEFORE = datetime(2026, 9, 13, 23, 0, tzinfo=UTC)
-
 #: Smart money stamped before this instant came from Finnhub, and is due NOW.
 #:
 #: The insider pass switched to SEC EDGAR here (`services/edgar_form4.py`),
@@ -2808,7 +2916,11 @@ _SMART_MONEY_EDGAR_SINCE = datetime(2026, 9, 14, 14, 10, tzinfo=UTC)
 #:   its CIK. On 2026-09-17, 70 CIKs spread 2,609 rows over 173 symbols:
 #:   Strategy's STRC/STRF/STRK/STRD preferreds carried MSTR's insider sales,
 #:   JPM's VYLD/AMJB ETNs carried JPM's, notes like GREEL and TMUSZ their
-#:   issuer's. Now only the ticker the filing names gets the lines.
+#:   issuer's. Then only the ticker the filing names got the lines; since
+#:   2026-09-19 every common-stock ticker of the issuer does, and nothing else
+#:   (edgar_form4, point 5). That change needs no second re-read: a sibling
+#:   class gains its rows at its next re-check, and a non-common listing's
+#:   rows go at its next re-check without the guard (`by_rule`).
 #: * AMENDMENTS. A 4/A dropped every Form 4 its owner filed that day, e.g. 51 of
 #:   Magnetar's CRWV sale lines. Now only the original it restates.
 #: * FUTURE DATES. A GIC filing's 2027-09-03 typo sat at the top of the Holdings
@@ -2900,12 +3012,6 @@ def _factor_due_clause(stamp_col: Any, now: datetime) -> Any:
         | ((Ticker.asset_class == "equity") & (stamp_col < equity_cutoff))
         | ((Ticker.asset_class != "equity") & (stamp_col < other_cutoff))
     )
-    if stamp_col.key == "last_fundamentals_at":
-        due = due | (
-            (Ticker.asset_class != "crypto")
-            & Ticker.sub_fundamentals.is_(None)
-            & (stamp_col < _FUNDAMENTALS_UNSAVED_BEFORE)
-        )
     if stamp_col.key == "last_smart_money_at":
         due = due | (stamp_col < _SMART_MONEY_EDGAR_SINCE)
         due = due | (stamp_col < _SMART_MONEY_REREAD_BEFORE)
@@ -2936,6 +3042,11 @@ def _factor_scope_clause(stamp_col: Any) -> Any:
     """
     if stamp_col.key == "last_smart_money_at":
         return Ticker.symbol.not_like("X:%")
+    if stamp_col.key == "last_fundamentals_at":
+        # Notes, preferreds, warrants, rights and units: the vendor answers
+        # them with the issuer's financials, so asking is a wasted call whose
+        # answer must not be used. See finnhub_feed._NO_FUNDAMENTALS.
+        return Ticker.is_non_common.is_(False)
     return true()
 
 
@@ -3250,9 +3361,14 @@ async def _save_factor_readings(
     owner to write.
 
     What remains: a tick that read a row before this commit can put the old
-    factor back, and restores the reading on its next write, from the cache.
-    Only a restart inside that one tick loses it. A sheet upsert already in
-    flight when this commits can do the same, until the sheet next changes.
+    factor back, with the composite of the old set, and restores the reading on
+    its next write of that row, from the cache. A restart before that write
+    loses the reading until the row next comes due (36h for an equity's smart
+    money, 8 days for its fundamentals): the stamp has already landed, and the
+    boot rebuild repairs only NULL rows. A sheet upsert already in flight when
+    this commits no longer does the same: it writes each row's factor set with
+    a compare-and-set of its own and keeps the newer reading (see
+    `sheet_feed._write_factor_sets`).
 
     `updated_at` is held still: a factor reading is not proof the row's price is
     live, and a delisted symbol that still answers /stock/metric must not stay
@@ -3260,10 +3376,18 @@ async def _save_factor_readings(
 
     Crypto pairs are never written: they are scored on a different factor set.
     """
+    from app.services.finnhub_feed import no_fundamentals_symbols
     from app.services.mock_feed import _signal_from_score
     from app.services.polygon_feed import _composite_from_subs
 
-    pending = {s: v for s, v in readings.items() if not s.startswith("X:")}
+    # A listing flagged not-common-stock since its reading was fetched must not
+    # be written its issuer's value: checked here, at write time, and again in
+    # the UPDATE below against the stored flag. See finnhub_feed._NO_FUNDAMENTALS.
+    fundamentals = factor == "sub_fundamentals"
+    skip = no_fundamentals_symbols() if fundamentals else frozenset()
+    pending = {
+        s: v for s, v in readings.items() if not s.startswith("X:") and s not in skip
+    }
     unwritten = [s for s in readings if s not in pending]
     others = [c for c in FACTOR_COLUMNS if c != factor]
     for _attempt in range(_FACTOR_SAVE_ATTEMPTS):
@@ -3278,6 +3402,7 @@ async def _save_factor_readings(
                     .where(
                         Ticker.symbol == sym,
                         *(getattr(Ticker, c).is_not_distinct_from(v) for c, v in held.items()),
+                        *((Ticker.is_non_common.is_(False),) if fundamentals else ()),
                     )
                     .values({
                         factor: pending[sym],
@@ -3414,6 +3539,8 @@ async def _refresh_fundamentals_cache(
             if metrics:
                 score = compute_fundamentals_score(metrics)
                 set_cached_score(sym, score)
+                # A symbol flagged not-common-stock since the selection ran is
+                # dropped when the batch is written; see _save_factor_readings.
                 if score is not None:
                     readings[sym] = score
                 refreshed += 1
@@ -3775,6 +3902,17 @@ _INSIDER_WINDOW_DAYS = 90
 #: add ~1.8 hours a day across ~6,000 equities for nothing.
 _INSIDER_PACE_SECONDS = 0.0
 
+#: Longest an insider batch waits for its stamp, in seconds.
+#:
+#: The boot rebuild trusts a symbol's stored Form 4 rows only when they were
+#: written within INSIDER_STAMP_LAG (15 min) before its stamp. Twenty symbols
+#: used to span ~22s at a fixed 1.1s a call. Since EDGAR (#835) a call costs
+#: what the filer's filings cost - TSM's 144 uncached filings took 18s - so
+#: twenty heavy filers could run past the window, and a row stamped without
+#: its reading (a contended save) would then never be rebuilt. Flushing on
+#: age as well as count keeps the lag under this plus one symbol's fetch.
+_INSIDER_BATCH_MAX_SECONDS = 300.0
+
 #: An empty answer is not believed while we hold a filing dated this recently.
 #:
 #: Clearing deletes data, so it has to survive a vendor that answers `[]` when
@@ -3796,7 +3934,9 @@ class EmptyAnswerContradictedError(EdgarUnavailableError):
     """
 
 
-async def _clear_smart_money_reading(symbol: str) -> tuple[bool, bool]:
+async def _clear_smart_money_reading(
+    symbol: str, *, by_rule: bool = False,
+) -> tuple[bool, bool]:
     """Retire a symbol's smart-money reading: SEC EDGAR holds no Form 4 filings
     for it in the window (or lists no filer for the ticker at all).
 
@@ -3832,6 +3972,15 @@ async def _clear_smart_money_reading(symbol: str) -> tuple[bool, bool]:
     and on such a row nothing corrects it until the sheet next changes. If every
     attempt misses, the Form 4 rows still go and the mark still lands, so the
     row's owner writes None on its next write.
+
+    `by_rule` is an empty answer decided from what we store, not by SEC: the
+    symbol is not its issuer's common stock (`edgar_form4`, point 5), so SEC
+    was never asked and there is no vendor answer for a stored filing to
+    contradict. The guard below is skipped for it. Without that, a listing that
+    held rows under the old attribution would have its correct empty answer
+    "contradicted" by exactly the rows it must lose, counted as a failure
+    forever: measured 2026-09-19, USO (an ETF, so not common stock) held 21
+    Form 4 rows fetched after _SMART_MONEY_REREAD_BEFORE, newest 2026-09-16.
 
     Raises EdgarUnavailableError, changing nothing, when a stored filing
     contradicts the empty answer; see `_INSIDER_EMPTY_CONTRADICTED_WITHIN`. Only
@@ -3884,7 +4033,7 @@ async def _clear_smart_money_reading(symbol: str) -> tuple[bool, bool]:
             .where(InsiderTransaction.symbol == sym, InsiderTransaction.source == "edgar")
         )).one()
         recent = (date.today() - _INSIDER_EMPTY_CONTRADICTED_WITHIN).isoformat()
-        if newest is not None and newest >= recent:
+        if not by_rule and newest is not None and newest >= recent:
             raise EmptyAnswerContradictedError(
                 "submissions",
                 f"empty answer contradicts a stored filing dated {newest}",
@@ -3927,6 +4076,109 @@ async def _clear_smart_money_reading(symbol: str) -> tuple[bool, bool]:
     return cleared, bool(edgar_rows)
 
 
+async def _clear_non_common_fundamentals() -> int:
+    """Retire the fundamentals reading on every listing that is not common stock.
+
+    A note, preferred, warrant, right or unit stored as a stock was scored on
+    its ISSUER's financials, because that is what the vendor answers for the
+    symbol. Measured read-only on production 2026-09-18: 99 of the 120 flagged
+    rows held one (GREEL, a Greenidge senior note, 60.2), and 66 reasons cited
+    it. The tick writes NULL for these rows on every tick from now on (see
+    `no_fundamentals` in tick()), but only for rows it snapshots; this clears
+    every flagged row still holding a value, once, wherever it sits.
+
+    Same shape as `_clear_smart_money_reading`: per row, a compare-and-set on
+    all six factors with the composite and label recomputed from the five that
+    remain, and updated_at held still. One difference: the reason is
+    re-rendered on EVERY row, sheet-owned ones included. Nothing else rewrites
+    a sheet-owned row's reason (the tick writes it only market fields, and the
+    ingest never writes one), so leaving it would keep "fundamentals among
+    this ticker's highest-scoring factors" beside a factor that is now blank.
+    confidence_pct is still left to the sheet on its rows: there it is a
+    conviction grade, not factor coverage. A row whose other
+    factors changed in between is re-read and tried again; one that loses
+    every attempt is left to its owner, which now writes NULL for it anyway.
+
+    A row that held only one other factor has no composite once this is gone
+    (MIN_FACTORS_FOR_COMPOSITE), so its score and label become None. That is
+    the correct reading, not a loss: its score rested on the issuer's figures.
+    """
+    sheet_owned = _sheet_governed_symbols if _sheet_is_scoring_source() else frozenset()
+    async with session_scope() as session:
+        symbols = (await session.execute(
+            select(Ticker.symbol).where(
+                Ticker.is_non_common.is_(True),
+                Ticker.sub_fundamentals.is_not(None),
+            )
+        )).scalars().all()
+
+    cleared = 0
+    for sym in symbols:
+        written = (
+            {"sub_fundamentals", "score", "signal", "reason"} if sym in sheet_owned
+            else {"sub_fundamentals", "score", "signal", "reason", "confidence_pct"}
+        )
+        try:
+            async with session_scope() as session:
+                for _attempt in range(_FACTOR_SAVE_ATTEMPTS):
+                    row = (await session.execute(
+                        select(
+                            Ticker.sector, Ticker.price,
+                            *(getattr(Ticker, col) for col in FACTOR_COLUMNS),
+                        ).where(Ticker.symbol == sym, Ticker.is_non_common.is_(True))
+                    )).one_or_none()
+                    if row is None or row.sub_fundamentals is None:
+                        break
+                    factors = {col: getattr(row, col) for col in FACTOR_COLUMNS}
+                    values = _merged_factor_set(
+                        {"symbol": sym, "sector": row.sector, "price": row.price},
+                        factors, cleared=_FUNDAMENTALS_ONLY,
+                    )
+                    result = await session.execute(
+                        update(Ticker)
+                        .where(
+                            Ticker.symbol == sym,
+                            *(
+                                getattr(Ticker, c).is_not_distinct_from(v)
+                                for c, v in factors.items()
+                            ),
+                        )
+                        .values({
+                            **{k: values[k] for k in written},
+                            "updated_at": Ticker.updated_at,
+                        })
+                        .execution_options(synchronize_session=False)
+                    )
+                    if result.rowcount == 1:  # type: ignore[attr-defined]
+                        cleared += 1
+                        break
+                else:
+                    logger.warning(
+                        "fundamentals.non_common_clear_contended symbol=%s", sym,
+                    )
+        except Exception:
+            logger.exception("fundamentals.non_common_clear_failed symbol=%s", sym)
+    if symbols:
+        logger.info(
+            "fundamentals.non_common_cleared rows=%d of=%d", cleared, len(symbols),
+        )
+    return cleared
+
+
+async def _settle_non_common() -> None:
+    """Reconcile the non-common flag against the whole universe, then retire
+    the fundamentals reading on every row it flags. Never raises.
+
+    The reconcile also tells this process's fundamentals cache which symbols
+    take no reading (finnhub_feed._NO_FUNDAMENTALS), so it must run before the
+    boot warm. See services/non_common.py."""
+    await reconcile_non_common_flags()
+    try:
+        await _clear_non_common_fundamentals()
+    except Exception:
+        logger.exception("fundamentals.non_common_clear_pass_failed")
+
+
 async def _refresh_insider_cache(
     limit: int | None = None, *, deadline: float | None = None,
 ) -> bool:
@@ -3950,7 +4202,7 @@ async def _refresh_insider_cache(
     from app.services.universe import ACTIVE_UNIVERSE_SIZE
     INSIDER_CAP = ACTIVE_UNIVERSE_SIZE if limit is None else limit
 
-    from app.services.edgar_form4 import fetch_insider_transactions
+    from app.services.edgar_form4 import Listing, fetch_insider_transactions
     from app.services.finnhub_feed import (
         compute_smart_money_score,
         insider_feed_size_db,
@@ -3963,6 +4215,21 @@ async def _refresh_insider_cache(
     symbols = await _select_factor_symbols(
         Ticker.last_smart_money_at, INSIDER_CAP,
     )
+    # What each symbol IS decides whether it carries its issuer's Form 4 lines
+    # (edgar_form4, point 5): its name and class, plus the universe for the
+    # fifth-letter unit/right/warrant rules. Read once per pass; the fetch would
+    # otherwise read the tickers table once per symbol.
+    listings: dict[str, Listing] = {}
+    if symbols:
+        async with session_scope() as session:
+            facts = (await session.execute(
+                select(Ticker.symbol, Ticker.name, Ticker.asset_class)
+            )).all()
+        universe = frozenset(r.symbol for r in facts)
+        listings = {
+            r.symbol: Listing(name=r.name, asset_class=r.asset_class, universe=universe)
+            for r in facts
+        }
 
     logger.info("insider.refresh_started count=%d", len(symbols))
     refreshed = 0
@@ -3977,6 +4244,8 @@ async def _refresh_insider_cache(
     pending: list[str] = []
     # This batch's readings, written onto their rows as the batch is stamped.
     readings: dict[str, float] = {}
+    # When the batch's first symbol was answered; see _INSIDER_BATCH_MAX_SECONDS.
+    batch_started = 0.0
     i = 0
     while i < len(symbols):
         if deadline is not None and monotonic() >= deadline:
@@ -3986,9 +4255,13 @@ async def _refresh_insider_cache(
             )
             break
         sym = symbols[i]
+        # A symbol with no row left (deleted mid-pass) has no stored facts: not
+        # known to be common stock, so it is answered by rule like a preferred.
+        listing = listings.get(sym) or Listing(name=None, asset_class=None)
         try:
             txns = await fetch_insider_transactions(
                 sym, days_back=_INSIDER_WINDOW_DAYS, raise_failures=True,
+                listing=listing,
             )
             if txns:
                 score = compute_smart_money_score(txns)
@@ -4001,10 +4274,15 @@ async def _refresh_insider_cache(
                 refreshed += 1
             elif txns is not None:
                 # [] is EDGAR answering "no Form 4 filings in 90 days" (or no
-                # filer for this ticker). Failures raise above.
-                held, had_filings = await _clear_smart_money_reading(sym)
+                # filer for this ticker), or - for a listing that is not common
+                # stock - the rule answering without asking EDGAR. Failures
+                # raise above.
+                by_rule = not listing.is_common_stock(sym)
+                held, had_filings = await _clear_smart_money_reading(sym, by_rule=by_rule)
                 cleared += held
-                cleared_with_filings += held and had_filings
+                # Only EDGAR's own empty answers are evidence of a vendor
+                # fault; a rule-decided clear is not (see _insider_clear_surge).
+                cleared_with_filings += held and had_filings and not by_rule
         except VendorThrottledError as exc:
             # Same rule as the fundamentals pass: a throttle is not an answer.
             throttled_in_a_row += 1
@@ -4042,6 +4320,8 @@ async def _refresh_insider_cache(
         # Stamped on ATTEMPT - a company with no Form 4 filings in the last 90
         # days is a real answer, not an outstanding request - and written onto
         # the row when there was a reading (see _save_factor_readings).
+        if not pending:
+            batch_started = monotonic()
         pending.append(sym)
         attempted += 1
         i += 1
@@ -4066,7 +4346,10 @@ async def _refresh_insider_cache(
             break
         if _INSIDER_PACE_SECONDS:
             await asyncio.sleep(_INSIDER_PACE_SECONDS)
-        if len(pending) >= _FACTOR_STAMP_BATCH:
+        if (
+            len(pending) >= _FACTOR_STAMP_BATCH
+            or monotonic() - batch_started >= _INSIDER_BATCH_MAX_SECONDS
+        ):
             await _flush_insider_attempts(pending, readings)
             pending, readings = [], {}
     await _flush_insider_attempts(pending, readings)
@@ -4196,6 +4479,15 @@ async def _backfill_sectors(cap: int = 2500) -> None:
                         values["is_leveraged"] = is_leveraged_fund(
                             name, asset_class,
                         )
+                        # Same moment for notes, preferreds and warrants: a
+                        # placeholder "GREEL" says nothing, its real name
+                        # does. Only ever RAISED here, never cleared: this
+                        # pass cannot see the universe, so it cannot tell
+                        # whether a fifth-letter rule set the flag. The
+                        # reconcile at the end of the pass settles the rest.
+                        # See services/non_common.py.
+                        if non_common_on_write(sym, name, asset_class, False):
+                            values["is_non_common"] = True
                     # A name or sector is reference data, not a refresh of
                     # the row's live numbers: hold updated_at still. See the
                     # comment on Ticker.updated_at.
@@ -4246,6 +4538,9 @@ async def _backfill_sectors(cap: int = 2500) -> None:
 
     logger.info("sector_backfill.done backfilled=%d candidates=%d cap=%d",
                 backfilled, len(rows), cap)
+    # Names this pass repaired can change the non-common flag either way;
+    # settle it against the whole universe. See services/non_common.py.
+    await _settle_non_common()
 
 
 _MARKET_CAP_BACKFILL_BATCH = 20
@@ -4532,6 +4827,9 @@ async def _refresh_universe() -> None:
     inserts: list[dict[str, object]] = []
     edits: list[dict[str, object]] = []
     added = renamed = retyped = 0
+    # Everything stored plus everything discovered: the non-common flag's
+    # fifth-letter rules need it (PTACU is a unit because PTAC is listed).
+    universe = frozenset(existing) | frozenset(r["symbol"] for r in new_rows)
     for row in new_rows:
         sym = row["symbol"]
         if sym not in existing:
@@ -4543,6 +4841,11 @@ async def _refresh_universe() -> None:
                 **row,
                 "is_leveraged": is_leveraged_fund(
                     row.get("name"), row.get("asset_class"),
+                ),
+                # Same reason: discovery writes every field this depends on,
+                # and is the one writer that can see the whole universe.
+                "is_non_common": is_non_common_equity(
+                    sym, row.get("name"), row.get("asset_class"), universe,
                 ),
             })
             added += 1
@@ -4587,6 +4890,14 @@ async def _refresh_universe() -> None:
             updates["is_leveraged"] = is_leveraged_fund(
                 updates.get("name", stored_name),
                 updates.get("asset_class", stored_class),
+            )
+            # And the non-common flag, for the mirror-image case: a row
+            # reclassified etf -> equity, or a placeholder given its real name.
+            updates["is_non_common"] = is_non_common_equity(
+                sym,
+                updates.get("name", stored_name),
+                updates.get("asset_class", stored_class),
+                universe,
             )
             edits.append({"symbol": sym, **updates})
 
@@ -4655,6 +4966,10 @@ async def _refresh_universe() -> None:
         "universe.write_detail planned_inserts=%d applied=%d planned_edits=%d applied=%d",
         added, applied_i, len(edits), applied_e,
     )
+    # Rows this pass did not touch can still change: a new listing is the
+    # four-letter base that makes an existing fifth-letter symbol a unit,
+    # right or warrant. See services/non_common.py.
+    await _settle_non_common()
 
 
 async def _seed_calendar() -> None:
@@ -4798,6 +5113,13 @@ async def main() -> None:
 
     # Seed universe on first boot (idempotent)
     await seed_universe()
+
+    # Settle the non-common flag against the whole universe before the first
+    # tick: writers that cannot see the universe only ever raise it. Never
+    # raises. BEFORE the warm below: it tells the fundamentals cache which
+    # listings take no reading and clears the issuer's value off their rows,
+    # so the warm cannot put it back. See services/non_common.py.
+    await _settle_non_common()
 
     # Restore the two Finnhub factor caches from the DB BEFORE the first tick.
     #

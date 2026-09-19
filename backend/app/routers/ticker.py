@@ -35,6 +35,7 @@ from app.services.finnhub_feed import (
 )
 from app.services.news_feed import fetch_news_for_ticker
 from app.services.percentile import peer_percentiles
+from app.services.quote_time import iso_utc
 from app.services.symbols import clean_symbol
 from app.services.tier import Tier, has_feature
 
@@ -349,8 +350,9 @@ _INSIDER_COUNT_WINDOW_DAYS = 90
 
 # Rows the Insider tab returns. The 90-day window of a heavy filer is far longer
 # than first measured: CRWV held 938 lines, DELL 808 and UTHR 731 on 2026-09-17.
-# Above the cap the response says so (`truncated`, `total`) rather than
-# silently showing a prefix.
+# Above the cap the response says so (`truncated`) rather than silently
+# showing a prefix. There is no `total`: counting a heavy filer's whole window
+# to report a number the tab does not show is not worth the query.
 _INSIDER_TAB_ROW_CAP = 2000
 
 
@@ -903,6 +905,11 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         # anonymous callers (not metered here, nothing to prove).
         "lookup_receipt": receipt_payload,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+        # The vendor's own time for `price` — see Ticker.quote_at. Null means
+        # no vendor time; the page states the plan's delay instead, never
+        # updated_at (our write time) dressed as a quote time.
+        "quote_at": iso_utc(t.quote_at),
+        "quote_timeframe": t.quote_timeframe,
     }
 
 

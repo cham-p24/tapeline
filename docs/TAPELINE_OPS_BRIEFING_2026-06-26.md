@@ -1,5 +1,14 @@
 # Tapeline — Operations Briefing
 
+> **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
+>
+> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 60 seconds (gaps of 59.99 to 60.02 seconds measured on 14 September 2026 after #843; longer around a deploy), and most score inputs are daily, so a score usually changes about once a day. The scanner and the other auto-refreshing in-app pages reload about once per pass during the US session (04:00 to 20:00 ET on trading days), and public pages are cached snapshots that can be an hour or more old. It is not real-time, not sub-60s and not "every minute".
+> - **Coverage.** About 11,500 US stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs updated once a day. 2,500 was a snapshot setting, fixed by #763/#765 and corrected in copy by #826.
+> <!-- copy-compliance-allow record-never-edited -- this dated note names the false phrasings in order to retire them -->
+> - **The record.** Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026. "Never edited", "unedited", "append-only" and "immutable" are false.
+>
+> Measurements, times and approved wording: `docs/COPY_FACTS.md`.
+
 **Date:** 26 June 2026
 **For:** Tapeline Operations
 **About:** Where the business stands, the one decision we need to make, and exactly what to do next.
@@ -27,7 +36,7 @@ So the first goal isn't "grow 10x." From zero, 10x is still zero. The first goal
 
 **What's done and working:**
 - The full website and app are live at tapeline.io.
-- The scoring engine is real and running — it scores about 2,500 stocks and updates every minute.
+- The scoring engine is real and running. *(Corrected 18 September 2026: this line used to say it scores about 2,500 stocks and "updates every minute". It covers about 11,500 US stocks and ETFs on prices delayed about 15 minutes, re-read about every 60 seconds; see the note at the top.)*
 - Payments are fully set up (Stripe). We can take money the moment someone subscribes. There's even built-in machinery to win back people who try to cancel.
 - ~~We have a free 30-day trial (no credit card needed).~~ **No longer true — never reuse this sentence.** Signup grants no trial at all (#536), and since 2026-08-22 a new account must put a card on file at `/app/start` before it can use the logged-in product: 30-day Premium trial, $0 charged that day, first charge on day 30, one click to cancel (#548). Accounts created before 2026-08-22 are grandfathered. What is still card-free: the public record — scorecard, daily picks, per-ticker pages, the CSV/JSON exports and the public API need no account and no card.
 - There are roughly 4,750 web pages built for Google to find us, plus finished launch posts for ten different channels.
@@ -44,7 +53,7 @@ So the first goal isn't "grow 10x." From zero, 10x is still zero. The first goal
 
 ## The one big decision we need to make
 
-Our main selling point is honesty. ~~*"We're the only scanner that publishes its formula and shows its real track record — wins and losses, never edited."*~~ **Do not paste that line** — "publishes its formula" is false: PR #342 withdrew the weights and the scoring equation from the public site, which names the six factors and their weight ordering only. The defensible version: *"We name all six factors behind the score and publish their weight ordering, and we show the real track record — wins and losses, never edited."* It's a great, genuine difference.
+Our main selling point is honesty. ~~*"We're the only scanner that publishes its formula and shows its real track record — wins and losses, never edited."*~~ **Do not paste that line** — "publishes its formula" is false: PR #342 withdrew the weights and the scoring equation from the public site, which names the six factors and their weight ordering only. The defensible version: *"We name all six factors behind the score and publish their weight ordering, and we show the real track record — wins and losses, with every correction dated."* *(15 September 2026: the last clause of this version used to say the record was never changed, which is false; see the note at the top and `docs/COPY_FACTS.md`.)* It's a great, genuine difference.
 
 **The catch:** right now that public track record is slightly *behind* the market. So if we shout "look at our record," a sharp trader will look and be unimpressed.
 

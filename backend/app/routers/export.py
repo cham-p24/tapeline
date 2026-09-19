@@ -31,6 +31,7 @@ from app.db import get_session, is_sqlite
 from app.models import Ticker, User, WatchlistItem
 from app.routers.scanner import (
     SCANNER_INCLUDE_LEVERAGED_DEFAULT,
+    SCANNER_INCLUDE_NON_COMMON_DEFAULT,
     SCANNER_MIN_DOLLAR_VOLUME,
     SCANNER_QUERY_TIMEOUT_MS,
 )
@@ -56,8 +57,10 @@ _SCANNER_HEADERS = [
     # thing: a structural fact about the instrument. It matters most in the
     # export a caller asked for WITH include_leveraged=true — without the
     # column that CSV would mix geared and ordinary funds with nothing to
-    # separate them.
-    "symbol", "name", "sector", "asset_class", "is_leveraged", "score", "signal", "price",
+    # separate them. is_non_common is the same kind of fact, for the export
+    # asked for WITH include_non_common=true.
+    "symbol", "name", "sector", "asset_class", "is_leveraged", "is_non_common",
+    "score", "signal", "price",
     "change_pct_1d", "change_pct_5d", "change_pct_1m", "volume",
     "confidence_pct", "sub_trend", "sub_rs", "sub_fundamentals",
     "sub_momentum", "sub_macro", "sub_smart_money", "reason", "updated_at",
@@ -133,6 +136,9 @@ async def export_scanner_csv(
     # again: filter the on-screen scanner to exclude geared funds, click
     # Export, and download a CSV that silently contains them.
     include_leveraged: bool = Query(SCANNER_INCLUDE_LEVERAGED_DEFAULT),
+    # Mirrors /api/scanner for the same reason. See
+    # SCANNER_INCLUDE_NON_COMMON_DEFAULT in routers/scanner.py.
+    include_non_common: bool = Query(SCANNER_INCLUDE_NON_COMMON_DEFAULT),
     q: str | None = Query(None, max_length=20),
     sort: str = Query("score", pattern="^(score|change_pct_1d|change_pct_5d|change_pct_1m|volume|symbol)$"),
     order: str = Query("desc", pattern="^(asc|desc)$"),
@@ -162,6 +168,8 @@ async def export_scanner_csv(
     # SCANNER_INCLUDE_LEVERAGED_DEFAULT in routers/scanner.py.
     if not include_leveraged:
         stmt = stmt.where(Ticker.is_leveraged.is_(False))
+    if not include_non_common:
+        stmt = stmt.where(Ticker.is_non_common.is_(False))
     if signal:
         stmt = stmt.where(Ticker.signal == signal)
     if sector:
@@ -206,7 +214,8 @@ async def export_scanner_csv(
 
     csv_rows: list[list[object]] = [
         [
-            r.symbol, r.name, r.sector, r.asset_class, r.is_leveraged, r.score, r.signal,
+            r.symbol, r.name, r.sector, r.asset_class, r.is_leveraged, r.is_non_common,
+            r.score, r.signal,
             r.price, r.change_pct_1d, r.change_pct_5d, r.change_pct_1m,
             r.volume, r.confidence_pct, r.sub_trend, r.sub_rs,
             r.sub_fundamentals, r.sub_momentum, r.sub_macro,

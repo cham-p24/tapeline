@@ -24,9 +24,12 @@
  * equity, the newest open-market buy in production was still 31 August 2026.
  * The vendor, not the pipeline: on 14 September 2026 Finnhub's newest Form 4
  * filing for AAPL, NVDA and META was 27 Aug, 6 Jul and 12 Aug, against 10, 11
- * and 11 Sep on SEC EDGAR — 14, 67 and 30 days behind. "A vendor that CAN run
- * behind EDGAR" understated that, so every surface that states the cadence
- * must also say the vendor's filings can run WEEKS behind.
+ * and 11 Sep on SEC EDGAR - 14, 67 and 30 days behind. For a day the copy said
+ * so (#827). Then #835/#837 moved the source to SEC EDGAR itself, and by 21:48
+ * UTC that day 53,317 Form 4 rows came from EDGAR against 95 vendor-era rows on
+ * 6 tickers. So every surface that states the cadence now names SEC EDGAR as
+ * the source, and any PRESENT-tense "data vendor ... behind EDGAR" is false: the
+ * vendor lag may only appear as dated history ("Until 14 September 2026 ...").
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -71,13 +74,48 @@ const STALE_CLAIMS = [
   // True once, and vaguer than the code now is (#817's pre-#822 wording).
   /once-a-day refresh/i,
   /not every stock is re-checked every day/i,
-  // Understates a measured 14-67 day vendor lag.
+  // Understated a measured 14-67 day vendor lag (#827 replaced it).
   /vendor (that |itself )?can run behind SEC EDGAR/i,
+  // #827's own wording, false in the present tense since #835/#837.
+  /can run weeks behind/i,
+  /runs behind SEC EDGAR/i,
+  /through a data vendor whose filings/i,
+  /with (a|our) data vendor/i,
+  /from its data vendor/i,
+  /via our data vendor/i,
+  /our data vendor's filings/i,
 ];
 
 const TWO_DAYS = /about every two days/i;
 const MONTHLY = /about monthly/i;
-const WEEKS_BEHIND = /filings can run weeks behind SEC EDGAR/;
+/**
+ * The source every cadence statement must name since #835/#837. A bare "on SEC
+ * EDGAR" is not enough ("filings appear on SEC EDGAR" names no source of OURS):
+ * it has to be what Tapeline re-checks.
+ */
+const FROM_EDGAR = /(read from|read directly from|straight from) SEC EDGAR|re-check(s|ing|ed)? each stock('s Form 4 filings)? on SEC EDGAR/;
+
+/** Past-tense vendor history, the only form the vendor may still appear in. */
+const DATED_VENDOR_HISTORY = /Until 14 September 2026[^.]*\./g;
+
+/** No PRESENT-tense vendor claim once the dated history is taken out. */
+function expectNoPresentVendor(text: string) {
+  const present = text.replace(DATED_VENDOR_HISTORY, "");
+  expect(present).not.toMatch(/\bvendor\b|Finnhub|data provider/i);
+}
+
+/** The FAQPage JSON-LD answer whose question matches `question`. */
+function faqAnswer(container: HTMLElement, question: RegExp): string {
+  const faq = Array.from(container.querySelectorAll('script[type="application/ld+json"]'))
+    .map((s) => JSON.parse(s.innerHTML) as Record<string, unknown>)
+    .find((g) => g["@type"] === "FAQPage") as
+    | { mainEntity: { name: string; acceptedAnswer: { text: string } }[] }
+    | undefined;
+  expect(faq, "no FAQPage JSON-LD on the page").toBeDefined();
+  const entry = faq!.mainEntity.find((e) => question.test(e.name));
+  expect(entry, `no FAQ entry matching ${question}`).toBeDefined();
+  return entry!.acceptedAnswer.text;
+}
 
 // ── The numbers the copy quotes, read from the backend ──────────────────────
 
@@ -166,16 +204,16 @@ describe("/app/holdings", () => {
 
     const header = screen.getByText(/officers, directors and 10%\+ owners/);
     expect(header.textContent).toMatch(TWO_DAYS);
-    expect(header.textContent).toMatch(WEEKS_BEHIND);
+    expect(header.textContent).toMatch(FROM_EDGAR);
     expect(header.textContent).not.toMatch(/live data/i);
 
-    const filterBar = screen.getByText(/tracked · /);
+    const filterBar = screen.getByText(/tracked transactions · /);
     expect(filterBar.textContent).toMatch(TWO_DAYS);
 
     const note = screen.getByText(/Source: SEC Form 4 filings/);
     expect(note.textContent).toMatch(TWO_DAYS);
     expect(note.textContent).toMatch(MONTHLY);
-    expect(note.textContent).toMatch(WEEKS_BEHIND);
+    expect(note.textContent).toMatch(FROM_EDGAR);
 
     expectNoStaleClaim(container.textContent ?? "");
   });
@@ -188,7 +226,7 @@ describe("/roadmap shipped item", () => {
     const { container } = render(<RoadmapPage />);
     const item = screen.getByText(/SEC Form 4 transactions \(officers/);
     expect(item.textContent).toMatch(TWO_DAYS);
-    expect(item.textContent).toMatch(WEEKS_BEHIND);
+    expect(item.textContent).toMatch(FROM_EDGAR);
     expectNoStaleClaim(container.textContent ?? "");
   });
 });
@@ -196,10 +234,10 @@ describe("/roadmap shipped item", () => {
 describe("/data-sources SEC filings cadence", () => {
   it("states the Form 4 cadence, not 'Form 4 daily'", () => {
     const { container } = render(<DataSourcesPage />);
-    const cadence = screen.getByText(/^Form 4 re-checked/);
+    const cadence = screen.getByText(/^Form 4 read from SEC EDGAR, re-checked/);
     expect(cadence.textContent).toMatch(TWO_DAYS);
     expect(cadence.textContent).toMatch(MONTHLY);
-    expect(cadence.textContent).toMatch(WEEKS_BEHIND);
+    expect(cadence.textContent).toMatch(FROM_EDGAR);
     // The 8-K half of the same sentence is untouched.
     expect(cadence.textContent).toContain("8-Ks every 5 minutes.");
     expectNoStaleClaim(container.textContent ?? "");
@@ -262,7 +300,7 @@ describe("/t/[symbol] FAQ", () => {
     expect(answer).toBeDefined();
     expect(answer!.acceptedAnswer.text).toMatch(TWO_DAYS);
     expect(answer!.acceptedAnswer.text).toMatch(MONTHLY);
-    expect(answer!.acceptedAnswer.text).toMatch(WEEKS_BEHIND);
+    expect(answer!.acceptedAnswer.text).toMatch(FROM_EDGAR);
 
     // The visible FAQ mirrors the schema.
     expect(container.textContent).toContain(answer!.acceptedAnswer.text);
@@ -276,7 +314,7 @@ describe("/insider-buying, /how-it-works and the Smart Money factor", () => {
     (useUser as ReturnType<typeof vi.fn>).mockReturnValue({ user: null, loading: false });
   });
 
-  it("/insider-buying states the cadence, the lag, and the measurement behind it", async () => {
+  it("/insider-buying states the cadence, the source, and the dated vendor history", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -295,29 +333,88 @@ describe("/insider-buying, /how-it-works and the Smart Money factor", () => {
     const text = container.textContent ?? "";
 
     const methodology = screen.getByText(/re-checking each stock about/);
-    expect(methodology.textContent).toMatch(TWO_DAYS);
-    expect(methodology.textContent).toMatch(WEEKS_BEHIND);
-    expect(methodology.textContent).toMatch(/not a real-time or complete record/);
+    const how = methodology.textContent ?? "";
+    expect(how).toMatch(TWO_DAYS);
+    expect(how).toMatch(FROM_EDGAR);
+    // A filing reaches our DATA in two to three days; this page shows ten rows,
+    // so most filings never reach the page at all.
+    expect(how).toMatch(/a new filing usually reaches our\s+data within two to three days of appearing on EDGAR/);
+    expect(how).toMatch(/shows only the ten purchases with the newest trade dates/);
+    expect(how).not.toMatch(/reach(es)? this list/);
+    expect(how).toMatch(/non-derivative/);
+    expect(how).toMatch(/replaces the original filing it restates/);
+    expect(how).toMatch(/not a\s+complete record of insider trading/);
+    expectNoPresentVendor(how);
 
-    // The freshness FAQ carries the dated measurement, visibly and in JSON-LD.
-    const measured = /14 September 2026, its newest Form 4 filing for Apple, NVIDIA and Meta was 14, 67 and 30 days older than the newest one on EDGAR/;
-    expect(text).toMatch(TWO_DAYS);
-    expect(text).toMatch(measured);
-    expect(container.innerHTML.match(new RegExp(measured.source, "g"))?.length).toBeGreaterThanOrEqual(2);
+    // Nothing on the page says the filing date is not STORED: the filings have
+    // one, the rows this page reads do not carry it.
+    expect(text).not.toMatch(/do not store the filing date/i);
+    expect(text).toMatch(/do not carry the filing date/);
+
+    // The freshness FAQ keeps the vendor measurement as DATED history and states
+    // how long EDGAR filings take to arrive now - in the JSON-LD answer itself,
+    // and the visible FAQ says the same.
+    const measured = /Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR: that day its newest Form 4 filing for Apple, NVIDIA and Meta was 14, 67 and 30 days older than the newest one on EDGAR/;
+    const answer = faqAnswer(container, /How often does the list update/);
+    expect(answer).toMatch(TWO_DAYS);
+    expect(answer).toMatch(FROM_EDGAR);
+    expect(answer).toMatch(/usually reaches our data within two to three days of appearing on EDGAR; this page shows only the ten purchases with the newest trade dates/);
+    expect(answer).toMatch(measured);
+    expectNoPresentVendor(answer);
+    expect(text).toContain(answer);
     expectNoStaleClaim(container.innerHTML);
   });
 
-  it("/how-it-works FAQ states the cadence and the lag", () => {
+  it("/how-it-works FAQ states the cadence and the source", () => {
     const { container } = render(<HowItWorksPage />);
-    expect(container.innerHTML).toMatch(/re-checked with a data vendor about every two days per stock/);
-    expect(container.innerHTML).toMatch(WEEKS_BEHIND);
+    expect(container.innerHTML).toMatch(/read from SEC EDGAR and re-checked about every two days per stock/);
+    expect(container.innerHTML).toMatch(FROM_EDGAR);
     expectNoStaleClaim(container.innerHTML);
   });
 
-  it("the Smart Money factor copy states the cadence and the lag", () => {
-    const copy = JSON.stringify(FACTORS.find((f) => f.slug === "smart-money"));
-    expect(copy).toMatch(TWO_DAYS);
-    expect(copy).toMatch(WEEKS_BEHIND);
-    expectNoStaleClaim(copy);
+  it("the Smart Money factor copy states the cadence, the source and what is read", () => {
+    const factor = FACTORS.find((f) => f.slug === "smart-money")!;
+    // Field by field: a match in one field must not stand in for another.
+    const detail = factor.feeds[0].detail;
+    expect(detail).toMatch(TWO_DAYS);
+    expect(detail).toMatch(MONTHLY);
+    expect(detail).toMatch(FROM_EDGAR);
+    expect(detail).toMatch(/non-derivative/);
+    expect(detail).toMatch(/replaces the original filing it restates/);
+    expect(detail).toMatch(/Until 14 September 2026 these filings came through a data vendor/);
+    expectNoPresentVendor(detail);
+
+    expect(factor.caveat).toMatch(FROM_EDGAR);
+    expectNoPresentVendor(factor.caveat);
+
+    // Changelog rule 4: the factor page states the attribution rule the code
+    // applies (services/edgar_form4.py point 5, 2026-09-19): every common-stock
+    // class carries the company's filings, nothing else carries any.
+    expect(detail).toMatch(/counts for every listed common-stock class of the company that filed it, and for none of its other listed securities/);
+    expect(detail).not.toMatch(/counts only for the ticker it names/);
+    const attribution = factor.limitations.find((l) => /GOOGL/.test(l));
+    expect(attribution, "no attribution limitation on the Smart Money page").toBeDefined();
+    expect(attribution).toMatch(/A filing's transactions count for every listed common-stock class/);
+    // No start date for the current rule: it takes effect at deploy, and a
+    // hard-coded day is false the moment the merge slips past it.
+    expect(attribution).not.toMatch(/From 19 September 2026|to 19 September 2026/);
+    expect(attribution).toMatch(/GOOG carries the same reading/);
+    expect(attribution).toMatch(/preferred shares, notes, warrants, rights, units and exchange-traded notes have no reading rather than a borrowed one/);
+    // The rule is a name-and-ticker judgement, and the page says so.
+    expect(attribution).toMatch(/judged from its name and ticker/);
+    // Both earlier rules stay stated, dated, as history.
+    expect(attribution).toMatch(/From 17 September 2026 until this rule replaced it, a filing counted only for the ticker it named/);
+    expect(attribution).toMatch(/Before 17 September every ticker of the issuer received all of them/);
+    // A ticker moves to the rule at its next re-check, so the page cannot
+    // imply the change is instant everywhere.
+    expect(attribution).toMatch(/at its next re-check/);
+    const unavailable = factor.computed.find((c) => /no reading at all/.test(c));
+    expect(unavailable).toMatch(/for which we hold no disclosed filings/);
+    const faq = factor.faq.find((f) => /no.*filings/i.test(f.q))!;
+    expect(faq.a).toMatch(/No filings on file for that ticker/);
+    expect(faq.a).toMatch(/each carries the company's filings/);
+    expect(faq.a).not.toMatch(/the one the filer names/);
+
+    expectNoStaleClaim(JSON.stringify(factor));
   });
 });

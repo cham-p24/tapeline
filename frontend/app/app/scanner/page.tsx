@@ -18,7 +18,7 @@ import {
   openAccessJustEnded,
 } from "@/lib/pricing";
 import { SECTOR_SLUG_TO_CANONICAL, TodaysTape } from "@/components/TodaysTape";
-import { IN_APP_REFRESH_SENTENCE, PASS_CADENCE_PHRASE, priceDelayNote } from "@/lib/freshness";
+import { CRYPTO_CADENCE_PHRASE, IN_APP_REFRESH_SENTENCE, PASS_CADENCE_PHRASE, priceDelayNote } from "@/lib/freshness";
 import { useLiveStream } from "@/lib/useLiveStream";
 import { LiveBadge } from "@/components/LiveBadge";
 import { HoverCard } from "@/components/HoverCard";
@@ -62,6 +62,9 @@ type ScannerFilters = {
   // saved before this filter existed simply lacks the key and falls through
   // to that default, which is what it was showing when it was saved.
   includeLeveraged?: boolean;
+  // Notes, preferreds, warrants, rights and units: excluded server-side by
+  // default in the same way, and absent from presets saved before it existed.
+  includeNonCommon?: boolean;
   search: string;
 };
 
@@ -189,6 +192,10 @@ export default function ScannerPage() {
   // default (backend SCANNER_INCLUDE_LEVERAGED_DEFAULT) — the param is only
   // ever sent when the user has ticked it on, so the two cannot drift.
   const [includeLeveraged, setIncludeLeveraged] = useState(false);
+  // Notes, preferreds, warrants, rights and units. Same arrangement: defaults
+  // to false to match the server (SCANNER_INCLUDE_NON_COMMON_DEFAULT), and the
+  // param is only sent when ticked on.
+  const [includeNonCommon, setIncludeNonCommon] = useState(false);
   const [loading, setLoading] = useState(true);
   // Distinct from the warming-up/empty state: true only when the last load()
   // actually threw (network/500). Without this, a failed fetch fell through to
@@ -293,6 +300,7 @@ export default function ScannerPage() {
     if (typeof f.signal === "string") setSignal(f.signal);
     if (typeof f.assetClass === "string") setAssetClass(f.assetClass as AssetBucket);
     if (typeof f.includeLeveraged === "boolean") setIncludeLeveraged(f.includeLeveraged);
+    if (typeof f.includeNonCommon === "boolean") setIncludeNonCommon(f.includeNonCommon);
     if (typeof f.search === "string") setSearch(f.search);
   }, [changeSector]);
 
@@ -359,6 +367,8 @@ export default function ScannerPage() {
       // the default lives in exactly one place (the backend) rather than
       // being restated here where it could drift.
       if (includeLeveraged) params.include_leveraged = "true";
+      // Same rule: only when ticked on, so the default lives in the backend.
+      if (includeNonCommon) params.include_non_common = "true";
       if (sector) params.sector = sector;
       if (signal) params.signal = signal;
       if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
@@ -379,7 +389,7 @@ export default function ScannerPage() {
       return true;
     } catch (e) { console.error(e); setLoadError(true); return false; }
     finally { setLoading(false); }
-  }, [minScore, maxScore, sort, order, sector, signal, assetClass, includeLeveraged, debouncedSearch, page]);
+  }, [minScore, maxScore, sort, order, sector, signal, assetClass, includeLeveraged, includeNonCommon, debouncedSearch, page]);
 
   // Any change to the filters invalidates the page number: narrowing a 3,000-row
   // result to 40 rows while sitting on page 5 would otherwise fetch offset 1000
@@ -392,7 +402,7 @@ export default function ScannerPage() {
   // requests and a visible flash of the wrong page.
   const filterKey = JSON.stringify([
     minScore, maxScore, sort, order, sector, signal, assetClass,
-    includeLeveraged, debouncedSearch,
+    includeLeveraged, includeNonCommon, debouncedSearch,
   ]);
   const [lastFilterKey, setLastFilterKey] = useState(filterKey);
   if (filterKey !== lastFilterKey) {
@@ -436,6 +446,7 @@ export default function ScannerPage() {
       // Must mirror `load` exactly. The asset_class bug was precisely this:
       // the on-screen scanner filtered one way and Export downloaded another.
       if (includeLeveraged) params.include_leveraged = "true";
+      if (includeNonCommon) params.include_non_common = "true";
       if (sector) params.sector = sector;
       if (signal) params.signal = signal;
       if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
@@ -449,7 +460,7 @@ export default function ScannerPage() {
     } finally {
       setExporting(false);
     }
-  }, [canExportCsv, minScore, maxScore, sort, order, sector, signal, assetClass, includeLeveraged, debouncedSearch]);
+  }, [canExportCsv, minScore, maxScore, sort, order, sector, signal, assetClass, includeLeveraged, includeNonCommon, debouncedSearch]);
 
   // EVERY filter is server-side now, asset class included, so what came back
   // is exactly what to show. Post-filtering here would spend the tier's row
@@ -559,6 +570,7 @@ export default function ScannerPage() {
     !!signal ||
     !!assetClass ||
     includeLeveraged ||
+    includeNonCommon ||
     !!search.trim();
 
   const resetFilters = () => {
@@ -568,6 +580,7 @@ export default function ScannerPage() {
     setSignal("");
     setAssetClass("");
     setIncludeLeveraged(false);
+    setIncludeNonCommon(false);
     setSearch("");
   };
 
@@ -724,7 +737,7 @@ export default function ScannerPage() {
               cadence is stated once, inside IN_APP_REFRESH_SENTENCE. */}
           <p className="text-xs text-subtle" data-testid="price-delay-note">
             {priceDelayNote(meta?.delayMinutes)}, re-read on each pass (see below) during US market
-            hours (crypto: once a day). {IN_APP_REFRESH_SENTENCE}
+            hours (crypto: {CRYPTO_CADENCE_PHRASE}). {IN_APP_REFRESH_SENTENCE}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -824,6 +837,17 @@ export default function ScannerPage() {
           onChange={setIncludeLeveraged}
           hint="Funds built to deliver a multiple (2x, 3x) or the opposite (inverse, short) of an index's daily move. Left out of the ranked list unless included here."
         />
+        {/*
+         * Notes, preferreds & warrants. Off by default, matching the server
+         * (SCANNER_INCLUDE_NON_COMMON_DEFAULT). Same COPY RULE as the toggle
+         * above: a fact about what the listing is, never a judgement.
+         */}
+        <ToggleFilter
+          label="Notes, preferreds & warrants"
+          checked={includeNonCommon}
+          onChange={setIncludeNonCommon}
+          hint="Listings that trade like a stock but are not a company's common shares: exchange-listed notes, preferred shares, warrants, rights and units. Left out of the ranked list unless included here."
+        />
         <SelectFilter
           label="Sort by"
           value={sort}
@@ -855,7 +879,8 @@ export default function ScannerPage() {
           currentFilters={{
             minScore: minScore === "" ? 0 : minScore,
             maxScore: maxScore === "" ? 100 : maxScore,
-            sort, order, sector, signal, assetClass, includeLeveraged, search,
+            sort, order, sector, signal, assetClass, includeLeveraged,
+            includeNonCommon, search,
           }}
           onApply={applyPreset}
         />
@@ -1064,6 +1089,17 @@ export default function ScannerPage() {
                           title="Built to deliver a multiple (2x, 3x) or the opposite (inverse, short) of an index's daily move"
                         >
                           Leveraged / inverse
+                        </span>
+                      )}
+                      {/* Same register as the chip above: it only appears
+                          when the user asked for these listings, and it
+                          states what the listing is. */}
+                      {r.is_non_common && (
+                        <span
+                          className="rounded-full border border-border px-1.5 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted"
+                          title="A note, preferred share, warrant, right or unit: listed like a stock, but not the company's common shares"
+                        >
+                          Not common stock
                         </span>
                       )}
                     </div>

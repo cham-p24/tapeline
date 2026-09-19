@@ -17,8 +17,11 @@ waiting. What matters in the tests below is not that concurrency is "faster" in
 the abstract, but that three properties survive it:
 
   - every symbol is still fetched, in batches of the documented size
-  - a failing batch still aborts the WHOLE pass, so the caller publishes
-    nothing rather than a partial universe that looks like a normal tick
+  - a failing batch costs only its own symbols: they are dropped from the
+    result (not NULL-priced), so their stored rows and updated_at stay put,
+    while the other batches publish. Only EVERY batch failing aborts the pass.
+    (Until 2026-09-19 one failure aborted the whole pass; see
+    tests/test_snapshot_batch_failure_is_isolated.py for why that changed.)
   - the fan-out stays bounded, so widening the universe again cannot turn into
     a thundering herd against the vendor
 """
@@ -130,34 +133,52 @@ async def test_the_fan_out_stays_bounded(vendor):
 
 
 @pytest.mark.asyncio
-async def test_a_failing_batch_publishes_nothing(monkeypatch):
-    """The property that must survive the rewrite.
+async def test_a_failing_batch_withholds_only_its_own_symbols(monkeypatch):
+    """Was `test_a_failing_batch_publishes_nothing`, which pinned the opposite.
 
-    A vendor outage must not be laundered into a partial universe. Half a
-    result set looks exactly like a normal tick while silently leaving the
-    missing names on yesterday's prices — worse than serving nothing, because
-    nothing is visible and self-heals.
+    Publishing nothing on one failure left ALL ~48 batches' symbols on the
+    previous minute's price to protect 250 of them. The failed batch's rows are
+    now dropped from the result, so the upsert never touches them and their
+    updated_at shows the gap per row, while the other batches publish.
     """
     calls = {"n": 0}
+    failed: list[str] = []
 
     async def _flaky(_client, _path, **kw):
         calls["n"] += 1
-        if calls["n"] == 3:
-            raise RuntimeError("vendor 503")
         syms = kw["params"]["ticker.any_of"].split(",")
+        if calls["n"] == 3:
+            failed.extend(syms)
+            raise RuntimeError("vendor 503")
         return {"results": [{"ticker": s} for s in syms]}
 
     monkeypatch.setattr(pf, "_request", _flaky, raising=True)
     monkeypatch.setattr(pf, "_api_key", lambda: "test-key", raising=True)
     monkeypatch.setattr(pf, "_is_production", lambda: True, raising=True)
+    quote = dict.fromkeys((
+        "price", "change_pct_1d", "volume", "previous_close", "day_close",
+        "day_open", "day_high", "day_low",
+    ), 1.0)
+    # Part of _to_scanner_row's contract since migration 0075.
+    quote |= {"quote_at": None, "quote_timeframe": None}
     monkeypatch.setattr(
-        pf, "_to_scanner_row", lambda t: {"symbol": t["ticker"]}, raising=True
+        pf, "_to_scanner_row", lambda t: {"symbol": t["ticker"], **quote}, raising=True
     )
 
-    rows = await pf.fetch_snapshots(symbols=_symbols(250 * 6))
-    assert rows == [], (
-        f"one failed batch still returned {len(rows)} rows — a partial "
-        f"universe was published as if the tick had succeeded"
+    universe = _symbols(250 * 6)
+    from app.services import universe as universe_mod
+
+    monkeypatch.setattr(
+        universe_mod, "active_universe", lambda: [(s, s, "Unknown") for s in universe]
+    )
+
+    rows = await pf.fetch_snapshots(macro_score=50.0)
+    published = {r["symbol"] for r in rows}
+    assert len(failed) == 250
+    assert not published & set(failed), "the failed batch's symbols were published"
+    assert published == set(universe) - set(failed), (
+        f"{len(published)} rows published; one failed batch still cost the "
+        f"other batches their prices"
     )
 
 

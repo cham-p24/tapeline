@@ -7,9 +7,12 @@ verified read-only against production before it was fixed:
    every one of them received the issuer's whole Form 4 set: 70 CIKs spread
    2,609 rows over 173 symbols. Strategy's STRC/STRF/STRK/STRD preferreds
    carried MSTR's insider sales, JPM's VYLD/AMJB ETNs carried JPM's, and notes
-   such as GREEL and TMUSZ carried their issuer's. A filing now goes to the
+   such as GREEL and TMUSZ carried their issuer's. A filing then went to the
    ticker it names in issuerTradingSymbol, or to the CIK's first-listed SEC
-   ticker when it names none SEC lists.
+   ticker when it names none SEC lists. That rule was replaced on 2026-09-19:
+   it left the other common class empty (GOOG, NWSA) and guessed on a rename.
+   A filing now goes to every COMMON-stock ticker of its CIK; see
+   tests/test_edgar_form4_common_class.py. The preferreds still get nothing.
 2. AMENDMENTS. A 4/A dropped EVERY Form 4 its owner filed that day. Magnetar
    filed three CRWV Form 4s on 2026-08-14 (trades of 12, 13 and 14 Aug); its
    4/A restated only the 14 Aug one, and the 12-13 Aug sales - 51 lines - were
@@ -42,7 +45,6 @@ from app.main import app
 from app.models import EdgarForm4Filing, InsiderTransaction, Ticker
 from app.services import finnhub_feed
 from app.services.edgar_form4 import (
-    attributed_ticker,
     fetch_insider_transactions,
     parse_form4_xml,
     superseded_accessions,
@@ -81,31 +83,16 @@ def test_the_parser_records_the_named_symbol_in_secs_spelling() -> None:
     assert parse_form4_xml(form4_xml(symbol="brk.b"))["issuer_symbol"] == "BRK-B"
 
 
-def test_attribution_rule() -> None:
-    tickers = ["MSTR", "STRC", "STRK"]
-    assert attributed_ticker({"issuer_symbol": "STRK"}, tickers) == "STRK"
-    assert attributed_ticker({"issuer_symbol": "MSTR"}, tickers) == "MSTR"
-    # Named symbol SEC does not list for the CIK (renamed, typo, blank):
-    assert attributed_ticker({"issuer_symbol": "OLDNAME"}, tickers) == "MSTR"
-    assert attributed_ticker({"issuer_symbol": ""}, tickers) == "MSTR"
-
-
 async def test_a_preferred_does_not_carry_the_common_stocks_filings(sec: FakeSec) -> None:
-    """Mutation: attribute every filing to every ticker of the CIK - STRK gets
-    MSTR's insider sale."""
+    """#862's headline case, kept through the 2026-09-19 fan-out to common
+    classes: STRK and STRC are named "Strategy Inc" exactly like MSTR, so only
+    security_type's explicit symbol list keeps them out. Mutation: drop that
+    list - STRK and STRC get MSTR's insider sale."""
     _with_strategy(sec)
     sec.add(MSTR_CIK, "0001050446-26-000001", _d(2),
             form4_xml(issuer_cik=MSTR_CIK, symbol="MSTR", lines=[(_d(3), "925", "D", "300", "S")]))
     assert [t["share_change"] for t in await fetch_insider_transactions("MSTR", raise_failures=True)] == [-925]
     assert await fetch_insider_transactions("STRK", raise_failures=True) == []
-    assert await fetch_insider_transactions("STRC", raise_failures=True) == []
-
-
-async def test_a_filing_naming_no_listed_ticker_goes_to_the_first_listed(sec: FakeSec) -> None:
-    _with_strategy(sec)
-    sec.add(MSTR_CIK, "0001050446-26-000002", _d(2),
-            form4_xml(issuer_cik=MSTR_CIK, symbol="MSTRX", lines=[(_d(3), "10", "A", "1", "P")]))
-    assert len(await fetch_insider_transactions("MSTR", raise_failures=True)) == 1
     assert await fetch_insider_transactions("STRC", raise_failures=True) == []
 
 
@@ -133,18 +120,6 @@ async def test_version_1_rows_still_serve_a_single_ticker_cik(sec: FakeSec) -> N
     rows = await fetch_insider_transactions("AAPL", raise_failures=True)
     assert [r["filer_name"] for r in rows] == ["Cached Owner"]
     assert _archive_hits(sec) == 0
-
-
-async def test_version_1_rows_are_read_again_for_a_multi_ticker_cik(sec: FakeSec) -> None:
-    """Mutation: serve version-1 rows to a multi-ticker CIK - with no issuer
-    symbol every filing falls back to the first-listed ticker, whatever it names."""
-    _with_strategy(sec)
-    sec.add(MSTR_CIK, "0001050446-26-000003", _d(2),
-            form4_xml(issuer_cik=MSTR_CIK, symbol="STRK", lines=[(_d(3), "40", "A", "1", "P")]))
-    await _seed_v1_cache("0001050446-26-000003", MSTR_CIK, _d(2), _d(3))
-    assert await fetch_insider_transactions("MSTR", raise_failures=True) == []
-    assert _archive_hits(sec) == 1
-    assert len(await fetch_insider_transactions("STRK", raise_failures=True)) == 1
 
 
 # ===========================================================================
@@ -175,22 +150,6 @@ def test_an_amendment_replaces_only_the_same_day_filing_it_restates() -> None:
         "a14": _r("MAG", ["2026-08-14"]), "amd": _r("MAG", ["2026-08-14"], original="2026-08-14"),
     }
     assert superseded_accessions(own, parsed) == {"a14"}
-
-
-def test_a_filing_naming_nothing_falls_back_to_the_first_listed_and_says_so(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """The fallback is a guess: SEC does not document common stock first, so a
-    preferred can be [0]. Mutation: stay silent - the guess leaves no trace for
-    a post-deploy grep."""
-    with caplog.at_level("WARNING"):
-        assert attributed_ticker({"issuer_symbol": ""}, ["STRK", "MSTR"]) == "STRK"
-    assert "edgar_form4.attribution_fallback" in caplog.text
-    # One ticker is not a guess, so it says nothing.
-    caplog.clear()
-    with caplog.at_level("WARNING"):
-        assert attributed_ticker({"issuer_symbol": "ODD"}, ["MSTR"]) == "MSTR"
-    assert "attribution_fallback" not in caplog.text
 
 
 def test_an_amendment_replaces_the_original_it_matches_best_not_every_overlap() -> None:
@@ -229,6 +188,29 @@ def test_a_second_amendment_of_one_original_replaces_the_first() -> None:
         "a2": _r("OWN", ["2026-08-12"], original="2026-08-14"),
     }
     assert superseded_accessions(two, parsed_two) == {"o1", "o2"}
+
+
+def test_an_amendment_replaces_every_identical_re_filing_of_its_original() -> None:
+    """A filer lodged the same Form 4 twice and then amended it: SMWB's
+    0001976408-26-000849 and -000850, both filed 2026-09-16 with the same two
+    sales, plus 4/A -000852 restating them.
+
+    Mutation: replace only the best match - the tiebreak keeps one twin, which
+    then stands beside the amendment and stores that sale twice. Since #856
+    numbered distinct lines, identical rows no longer collide on
+    uq_insider_natural, so the duplicate materialises."""
+    own = [_f("dup1", "4", "2026-09-16"), _f("dup2", "4", "2026-09-16"),
+           _f("amd", "4/A", "2026-09-16")]
+    parsed = {
+        "dup1": _r("OFFER", ["2026-09-14", "2026-09-15"]),
+        "dup2": _r("OFFER", ["2026-09-14", "2026-09-15"]),
+        "amd": _r("OFFER", ["2026-09-14", "2026-09-15"], original="2026-09-16"),
+    }
+    assert superseded_accessions(own, parsed) == {"dup1", "dup2"}
+    # A near-miss is not a twin: one line differs, so it is a real filing and
+    # the amendment leaves it alone.
+    parsed["dup2"] = _r("OFFER", ["2026-09-14", "2026-09-11"])
+    assert superseded_accessions(own, parsed) == {"dup1"}
 
 
 def test_an_amendment_finds_an_original_edgar_dated_later() -> None:

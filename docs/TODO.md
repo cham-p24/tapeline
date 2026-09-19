@@ -1,5 +1,16 @@
 # The list
 
+> **Note added 15 September 2026.** This is a dated document and is kept as written. Some of what it says is no longer true, or was never true, so do not copy product claims from it into anything a user or a platform will read. After the integrity wave the founder approved on 14 September 2026:
+>
+> - **Freshness.** Prices are delayed about 15 minutes (Massive Stocks Starter). During US market hours the worker re-reads them for every covered stock and ETF about every 60 seconds (gaps of 59.99 to 60.02 seconds measured on 14 September 2026 after #843; longer around a deploy), and most score inputs are daily, so a score usually changes about once a day. The scanner and the other auto-refreshing in-app pages reload about once per pass during the US session (04:00 to 20:00 ET on trading days), and public pages are cached snapshots that can be an hour or more old. It is not real-time, not sub-60s and not "every minute".
+> - **Coverage.** About 11,500 US stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs updated once a day. 2,500 was a snapshot setting, fixed by #763/#765 and corrected in copy by #826.
+> - **Congressional trades.** There is no real source of congressional trade disclosures. Tapeline shows none, none feeds the score, and they are not a Premium feature (#770, #820).
+> <!-- copy-compliance-allow record-never-edited -- this dated note names the false phrasings in order to retire them -->
+> - **The record.** Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. No top 10 was recorded for 31 August, 2 September, 4 September or 9 September 2026. "Never edited", "unedited", "append-only" and "immutable" are false.
+> - **Trial and card.** Signing up is free and needs no card (the card wall ran from 22 to 30 August 2026, #548 to #683). A card starts the 30-day Premium trial, and the pre-charge email goes about 7 days before the first charge.
+>
+> Measurements, times and approved wording: `docs/COPY_FACTS.md`.
+
 *Consolidated 2026-08-30 from every Tapeline session (11 chats + this one, ~70,000 messages) plus live checks against prod, Stripe, GitHub and the scheduled-task runner.*
 
 **This file supersedes four ledgers that went stale in mid-June and were never picked back up:** `C:\Tapeline\sales\queue\{ALL_CHATS_TODO,FOUNDER_TODO,TAPELINE_TODO}.md` and `docs/MORNING_QUEUE.md` (still titled 2026-05-17). Those live outside any git repo. This one is in the repo, so it is backed up and diffable.
@@ -203,8 +214,8 @@ Seven exposures found independently across four sessions. The Massive vendor key
   founder) said the sheet already carries the real trades and only needs
   "wiring up". It does not. `parse_smart_money_csv`'s own docstring is explicit:
   the `SMART MONEY & CONGRESS` tab is free text, not structured rows, which is
-  precisely why it boosts `sub_smart_money` by per-ticker appearance count
-  instead of building `CongressTrade` rows. A real feed therefore needs a real
+  precisely why it boosted `sub_smart_money` by per-ticker appearance count
+  (retired 2026-09-17) instead of building `CongressTrade` rows. A real feed therefore needs a real
   SOURCE — House/Senate disclosure filings, or a licensed vendor — not a
   parser change. That is a build, not a repair, and it is what the Premium
   claim would cost to bring back. Until then Premium is one bullet shorter,
@@ -401,7 +412,7 @@ things the teardown tripped over in Tapeline itself, each verified by hand.
   `Ticker.sub_fundamentals` / `sub_smart_money` on boot, or persist them;
   (2) make stages 3–4 self-gating on NULL like stages 1–2 so restarts resume;
   (3) spread the 2,500 cap over days. It changes published scores for ~5,600
-  tickers → **needs a `/changelog` entry**; the record stays append-only. ~1 day.
+  tickers → **needs a `/changelog` entry**; entries are not re-ranked or deleted, and the change is dated *(wording corrected 15 September 2026, see the note at the top)*. ~1 day.
   This supersedes the "second cap-filtered record" idea from the 05-Sep sweep:
   a cap-filtered list built on four-factor scores would be honest only if
   labelled as such. Fix the inputs first. Memory:

@@ -1,17 +1,40 @@
 # Fintwit Outreach — Companion Guide for `fintwit_list.csv`
 
-> **WHERE THE CARD SITS — updated 2026-09-05. Check every claim below against `docs/PRICING.md` before posting.**
+> **WHERE THE CARD SITS — updated 2026-09-15. Check every claim below against `docs/COPY_FACTS.md` and `docs/PRICING.md` before posting.**
+>
+> **WHAT CHANGED ON 14 SEPTEMBER 2026 — read before posting anything below.**
+> The founder approved an integrity wave on 14 September 2026 that corrected the
+> product and the site. Drafts below were written before it. False lines found
+> on 15 September 2026 were corrected in place, but check each one against
+> `docs/COPY_FACTS.md`, which has the measurements and times:
+>
+> - **Prices are delayed about 15 minutes.** Tapeline re-reads them for every
+>   covered stock and ETF about every 60 seconds during US market hours (longer
+>   around a deploy), and a score usually changes about once a day. Never call
+>   the data live: not real-time, not sub-60s, not "every minute".
+> - **Coverage** is about 11,500 US stocks and ETFs, plus about 100 crypto pairs
+>   updated once a day. Not ~2,500.
+> - **Congressional trades and squeeze detection do not exist today.** Do not
+>   offer either as a feature, a Premium benefit or a score input.
+> - **The record:** entries are not re-ranked or deleted. We have corrected
+>   recorded values twice, and said so: prices on 25 August 2026, and scores from
+>   18 May to 12 June capped on 15 June 2026. No top 10 was recorded for
+>   31 August, 2 September, 4 September or 9 September 2026.
+> - **The pre-charge email** goes about 7 days before the first charge.
 >
 > **Signing up takes an email and a password.** The account it makes lands on
-> the Free plan and opens the live scanner — the top ten scored rows of any
+> the Free plan and opens the scanner — the top ten scored rows of any
 > scan, one saved screen. **A card is what starts the 30-day Premium trial**
 > (Stripe Checkout, $0 charged that day, first charge on day 30, one click to
 > cancel before then), and the trial is what turns on every matching row rather
-> than the first ten, plus alerts, CSV export and the Congressional and insider
-> feeds.
+> than the first ten, plus alerts, CSV export and per-ticker SEC Form 4
+> filings.
 >
 > The **published record is free with no account at all**: the daily Top 10, the
-> complete scorecard, a page per scored ticker, and the raw CSV/JSON export.
+> public scorecard, a page per scored ticker, and the raw CSV/JSON export. The
+> scorecard's summary figures are current; its per-day entries are on a 7-day
+> delay without Pro or Premium, and the CSV/JSON export stops 7 days back for
+> every caller (`_FREE_DELAY_DAYS` in `backend/app/routers/scorecard.py`).
 >
 > So: **no line in this file may attach the card to the ACCOUNT or to SIGNING
 > IN.** Attach it to the TRIAL, which genuinely requires one. Three layers, in
@@ -97,12 +120,12 @@ Open DMs OR follow-back are nice-to-have, not required — replies don't need ei
 
 ---
 
-## The vehicle — a substantive reply with live data
+## The vehicle — a substantive reply with current data
 
 Workflow per reply (~5 minutes):
 
 1. Open the account, find a recent (≤ 72h) tweet about a specific US ticker.
-2. Curl the live Tapeline score for that ticker:
+2. Curl the current Tapeline score for that ticker (prices behind it are delayed about 15 minutes):
    ```powershell
    $d = irm "https://api.tapeline.io/api/ticker/[SYMBOL]"
    "{0} composite={1} | trend={2} rs={3} fund={4} sm={5} macro={6} mom={7} | {8}" -f $d.symbol, $d.score, $d.breakdown.trend.value, $d.breakdown.rs.value, $d.breakdown.fundamentals.value, $d.breakdown.smart_money.value, $d.breakdown.macro.value, $d.breakdown.momentum.value, $d.reason
@@ -174,10 +197,10 @@ For those narrow cases the original DM template (preserved in git history if nee
 | Reply type                              | Response                                                                                                                                                                              |
 |-----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | "Interesting, what's the formula?"      | Link to /how-it-works. Never paste weights or an equation — the page names the six factors and their weight ordering, and that is the whole of what's public. Getting them onto the site also lets GA4 attribute the click.       |
-| "Have you back-tested this?"            | "Walk-forward back-test on 2024-2025 in progress. /scorecard is the live forward-test — every miss stays on the page."                                                                |
+| "Have you back-tested this?"            | "Walk-forward back-test on 2024-2025 in progress. /scorecard is the forward-test — misses stay on the page, and corrections are dated."                                                                |
 | "What about $[other ticker]?"           | Run the curl, paste the breakdown in the thread. Be willing to spend 2-3 replies going deep on their actual ticker of interest before any soft CTA.                                   |
 | "Are you the founder?"                  | "Yes — Christian Piyatilaka, solo founder. Built Tapeline because I was tired of stock scanners that hide their formula."                                                             |
-| "How do I try it?"                      | "The full record — daily Top 10, the whole scorecard, a page per ticker, the CSV/JSON export — is readable with no account and no card. If you want the logged-in scanner, an account is just an email and a password. A card is only for the 30-day Premium trial: $0 that day, first charge on day 30, one click cancels. tapeline.io if you want to give it a shot."                                      |
+| "How do I try it?"                      | "The public record — daily Top 10, the scorecard (per-day entries on a 7-day delay), a page per ticker, the CSV/JSON export — is readable with no account and no card. If you want the logged-in scanner, an account is just an email and a password. A card is only for the 30-day Premium trial: $0 that day, first charge on day 30, one click cancels. tapeline.io if you want to give it a shot."                                      |
 | Pushback / methodological critique      | Don't defend — engage with the substance. "That's a real critique — I think the answer is X but the version-controlled changelog lets the next operator argue differently."           |
 | Silence after the OP reads it           | Move on. The followers who saw the exchange got the value either way.                                                                                                                 |
 

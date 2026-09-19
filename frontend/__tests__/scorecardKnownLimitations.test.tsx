@@ -72,6 +72,23 @@ describe("/scorecard server render — gaps, the June cap, limitations", () => {
     expect(screen.getByRole("heading", { name: /gaps and known limitations/i })).toBeInTheDocument();
   });
 
+  it("names the one listed entry that is not a common stock", async () => {
+    // BHFAO, a preferred, was listed fourth on 23 June 2026. The changelog once
+    // said no preferred had ever been listed; /scorecard is where a reader
+    // checking that finds the truth, so it must say so itself.
+    stubFetch(SUMMARY);
+    render(await ScorecardPage());
+    const text = document.body.textContent ?? "";
+    expect(text).toMatch(/BHFAO[\s\S]{0,200}preferred depositary shares/);
+    expect(text).toMatch(/listed fourth/);
+    expect(text).toMatch(/all 439 symbols ever listed/);
+    // Since #875 such listings can no longer be listed, and detection is
+    // stated as imperfect rather than complete.
+    expect(text).toMatch(/From 19 September 2026 \(#875\)[\s\S]{0,200}can no longer be listed/);
+    expect(text).toMatch(/does not catch every one/);
+    expect(text).toMatch(/PBR\.A and CIG, each its company's main traded share/);
+  });
+
   it("still lists the verified gaps when the summary API is down", async () => {
     stubFetch("reject");
     render(await ScorecardPage());

@@ -203,6 +203,7 @@ export const FACTORS: Factor[] = [
       "Each metric that is available is mapped onto a common 0–100 scale using fixed, broadly-drawn bands.",
       "The available components are averaged. A metric that is missing is left out entirely rather than filled in with a guess, and the ticker's confidence percentage falls to reflect the thinner evidence.",
       "If none of the metrics are available — as with most ETFs and funds — the factor is unavailable for that ticker and the composite substitutes a mid-range value.",
+      "A listing that trades like a stock but is not the company's common shares (an exchange-listed note, a preferred or depositary share, a warrant, a right or a unit) takes no reading at all. The financial figures a data vendor returns for it are its issuer's, not its own, so since 19 September 2026 the factor is unavailable for it and the composite substitutes a mid-range value.",
     ],
     feeds: [
       {
@@ -216,6 +217,7 @@ export const FACTORS: Factor[] = [
     limitations: [
       "It is not sector-relative. Margin and return-on-equity levels that are ordinary in one industry are unusual in another, and this factor does not adjust for that.",
       "ETFs, funds, trusts and many ADRs have no comparable company financials. The factor is simply unavailable for them.",
+      "Notes, preferred shares, warrants, rights and units listed like stocks have no financials of their own. Since 19 September 2026 the factor is unavailable for them rather than borrowing the issuer's figures. They are recognised by listing name and symbol, which does not catch every one.",
       "The reading is exactly as current as the last filing. Between reports it does not move, even when the business does — for most companies that means it is static for weeks at a time.",
       "A reported figure describes a period that has already closed. It describes the last reported quarter, not the current one.",
       "Restatements change previously reported history, and the reading changes with them.",
@@ -224,7 +226,7 @@ export const FACTORS: Factor[] = [
     faq: [
       {
         q: "Why do some tickers have no Fundamentals reading?",
-        a: "ETFs, funds and some foreign-listed structures do not report comparable company financials. Rather than substitute a guess, the factor is treated as unavailable and the composite uses a mid-range value in its place.",
+        a: "ETFs, funds and some foreign-listed structures do not report comparable company financials, and a note, preferred share or warrant listed like a stock has none of its own: the figures belong to the company that issued it. Rather than substitute a guess or borrow the issuer's figures, the factor is treated as unavailable and the composite uses a mid-range value in its place.",
       },
       {
         q: "Is the Fundamentals factor a valuation model?",
@@ -250,21 +252,22 @@ export const FACTORS: Factor[] = [
     computed: [
       "Every disclosed transaction in the window is converted to a signed dollar value, and the net is taken against the gross. The result is a ratio running from all-selling to all-buying.",
       "That ratio is mapped onto a 0–100 scale around a midpoint, so the reading reflects the balance of disclosed activity rather than its raw size. One large disclosed purchase can outweigh several small disclosed sales, but only on a net basis.",
-      "A ticker with no disclosed filings in the window has no reading at all, and the composite substitutes a mid-range value. An absence of filings is treated as an absence of information, not as a negative signal.",
+      "A ticker for which we hold no disclosed filings in the window has no reading at all, and the composite substitutes a mid-range value. An absence of filings is treated as an absence of information, not as a negative signal.",
       "When a ticker's filings have all left the window, its reading is removed at the ticker's next re-check, not at once: within about two days for a stock, and up to about a month for an ETF or futures contract. Until 14 September 2026 such a reading was not removed when its filings left the window. On 14 September 2026 some tickers held a value with no filing on file at all; from that date such a value is removed when the ticker is next re-checked. The changelog entry for that date has the details.",
     ],
     feeds: [
       {
         name: "SEC filings",
-        detail: "Form 4 insider transactions from a data vendor, re-checked about every two days per stock (about monthly for ETFs). The vendor's filings can run weeks behind SEC EDGAR.",
+        detail: "Form 4 insider transactions read directly from SEC EDGAR, re-checked about every two days per stock (about monthly for ETFs). Only non-derivative transactions (shares, not options) count, and an amended filing (4/A) replaces the original filing it restates. A filing counts for every listed common-stock class of the company that filed it, and for none of its other listed securities. Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR.",
       },
     ],
     caveat:
-      "Disclosure is lagged by statute: a Form 4 is generally filed up to two business days after the trade. Tapeline's copy can lag much further, because our data vendor's filings can run weeks behind SEC EDGAR and each stock is re-checked only about every two days. So this factor is always reading the past, and the filing records that a transaction happened, never why.",
+      "Disclosure is lagged by statute: a Form 4 is generally filed up to two business days after the trade, and Tapeline re-checks each stock on SEC EDGAR only about every two days, so a filing can take a few days more to reach this factor. This factor is therefore always reading the past, and the filing records that a transaction happened, never why.",
     limitations: [
       "Many disclosed transactions carry no view at all. Sales scheduled months in advance under a 10b5-1 plan, option exercises, vesting events and share sales made purely to cover tax withholding all arrive as Form 4 filings and are netted like any other.",
       "Smaller and less-covered companies file rarely, so the window is frequently empty and the factor is unavailable for long stretches.",
       "The factor reads corporate-insider Form 4 filings only. It has no congressional-trade input.",
+      "A company can have several listed securities under one SEC identifier — share classes, preferred shares, notes. A filing's transactions count for every listed common-stock class of the company, so the reading is the company's and its classes share it: Alphabet's insiders file under GOOGL, and GOOG carries the same reading. Its preferred shares, notes, warrants, rights, units and exchange-traded notes have no reading rather than a borrowed one, and neither does an ETF. Which listing is common stock is judged from its name and ticker, because no data field we hold states it, so a preferred share named and lettered like its company's common stock can be counted as common. From 17 September 2026 until this rule replaced it, a filing counted only for the ticker it named, so the other common class had no reading. Before 17 September every ticker of the issuer received all of them. Each ticker moves to the current rule at its next re-check — about two days for a stock, up to about a month for an ETF, ETN or futures contract.",
       "Netting by dollar value means one large filer can dominate a company with many reporting insiders.",
       "Insiders are not a uniformly informed group, and this factor makes no claim that they are. The name of the factor is conventional industry shorthand, not an assessment of anyone's judgement.",
     ],
@@ -275,7 +278,7 @@ export const FACTORS: Factor[] = [
       },
       {
         q: "What happens if a ticker has no insider filings?",
-        a: "The factor is unavailable and the composite substitutes a mid-range value. No filings means no information, which is not the same as a negative reading.",
+        a: "The factor is unavailable and the composite substitutes a mid-range value. No filings on file for that ticker means no information, which is not the same as a negative reading. Where a company has several listed common-stock classes, each carries the company's filings; its preferred shares, notes and similar listings carry none.",
       },
     ],
   },

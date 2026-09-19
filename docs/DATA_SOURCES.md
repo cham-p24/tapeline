@@ -10,14 +10,15 @@ Every data source used in production must be documented here with license terms,
 - **URL:** https://massive.com/pricing
 - **Note:** Polygon.io rebranded to Massive on 2025-10-30. Same API, same auth, same endpoint shapes — adapter `polygon_feed.py` only needed a hostname change to `api.massive.com`. Legacy `api.polygon.io` still resolves during grace period.
 - **Feeds used:**
-  - Snapshot API (`/v2/snapshot/locale/us/markets/stocks/tickers`) — real-time prices
+  - Snapshot API (`/v3/snapshot`) — prices, **delayed about 15 minutes on Stocks Starter** (measured 14 September 2026 13:59 UTC: AAPL snapshot 899 s old, latest minute bar 961 s old, no last-trade or last-quote keys; SPY, AAPL, NVDA and MSFT 15.0 min old at 13:41 UTC). The `last_updated` fields read ~0 s old but are the response time, not the trade time
+  - Price age (migration 0075): `tickers.quote_at` stores the vendor's own time for a price (last trade, then last quote, then minute-bar end, never a `last_updated` field and never our clock) and `tickers.quote_timeframe` its DELAYED / REAL-TIME flag, via `services/quote_time.py`. Both stay NULL when the plan sends no such field or the vendor skipped the row that tick (its price is NULLed too), and the UI then states the delay ("or more") instead of a time; a crypto row's `quote_at` is the end of its daily close's UTC day, and a crypto row without one is described by its daily-close cadence, never by the stock delay. The heatmap's and `/api/status`'s "newest quote" figures ignore crypto rows. The worker logs `polygon_feed.quote_time_fields` once per process with the field names the plan actually returned. `tickers.updated_at` is our write time, not the price's age
   - Aggregates API (`/v2/aggs/ticker/{symbol}/range/...`) — historical bars for scoring
   - Reference data — ticker lists, splits, dividends
 - **Populates:** `tickers`, `snapshots`, `scores` (via aggregates)
 - **Rate limit:** Starter 5 calls/min, Developer unlimited
 - **Renewal:** Monthly auto-renew via card
 
-### Finnhub — Fundamentals, insider Form 4, calendars, sector backfill
+### Finnhub — Fundamentals, calendars, sector backfill (insider Form 4 moved to SEC EDGAR in #835, 14 September 2026)
 - **Tier:** Free
 - **License:** ❌ **Personal use only.** Finnhub's ToS: personal plans cannot be used by a business, even internally, without written approval, and derived results may not be redistributed. Open launch blocker — see `docs/LICENSE_AUDIT.md`.
 - **URL:** https://finnhub.io/pricing
@@ -40,11 +41,11 @@ Every data source used in production must be documented here with license terms,
 - **Populates:** `news` (8-Ks folded into the combined news feed by the worker)
 - **Renewal:** n/a
 
-### Congressional trades — ⚠️ NO SOURCE WIRED
+### Congressional trades — ⚠️ NO SOURCE WIRED (not shown, not sold, #820)
 - **Status:** Not a production source. `polygon_feed.fetch_congress_trades()` returns an empty list, and `mock_feed`'s generator (which invents trades attributed to real, named politicians) is only persisted outside production — see `signal_publisher._mock_writes_enabled()`. The `congress_trades` table therefore stops accruing rows in prod.
 - **Would-be source:** official House/Senate STOCK Act disclosures are public record, but nothing reads them — there is no `congress_ingestor.py`. Wiring one is unstarted work, not a documented feed.
 - **Note:** QuiverQuant was **removed** (subscription cancelled). Its Trader tier carried "No Commercial Use Rights"; the adapter, worker task, model and config key are deleted, and the feed only ever served mock data.
-- **Caveat:** the SMART MONEY & CONGRESS sheet tab is ingested, but it only boosts each ticker's `sub_smart_money` by appearance count — it does not store individual trades.
+- **Caveat:** the SMART MONEY & CONGRESS sheet tab is **not** a factor source. It used to overwrite each ticker's `sub_smart_money` with an appearance count and never stored individual trades; it was retired on 2026-09-17 (smart money is SEC Form 4 from EDGAR, #835/#848), and its `SMART_MONEY_CONGRESS_CSV_URL` secret is not set on Fly. The public `/data-sources` page therefore agrees: no congressional disclosure feeds the score (#820).
 
 ### Clerk — Authentication (env-gated, not the live path)
 - **Tier:** Free up to 10k MAU; paid tiers from $25/mo
@@ -90,11 +91,12 @@ Every data source used in production must be documented here with license terms,
 
 | Source | Production refresh cadence |
 |---|---|
-| Polygon snapshot | 30–60 seconds during market hours |
-| Polygon aggregates (scoring) | Every 5 minutes during market hours |
-| Regime inputs (VIX, DXY, 10Y) | Every 5 minutes |
+| Massive snapshot | Re-read about every 60 seconds during market hours (one pass per worker loop, measured 14 September 2026); the prices themselves are delayed about 15 minutes |
+| Massive daily aggregates (trend, RS, momentum) | Once per 24 hours per worker process; the latch resets on deploy |
+| Regime inputs (VIX, DXY, 10Y) | FRED daily closes (the Starter plan has no indices entitlement) |
+| Crypto | Once a day, from daily bars |
 | Congress disclosures | ⚠️ n/a — no feed wired; the table does not accrue rows in production |
-| Fundamentals (P/E, margins, etc.) | Weekly refresh |
+| Fundamentals (P/E, margins, etc.) | Started at most once per 24 hours per worker process (`_last_fundamentals_refresh` latch in `workers/signal_publisher.py`; in memory, so a deploy resets it and restarts the chain). The chain is serial and paced at about 1.1 s per Finnhub request, so a full pass takes hours and may not finish on a deploy-heavy day. Not measured end to end; for public copy use the `/data-sources` wording, never "weekly" |
 
 ---
 

@@ -170,17 +170,83 @@ def configured() -> bool:
 # happens 60×/min during market hours.
 _FUND_SCORE_CACHE: dict[str, float] = {}
 
+#: Symbols that take NO fundamentals reading: listings stored as stocks that
+#: are not the company's common shares (notes, preferreds, warrants, rights,
+#: units; services/non_common.py). The vendor answers such a symbol with its
+#: ISSUER's financials, so a reading is the company's, not the security's:
+#: GREEL, a Greenidge 8.50% senior note, held 60.2 and its reason called
+#: fundamentals one of its strengths (measured 2026-09-18, 99 such rows).
+#: Filled by `set_no_fundamentals_symbols` from the non-common reconcile. While
+#: a symbol is in it, the cache neither returns nor stores a value for it, and
+#: its pass reading is None, which the sheet ingest writes as a NULL.
+_NO_FUNDAMENTALS: set[str] = set()
+
 
 def get_cached_score(symbol: str) -> float | None:
     """Per-tick lookup. Returns None if the symbol hasn't been refreshed yet
-    or had no Finnhub fundamentals (e.g. ETFs, foreign ADRs)."""
+    or had no Finnhub fundamentals (e.g. ETFs, foreign ADRs), and for a symbol
+    that takes no reading: `set_no_fundamentals_symbols` drops its entry and
+    `set_cached_score` refuses a new one (see `_NO_FUNDAMENTALS`)."""
     return _FUND_SCORE_CACHE.get(symbol.upper())
 
 
-def set_cached_score(symbol: str, score: float | None) -> None:
-    """Worker-side setter — call after each fetch_basic_financials + compute."""
+def set_cached_score(symbol: str, score: float | None, *, from_row: bool = False) -> None:
+    """Worker-side setter — call after each fetch_basic_financials + compute.
+
+    `from_row=True` for a value loaded from the Ticker row (the cache warm),
+    which is not a new reading; see `_PASS_READINGS`. Ignored for a symbol
+    that takes no reading (see `_NO_FUNDAMENTALS`)."""
     if score is not None:
-        _FUND_SCORE_CACHE[symbol.upper()] = score
+        sym = symbol.upper()
+        if sym in _NO_FUNDAMENTALS:
+            return
+        _FUND_SCORE_CACHE[sym] = score
+        if not from_row:
+            _PASS_READINGS[("sub_fundamentals", sym)] = score
+
+
+def no_fundamentals_symbols() -> frozenset[str]:
+    """A copy of the symbols that take no fundamentals reading."""
+    return frozenset(_NO_FUNDAMENTALS)
+
+
+def set_no_fundamentals_symbols(symbols: frozenset[str] | set[str]) -> None:
+    """Replace the set of symbols that take no fundamentals reading.
+
+    A symbol entering it loses any cached value, and its pass reading becomes
+    None: an answer ("this listing has no fundamentals of its own"), not a
+    missing one, so a row's owner writes NULL rather than keeping the
+    issuer's value. A symbol leaving it drops that None, so it is read again
+    like any other symbol.
+    """
+    wanted = {s.upper() for s in symbols}
+    for sym in _NO_FUNDAMENTALS - wanted:
+        if _PASS_READINGS.get(("sub_fundamentals", sym), 0.0) is None:
+            del _PASS_READINGS[("sub_fundamentals", sym)]
+    for sym in wanted:
+        _FUND_SCORE_CACHE.pop(sym, None)
+        _PASS_READINGS[("sub_fundamentals", sym)] = None
+    _NO_FUNDAMENTALS.clear()
+    _NO_FUNDAMENTALS.update(wanted)
+
+
+#: What THIS process's factor passes last learned, by (column, SYMBOL): a
+#: reading, or None for one an empty insider answer retired.
+#:
+#: The caches alone cannot say whether they are newer than the row: the boot
+#: warm and every sheet-changed webhook fill them FROM the rows. A pass's own
+#: result can. It is never older than the row - the pass puts it here before it
+#: writes the row - and it is what the row's owner must write when the pass's
+#: own write lost its compare-and-set (`signal_publisher._save_factor_readings`,
+#: `_clear_smart_money_reading`). `sheet_feed._write_factor_sets` reads this to
+#: decide between the row and the cache for a sheet-owned row.
+_PASS_READINGS: dict[tuple[str, str], float | None] = {}
+
+
+def pass_reading(column: str, symbol: str) -> tuple[bool, float | None]:
+    """(whether this process's passes produced a value for it, that value)."""
+    key = (column, symbol.upper())
+    return key in _PASS_READINGS, _PASS_READINGS.get(key)
 
 
 def fund_cache_size() -> int:
@@ -232,11 +298,17 @@ def get_cached_smart_money_score(symbol: str) -> float | None:
     return _SMART_MONEY_SCORE_CACHE.get(symbol.upper())
 
 
-def set_cached_smart_money_score(symbol: str, score: float | None) -> None:
+def set_cached_smart_money_score(
+    symbol: str, score: float | None, *, from_row: bool = False,
+) -> None:
+    """`from_row=True` for a value loaded or rebuilt from stored rows, which is
+    not a new reading; see `_PASS_READINGS`."""
     if score is not None:
         sym = symbol.upper()
         _SMART_MONEY_SCORE_CACHE[sym] = score
         _SMART_MONEY_CLEARED.discard(sym)
+        if not from_row:
+            _PASS_READINGS[("sub_smart_money", sym)] = score
 
 
 def clear_cached_smart_money_score(symbol: str) -> None:
@@ -246,6 +318,7 @@ def clear_cached_smart_money_score(symbol: str) -> None:
     sym = symbol.upper()
     _SMART_MONEY_SCORE_CACHE.pop(sym, None)
     _SMART_MONEY_CLEARED.add(sym)
+    _PASS_READINGS[("sub_smart_money", sym)] = None
 
 
 def smart_money_cleared_symbols() -> frozenset[str]:
@@ -365,7 +438,7 @@ async def _rebuild_unsaved_smart_money_scores() -> int:
         for sym, txns in by_symbol.items():
             score = compute_smart_money_score(txns)
             if score is not None and get_cached_smart_money_score(sym) is None:
-                set_cached_smart_money_score(sym, score)
+                set_cached_smart_money_score(sym, score, from_row=True)
                 rebuilt += 1
     except Exception:
         # Guards the WHOLE rebuild, scoring included: the warm is awaited
@@ -447,6 +520,14 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
                     | Ticker.sub_smart_money.is_not(None)
                 )
             )).all()
+            # Every flagged symbol, not only those still holding a value: the
+            # API process never runs the reconcile, so this is where ITS cache
+            # learns that a row flagged and cleared since its last warm takes no
+            # reading. Without it, a value this process cached earlier stayed
+            # and the sheet webhook wrote it back onto the cleared row.
+            non_common_symbols = set((await session.execute(
+                select(Ticker.symbol).where(Ticker.is_non_common.is_(True))
+            )).scalars().all())
             on_row = {sym for sym, _, sm in rows if sm is not None}
             unbacked = [s for s in _SMART_MONEY_SCORE_CACHE if s not in on_row]
             with_form4: set[str] = set()
@@ -456,12 +537,15 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
                     .where(InsiderTransaction.symbol.in_(unbacked))
                     .distinct()
                 )).scalars().all())
+        # Published BEFORE the loop: set_cached_score then refuses a flagged
+        # row's stored value, which is its issuer's, not its own.
+        set_no_fundamentals_symbols(non_common_symbols)
         for sym, fund, sm in rows:
-            if fund is not None:
-                set_cached_score(sym, float(fund))
+            if fund is not None and sym.upper() not in _NO_FUNDAMENTALS:
+                set_cached_score(sym, float(fund), from_row=True)
                 funds += 1
             if sm is not None:
-                set_cached_smart_money_score(sym, float(sm))
+                set_cached_smart_money_score(sym, float(sm), from_row=True)
                 smart += 1
         for sym in unbacked:
             if sym not in with_form4:
@@ -536,6 +620,17 @@ async def set_recent_insider_transactions_db(
     # key, in source order, which keeps the rows unique under
     # `uq_insider_natural` (migration 0071). A repeated key is logged, so how
     # often it happens stays visible.
+    # ONE timestamp for the whole fetch, taken here rather than left to the
+    # database default. The boot rebuild trusts a symbol's rows only when they
+    # share a single fetched_at (`insider_rows_are_the_stamped_fetch`). The ORM
+    # sends one INSERT per row, and SQLite reads CURRENT_TIMESTAMP per statement
+    # at one-second resolution, so a second boundary between a fetch's first and
+    # last row used to store it under two timestamps and the rebuild refused it
+    # - the flake that failed #866's deploy gate. Postgres fixes now() for the
+    # transaction, so production only held by that accident. Taking it here also
+    # puts fetched_at on the same clock as the last_smart_money_at stamp it is
+    # compared with, instead of the database server's.
+    fetched_at = datetime.now(UTC)
     rows: list[InsiderTransaction] = []
     seen: dict[tuple[str, str, int], int] = {}
     repeated = 0
@@ -560,6 +655,7 @@ async def set_recent_insider_transactions_db(
                 code=(t.get("code") or "")[:4],
                 source=source,
                 line_seq=line_seq,
+                fetched_at=fetched_at,
             )
         )
     if repeated:
@@ -620,12 +716,17 @@ async def get_recent_insider_transactions_db(
                   such rows in the 30 days to 2026-09-17.
 
     Same shape and ordering as the prior in-memory implementation so the
-    router/UI don't see any contract change.
+    router/UI don't see any contract change, plus `symbols`: every ticker the
+    line is listed under. Without a symbol filter the list spans tickers, so a
+    line one issuer's share classes all carry (GOOG and GOOGL, since
+    2026-09-19) is listed once; see `services/insider_dedup.py`. With one,
+    `symbols` is just that symbol.
     """
     from sqlalchemy import desc, select
 
     from app.db import session_scope
     from app.models import InsiderTransaction
+    from app.services.insider_dedup import MAX_CLASS_COPIES, collapse_share_classes
 
     today = date.today()
     cutoff = (today - timedelta(days=max(1, days))).isoformat()
@@ -636,7 +737,8 @@ async def get_recent_insider_transactions_db(
         .where(InsiderTransaction.transaction_date >= cutoff)
         .where(InsiderTransaction.transaction_date <= today.isoformat())
         .order_by(desc(InsiderTransaction.transaction_date))
-        .limit(limit)
+        # Across tickers, read enough copies to still fill `limit` lines.
+        .limit(limit if sym else limit * MAX_CLASS_COPIES)
     )
     if sym:
         stmt = stmt.where(InsiderTransaction.symbol == sym)
@@ -649,7 +751,7 @@ async def get_recent_insider_transactions_db(
         result = await session.execute(stmt)
         rows = result.scalars().all()
 
-    return [
+    items = [
         {
             "symbol":            r.symbol,
             "insider_name":      r.insider_name,
@@ -658,8 +760,19 @@ async def get_recent_insider_transactions_db(
             "transaction_price": r.transaction_price,
             "transaction_value": r.transaction_value,
             "code":              r.code,
+            "line_seq":          r.line_seq,
+            "source":            r.source,
         }
         for r in rows
+    ]
+    if not sym:
+        items = await collapse_share_classes(items)
+    return [
+        {
+            **{k: v for k, v in item.items() if k not in ("line_seq", "source")},
+            "symbols": item.get("symbols") or [item["symbol"]],
+        }
+        for item in items[:limit]
     ]
 
 
@@ -689,17 +802,13 @@ def get_recent_insider_transactions(
 
 
 async def insider_feed_size_db() -> int:
-    """Total rows in the DB-backed feed. Cheap COUNT(*) — runs against an
-    index'd column so it's sub-millisecond even with the full universe."""
-    from sqlalchemy import func as sa_func
-    from sqlalchemy import select as sa_select
+    """Distinct Form 4 lines in the DB-backed feed: every row, counting a line
+    that several share classes of one issuer carry once (since 2026-09-19 GOOG
+    and GOOGL both hold Alphabet's lines). The Holdings page shows it as
+    "tracked transactions"; see `insider_dedup.distinct_line_count`."""
+    from app.services.insider_dedup import distinct_line_count
 
-    from app.db import session_scope
-    from app.models import InsiderTransaction
-
-    async with session_scope() as session:
-        result = await session.execute(sa_select(sa_func.count(InsiderTransaction.id)))
-        return int(result.scalar_one() or 0)
+    return await distinct_line_count()
 
 
 def insider_feed_size() -> int:

@@ -83,11 +83,34 @@ def _grouped_path(on: date) -> str:
     return f"/v2/aggs/grouped/locale/global/market/crypto/{on.isoformat()}"
 
 
-def _row_from_bar(bar: dict[str, Any]) -> dict[str, Any] | None:
+def daily_close_time(on: date | None, *, now: datetime | None = None) -> datetime | None:
+    """When the daily close of UTC day `on` was struck: the end of that day.
+
+    Taken from the DAY the vendor returned the bar for, not from the bar's own
+    `t`: the vendor documents grouped-bar `t` as the window's start while its
+    crypto examples carry the window's end (23:59:59.999), and an off-by-a-day
+    quote time is the exact error this column exists to prevent. A day that
+    has not ended yet has no close, so a bar for it gets None (its "close" is
+    an intraday reading of unknown time). `now` only bounds; it is never
+    returned.
+    """
+    if on is None:
+        return None
+    end = datetime(on.year, on.month, on.day, tzinfo=UTC) + timedelta(days=1)
+    if end > (now or datetime.now(UTC)):
+        return None
+    return end
+
+
+def _row_from_bar(bar: dict[str, Any], on: date | None = None) -> dict[str, Any] | None:
     """One grouped-bar entry -> a normalized row, or None to skip it.
 
     Mirrors `polygon_feed._to_scanner_row`'s contract: return None rather than
     a half-built row, so a caller can never publish a partial reading.
+
+    `on` is the UTC day the grouped request asked for. It sets `quote_at` —
+    the time of the close this row's price is — so a crypto price shows its
+    real age (a day or more) instead of the time we wrote it.
     """
     # MUST be the namespaced form, not merely "a valid symbol".
     #
@@ -126,6 +149,10 @@ def _row_from_bar(bar: dict[str, Any]) -> dict[str, Any] | None:
         "volume": int(volume) if isinstance(volume, int | float) else None,
         "change_pct_1d": change_pct_1d,
         "dollar_volume": dollar_volume,
+        # The end of the UTC day whose close `price` is. No timeframe flag:
+        # the grouped endpoint sends none, and inventing one is not ours to do.
+        "quote_at": daily_close_time(on),
+        "quote_timeframe": None,
     }
 
 
@@ -167,7 +194,7 @@ async def fetch_crypto_universe(
         if not results:
             continue
 
-        rows = [r for r in (_row_from_bar(b) for b in results) if r is not None]
+        rows = [r for r in (_row_from_bar(b, target) for b in results) if r is not None]
         kept = [r for r in rows if r["dollar_volume"] >= floor]
         logger.info(
             "crypto.universe on=%s pairs=%d parsed=%d above_floor=%d floor=%s",
@@ -260,10 +287,13 @@ async def build_crypto_rows(client: httpx.AsyncClient) -> list[dict[str, Any]]:
 
     The consequence is real and worth stating plainly rather than engineering
     around: fundamentals and smart-money fall back to NEUTRAL 50 for a coin, so
-    part of the weight is a constant and a coin's range is compressed. Measured
-    against the live weights: a coin perfect on all four factors it can have
-    reaches **85.0**, a strong one ~74, a weak one ~28. So coins can span the
-    band but cannot reach the top of it.
+    part of the weight is a constant and a coin's range is compressed. Against
+    the live weights, a coin at the top of trend, relative strength and
+    momentum reaches **81.25** in the most favourable regime (the macro factor
+    tops out at 75, not 100) and 77.5 in a neutral one. So coins can reach
+    STRONG SETUP but not HIGH CONVICTION. (This paragraph used to say 85.0.
+    That assumed a macro reading of 100, which `sub_macro` never produces, and
+    until 2026-09-19 the real ceiling was 68.75 — see `_near_high_pct`.)
 
     That is not a bug to be re-normalised away — it is the honest reading of a
     six-factor model applied to an instrument that has four of them, and the
@@ -389,18 +419,42 @@ async def build_crypto_rows(client: httpx.AsyncClient) -> list[dict[str, Any]]:
     return rows
 
 
-def _near_high_pct(bars: list[dict[str, Any]]) -> float | None:
-    """Percent below the highest close in the window, as a negative number.
+#: Daily bars in 52 weeks for an instrument that trades every day of the year.
+#:
+#: The workbook's equity column takes its high over the last 252 closes, which
+#: is 52 weeks of weekday sessions. A coin prints a bar on weekends too, so the
+#: same 52 weeks is 365 bars; `CRYPTO_HISTORY_DAYS` holds ~400, and taking the
+#: peak over all of them reached back about five weeks past a year.
+_NEAR_HIGH_WINDOW_BARS = 365
 
-    Same convention as the equity column: -3.1 means "3.1% off its high".
+
+def _near_high_pct(bars: list[dict[str, Any]]) -> float | None:
+    """Latest close as a percent of the highest close in the last 52 weeks.
+
+    0-100, where 100 means "closing at its 52-week high" and 80 means "20% off
+    it". That is the scale `score.sub_trend` reads for this key, and the scale
+    the workbook's "Near 52W High %" column uses for every equity (the
+    signal-system writes it as ``round(last / h52 * 100, 1)``, h52 the highest
+    close in the last 252 sessions).
+
+    Until 2026-09-19 this returned the DISTANCE below the high as a negative
+    number (-3.1 for "3.1% off"), under a docstring claiming that was the
+    equity convention. It was not. `sub_trend` clamps the value to 0-100, so
+    every coin's near-high component was 0, its trend could not exceed 50, and
+    no coin could score above 68.75 — below the 70 floor of STRONG SETUP.
+    Measured read-only in production on 2026-09-19: all 116 scored pairs had
+    sub_trend <= 50.0 and the best composite was 65.0.
     """
-    closes = [b.get("c") for b in bars if isinstance(b.get("c"), int | float)]
+    closes = [
+        b.get("c") for b in bars[-_NEAR_HIGH_WINDOW_BARS:]
+        if isinstance(b.get("c"), int | float)
+    ]
     if not closes:
         return None
     peak = max(closes)
-    if not peak:
+    if not peak or peak <= 0:
         return None
-    return (closes[-1] - peak) / peak * 100.0
+    return float(closes[-1]) / float(peak) * 100.0
 
 
 #: Coins whose vendor NEWS tag is verified to mean the coin, not a listed company.

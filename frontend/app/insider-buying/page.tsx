@@ -18,9 +18,9 @@ const API_BASE =
 // buy it returned was dated 2026-08-31 — so neither "right now" nor "ranked by
 // value" was true.
 export const metadata = pageMeta({
-  title: "Insider Buying — SEC Form 4 Open-Market Buys | Tapeline",
+  title: "Insider Buying — SEC Form 4 Insider Purchases | Tapeline",
   description:
-    "The most recent open-market insider buys (SEC Form 4 code P) in Tapeline's data, newest trade first, with the date of the newest trade printed under the table. Each ticker links to its Tapeline page.",
+    "The most recent insider purchases (SEC Form 4 code P, on the open market or privately) in Tapeline's data, newest trade first, with the date of the newest trade printed under the table. Each ticker links to its Tapeline page.",
   path: "/insider-buying",
 });
 
@@ -28,8 +28,8 @@ export const metadata = pageMeta({
  * One row of the public Form 4 feed, exactly as /api/public/insider-buys
  * returns it. The numeric fields are optional here on purpose: the column is
  * NOT NULL with a 0.0 default in backend/app/models/insider_transaction.py, so
- * a filing the vendor gave us no price for arrives as a real, indistinguishable
- * 0 — see the guards in the table body.
+ * a filing that reported no price arrives as a real, indistinguishable 0 — see
+ * the guards in the table body.
  *
  * `transaction_date` is the TRADE date reported on the filing. The model stores
  * no filing date at all, which is why the column is labelled "Trade date" and
@@ -37,6 +37,9 @@ export const metadata = pageMeta({
  */
 type InsiderRow = {
   symbol: string;
+  /** Every ticker the purchase is listed under: one company's common-stock
+   *  classes share its filings (GOOG and GOOGL), and the row is shown once. */
+  symbols?: string[];
   insider_name: string;
   transaction_date: string;
   share_change?: number | null;
@@ -83,7 +86,7 @@ const EMPTY = "—";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function fmtMoney(v: number | null | undefined): string {
-  // A 0 here is the NOT NULL column default standing in for "the vendor sent
+  // A 0 here is the NOT NULL column default standing in for "the filing gave
   // no value", not a zero-dollar transaction — the feed is filtered to
   // code-P BUYS with share_change > 0, so a $0 value cannot be real.
   if (v == null || v <= 0) return EMPTY;
@@ -135,7 +138,7 @@ function newestTradeDate(rows: InsiderRow[]): string | null {
 }
 
 const SOURCE_PREFIX =
-  "Source: SEC Form 4 filings via our data vendor. Insiders must file within 2 business days of a trade.";
+  "Source: SEC Form 4 filings, read from SEC EDGAR. Insiders must file within 2 business days of a trade.";
 
 export default async function InsiderBuyingPage() {
   const { items: rows, state } = await fetchInsiderBuys();
@@ -146,7 +149,7 @@ export default async function InsiderBuyingPage() {
     <SeoFeaturePage
       slug="insider-buying"
       eyebrow="Feature · Insider buys"
-      h1="Insider Buying Stocks — SEC Form 4 Open-Market Buys"
+      h1="Insider Buying Stocks — SEC Form 4 Insider Purchases"
       lede="When a company's director, officer or 10% owner buys its stock, the trade is reported to the SEC on Form 4. This page lists the most recent purchases in our data that carry transaction code 'P' — not option grants, not sales — newest trade first, with each ticker linked to its Tapeline page. A filing records that a purchase happened. It is not a forecast."
       methodology={{
         heading: "How this list is built",
@@ -156,12 +159,15 @@ export default async function InsiderBuyingPage() {
               SEC Form 4 must generally be filed within two business days of a
               trade by a director, officer, or 10%+ shareholder. The form
               discloses the transaction code, share count, price, and resulting
-              ownership. Tapeline pulls Form 4 transactions from its data vendor
-              (Finnhub) for the stocks it scores, re-checking each stock about
-              every two days (ETFs about monthly). The vendor&rsquo;s filings
-              can run weeks behind SEC EDGAR, so recent filings on EDGAR may not
-              be in our data yet. This is not a real-time or complete record of
-              insider trading.
+              ownership. Tapeline reads Form 4 filings straight from SEC EDGAR
+              for the stocks it scores, re-checking each stock about every two
+              days (ETFs about monthly), so a new filing usually reaches our
+              data within two to three days of appearing on EDGAR. This page
+              shows only the ten purchases with the newest trade dates, so most
+              filings never appear here. Only non-derivative transactions
+              (shares, not options) are read, and an amended filing (4/A)
+              replaces the original filing it restates. This page is not a
+              complete record of insider trading.
             </p>
             <p>
               This page shows only transaction code <strong>P</strong> (a
@@ -173,15 +179,14 @@ export default async function InsiderBuyingPage() {
               page makes no claim about what the stock does next.
             </p>
             <p>
-              The date in each row is the trade date reported on the filing. We
-              do not store the filing date, so this page cannot show the gap
-              between the two. Each row links to the ticker&rsquo;s page. The full
-              Form 4 list (all transaction codes, with a buys-only filter) is
-              at{" "}
+              The date in each row is the trade date reported on the filing.
+              The rows behind this page do not carry the filing date, so it
+              cannot show the gap between the two. Each row links to the
+              ticker&rsquo;s page. The Form 4 list on Premium, at{" "}
               <Link href="/app/holdings" className="link">
                 /app/holdings
-              </Link>{" "}
-              on Premium, also newest trade first.
+              </Link>
+              , shows up to 200 of the newest Form 4 transactions in our data (all transaction codes), filterable by ticker, by a lookback of up to 90 days and to purchases only, also newest trade first.
             </p>
           </>
         ),
@@ -197,7 +202,7 @@ export default async function InsiderBuyingPage() {
         },
         {
           q: "What's the difference between this and OpenInsider / Insider Monkey?",
-          a: "Those sites are built around the filings themselves. This page is a short preview: the ten most recent code-P purchases in Tapeline's data, newest trade first, each linked to that ticker's Tapeline page. The full Form 4 list (all transaction codes, with a buys-only filter) is at /app/holdings on Premium, also newest trade first.",
+          a: "Those sites are built around the filings themselves. This page is a short preview: the ten most recent code-P purchases in Tapeline's data, newest trade first, each linked to that ticker's Tapeline page. The Form 4 list on Premium, at /app/holdings, shows up to 200 of the newest Form 4 transactions in our data (all transaction codes), filterable by ticker, by a lookback of up to 90 days and to purchases only, also newest trade first.",
         },
         {
           q: "Is there an alert for new insider buys?",
@@ -205,11 +210,11 @@ export default async function InsiderBuyingPage() {
         },
         {
           q: "How often does the list update?",
-          a: "This page is rebuilt hourly from our database. We re-check each stock's Form 4 filings with our data vendor about every two days (ETFs about monthly). The vendor itself runs behind SEC EDGAR: when we checked on 14 September 2026, its newest Form 4 filing for Apple, NVIDIA and Meta was 14, 67 and 30 days older than the newest one on EDGAR, and the newest open-market buy in our data was dated 31 August 2026. The newest trade date is printed under the table so you can see how current the list is.",
+          a: "This page is rebuilt hourly from our database. We re-check each stock's Form 4 filings on SEC EDGAR about every two days (ETFs about monthly), so a new filing usually reaches our data within two to three days of appearing on EDGAR; this page shows only the ten purchases with the newest trade dates. Until 14 September 2026 these filings came through a data vendor whose data ran weeks behind EDGAR: that day its newest Form 4 filing for Apple, NVIDIA and Meta was 14, 67 and 30 days older than the newest one on EDGAR. The newest trade date is printed under the table so you can see how current the list is.",
         },
         {
           q: "What tier do I need?",
-          a: `This preview page is free and needs no account. The full Form 4 list at /app/holdings is a Premium feature: ${usd(PRICING.premium.monthly)} a month, or ${usd(PRICING.premium.annualPerMonth)} a month ${billedAnnuallyNote(PRICING.premium)}. The 30-day Premium trial includes it.`,
+          a: `This preview page is free and needs no account. The Form 4 list at /app/holdings is a Premium feature: ${usd(PRICING.premium.monthly)} a month, or ${usd(PRICING.premium.annualPerMonth)} a month ${billedAnnuallyNote(PRICING.premium)}. The 30-day Premium trial includes it.`,
         },
       ]}
       tier="premium"
@@ -218,7 +223,7 @@ export default async function InsiderBuyingPage() {
         <div className="flex items-center justify-between px-4 pt-3">
           {live ? (
             <span className="text-[10px] uppercase tracking-wider text-muted">
-              Most recent open-market buys in our data
+              Most recent insider purchases in our data
             </span>
           ) : state === "empty" ? (
             <span className="text-[10px] uppercase tracking-wider text-subtle" data-testid="feed-empty-label">
@@ -251,13 +256,18 @@ export default async function InsiderBuyingPage() {
               {rows.map((r, i) => (
                 <tr key={`${r.symbol}-${i}`} className="border-b border-border/30 hover:bg-panel/40">
                   <td className="px-3 py-3 font-mono font-medium">
-                    <Link href={`/t/${r.symbol}`} className="hover:text-accent">
-                      {r.symbol}
-                    </Link>
+                    {(r.symbols && r.symbols.length > 1 ? r.symbols : [r.symbol]).map((s, j) => (
+                      <span key={s}>
+                        {j > 0 ? " · " : null}
+                        <Link href={`/t/${s}`} className="hover:text-accent">
+                          {s}
+                        </Link>
+                      </span>
+                    ))}
                   </td>
                   <td className="px-3 py-3 text-xs text-muted">{r.insider_name}</td>
                   {/* Every figure below is guarded: the Form 4 columns are NOT
-                      NULL with a 0 default, so an omission by the vendor would
+                      NULL with a 0 default, so an omission on the filing would
                       otherwise print as "$0.00" / "$0" — a stated measurement
                       we never took. */}
                   <td className="px-3 py-3 text-right font-mono nums">{fmtShares(r.share_change)}</td>
@@ -273,7 +283,7 @@ export default async function InsiderBuyingPage() {
         ) : state === "empty" ? (
           <div className="px-4 py-10 text-center" data-testid="insider-feed-empty">
             <p className="text-sm text-muted">
-              The Form 4 feed answered with no open-market buys, so there is
+              The Form 4 feed answered with no insider purchases, so there is
               nothing to show here. No sample rows are substituted.
             </p>
           </div>
@@ -309,16 +319,16 @@ export default async function InsiderBuyingPage() {
         {/* "every 10 minutes" was wrong: `revalidate` on this page and on the
             fetch are both 3600s. State the cadence the code actually uses. */}
         {live
-          ? "The ten most recent open-market buys (Form 4 code 'P') in our data, newest trade first, rebuilt hourly."
+          ? "The ten most recent insider purchases (Form 4 code 'P') in our data, newest trade first, rebuilt hourly."
           : state === "empty"
             ? "This snapshot is empty because the feed returned no rows at render time. It is not a sample."
             : "This snapshot is empty because the feed was unreachable at render time. It is not a sample."}{" "}
         The{" "}
         <Link href="/app/holdings" className="text-accent hover:underline">
-          full Form 4 list
+          Form 4 list
         </Link>{" "}
-        (all transaction codes, with a buys-only filter) is on Premium, also
-        newest trade first.
+        on Premium shows up to 200 of the newest transactions (all transaction
+        codes), filterable to purchases only, also newest trade first.
       </p>
     </SeoFeaturePage>
   );

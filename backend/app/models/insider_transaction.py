@@ -66,7 +66,8 @@ class InsiderTransaction(Base):
     # Pre-computed transaction value (abs(share_change) * price) so the
     # API doesn't recompute per row. Helps when sorting by value later.
     transaction_value: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    # SEC Form 4 transaction code: P=open-market buy, S=open-market sale,
+    # SEC Form 4 transaction code: P=purchase (open market or private),
+    # S=sale (open market or private),
     # A=grant/award, M=option exercise, G=gift, F=tax via shares, D=disposition,
     # C=conversion of derivative.
     code: Mapped[str] = mapped_column(String(4), nullable=False, default="")

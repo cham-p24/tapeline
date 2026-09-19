@@ -41,13 +41,12 @@ const FACT_SHEET = [
     label: "Pricing",
     value:
       `Free · Pro ${usdCompact(PRICING.pro.annual)}/yr (or ${usd(PRICING.pro.monthly)}/mo) · ` +
-      `Premium ${usdCompact(PRICING.premium.annual)}/yr (or ${usd(PRICING.premium.monthly)}/mo) · ` +
-      `Trader ${usdCompact(PRICING.trader.annual)}/yr (concierge, sold by hand) — annual billing is the default`,
+      `Premium ${usdCompact(PRICING.premium.annual)}/yr (or ${usd(PRICING.premium.monthly)}/mo) — annual billing is the default`,
   },
   // "Premium trial", never "Free trial": the trial is the one thing that takes a card,
   // and its length comes from lib/trial.ts so this line cannot say two numbers at once again.
   { label: "Premium trial",   value: `${TRIAL_DAYS}-day Premium; card required, $0 charged today, first charge on day ${TRIAL_DAYS}` },
-  { label: "Universe scored", value: "About 11,500 US-listed stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs scored separately and updated once a day" },
+  { label: "Universe scored", value: "About 11,500 US-listed stocks and ETFs (an unfiltered scan returned 11,501 on 13 September 2026), plus about 100 crypto pairs scored separately from daily closes, which can be several days old" },
   // Measured 14 Sep 2026 (integrity wave): vendor prices ~15 min delayed,
   // worker passes about 60 s apart since #843 (70-74 s before it), scores
   // change about once a day.
@@ -63,7 +62,7 @@ const ONE_LINER =
 
 // Prices interpolate from lib/pricing.ts so a future reprice can't strand a
 // stale figure in the most-copied paragraph on the site.
-const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every ticker in the scored universe (about 11,500 US-listed stocks and ETFs) gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — recalculated on each worker pass during US market hours over prices delayed about 15 minutes, though most inputs are daily readings, so a score usually changes about once a day. Each recorded daily top 10 is published to a public scorecard (open to everyone 7 days after the session) and back-checked against SPY the next session. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin, priced annual-first at Pro ${usdCompact(PRICING.pro.annual)}/yr and Premium ${usdCompact(PRICING.premium.annual)}/yr, with a concierge Trader tier at ${usdCompact(PRICING.trader.annual)}/yr.`;
+const ONE_PARAGRAPH = `Tapeline is a quantitative stock scanner for active retail traders, built on the principle that the methodology and the track record should both be public. Every ticker in the scored universe (about 11,500 US-listed stocks and ETFs) gets one 0-100 composite score blended from six named factors — Trend, Relative Strength, Fundamentals, Smart Money, Macro, and Momentum, weighted most toward Trend and Relative Strength and least toward Momentum — recalculated on each worker pass during US market hours over prices delayed about 15 minutes, though most inputs are daily readings, so a score usually changes about once a day. Each recorded daily top 10 is published to a public scorecard (open to everyone 7 days after the session) and back-checked against SPY the next session. Entries are not re-ranked or deleted. We have corrected recorded values twice, and said so: prices on 25 August 2026, and scores from 18 May to 12 June capped on 15 June 2026. Tapeline is bootstrapped, launched in 2026, and competes with Finviz, Zacks, WallStreetZen, TradingView, Trade Ideas, and Koyfin, priced annual-first at Pro ${usdCompact(PRICING.pro.annual)}/yr and Premium ${usdCompact(PRICING.premium.annual)}/yr.`;
 
 const PULL_QUOTES = [
   {
@@ -432,9 +431,10 @@ export default function PressPage() {
             <li className="rounded-lg border border-border/60 bg-panel/30 p-4">
               <strong className="text-fg">Not options.</strong>{" "}
               About 11,500 US-listed stocks and ETFs are scored. About 100
-              crypto pairs are scored in a separate list, updated once a day,
-              from four of the six factors, and are never ranked against
-              stocks.
+              crypto pairs are scored in a separate list from daily closes
+              (refreshed about once a day, and several days old when the daily
+              pass misses a pair), from four of the six factors, and are never
+              ranked against stocks.
             </li>
           </ul>
         </section>

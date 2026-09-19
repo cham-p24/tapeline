@@ -368,7 +368,7 @@ export default function VerifyPage() {
         </div>
       </section>
 
-      <TransparencyStrip />
+      <TransparencyStrip current="/verify" />
       <MarketingFooter />
     </main>
   );

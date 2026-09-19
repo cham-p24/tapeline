@@ -5,27 +5,34 @@ Single file is the ONLY place the codebase talks to Polygon. Swapping
 `app.services.mock_feed` → `app.services.polygon_feed` in the worker is
 the complete "go live with real data" change.
 
-Starter tier ($29/mo):
-    - 5 requests/min rate limit — handled by the built-in retry/sleep
-    - 15-minute delayed quotes
-    - Commercial redistribution rights
-    - Aggregates API: end-of-day bars
+Plan in use: Massive (formerly Polygon.io) Stocks Starter, $29/mo.
+    - 15-minute delayed prices. Measured 14 Sep 2026 during the US session:
+      the AAPL snapshot 899 s old, its newest minute bar 961 s old, and no
+      last-trade or last-quote keys in the response (apparently not
+      entitled on this plan; inferred from their absence, not confirmed).
+    - Licensed for individual, non-business use. Displaying its data to
+      Tapeline's customers is not licensed on this plan; whether, and on which
+      plan, it can be is an open question with the vendor (docs/LICENSE_AUDIT.md,
+      docs/DATA_SOURCES.md). This docstring used to say Starter carried
+      "commercial redistribution rights" and that the next tier up gave
+      "real-time quotes"; neither was true of the plans as sold.
+    - Aggregates API: daily bars.
 
-Developer tier ($79/mo):
-    - Unlimited req/min, real-time quotes
-
-Tapeline MVP uses Starter. Upgrade to Developer once MRR > $500/mo.
+Moving to a faster or business-licensed plan is a founder decision, not an
+assumption anything in this module may make. Each price's own time is carried
+separately from our write time: see services/quote_time.py and Ticker.quote_at.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 
 import httpx
 
 from app.config import get_settings
+from app.services.quote_time import describe_quote_fields, extract_quote_time
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -180,6 +187,67 @@ SNAPSHOT_BATCH_SIZE = 250
 #: retry storm from turning into a thundering herd.
 SNAPSHOT_CONCURRENCY = int(os.environ.get("SNAPSHOT_CONCURRENCY", "6"))
 
+#: Consecutive snapshot passes in which at least one batch failed, and the
+#: streak length at which that stops being a WARNING and pages.
+#:
+#: A failed batch withholds only its own symbols, so the healthy batches keep
+#: max(Ticker.updated_at) moving and /health's worker_last_tick stays "ok" (the
+#: old whole-pass abort tripped that check instead). That is right for a blip
+#: and wrong for a failure that REPEATS: `_request` retries only 429 and 5xx,
+#: so a 4xx, a timeout or a connect error fails the batch at once, and the
+#: batches are cut in the same order every tick, so one bad request could pin
+#: the same ~250 symbols to an old price for days while every health check
+#: read green. 5 passes is ~5 minutes at the 60s tick, the same 300s /health
+#: allows before it calls the worker stale. In-memory and per-process on
+#: purpose: a restart resets it, and a failure that survives the restart pages
+#: again five passes later.
+SNAPSHOT_FAILURE_STREAK_ALERT = 5
+#: While the streak lasts, repeat the page this often (~hourly) rather than on
+#: every pass, so a stuck batch is one Sentry issue, not 60 an hour.
+SNAPSHOT_FAILURE_STREAK_REPEAT = 60
+_snapshot_failure_streak = 0
+
+
+def _note_snapshot_failures(
+    failures: list[tuple[list[str], Exception]], total: int,
+) -> None:
+    """Advance or reset the failed-batch streak; page once it is a pattern.
+
+    Runs before the all-fail re-raise, so a full outage counts toward the
+    streak too. Logs counts and exception TYPES only, never str(exc): an
+    HTTPStatusError's message embeds the request URL.
+    """
+    global _snapshot_failure_streak
+    if not failures:
+        _snapshot_failure_streak = 0
+        return
+    _snapshot_failure_streak += 1
+    streak = _snapshot_failure_streak
+    if streak < SNAPSHOT_FAILURE_STREAK_ALERT or (
+        (streak - SNAPSHOT_FAILURE_STREAK_ALERT) % SNAPSHOT_FAILURE_STREAK_REPEAT
+    ):
+        return
+    types = ",".join(sorted({type(e).__name__ for _, e in failures}))
+    logger.error(
+        "polygon.snapshot_batches_failing_streak passes=%d failed=%d of=%d "
+        "types=%s — the same symbols may be sitting on an old price while "
+        "/health reads ok",
+        streak, len(failures), total, types,
+    )
+    # Mirrors tick.timeout_streak: capture explicitly so the streak pages, not
+    # just a log line. A no-op when SENTRY_DSN is unset (sentry_sdk.init never
+    # ran), and never allowed to break the pass.
+    try:
+        import sentry_sdk
+
+        sentry_sdk.capture_message(
+            f"snapshot batches failing {streak} passes in a row "
+            f"(failed={len(failures)} of {total}, types={types})",
+            level="error",
+        )
+    except Exception:
+        logger.exception("polygon.snapshot_streak.sentry_capture_failed")
+
 
 async def fetch_snapshots(
     symbols: list[str] | None = None,
@@ -268,6 +336,9 @@ async def fetch_snapshots(
     # Pull real prices + volumes from Massive in batched calls.
     syms = [r["symbol"] for r in base_rows] if symbols is None else symbols
     real_by_sym: dict[str, dict[str, Any]] = {}
+    # Symbols whose batch FAILED this pass. Their rows are dropped from the
+    # result below (not NULL-priced), so the upsert never touches them.
+    withheld: set[str] = set()
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -277,31 +348,67 @@ async def fetch_snapshots(
             ]
             sem = asyncio.Semaphore(SNAPSHOT_CONCURRENCY)
 
-            async def _one(batch: list[str]) -> dict[str, Any]:
+            async def _one(batch: list[str]) -> dict[str, Any] | Exception:
                 async with sem:
                     # Massive's v3 snapshot endpoint (the v2 path returned the
                     # legacy {day,prevDay,lastTrade} shape that parsed to zeros
                     # after the 2026-Q1 schema migration to
                     # {session,last_minute}).
-                    return await _request(
-                        client,
-                        "/v3/snapshot",
-                        params={
-                            "ticker.any_of": ",".join(batch),
-                            "limit": len(batch),
-                        },
-                    )
+                    try:
+                        return await _request(
+                            client,
+                            "/v3/snapshot",
+                            params={
+                                "ticker.any_of": ",".join(batch),
+                                "limit": len(batch),
+                            },
+                        )
+                    except Exception as exc:
+                        # `except Exception`, never BaseException: a watchdog
+                        # kill arrives as CancelledError, which must still
+                        # cancel the pass rather than be recorded as one
+                        # failed batch.
+                        return exc
 
-            # gather, not as_completed: one failing batch must abort the whole
-            # fetch so the handler below can publish NOTHING rather than a
-            # partial universe. A partial result would look like a normal tick
-            # and quietly leave the missing names on yesterday's prices.
-            bodies = await asyncio.gather(*(_one(b) for b in batches))
-            for body in bodies:
-                for t in body.get("results", []):
+            # Each batch is isolated. This used to be a bare gather, so one
+            # batch still failing after _request's retries aborted the whole
+            # pass and the tick published NOTHING: all ~48 batches (~11,600
+            # symbols, 2026-09 universe) lost that minute's price because of
+            # one bad 250-symbol request. The reasoning was that a partial
+            # result "looks like a normal tick" — but the failed batch's rows
+            # are now DROPPED, not NULL-priced, so the upsert leaves them
+            # exactly as stored and does not advance their updated_at (the
+            # live-data stamp). Staleness stays visible per row, and is
+            # confined to the 250 symbols that actually failed.
+            outcomes = await asyncio.gather(*(_one(b) for b in batches))
+            failures: list[tuple[list[str], Exception]] = []
+            for batch, outcome in zip(batches, outcomes, strict=True):
+                if isinstance(outcome, Exception):
+                    failures.append((batch, outcome))
+                    withheld.update(batch)
+                    continue
+                for t in outcome.get("results", []):
                     naive = _to_scanner_row(t)
                     if naive is not None:
                         real_by_sym[naive["symbol"]] = naive
+            _note_snapshot_failures(failures, len(batches))
+            if failures and len(failures) == len(batches):
+                # Every batch failed: a vendor outage, not a bad request.
+                # Re-raise into the handler below so the whole-pass contract
+                # is exactly what it was.
+                raise failures[0][1]
+            if failures:
+                # Exception TYPE only, never str(exc): an HTTPStatusError's
+                # message embeds the request URL. The key rides in the
+                # Authorization header (see auth_headers), but the log line
+                # has no business carrying 250 symbols per failure either.
+                logger.warning(
+                    "polygon.snapshot_batches_failed failed=%d of=%d "
+                    "batch_size=%d withheld_symbols=%d types=%s",
+                    len(failures), len(batches), SNAPSHOT_BATCH_SIZE,
+                    len(withheld),
+                    ",".join(sorted({type(e).__name__ for _, e in failures})),
+                )
     except Exception:
         # Same reasoning as the no-key exit above: a vendor outage must not be
         # laundered into a universe of fabricated quotes and scores. Returning
@@ -313,6 +420,13 @@ async def fetch_snapshots(
             return []
         logger.exception("polygon.fetch_snapshots_failed — returning mock-only rows")
         return base_rows
+
+    if withheld:
+        # Drop the failed batches' rows entirely. Keeping them would fall into
+        # the "vendor answered but had nothing for this symbol" branch below
+        # and write NULL over a perfectly good stored price — the opposite of
+        # what a failed request tells us.
+        base_rows = [r for r in base_rows if r["symbol"] not in withheld]
 
     # Merge: real price/volume + real fundamentals + recomputed composite
     for r in base_rows:
@@ -329,6 +443,10 @@ async def fetch_snapshots(
             r["day_open"] = real["day_open"]
             r["day_high"] = real["day_high"]
             r["day_low"] = real["day_low"]
+            # The vendor's own time for this price (None when it priced the
+            # row but sent no usable time). See services/quote_time.py.
+            r["quote_at"] = real["quote_at"]
+            r["quote_timeframe"] = real["quote_timeframe"]
         else:
             # The vendor call SUCCEEDED but returned nothing for this symbol.
             # Every row here started life as a _mock_snapshots() row, so leaving
@@ -344,6 +462,13 @@ async def fetch_snapshots(
             r["day_open"] = None
             r["day_high"] = None
             r["day_low"] = None
+            # The price is NULLed above, so its time goes with it. Keeping the
+            # previous quote_at would describe a price the row no longer
+            # holds: review of this change found the ticker page showing "-"
+            # for the price beside "Quote as of 3h ago". Same reasoning as the
+            # tape fields: a vendor "no read" is NULL, never a kept stale value.
+            r["quote_at"] = None
+            r["quote_timeframe"] = None
 
         # Real fundamentals from Finnhub cache (pre-fetched daily by worker)
         # ASSIGN UNCONDITIONALLY — a cache miss must leave the factor NULL.
@@ -548,6 +673,9 @@ def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
     score = _naive_score_from_move(change_1d) if change_1d is not None else None
     signal = _signal_from_score(score) if score is not None else None
 
+    quote_at, quote_timeframe, quote_source = extract_quote_time(snap)
+    _log_quote_fields_once(snap, quote_source, quote_timeframe)
+
     return {
         "symbol": ticker,
         "score": round(score, 1) if score is not None else None,
@@ -567,8 +695,44 @@ def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
         "day_open": day_open,
         "day_high": day_high,
         "day_low": day_low,
-        "last_timestamp": datetime.now(UTC).isoformat(),
+        # The vendor's own time for this price, and its DELAYED / REAL-TIME
+        # flag. This used to be `"last_timestamp": datetime.now(UTC)` — our
+        # clock, in a key nothing persisted — while the vendor's timestamp
+        # fields were dropped. None when the vendor sent no usable time; the
+        # UI then states the plan's delay instead of a time. See
+        # services/quote_time.py for which fields count and which never do.
+        "quote_at": quote_at,
+        "quote_timeframe": quote_timeframe,
     }
+
+
+#: Set once the snapshot's field names have been logged in this process.
+_quote_fields_logged = False
+
+
+def _log_quote_fields_once(
+    snap: dict[str, Any], source: str | None, timeframe: str | None,
+) -> None:
+    """Record, once per process, which timestamp fields the plan returns.
+
+    Nobody may call the vendor from a dev machine to find out, and the
+    14 Sep 2026 measurement found no last-trade or last-quote keys at all, so
+    production is where this gets answered. Field NAMES only (plus the chosen
+    source and the timeframe flag): no values, no URL, no key.
+    """
+    global _quote_fields_logged
+    if _quote_fields_logged:
+        return
+    _quote_fields_logged = True
+    fields = describe_quote_fields(snap)
+    logger.info(
+        "polygon_feed.quote_time_fields source=%s timeframe=%s top=%s "
+        "session=%s last_minute=%s last_trade=%s last_quote=%s",
+        source or "none", timeframe or "none",
+        ",".join(fields["top"]), ",".join(fields["session"]),
+        ",".join(fields["last_minute"]), ",".join(fields["last_trade"]),
+        ",".join(fields["last_quote"]),
+    )
 
 
 # =====================================================================
