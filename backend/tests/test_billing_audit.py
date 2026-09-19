@@ -1,15 +1,24 @@
 """Guards on the billing audit.
 
 It reads live Stripe and every account's tier, so the properties worth pinning
-are: it stays read-only, it never leaks a customer's email into a CI log, and
-it uses the shared vendor-object accessor rather than `.get()` — which is the
-#639 bug it partly exists to detect.
+are: it stays read-only, it never leaks a customer's email or Stripe id into
+its public CI log, and it uses the shared vendor-object accessor rather than
+`.get()` — which is the #639 bug it partly exists to detect.
 """
 
 import ast
 import inspect
+import json
+import logging
+import re
 import textwrap
+from urllib.parse import parse_qs, urlparse
 
+import pytest
+import stripe
+
+import app.db as _db
+from app.models import User
 from app.scripts import billing_audit as ba
 from app.services.stripe_compat import stripe_field
 
@@ -257,3 +266,157 @@ def test_the_accessor_survives_a_subscription_without_get():
     assert not hasattr(sub, "get")
     assert stripe_field(sub, "cancel_at_period_end") is True
     assert stripe_field(sub, "cancel_at", None) is None
+
+
+# ---------------------------------------------------------------------------
+# The log is PUBLIC. This job runs as a GitHub Action on a public repository,
+# so anything it prints is world-readable. Masking the email was never enough:
+# the 14 Sep 2026 run printed every customer's raw Stripe id 5 times over —
+# 4 times per customer from stripe-python's own INFO request logging
+# ("Request to Stripe api ... url=.../v1/customers/cus_...") and once more from
+# the audit's own per-account line, plus again on each PAST_DUE finding.
+# ---------------------------------------------------------------------------
+
+#: Fake, test-only ids. Shaped like real ones so the library routes them and
+#: the leak pattern below would catch them.
+ORPHAN = "cus_TESTorphan000001"
+DELETED = "cus_TESTdeleted00002"
+PAST_DUE = "cus_TESTpastdue00003"
+DUP_A = "cus_TESTdupeA0000004"
+DUP_B = "cus_TESTdupeB0000005"
+ALL_IDS = (ORPHAN, DELETED, PAST_DUE, DUP_A, DUP_B)
+
+
+class _FakeStripeHTTP(stripe.HTTPClient):
+    """Canned Stripe API. Going through the real library's request path is the
+    point: stripe-python's own INFO logging of each request URL is one of the
+    two ways a raw customer id reached the public log."""
+
+    name = "fake"
+
+    def request(self, method, url, headers, post_data=None, *, _usage=None):
+        u = urlparse(url)
+        q = parse_qs(u.query)
+        hdrs = {"request-id": "req_test"}
+        if u.path.startswith("/v1/customers/"):
+            cid = u.path.rsplit("/", 1)[-1]
+            if cid == ORPHAN:
+                err = {
+                    "error": {
+                        "type": "invalid_request_error",
+                        "code": "resource_missing",
+                        "param": "id",
+                        "message": f"No such customer: '{cid}'",
+                    }
+                }
+                return json.dumps(err), 404, hdrs
+            if cid == DELETED:
+                return json.dumps({"id": cid, "object": "customer", "deleted": True}), 200, hdrs
+            email = "dupe@example.com" if cid in (DUP_A, DUP_B) else "late@example.com"
+            return json.dumps({"id": cid, "object": "customer", "email": email}), 200, hdrs
+        if u.path == "/v1/subscriptions":
+            cid = q.get("customer", [""])[0]
+            data = []
+            if cid == PAST_DUE:
+                data = [{
+                    "id": "sub_TESTpastdue0001",
+                    "object": "subscription",
+                    "status": "past_due",
+                    "cancel_at_period_end": False,
+                    "items": {"object": "list", "data": []},
+                }]
+            body = {"object": "list", "data": data, "has_more": False, "url": "/v1/subscriptions"}
+            return json.dumps(body), 200, hdrs
+        if u.path == "/v1/invoices":
+            body = {"object": "list", "data": [], "has_more": False, "url": "/v1/invoices"}
+            return json.dumps(body), 200, hdrs
+        return json.dumps({"error": {"type": "api_error", "message": "unrouted"}}), 500, hdrs
+
+
+async def _seed_customers() -> None:
+    async with _db.SessionLocal() as s:
+        for i, cid in enumerate(ALL_IDS):
+            s.add(User(
+                id=f"u{i}", email=f"acct{i}@example.com", tier="free",
+                password_hash="x", stripe_customer_id=cid,
+            ))
+        await s.commit()
+
+
+async def _run_audit_capturing(monkeypatch, caplog) -> str:
+    await _seed_customers()
+    monkeypatch.setattr(ba.settings, "stripe_secret_key", "sk_test_fake", raising=False)
+    monkeypatch.setattr(stripe, "api_key", None)
+    monkeypatch.setattr(stripe, "default_http_client", _FakeStripeHTTP())
+    monkeypatch.setattr(stripe, "max_network_retries", 0)
+    # Production runs the module as a script, where `logging.basicConfig(
+    # level=INFO)` puts an INFO handler on the root logger. Mirror that.
+    caplog.set_level(logging.INFO)
+    await ba._main()
+    # Every record from every logger, as it would print — the stripe library's
+    # own request lines included.
+    return "\n".join(r.getMessage() for r in caplog.records)
+
+
+async def test_the_public_log_carries_no_raw_customer_id(monkeypatch, caplog):
+    text = await _run_audit_capturing(monkeypatch, caplog)
+    # The run really exercised every path that used to print an id — the
+    # per-account line, ORPHAN (both kinds), PAST_DUE, PAID_NOT_GRANTED and
+    # DUPLICATE_CUSTOMER — otherwise a clean log would prove nothing.
+    for section in ("ORPHAN_CUSTOMER", "PAST_DUE", "PAID_NOT_GRANTED", "DUPLICATE_CUSTOMER"):
+        assert re.search(rf"^{section}\s+[1-9]", text, re.M), f"{section} was not exercised"
+    leaked = sorted({cid for cid in ALL_IDS if cid in text})
+    assert not leaked, f"raw Stripe customer ids in the public log: {leaked}"
+    assert not re.search(r"cus_[A-Za-z0-9]{6,}", text), "a raw customer id shape survived"
+
+
+async def test_findings_still_name_the_account_by_a_stable_hash(monkeypatch, caplog):
+    """Hashing must not make the report useless: each finding still carries a
+    handle the operator can match against the database, and it is the same
+    handle every week."""
+    text = await _run_audit_capturing(monkeypatch, caplog)
+    assert ba._mask_stripe_id(PAST_DUE) in text
+    assert ba._mask_stripe_id(ORPHAN) in text
+    assert ba._mask_stripe_id(DUP_A) in text and ba._mask_stripe_id(DUP_B) in text
+
+
+def test_stripe_library_request_logging_is_silenced(caplog):
+    """stripe-python logs every request URL — which embeds the customer id —
+    at INFO on the `stripe` logger. Under the script's INFO root handler that
+    went straight into the public log."""
+    caplog.set_level(logging.INFO)
+    logging.getLogger("stripe").info(
+        "message='Request to Stripe api' method=get "
+        "url=https://api.stripe.com/v1/customers/cus_TESTlogline00001"
+    )
+    assert "cus_TESTlogline00001" not in caplog.text
+
+
+def test_customer_id_mask_is_stable_one_way_and_distinct():
+    a = ba._mask_stripe_id(PAST_DUE)
+    assert a == ba._mask_stripe_id(PAST_DUE), "must be stable across runs"
+    assert PAST_DUE not in a and PAST_DUE[4:] not in a
+    assert a != ba._mask_stripe_id(ORPHAN)
+    assert ba._mask_stripe_id(None) == "(none)"
+    assert ba._mask_stripe_id("") == "(none)"
+    # Free text (an exception message quotes the id it failed on) is scrubbed.
+    scrubbed = ba._scrub(f"No such customer: '{ORPHAN}'")
+    assert ORPHAN not in scrubbed and ba._mask_stripe_id(ORPHAN) in scrubbed
+
+
+def test_a_crash_does_not_print_a_raw_customer_id(monkeypatch, caplog):
+    """An uncaught Stripe error is printed by Python as a traceback whose
+    message can quote the customer id it failed on. The entry point scrubs it
+    and still exits non-zero, so the Actions run still goes red."""
+    crash_id = "cus_TESTcrash0000001"
+
+    async def _boom() -> None:
+        raise RuntimeError(f"Request req_test: No such customer: '{crash_id}'")
+
+    monkeypatch.setattr(ba, "_main", _boom)
+    caplog.set_level(logging.INFO)
+    with pytest.raises(SystemExit) as exit_:
+        ba.main()
+    assert exit_.value.code == 1
+    assert crash_id not in caplog.text
+    assert ba._mask_stripe_id(crash_id) in caplog.text

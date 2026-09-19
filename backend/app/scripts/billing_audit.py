@@ -35,12 +35,16 @@ FINDINGS
   DUPLICATE_CUSTOMER Two Stripe customers share one email — a double-billing
                      risk the moment both subscribe.
 
-Emails are masked in the output: this runs in CI logs.
+Emails are masked and Stripe ids are hashed in the output: this runs in the
+Actions log of a PUBLIC repository, which anyone can read.
 """
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
+import re
+import traceback
 from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any
@@ -54,6 +58,14 @@ from app.services.stripe_compat import stripe_field as _f
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("billing_audit")
+# stripe-python logs every request at INFO on the "stripe" logger, and the URL
+# carries the customer id (".../v1/customers/cus_…",
+# ".../v1/subscriptions?customer=cus_…"). Under the INFO root handler above
+# that went straight into the public Actions log: the 14 Sep 2026 run printed
+# each customer's raw id four times this way. Nothing of the audit's own is
+# lost: a failed Stripe call still raises into this script, which reports it
+# through _scrub().
+logging.getLogger("stripe").setLevel(logging.WARNING)
 
 settings = get_settings()
 
@@ -68,6 +80,30 @@ def _mask_email(email: str | None) -> str:
     name, _, domain = email.partition("@")
     head = name[:2] if len(name) > 2 else name[:1]
     return f"{head}***@{domain}" if domain else f"{head}***"
+
+
+def _mask_stripe_id(obj_id: str | None) -> str:
+    """A Stripe object id as a short one-way hash, e.g. `cus#1a2b3c4d5e`.
+
+    Stable, so the same account can be followed from one weekly run to the
+    next, and the operator can match a finding by hashing the ids they can
+    already read in the database. One-way, so the public log never carries an
+    id that works in the Stripe dashboard or API.
+    """
+    if not obj_id:
+        return "(none)"
+    prefix = obj_id.split("_", 1)[0] if "_" in obj_id else "id"
+    return f"{prefix}#{hashlib.sha256(obj_id.encode()).hexdigest()[:10]}"
+
+
+#: Stripe object ids that identify a customer or their billing. Free text
+#: (an exception message quotes the id it failed on) is scrubbed with this.
+_STRIPE_ID = re.compile(r"\b(?:cus|sub|pm|pi|ch)_[A-Za-z0-9]{6,}\b")
+
+
+def _scrub(text: object) -> str:
+    """`str(text)` with every Stripe object id in it hashed."""
+    return _STRIPE_ID.sub(lambda m: _mask_stripe_id(m.group(0)), str(text))
 
 
 def _price_to_tier(price_id: str) -> str | None:
@@ -108,7 +144,7 @@ async def _revenue() -> None:
     try:
         invoices = await asyncio.to_thread(stripe.Invoice.list, status="paid", limit=100)
     except Exception as exc:
-        logger.error("  could not list invoices — %s", exc)
+        logger.error("  could not list invoices — %s", _scrub(exc))
         return
 
     data = _f(invoices, "data", []) or []
@@ -170,6 +206,7 @@ async def _audit() -> None:
         who = _mask_email(getattr(u, "email", None))
         local_tier = (getattr(u, "tier", "") or "free").lower()
         cust = getattr(u, "stripe_customer_id", None)
+        cust_ref = _mask_stripe_id(cust)  # what the public log may carry
         is_admin = bool(getattr(u, "is_admin", False))
         # Hand-comped / lifetime accounts legitimately hold a paid tier with no
         # subscription. Treat them as explained rather than as findings.
@@ -192,10 +229,10 @@ async def _audit() -> None:
         try:
             customer = await asyncio.to_thread(stripe.Customer.retrieve, cust)
         except Exception as exc:
-            findings["ORPHAN_CUSTOMER"].append(f"{who} {cust} — {exc}")
+            findings["ORPHAN_CUSTOMER"].append(f"{who} {cust_ref} — {_scrub(exc)}")
             continue
         if _f(customer, "deleted"):
-            findings["ORPHAN_CUSTOMER"].append(f"{who} {cust} — deleted in Stripe")
+            findings["ORPHAN_CUSTOMER"].append(f"{who} {cust_ref} — deleted in Stripe")
             continue
 
         cust_email = str(_f(customer, "email", "") or "")
@@ -229,11 +266,11 @@ async def _audit() -> None:
                 churn.append((who, str(_f(sub, "status", "?")), local_tier, ends))
 
         if any(str(_f(s, "status", "")) == "past_due" for s in live):
-            findings["PAST_DUE"].append(f"{who} {cust} — Stripe cannot collect")
+            findings["PAST_DUE"].append(f"{who} {cust_ref} — Stripe cannot collect")
 
         if live and local_tier not in PAID_TIERS:
             findings["PAID_NOT_GRANTED"].append(
-                f"{who} {cust} stripe={statuses} but local tier={local_tier}"
+                f"{who} {cust_ref} stripe={statuses} but local tier={local_tier}"
             )
         elif live and stripe_tier and stripe_tier != local_tier:
             findings["TIER_MISMATCH"].append(
@@ -246,7 +283,7 @@ async def _audit() -> None:
 
         logger.info(
             "  %-26s local=%-8s customer=%s subs=%s",
-            who, local_tier, cust[:20], ",".join(statuses),
+            who, local_tier, cust_ref, ",".join(statuses),
         )
 
     # Duplicate customers by email — a double-billing risk once both subscribe.
@@ -256,7 +293,8 @@ async def _audit() -> None:
     for em, cids in by_email.items():
         if len(cids) > 1:
             findings["DUPLICATE_CUSTOMER"].append(
-                f"{_mask_email(em)} -> {len(cids)} customers: {', '.join(cids)}"
+                f"{_mask_email(em)} -> {len(cids)} customers: "
+                f"{', '.join(_mask_stripe_id(c) for c in cids)}"
             )
 
     logger.info("")
@@ -318,5 +356,17 @@ async def _main() -> None:
     await _revenue()
 
 
+def main() -> None:
+    """Entry point. An uncaught Stripe error's message can quote the id it
+    failed on ("No such customer: 'cus_…'"), and Python would print that
+    traceback raw into the public log. Scrub it; still exit non-zero so the
+    Actions run goes red exactly as before."""
+    try:
+        asyncio.run(_main())
+    except Exception:
+        logger.error(_scrub(traceback.format_exc()))
+        raise SystemExit(1) from None
+
+
 if __name__ == "__main__":
-    asyncio.run(_main())
+    main()

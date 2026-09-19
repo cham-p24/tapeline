@@ -19,8 +19,10 @@ name: Billing audit (local tier vs live Stripe)
 # It is printed first and loudest.
 #
 # Takes no inputs, so it cannot become an arbitrary-command runner. Customer
-# emails are masked in the output because these logs are world-readable on this
-# public repo.
+# emails are masked, Stripe ids are hashed and stripe-python's own request
+# logging is silenced, because these logs are world-readable on this public
+# repo. NOTE: this runs the DEPLOYED backend's copy of the script, so a change
+# to billing_audit.py only reaches this job after the backend deploy.
 
 on:
   workflow_dispatch:
