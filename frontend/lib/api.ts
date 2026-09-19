@@ -463,6 +463,10 @@ export type AnalystRatings = {
 export type TickerFinancials = {
   symbol: string;
   available: boolean;
+  /** "non_common" when the listing is a note, preferred, warrant, right or
+   *  unit: the vendor's figures for it would be its issuer's, so none are
+   *  fetched. Absent otherwise. */
+  reason?: string;
   metrics: {
     pe?: number | null;
     margin?: number | null;

@@ -14,7 +14,7 @@ from datetime import UTC, date, datetime, timedelta
 from time import monotonic
 from typing import Any
 
-from sqlalchemy import bindparam, case, delete, desc, func, select, true, update
+from sqlalchemy import bindparam, case, delete, desc, func, or_, select, true, update
 from sqlalchemy.exc import IntegrityError
 
 from app.config import get_settings
@@ -4165,9 +4165,46 @@ async def _clear_non_common_fundamentals() -> int:
     return cleared
 
 
+#: Company-wide figures the key-statistics pass writes from the vendor's
+#: /stock/metric blob. For a non-common listing they are its issuer's.
+_ISSUER_STAT_COLUMNS: tuple[str, ...] = (
+    "beta", "pe_ttm", "eps_ttm", "dividend_yield", "ex_dividend_date",
+)
+
+
+async def _clear_non_common_issuer_stats() -> int:
+    """Blank the issuer's company-wide figures on every non-common listing.
+
+    _backfill_key_statistics wrote beta, P/E, EPS, dividend yield and
+    ex-dividend date from the vendor's answer for the symbol, which for a note,
+    preferred, warrant, right or unit is its ISSUER's (AGNCO, an AGNC
+    preferred, carried AGNC common's 16.5% yield against its own 6.50% coupon;
+    28 of 120 flagged rows held at least one of P/E, EPS or yield, 2026-09-19).
+    That pass no longer asks for them; this clears what it already wrote.
+    Market cap is left to the profile path (finnhub_feed), which refuses a
+    non-common symbol's cap. One statement; updated_at held still, since no
+    live data changed. Returns the rows cleared."""
+    has_any = or_(*(getattr(Ticker, c).is_not(None) for c in _ISSUER_STAT_COLUMNS))
+    async with session_scope() as session:
+        result = await session.execute(
+            update(Ticker)
+            .where(Ticker.is_non_common.is_(True), has_any)
+            .values({
+                **dict.fromkeys(_ISSUER_STAT_COLUMNS),
+                "updated_at": Ticker.updated_at,
+            })
+            .execution_options(synchronize_session=False)
+        )
+    cleared = result.rowcount or 0  # type: ignore[attr-defined]
+    if cleared:
+        logger.info("key_stats.non_common_cleared rows=%d", cleared)
+    return cleared
+
+
 async def _settle_non_common() -> None:
     """Reconcile the non-common flag against the whole universe, then retire
-    the fundamentals reading on every row it flags. Never raises.
+    what a flagged row holds that is really its issuer's: the fundamentals
+    reading and the company-wide key statistics. Never raises.
 
     The reconcile also tells this process's fundamentals cache which symbols
     take no reading (finnhub_feed._NO_FUNDAMENTALS), so it must run before the
@@ -4177,6 +4214,10 @@ async def _settle_non_common() -> None:
         await _clear_non_common_fundamentals()
     except Exception:
         logger.exception("fundamentals.non_common_clear_pass_failed")
+    try:
+        await _clear_non_common_issuer_stats()
+    except Exception:
+        logger.exception("key_stats.non_common_clear_failed")
 
 
 async def _refresh_insider_cache(
@@ -4679,6 +4720,10 @@ async def _backfill_key_statistics(cap: int = 2500) -> None:
     async with session_scope() as session:
         result = await session.execute(
             select(Ticker.symbol)
+            # Not for a note, preferred, warrant, right or unit: the vendor's
+            # beta, P/E, EPS and dividend figures for it are its issuer's. See
+            # _clear_non_common_issuer_stats.
+            .where(Ticker.is_non_common.is_(False))
             # NULLS LAST across dialects — see _refresh_fundamentals_cache.
             .order_by(desc(func.coalesce(Ticker.volume * Ticker.price, -1)))
             .limit(KEY_STATS_CAP)

@@ -49,6 +49,14 @@ export function FinancialsTab({ symbol }: { symbol: string }) {
         ))}
       </div>
     );
+  if (data.reason === "non_common")
+    return (
+      <p className="text-sm text-muted">
+        Not shown for {symbol}: it is a note, preferred share, warrant, right or unit
+        rather than the company&rsquo;s common stock, and the financial figures a data
+        vendor returns for it are its issuer&rsquo;s, not its own.
+      </p>
+    );
   if (!data.available)
     return (
       <p className="text-sm text-muted">

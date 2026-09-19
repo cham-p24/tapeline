@@ -41,6 +41,18 @@ type LogEntry = {
 };
 
 const METHODOLOGY_LOG: LogEntry[] = [
+  // Display change for the listings #875 flags. Counts measured read-only
+  // against production on 2026-09-19: of 120 flagged listings, 28 showed at
+  // least one of P/E, EPS or dividend yield and 96 a market cap, all their
+  // issuer's. The ref must be this PR's number (rule 2).
+  {
+    date: "2026-09-19",
+    kind: "correction",
+    title: "Ticker pages for notes, preferred shares and warrants no longer show their issuer's company figures",
+    body:
+      "A listing that trades like a stock but is not the company's common shares (an exchange-listed note, a preferred or depositary share, a warrant, a right or a unit) was shown with its issuer's company-wide figures as if they were its own: market cap, beta, P/E, EPS, dividend yield and, in the app, the Financials tab. A data vendor answers such a symbol with the company's figures, so a preferred share's page could show the company's market cap and its common stock's dividend yield instead of its own coupon. From this date those fields show a dash on such a listing, with a line saying why, and the Financials tab says why it shows nothing. The listing's own trading figures, its prices, ranges and volumes, are unchanged. Listings are recognised by name and symbol, the same rule as the entry below titled \"Notes, preferred shares and warrants no longer qualify for the daily record\", which does not catch every one. No recorded entry was changed.",
+    ref: "#__PR__",
+  },
   // Two scope changes in one PR (fix/keyless-no-prices). Counts measured
   // read-only against production on 2026-09-19: 27 rows ending "=F" and the
   // two hyphen rows BRK-A/BRK-B, price and change_pct_1d NULL on all 29;

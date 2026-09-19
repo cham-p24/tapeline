@@ -91,6 +91,9 @@ export type KeyStats = {
   /** Indicated annual yield as a PERCENT (Finnhub's units: 0.43 → "0.43%"). */
   dividend_yield?: number | null;
   ex_dividend_date?: string | null;
+  /** True for a note, preferred, warrant, right or unit. The backend blanks the
+   *  company-wide figures for it (they would be its issuer's); this says why. */
+  is_non_common?: boolean;
 };
 
 /** The single, deliberate rendering of "we do not hold this value". */
@@ -115,6 +118,11 @@ export function KeyStatistics({ stats }: { stats: KeyStats }) {
           Market fields as reported. An em-dash means we hold no value for this
           ticker &mdash; most of the universe has no daily price or volume read.
         </p>
+        {stats.is_non_common && (
+          <p className="mt-2 text-xs text-muted">
+            This listing is a note, preferred share, warrant, right or unit, not the company&rsquo;s common stock. Company-wide figures such as market cap, earnings and dividends belong to the issuer, so they are not shown here.
+          </p>
+        )}
       </div>
 
       {/* Overflow container: the grid reflows to one column on a phone and no
