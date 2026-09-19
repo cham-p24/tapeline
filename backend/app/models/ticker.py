@@ -221,6 +221,26 @@ class Ticker(Base):
     )
     quote_timeframe: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
+    # When a COMPLETE universe-discovery walk first failed to list this symbol
+    # among the vendor's active US listings, of any type. NULL = listed (or
+    # never checked). Migration 0077.
+    #
+    # Written only by signal_publisher._refresh_universe, which stamps it on a
+    # complete, plausibly whole walk and clears it when the symbol reappears;
+    # services/delisting.py holds the rules and the safety cap. A retired row
+    # is KEPT, not deleted: watchlists still hold it and the public record's
+    # entries for it are immutable. It leaves every ranked surface, the
+    # snapshot universe and the factor passes through ONE predicate,
+    # services/ticker_freshness.listed_clause, and /api/ticker/{symbol}
+    # answers 404 "No longer trading" for it.
+    #
+    # Before this existed nothing retired a ticker, and a symbol that stopped
+    # trading kept a frozen price and a live score: GREE (renamed VIP on 24 Jul
+    # 2026) read 75.8 STRONG SETUP on 19 Sep.
+    delisted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
     # When this row's LIVE DATA — price, score, factors — was last refreshed.
     #
     # Readers depend on exactly that meaning: services/ticker_freshness.py

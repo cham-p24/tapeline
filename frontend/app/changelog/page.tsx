@@ -67,6 +67,22 @@ const METHODOLOGY_LOG: LogEntry[] = [
       "The Fundamentals factor reads reported figures such as margin, return on equity and growth. For a listing that trades like a stock but is not the company's common shares (an exchange-listed note, a preferred or depositary share, a warrant, a right or a unit), the figures a data vendor returns are the issuer's, not the listing's, and until this change they were scored as if they were its own. From this date those listings take no Fundamentals reading: the factor is unavailable for them and the composite uses a mid-range value in its place, as it does for most ETFs. Their scores and labels were recalculated without it, and where the one-line summary had cited fundamentals, it no longer does. They are recognised by listing name and symbol, the same rule as the entry below titled \"Notes, preferred shares and warrants no longer qualify for the daily record\", which does not catch every one. No recorded entry was changed.",
     ref: "#878",
   },
+  // Retiring tickers that stopped trading (branch fix/retire-delisted-tickers).
+  // Measured read-only against production on 2026-09-19: GREE scored 75.8
+  // (STRONG SETUP) two months after the rename to VIP; 11,828 rows stored as
+  // stocks or ETFs. How many are retired is only known after the first
+  // complete pass in production, so no count is stated. Placed below #878
+  // rather than on top only to keep a parallel PR's rebase mechanical; the
+  // dates are equal. The ref must be this PR's number: set it when the PR is
+  // opened (rule 2).
+  {
+    date: "2026-09-19",
+    kind: "scope",
+    title: "Tickers that stop trading are retired instead of staying ranked",
+    body:
+      "Until 19 September 2026 nothing removed a ticker that had stopped trading. It kept its last price, a daily score and its place in the scanner, search, the public signals list and the pool the daily record is drawn from. GREE, for example, was renamed VIP on 24 July 2026, and on 19 September its old symbol still scored 75.8, labelled STRONG SETUP. From this date, when a complete pass over our data vendor's list of active US listings no longer includes a stock or ETF under any listing type, that ticker is retired. It leaves the scanner, search, the public signals list, the API and the site map, it can no longer be listed on the daily record, and its page says it is no longer trading and the date its absence was first seen. Its score is no longer updated. A retired ticker that reappears on the vendor's list is restored. A pass that stops partway, or that lists far fewer tickers than the market holds, retires nothing, and a pass that would retire an unusually large number at once retires none of them until the list has been checked by hand. Crypto pairs are not affected. Watchlists keep retired tickers. How many tickers this retires is known only after the first complete pass. No recorded entry was changed: entries already on the record for a ticker that is later retired stay as listed.",
+    ref: "#TBD",
+  },
   // #875 changed what may enter the record, the same kind of change as #761
   // (2026-09-06). Counts measured read-only against production on 2026-09-18:
   // 120 of the 6,012 rows stored as stocks are one of these listings, 118 of

@@ -211,6 +211,8 @@ async def _refresh_active_universe(target_size: int | None = None) -> int:
             # express NULLS LAST in DESC order: NULL → -1 → sorts last.
             from sqlalchemy import func
 
+            from app.services.ticker_freshness import listed_clause
+
             # Crypto is EXCLUDED. This list feeds the equity snapshot pass,
             # and the vendor answers NOT_ENTITLED for a pair on that endpoint.
             #
@@ -236,6 +238,11 @@ async def _refresh_active_universe(target_size: int | None = None) -> int:
             sort_key = func.coalesce(Ticker.volume * Ticker.price, -1)
             r = await session.execute(
                 select(Ticker.symbol, Ticker.name, Ticker.sector)
+                # Retired as no longer trading (2026-09-19): the snapshot for a
+                # dead symbol answers with its last close, which kept GREE
+                # priced and ranked weeks after it was renamed VIP. See
+                # services/delisting.py.
+                .where(listed_clause())
                 .where(Ticker.score.is_not(None))
                 .where(func.coalesce(Ticker.asset_class, "") != "crypto")
                 .where(*covered_clauses())
@@ -259,7 +266,7 @@ async def _refresh_active_universe(target_size: int | None = None) -> int:
                     await session.execute(
                         select(func.count())
                         .select_from(Ticker)
-                        .where(Ticker.score.is_not(None))
+                        .where(listed_clause(), Ticker.score.is_not(None))
                     )
                 ).scalar_one()
                 if total_scored > size:
@@ -294,6 +301,8 @@ async def _refresh_active_universe(target_size: int | None = None) -> int:
                 global _bootstrap_cursor
                 seen = {row[0] for row in rows}
                 unscored_scope = (
+                    # Nor a retired row; see the first select.
+                    listed_clause(),
                     Ticker.score.is_(None),
                     # Same exclusion as above: a never-scored crypto pair must
                     # not be handed to the equity snapshot either.

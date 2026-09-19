@@ -62,6 +62,7 @@ from app.services.non_common import (
 from app.services.polygon_feed import fetch_regime, fetch_snapshots
 from app.services.pubsub import broker
 from app.services.scorecard_backcheck import backcheck_all_pending, is_trading_day
+from app.services.ticker_freshness import listed_clause
 from app.services.universe import refresh_active_universe
 
 logger = logging.getLogger(__name__)
@@ -3039,7 +3040,16 @@ def _factor_scope_clause(stamp_col: Any) -> Any:
     token. On 2026-09-14 all 106 X: pairs had been asked, 0 held a reading, and
     each empty answer now opens a clear. The gap query applies this too, so the
     due count and the selection still cover exactly the same rows.
+
+    Retired rows are out of both passes (2026-09-19): a symbol no longer
+    trading has no new filings or financials to read, and each ask spent an
+    SEC or Finnhub request on it. See services/delisting.py.
     """
+    return _factor_class_scope(stamp_col) & listed_clause()
+
+
+def _factor_class_scope(stamp_col: Any) -> Any:
+    """The per-factor part of `_factor_scope_clause`."""
     if stamp_col.key == "last_smart_money_at":
         return Ticker.symbol.not_like("X:%")
     if stamp_col.key == "last_fundamentals_at":
@@ -4826,10 +4836,19 @@ def _is_placeholder_name(name: str | None, symbol: str) -> bool:
 
 async def _refresh_universe() -> None:
     """
-    Weekly universe refresh from Polygon /v3/reference/tickers.
-    Adds newly-listed equities + ETFs to the Ticker table; does NOT
-    delete delistings (delisted tickers just stop receiving snapshot updates).
+    Universe refresh from Polygon /v3/reference/tickers (weekly, and on boot).
+    Adds newly-listed equities + ETFs to the Ticker table, reconciles name and
+    asset_class on existing rows, and RETIRES rows that have stopped trading
+    by stamping `delisted_at` (clearing it if the symbol comes back).
+
+    Rows are never deleted. This docstring used to say delisted tickers "just
+    stop receiving snapshot updates"; measured on 2026-09-19 they did not:
+    GREE, renamed VIP on 24 Jul 2026, still carried a price, a daily score of
+    75.8 STRONG SETUP and a place on every ranked surface. The retirement rules
+    and their safety guards (complete walk only, any instrument type, plausible
+    size, per-run cap) are in services/delisting.py.
     """
+    from app.services.delisting import StoredListing
     from app.services.polygon_feed import discover_active_us_tickers
 
     new_rows = await discover_active_us_tickers()
@@ -4841,9 +4860,11 @@ async def _refresh_universe() -> None:
     # planned in memory and applied in small batches — see _apply below.
     async with session_scope() as session:
         existing_r = await session.execute(
-            select(Ticker.symbol, Ticker.name, Ticker.asset_class)
+            select(Ticker.symbol, Ticker.name, Ticker.asset_class, Ticker.delisted_at)
         )
-        existing = {r[0]: (r[1], r[2]) for r in existing_r.all()}
+        existing_rows = existing_r.all()
+    existing = {r[0]: (r[1], r[2]) for r in existing_rows}
+    listings = {r[0]: StoredListing(asset_class=r[2], delisted_at=r[3]) for r in existing_rows}
 
     inserts: list[dict[str, object]] = []
     edits: list[dict[str, object]] = []
@@ -4987,10 +5008,85 @@ async def _refresh_universe() -> None:
         "universe.write_detail planned_inserts=%d applied=%d planned_edits=%d applied=%d",
         added, applied_i, len(edits), applied_e,
     )
+    await _apply_delistings(new_rows, listings)
+
     # Rows this pass did not touch can still change: a new listing is the
     # four-letter base that makes an existing fifth-letter symbol a unit,
     # right or warrant. See services/non_common.py.
     await _settle_non_common()
+
+
+async def _apply_delistings(
+    discovered: list[dict[str, str]],
+    stored: dict[str, Any],
+) -> None:
+    """Retire stored rows the vendor no longer lists; un-retire any that are back.
+
+    `discovered` is what `discover_active_us_tickers` returned. Its
+    `active_symbols` (every active symbol, of any type) and `complete` ride on
+    the DiscoveredUniverse it really is; a plain list carries neither and is
+    treated as an incomplete walk, which may un-retire but never retire. The
+    rules live in services/delisting.py.
+
+    Both writes hold updated_at still: retiring a row is reference data, not a
+    refresh of its live numbers (see the comment on Ticker.updated_at).
+    """
+    from app.services.delisting import LOG_SAMPLE, plan_delistings
+
+    plan = plan_delistings(
+        stored,
+        active_symbols=getattr(discovered, "active_symbols", frozenset()),
+        discovered_symbols=[r["symbol"] for r in discovered],
+        complete=bool(getattr(discovered, "complete", False)),
+    )
+
+    if plan.skipped == "safety_cap":
+        # Loud and inert. A vendor answer missing a whole instrument type or a
+        # page would read as thousands of delistings at once; retiring them
+        # would empty the scanner. A genuine backlog this size is read from
+        # the sample and the cap in services/delisting.py raised by hand.
+        logger.error(
+            "universe.delisting_capped would_retire=%d cap=%d retired=0 "
+            "sample=%s — nothing retired; if the sample reads as genuine "
+            "delistings, raise the cap in services/delisting.py",
+            plan.candidates, plan.cap, ",".join(plan.sample),
+        )
+    elif plan.skipped is not None:
+        logger.info("universe.delisting_skipped reason=%s", plan.skipped)
+
+    now = datetime.now(UTC)
+    retired = await _stamp_delisted(plan.retire, now)
+    restored = await _stamp_delisted(plan.restore, None)
+    if plan.skipped is None:
+        # The line to read after a deploy: `retired` is how many rows this
+        # walk took off every surface, `candidates` how many it found.
+        logger.log(
+            logging.WARNING if retired else logging.INFO,
+            "universe.delisting retired=%d candidates=%d cap=%d sample=%s",
+            retired, plan.candidates, plan.cap, ",".join(plan.sample),
+        )
+    if plan.restore:
+        logger.warning(
+            "universe.delisting_restored restored=%d symbols=%s",
+            restored, ",".join(plan.restore[:LOG_SAMPLE]),
+        )
+
+
+async def _stamp_delisted(symbols: list[str], value: datetime | None) -> int:
+    """Set `delisted_at` on `symbols` in small batches; returns rows written."""
+    written = 0
+    for i in range(0, len(symbols), _UNIVERSE_WRITE_BATCH):
+        chunk = symbols[i : i + _UNIVERSE_WRITE_BATCH]
+        try:
+            async with session_scope() as s2:
+                await s2.execute(
+                    update(Ticker).where(Ticker.symbol.in_(chunk))
+                    .values(delisted_at=value, updated_at=Ticker.updated_at)
+                )
+            written += len(chunk)
+        except Exception:
+            logger.exception("universe.delisting_batch_failed size=%d", len(chunk))
+    return written
 
 
 async def _seed_calendar() -> None:

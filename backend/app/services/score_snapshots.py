@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import ScoreSnapshot, Ticker
 from app.services.scorecard_backcheck import is_trading_day
+from app.services.ticker_freshness import listed_clause
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,14 @@ async def capture_score_snapshots(session: AsyncSession, snapshot_date: date) ->
             Ticker.symbol,
             Ticker.score,
             *(getattr(Ticker, c) for c in _FACTOR_COLUMNS),
-        ).where(Ticker.score.is_not(None))
+        ).where(
+            Ticker.score.is_not(None),
+            # A retired row (no longer trading, 2026-09-19) is not archived:
+            # its score is frozen, and a new dated row a day would record a
+            # model opinion about a listing that no longer exists. Rows
+            # already captured are untouched. See services/delisting.py.
+            listed_clause(),
+        )
     )
     payload = [
         {
