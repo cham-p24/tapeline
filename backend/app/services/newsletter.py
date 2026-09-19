@@ -339,6 +339,13 @@ async def run_daily_digest(
     )
     for _clause in await live_clauses(session):
         _top_stmt = _top_stmt.where(_clause)
+    # No crypto, the same universe as the scanner's default view and the daily
+    # record (asset_class.DEFAULT_EXCLUDED_CLASSES): a coin's score is built from
+    # four readings, a stock's from six. Since 2026-09-19 a coin can score up to
+    # 81.25, which is enough to rank in a mixed top-N list.
+    # The digest's own copy says "US tickers from the 6-factor composite".
+    from app.services.asset_class import default_view_clause
+    _top_stmt = _top_stmt.where(default_view_clause())
     top_q = await session.execute(
         _top_stmt.order_by(desc(Ticker.score)).limit(10)
     )
