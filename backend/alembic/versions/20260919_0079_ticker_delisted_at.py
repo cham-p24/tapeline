@@ -19,8 +19,8 @@ Additive: one nullable column, no backfill. Which rows are retired is only
 known after the first complete walk in production, so there is nothing honest
 to backfill with here.
 
-Revision ID: 0077_ticker_delisted_at
-Revises: 0075_ticker_quote_at
+Revision ID: 0079_ticker_delisted_at
+Revises: 0078_market_cap_usd_only
 """
 from __future__ import annotations
 
@@ -28,8 +28,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0077_ticker_delisted_at"
-down_revision = "0075_ticker_quote_at"
+revision = "0079_ticker_delisted_at"
+down_revision = "0078_market_cap_usd_only"
 branch_labels = None
 depends_on = None
 

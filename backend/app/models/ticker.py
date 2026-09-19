@@ -223,7 +223,7 @@ class Ticker(Base):
 
     # When a COMPLETE universe-discovery walk first failed to list this symbol
     # among the vendor's active US listings, of any type. NULL = listed (or
-    # never checked). Migration 0077.
+    # never checked). Migration 0079.
     #
     # Written only by signal_publisher._refresh_universe, which stamps it on a
     # complete, plausibly whole walk and clears it when the symbol reappears;
