@@ -186,12 +186,13 @@ async def test_a_row_left_with_one_factor_has_no_composite() -> None:
     assert (t.score, t.signal) == (None, None)
 
 
-async def test_the_clear_keeps_the_sheet_s_own_columns_on_a_sheet_owned_row(
+async def test_the_clear_keeps_the_sheet_s_grade_but_rewrites_the_sentence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Same rule as _clear_smart_money_reading: the sheet writes neither the
-    reason nor confidence_pct (a conviction grade there). Mutation: writing the
-    tick's full set on a sheet-owned row."""
+    """confidence_pct is the sheet's conviction grade on its rows and is left
+    alone, as _clear_smart_money_reading does. The reason is not: nothing else
+    rewrites it on a sheet-owned row. Mutations: writing the tick's full set on
+    a sheet-owned row; leaving the reason out."""
     monkeypatch.setattr(sp, "_sheet_is_scoring_source", lambda: True)
     monkeypatch.setattr(sp, "_sheet_governed_symbols", frozenset({NOTE}))
     await _seed(NOTE, non_common=True, confidence_pct=85.0)
@@ -199,7 +200,12 @@ async def test_the_clear_keeps_the_sheet_s_own_columns_on_a_sheet_owned_row(
     t = await _row(NOTE)
     assert t.sub_fundamentals is None
     assert t.score == AFTER
-    assert t.confidence_pct == 85.0
+    assert t.confidence_pct == 85.0, "the sheet's conviction grade was overwritten"
+    # The reason IS re-rendered: nothing else rewrites a sheet-owned row's
+    # sentence, so it would keep citing the factor it no longer has.
+    assert t.reason is not None and "fundamental" not in t.reason.lower(), (
+        f"a sheet-owned row kept a sentence citing fundamentals: {t.reason!r}"
+    )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -378,3 +384,66 @@ async def test_the_pass_never_writes_a_reading_for_one_that_slipped_through(
     assert (await _row(NOTE)).sub_fundamentals is None, (
         "the pass wrote the issuer's reading onto the note"
     )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Found in review
+# ═════════════════════════════════════════════════════════════════════════════
+
+async def test_the_api_process_cannot_write_back_a_value_it_cached_before_the_clear(
+) -> None:
+    """The API process runs the warm and the sheet ingest on every webhook but
+    never the reconcile. A value it cached before the row was flagged and
+    cleared must not come back. Reproduced in review: the row returned to 95
+    and STRONG SETUP. Mutation: the warm not publishing the flagged set."""
+    from app.services.sheet_feed import parse_all_signals_csv, upsert_tickers
+
+    await _seed(NOTE, non_common=False, name=NOTE_NAME)
+    await finnhub_feed.warm_factor_caches_from_db()        # caches 95, unflagged
+    assert finnhub_feed._FUND_SCORE_CACHE.get(NOTE) == 95.0
+
+    async with session_scope() as s:                       # the worker flags it
+        t = (await s.execute(select(Ticker).where(Ticker.symbol == NOTE))).scalar_one()
+        t.is_non_common = True
+    await sp._clear_non_common_fundamentals()              # ...and clears it
+    finnhub_feed._NO_FUNDAMENTALS.clear()                  # this is not the worker
+
+    await finnhub_feed.warm_factor_caches_from_db()        # the next webhook
+    csv = (
+        "Ticker,Type,Asset Class,Strategy,Conviction,Score,Raw Score,Signal,"
+        "Verdict,Action,Hold Duration,Price,Above 200DMA,Market Regime,Beats SPY?,"
+        "Momentum Quality,3M Return %,6M Return %,1Y Return %,RS vs SPY 3M %,"
+        "RS vs SPY 6M %,RS vs SPY 1Y %,RS vs Sector 3M %,Near 52W High %\n"
+        f"{NOTE},STOCK,Stock,MOMENTUM A+,A+,100,142,BUY NOW,Strong Buy,"
+        "Strong Buy & Hold,6-12 months,59.62,TRUE,STRONG BULL,Yes (+32.8%),"
+        "All 3 positive,30.4,43.4,40.4,21.9,32.8,13.8,19.1,99.5\n"
+    )
+    async with session_scope() as s:
+        await upsert_tickers(s, parse_all_signals_csv(csv))
+    assert (await _row(NOTE)).sub_fundamentals is None, (
+        "the webhook wrote the issuer's value back onto a cleared row"
+    )
+
+
+async def test_a_reading_is_not_written_onto_a_row_flagged_after_it_was_fetched() -> None:
+    """The pass fetches, then writes in batches of 20; a settle can flag and
+    clear the row in between. Reproduced in review: the row ended flagged with
+    71.8. Mutation: the UPDATE without the is_non_common guard."""
+    await _seed(NOTE, non_common=True, sub_fundamentals=None, score=AFTER)
+    # This process has not learned the flag yet: only the stored flag knows.
+    await sp._save_factor_readings(
+        "last_fundamentals_at", "sub_fundamentals", {NOTE: 71.8}, datetime.now(UTC),
+    )
+    assert (await _row(NOTE)).sub_fundamentals is None
+
+
+async def test_the_save_skips_a_symbol_this_process_knows_takes_no_reading() -> None:
+    """The in-process check, which also keeps such a symbol out of the
+    'contended' count. Mutation: no skip (the stored flag is off here, so
+    nothing else stops it)."""
+    await _seed(STOCK, non_common=False, sub_fundamentals=None, score=AFTER)
+    finnhub_feed.set_no_fundamentals_symbols({STOCK})
+    await sp._save_factor_readings(
+        "last_fundamentals_at", "sub_fundamentals", {STOCK: 71.8}, datetime.now(UTC),
+    )
+    assert (await _row(STOCK)).sub_fundamentals is None

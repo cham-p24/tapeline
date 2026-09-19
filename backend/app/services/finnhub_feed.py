@@ -205,6 +205,11 @@ def set_cached_score(symbol: str, score: float | None, *, from_row: bool = False
             _PASS_READINGS[("sub_fundamentals", sym)] = score
 
 
+def no_fundamentals_symbols() -> frozenset[str]:
+    """A copy of the symbols that take no fundamentals reading."""
+    return frozenset(_NO_FUNDAMENTALS)
+
+
 def set_no_fundamentals_symbols(symbols: frozenset[str] | set[str]) -> None:
     """Replace the set of symbols that take no fundamentals reading.
 
@@ -510,13 +515,20 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
             rows = (await session.execute(
                 select(
                     Ticker.symbol, Ticker.sub_fundamentals, Ticker.sub_smart_money,
-                    Ticker.is_non_common,
                 ).where(
                     Ticker.sub_fundamentals.is_not(None)
                     | Ticker.sub_smart_money.is_not(None)
                 )
             )).all()
-            on_row = {sym for sym, _, sm, _ in rows if sm is not None}
+            # Every flagged symbol, not only those still holding a value: the
+            # API process never runs the reconcile, so this is where ITS cache
+            # learns that a row flagged and cleared since its last warm takes no
+            # reading. Without it, a value this process cached earlier stayed
+            # and the sheet webhook wrote it back onto the cleared row.
+            non_common_symbols = set((await session.execute(
+                select(Ticker.symbol).where(Ticker.is_non_common.is_(True))
+            )).scalars().all())
+            on_row = {sym for sym, _, sm in rows if sm is not None}
             unbacked = [s for s in _SMART_MONEY_SCORE_CACHE if s not in on_row]
             with_form4: set[str] = set()
             if unbacked:
@@ -525,11 +537,11 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
                     .where(InsiderTransaction.symbol.in_(unbacked))
                     .distinct()
                 )).scalars().all())
-        for sym, fund, sm, non_common in rows:
-            # A non-common listing's stored value is its issuer's, not its own
-            # (see _NO_FUNDAMENTALS); never warm it back. This runs in the API
-            # process too, where the reconcile that fills that set never runs.
-            if fund is not None and not non_common:
+        # Published BEFORE the loop: set_cached_score then refuses a flagged
+        # row's stored value, which is its issuer's, not its own.
+        set_no_fundamentals_symbols(non_common_symbols)
+        for sym, fund, sm in rows:
+            if fund is not None and sym.upper() not in _NO_FUNDAMENTALS:
                 set_cached_score(sym, float(fund), from_row=True)
                 funds += 1
             if sm is not None:

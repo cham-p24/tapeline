@@ -3331,10 +3331,18 @@ async def _save_factor_readings(
 
     Crypto pairs are never written: they are scored on a different factor set.
     """
+    from app.services.finnhub_feed import no_fundamentals_symbols
     from app.services.mock_feed import _signal_from_score
     from app.services.polygon_feed import _composite_from_subs
 
-    pending = {s: v for s, v in readings.items() if not s.startswith("X:")}
+    # A listing flagged not-common-stock since its reading was fetched must not
+    # be written its issuer's value: checked here, at write time, and again in
+    # the UPDATE below against the stored flag. See finnhub_feed._NO_FUNDAMENTALS.
+    fundamentals = factor == "sub_fundamentals"
+    skip = no_fundamentals_symbols() if fundamentals else frozenset()
+    pending = {
+        s: v for s, v in readings.items() if not s.startswith("X:") and s not in skip
+    }
     unwritten = [s for s in readings if s not in pending]
     others = [c for c in FACTOR_COLUMNS if c != factor]
     for _attempt in range(_FACTOR_SAVE_ATTEMPTS):
@@ -3349,6 +3357,7 @@ async def _save_factor_readings(
                     .where(
                         Ticker.symbol == sym,
                         *(getattr(Ticker, c).is_not_distinct_from(v) for c, v in held.items()),
+                        *((Ticker.is_non_common.is_(False),) if fundamentals else ()),
                     )
                     .values({
                         factor: pending[sym],
@@ -3455,7 +3464,6 @@ async def _refresh_fundamentals_cache(
         compute_fundamentals_score,
         fetch_basic_financials,
         fund_cache_size,
-        get_cached_score,
         set_cached_score,
     )
 
@@ -3486,9 +3494,9 @@ async def _refresh_fundamentals_cache(
             if metrics:
                 score = compute_fundamentals_score(metrics)
                 set_cached_score(sym, score)
-                # The selection leaves non-common listings out; one flagged
-                # since it ran must still not be written its issuer's value.
-                if score is not None and get_cached_score(sym) is not None:
+                # A symbol flagged not-common-stock since the selection ran is
+                # dropped when the batch is written; see _save_factor_readings.
+                if score is not None:
                     readings[sym] = score
                 refreshed += 1
         except FinnhubThrottledError as exc:
@@ -4025,8 +4033,13 @@ async def _clear_non_common_fundamentals() -> int:
 
     Same shape as `_clear_smart_money_reading`: per row, a compare-and-set on
     all six factors with the composite and label recomputed from the five that
-    remain, reason and confidence_pct too except on rows the sheet owns (the
-    sheet writes neither), and updated_at held still. A row whose other
+    remain, and updated_at held still. One difference: the reason is
+    re-rendered on EVERY row, sheet-owned ones included. Nothing else rewrites
+    a sheet-owned row's reason (the tick writes it only market fields, and the
+    ingest never writes one), so leaving it would keep "fundamentals among
+    this ticker's highest-scoring factors" beside a factor that is now blank.
+    confidence_pct is still left to the sheet on its rows: there it is a
+    conviction grade, not factor coverage. A row whose other
     factors changed in between is re-read and tried again; one that loses
     every attempt is left to its owner, which now writes NULL for it anyway.
 
@@ -4046,7 +4059,7 @@ async def _clear_non_common_fundamentals() -> int:
     cleared = 0
     for sym in symbols:
         written = (
-            {"sub_fundamentals", "score", "signal"} if sym in sheet_owned
+            {"sub_fundamentals", "score", "signal", "reason"} if sym in sheet_owned
             else {"sub_fundamentals", "score", "signal", "reason", "confidence_pct"}
         )
         try:
