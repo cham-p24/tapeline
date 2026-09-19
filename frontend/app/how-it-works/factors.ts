@@ -203,6 +203,7 @@ export const FACTORS: Factor[] = [
       "Each metric that is available is mapped onto a common 0–100 scale using fixed, broadly-drawn bands.",
       "The available components are averaged. A metric that is missing is left out entirely rather than filled in with a guess, and the ticker's confidence percentage falls to reflect the thinner evidence.",
       "If none of the metrics are available — as with most ETFs and funds — the factor is unavailable for that ticker and the composite substitutes a mid-range value.",
+      "A listing that trades like a stock but is not the company's common shares (an exchange-listed note, a preferred or depositary share, a warrant, a right or a unit) takes no reading at all. The financial figures a data vendor returns for it are its issuer's, not its own, so since 19 September 2026 the factor is unavailable for it and the composite substitutes a mid-range value.",
     ],
     feeds: [
       {
@@ -216,6 +217,7 @@ export const FACTORS: Factor[] = [
     limitations: [
       "It is not sector-relative. Margin and return-on-equity levels that are ordinary in one industry are unusual in another, and this factor does not adjust for that.",
       "ETFs, funds, trusts and many ADRs have no comparable company financials. The factor is simply unavailable for them.",
+      "Notes, preferred shares, warrants, rights and units listed like stocks have no financials of their own. Since 19 September 2026 the factor is unavailable for them rather than borrowing the issuer's figures. They are recognised by listing name and symbol, which does not catch every one.",
       "The reading is exactly as current as the last filing. Between reports it does not move, even when the business does — for most companies that means it is static for weeks at a time.",
       "A reported figure describes a period that has already closed. It describes the last reported quarter, not the current one.",
       "Restatements change previously reported history, and the reading changes with them.",
@@ -224,7 +226,7 @@ export const FACTORS: Factor[] = [
     faq: [
       {
         q: "Why do some tickers have no Fundamentals reading?",
-        a: "ETFs, funds and some foreign-listed structures do not report comparable company financials. Rather than substitute a guess, the factor is treated as unavailable and the composite uses a mid-range value in its place.",
+        a: "ETFs, funds and some foreign-listed structures do not report comparable company financials, and a note, preferred share or warrant listed like a stock has none of its own: the figures belong to the company that issued it. Rather than substitute a guess or borrow the issuer's figures, the factor is treated as unavailable and the composite uses a mid-range value in its place.",
       },
       {
         q: "Is the Fundamentals factor a valuation model?",

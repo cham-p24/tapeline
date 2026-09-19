@@ -41,6 +41,17 @@ type LogEntry = {
 };
 
 const METHODOLOGY_LOG: LogEntry[] = [
+  // #878 changed what the Fundamentals factor reads (rule 4: the factor page
+  // changed in the same PR). Measured read-only against production on
+  // 2026-09-18: 99 of the 120 flagged listings held an issuer's reading.
+  {
+    date: "2026-09-19",
+    kind: "methodology",
+    title: "Notes, preferred shares and warrants no longer borrow their issuer's fundamentals",
+    body:
+      "The Fundamentals factor reads reported figures such as margin, return on equity and growth. For a listing that trades like a stock but is not the company's common shares (an exchange-listed note, a preferred or depositary share, a warrant, a right or a unit), the figures a data vendor returns are the issuer's, not the listing's, and until this change they were scored as if they were its own. From this date those listings take no Fundamentals reading: the factor is unavailable for them and the composite uses a mid-range value in its place, as it does for most ETFs. Their scores and labels were recalculated without it, and where the one-line summary had cited fundamentals, it no longer does. They are recognised by listing name and symbol, the same rule as the entry below titled \"Notes, preferred shares and warrants no longer qualify for the daily record\", which does not catch every one. No recorded entry was changed.",
+    ref: "#878",
+  },
   // #875 changed what may enter the record, the same kind of change as #761
   // (2026-09-06). Counts measured read-only against production on 2026-09-18:
   // 120 of the 6,012 rows stored as stocks are one of these listings, 118 of
