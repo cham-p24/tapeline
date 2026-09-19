@@ -23,10 +23,11 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import { DEFAULT_BILLING_PERIOD, type BillingPeriod } from "@/lib/pricing";
+import { DEFAULT_BILLING_PERIOD, PRICING, type BillingPeriod } from "@/lib/pricing";
 
 type BillingPeriodCtx = {
   billing: BillingPeriod;
@@ -76,12 +77,30 @@ export function useBillingPeriod(): BillingPeriodCtx {
 }
 
 /**
- * The pill toggle — a pure controlled UI component; pass it the pair from
+ * The yearly saving as a whole percent, floored so it is never overstated,
+ * and taken as the SMALLEST across the paid plans so the one chip is true of
+ * every card it sits above: Pro $99 vs $9.99×12 = 17.4%, Premium $199 vs
+ * $19.99×12 = 17.0% → "Save 17%".
+ */
+export const YEARLY_SAVING_PCT = Math.floor(
+  Math.min(
+    ...[PRICING.pro, PRICING.premium].map((p) => (1 - p.annual / (p.monthly * 12)) * 100),
+  ),
+);
+
+/**
+ * The billing switch — two equal segments and one sliding thumb, the
+ * Monthly | Yearly pattern people know from LinkedIn and most subscription
+ * pages. A pure controlled component: pass it the pair from
  * useBillingPeriod() at the call site (so a standalone render without a
- * provider still shares ONE local state with its host component). Annual
- * (the default) is listed first; monthly is one click away. The −17% chip on
- * the Annual pill is the factual annual-vs-monthly saving (e.g. $99/yr vs
- * $9.99×12), shown only while monthly is selected.
+ * provider still shares ONE local state with its host component).
+ *
+ * Built this way because the founder asked for switching to be "a lot more
+ * smoother" (2026-09-19). The old pill swapped its background instantly and a
+ * "−17%" chip popped in and out above it. Now both segments are always the
+ * same width (a 2-column grid), a single thumb slides between them, and the
+ * saving chip is always on Yearly, so nothing appears, disappears or resizes
+ * when you switch. Yearly stays the default (founder decision 2026-07-18).
  */
 export function BillingToggle({
   billing,
@@ -91,24 +110,47 @@ export function BillingToggle({
   setBilling: (b: BillingPeriod) => void;
 }) {
   return (
-    <div className="inline-flex rounded-full border border-border bg-panel p-1">
-      {(["annual", "monthly"] as const).map((b) => (
+    <div
+      role="group"
+      aria-label="Billing period"
+      className="relative inline-grid grid-cols-2 rounded-full border border-border bg-panel p-1 shadow-sm"
+    >
+      <span
+        aria-hidden="true"
+        data-testid="billing-toggle-thumb"
+        className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-fg shadow transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+        style={{ transform: billing === "annual" ? "translateX(100%)" : "translateX(0)" }}
+      />
+      {(["monthly", "annual"] as const).map((b) => (
         <button
           key={b}
+          type="button"
           onClick={() => setBilling(b)}
           aria-pressed={billing === b}
-          className={`relative rounded-full px-5 py-1.5 text-sm font-medium transition-all ${
-            billing === b ? "bg-fg text-background" : "text-muted hover:text-fg"
+          className={`relative z-10 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+            billing === b ? "text-background" : "text-muted hover:text-fg"
           }`}
         >
-          {b === "annual" ? "Annual" : "Monthly"}
-          {b === "annual" && billing !== "annual" && (
-            <span className="absolute -right-2 -top-2 rounded-full bg-up px-1.5 py-0.5 text-[10px] font-bold text-background">
-              −17%
+          {b === "annual" ? "Yearly" : "Monthly"}
+          {b === "annual" && (
+            <span className="rounded-full bg-up px-1.5 py-0.5 text-[10px] font-bold leading-none text-background">
+              Save {YEARLY_SAVING_PCT}%
             </span>
           )}
         </button>
       ))}
     </div>
   );
+}
+
+/**
+ * True once the billing period has changed at least once since mount. Prices
+ * use it to ease in only on a real switch, never on first paint, where a
+ * fade-in would just delay the numbers.
+ */
+export function useBillingChanged(billing: BillingPeriod): boolean {
+  const first = useRef(billing);
+  const changed = useRef(false);
+  if (billing !== first.current) changed.current = true;
+  return changed.current;
 }
