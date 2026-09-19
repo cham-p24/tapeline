@@ -225,6 +225,9 @@ def set_no_fundamentals_symbols(symbols: frozenset[str] | set[str]) -> None:
             del _PASS_READINGS[("sub_fundamentals", sym)]
     for sym in wanted:
         _FUND_SCORE_CACHE.pop(sym, None)
+        # The profile's market cap for such a listing is its issuer's too.
+        # See _seed_market_cap_from_profile.
+        _MARKET_CAP_CACHE.pop(sym, None)
         _PASS_READINGS[("sub_fundamentals", sym)] = None
     _NO_FUNDAMENTALS.clear()
     _NO_FUNDAMENTALS.update(wanted)
@@ -258,8 +261,10 @@ def fund_cache_size() -> int:
 # Same pattern as _FUND_SCORE_CACHE — populated when the worker fetches a
 # company profile (daily sector backfill), read per-tick by
 # polygon_feed.fetch_snapshots so the cheap dict lookup — not an HTTP call —
-# runs 60×/min. Values are ABSOLUTE DOLLARS (Finnhub reports market cap in
-# MILLIONS; the populator multiplies by 1e6 before storing here).
+# runs 60×/min. Values are ABSOLUTE US DOLLARS (Finnhub reports market cap in
+# MILLIONS of the company's filing currency; the populator keeps only USD
+# figures and multiplies by 1e6 before storing here). See
+# _seed_market_cap_from_profile.
 _MARKET_CAP_CACHE: dict[str, float] = {}
 
 
@@ -1327,6 +1332,10 @@ async def fetch_company_profile(symbol: str) -> dict[str, Any] | None:
     Ticker.sector="Unknown" rows after universe auto-discovery.
 
     Cached 7 days per symbol — sectors don't change.
+
+    `currency` is the vendor's filing currency, upper-cased ("" when it does
+    not say). `market_cap` is in MILLIONS OF THAT CURRENCY, not of dollars:
+    see _seed_market_cap_from_profile.
     """
     if not configured():
         return None
@@ -1334,6 +1343,12 @@ async def fetch_company_profile(symbol: str) -> dict[str, Any] | None:
     sym = symbol.upper()
     cache_key = f"profile_{sym}"
     cached = _load_cache(cache_key, CACHE_TTL_FUNDAMENTALS_HOURS)
+    if cached and "currency" not in cached:
+        # Cached before the adapter kept the currency. Its market_cap is in a
+        # unit it does not name, so ask again rather than trust it or sit on
+        # no cap for up to seven days. `{}` (the no-such-ticker sentinel) is
+        # falsy and still honoured below.
+        cached = None
     if cached is not None:
         # Seed the per-tick cap cache on the CACHED path too. It used to be
         # populated only on a live fetch (below), so once a symbol's profile
@@ -1364,6 +1379,7 @@ async def fetch_company_profile(symbol: str) -> dict[str, Any] | None:
         "industry":    data.get("finnhubIndustry") or "",
         "name":        data.get("name") or sym,
         "market_cap":  _f(data.get("marketCapitalization")),
+        "currency":    str(data.get("currency") or "").strip().upper(),
         "country":     data.get("country") or "",
         "exchange":    data.get("exchange") or "",
         "ipo":         data.get("ipo") or "",
@@ -1371,6 +1387,11 @@ async def fetch_company_profile(symbol: str) -> dict[str, Any] | None:
     _save_cache(cache_key, profile)
     _seed_market_cap_from_profile(sym, profile)
     return profile
+
+
+#: The one currency Ticker.market_cap is stated in. See
+#: _seed_market_cap_from_profile.
+MARKET_CAP_CURRENCY = "USD"
 
 
 def _seed_market_cap_from_profile(symbol: str, profile: dict[str, Any] | None) -> None:
@@ -1381,10 +1402,39 @@ def _seed_market_cap_from_profile(symbol: str, profile: dict[str, Any] | None) -
     "Mkt Cap" column — hold ABSOLUTE DOLLARS. The ×1e6 conversion lives here
     and nowhere else, so the live path and the cache-hit path can't drift by
     six orders of magnitude.
+
+    USD ONLY. The millions are of the company's FILING currency, which the
+    same payload names in `currency`. Multiplying every figure as if it were
+    dollars published foreign filers in their home currency with a "$" in
+    front — measured on production 2026-09-19: a Korean filer at $1,230T
+    (won), TSM at $61.6T (new Taiwan dollars), TM at $36.3T (yen), and 33
+    foreign filers above $5T. Smaller currencies were off by less and looked
+    plausible (rupees, reais, Canadian dollars), so no size ceiling separates
+    them. A figure in any other currency, or in one the vendor does not name,
+    seeds nothing: the row keeps its NULL and renders an em-dash. Converting
+    would need an FX rate we do not hold.
+
+    Also nothing for a zero (a number nobody gave us), and nothing for a
+    listing that is not the company's common shares (a note, a preferred, a
+    warrant): the vendor answers such a symbol with its ISSUER's figures, so
+    its "market cap" is the parent's. Those are the symbols in
+    _NO_FUNDAMENTALS, set at worker boot before any profile is fetched.
+
+    Refusing also drops whatever the cache held for the symbol, so the cache
+    only ever holds a figure its latest profile vouched for.
     """
-    mc_millions = _f((profile or {}).get("market_cap"))
-    if mc_millions is not None:
-        set_cached_market_cap(symbol.upper(), mc_millions * 1e6)
+    sym = symbol.upper()
+    p = profile or {}
+    mc_millions = _f(p.get("market_cap"))
+    if (
+        p.get("currency") != MARKET_CAP_CURRENCY
+        or sym in _NO_FUNDAMENTALS
+        or mc_millions is None
+        or mc_millions <= 0
+    ):
+        _MARKET_CAP_CACHE.pop(sym, None)
+        return
+    set_cached_market_cap(sym, mc_millions * 1e6)
 
 
 async def fetch_insider_transactions(
