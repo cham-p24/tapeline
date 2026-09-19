@@ -1252,9 +1252,44 @@ VENDOR_TYPE_TO_ASSET_CLASS: dict[str, str] = {
 DISCOVERY_MAX_TICKERS = 25_000
 
 
+class DiscoveredUniverse(list[dict[str, str]]):
+    """The rows `discover_active_us_tickers` returns, plus what the walk saw.
+
+    It IS the list of scoreable rows every caller already iterates, so nothing
+    that reads it as a list changes. Two facts ride along for the one reader
+    that needs more (signal_publisher._refresh_universe, which retires
+    delistings):
+
+    * `active_symbols` - EVERY symbol the vendor listed as active, of any type.
+      The rows above are filtered by VENDOR_TYPE_TO_ASSET_CLASS, but a
+      preferred (PFD) or a unit (UNIT) the filter drops is still trading, so
+      the filtered rows must never be what decides that a stored symbol has
+      stopped trading.
+    * `complete` - True only when the walk reached the last page: it ended on
+      a response with no next_url, no page raised, and the runaway cap did not
+      bind. Anything else is a PARTIAL list, and a symbol missing from a
+      partial list says nothing about whether it still trades.
+
+    A plain list (what a test double or an older caller hands over) has
+    neither attribute; readers use getattr with a conservative default and
+    treat it as incomplete.
+    """
+
+    def __init__(
+        self,
+        rows: list[dict[str, str]],
+        *,
+        active_symbols: frozenset[str],
+        complete: bool,
+    ) -> None:
+        super().__init__(rows)
+        self.active_symbols = active_symbols
+        self.complete = complete
+
+
 async def discover_active_us_tickers(
     max_tickers: int = DISCOVERY_MAX_TICKERS,
-) -> list[dict[str, str]]:
+) -> DiscoveredUniverse:
     """
     Walk Polygon's `/v3/reference/tickers` and return the active US universe:
     common stock, ADRs, ETFs, commodity trusts, single-security ETFs and ETNs.
@@ -1268,12 +1303,19 @@ async def discover_active_us_tickers(
     tickers in ascending symbol order, so any cap that actually binds truncates
     the universe ALPHABETICALLY rather than sampling it. See
     DISCOVERY_MAX_TICKERS.
+
+    The result also carries every active symbol of ANY type and whether the
+    walk completed; see DiscoveredUniverse. Delisting depends on both.
     """
     if not _api_key():
-        return []
+        return DiscoveredUniverse([], active_symbols=frozenset(), complete=False)
 
     rows: list[dict[str, str]] = []
     seen: set[str] = set()
+    # Every active symbol, whatever its type. See DiscoveredUniverse.
+    active: set[str] = set()
+    # Set only by a page that fails; see the `complete` expression below.
+    page_failed = False
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         next_url: str | None = f"{BASE_URL}/v3/reference/tickers"
@@ -1291,9 +1333,13 @@ async def discover_active_us_tickers(
                 data = r.json()
             except (httpx.HTTPError, ValueError):
                 logger.exception("polygon.reference_tickers_failed url=%s", next_url)
+                page_failed = True
                 break
 
             for t in data.get("results", []):
+                listed = (t.get("ticker") or "").strip().upper()
+                if listed:
+                    active.add(listed)
                 ttype = t.get("type") or ""
                 asset_class = VENDOR_TYPE_TO_ASSET_CLASS.get(ttype)
                 if asset_class is None:
@@ -1333,8 +1379,13 @@ async def discover_active_us_tickers(
             "off alphabetically; raise DISCOVERY_MAX_TICKERS",
             max_tickers,
         )
+    # Complete = the vendor said there is no next page. A failed page leaves
+    # next_url set (the loop broke out of it), and so does a binding cap, but
+    # both are named explicitly so the rule reads without tracing the loop.
+    complete = next_url is None and not page_failed and len(rows) < max_tickers
     logger.info(
-        "polygon.universe_discovered count=%d pages=%d cap=%d",
-        len(rows), pages, max_tickers,
+        "polygon.universe_discovered count=%d active_any_type=%d pages=%d "
+        "cap=%d complete=%s",
+        len(rows), len(active), pages, max_tickers, complete,
     )
-    return rows
+    return DiscoveredUniverse(rows, active_symbols=frozenset(active), complete=complete)

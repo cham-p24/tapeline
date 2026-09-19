@@ -121,6 +121,30 @@ async def freshness_cutoff(session: AsyncSession) -> datetime | None:
     return latest - timedelta(days=STALE_WINDOW_DAYS)
 
 
+def listed_clause() -> ColumnElement[bool]:
+    """The row has not been retired as no longer trading.
+
+    THE one predicate for "this symbol is still a listing". A retired row
+    (``delisted_at`` stamped by signal_publisher._refresh_universe when a
+    complete discovery walk stopped listing it; see services/delisting.py)
+    keeps its row, its watchlist entries and its public-record entries, but
+    must not be ranked, searched, priced, snapshotted, archived or asked about
+    again. It rides in valid_composite_clauses, so every ranked surface that
+    already applies that floor (scanner, search, /api/public/signals, the keyed
+    API, the scorecard freeze, the newsletter, MCP's ranked tools) drops
+    retired rows with no change of its own; the few readers that do not apply
+    the floor (the snapshot universe, the sitemap's symbol list, the factor
+    passes, the score archive, the heatmap, the score and watchlist alert
+    evaluators) call this directly. The by-symbol lookups (/api/ticker, MCP
+    get_ticker_score, the extension's /ticker) read `delisted_at` themselves so
+    they can answer with the reason.
+
+    Before it existed nothing retired a ticker: GREE, renamed VIP on 24 Jul
+    2026, still read 75.8 STRONG SETUP on 19 Sep.
+    """
+    return Ticker.delisted_at.is_(None)
+
+
 def valid_composite_clauses() -> list[ColumnElement[bool]]:
     """Deterministic data-quality filters for a real, scored composite row.
 
@@ -153,6 +177,10 @@ def valid_composite_clauses() -> list[ColumnElement[bool]]:
     decorated/multi-word raw value is dropped. See asset_class_clean_clauses.
     """
     return [
+        # Still trading (2026-09-19). First, and not folded into the data-quality
+        # signatures above: a retired row's score is a real composite, it is
+        # just about a listing that no longer exists. See listed_clause.
+        listed_clause(),
         Ticker.score.isnot(None),
         Ticker.score <= MAX_VALID_SCORE,
         Ticker.symbol.notlike("% %"),

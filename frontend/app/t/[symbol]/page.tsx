@@ -22,6 +22,7 @@ import { ScoreRadial } from "@/components/ScoreRadial";
 import { ScoreSparkline } from "@/components/ScoreSparkline";
 import { KeyStatistics, type KeyStats } from "@/components/KeyStatistics";
 import { sectorRankLine } from "@/components/sectorRankLine";
+import { retiredDetail } from "@/lib/retired";
 import {
   breadcrumbJsonLd,
   faqJsonLd,
@@ -147,6 +148,8 @@ type TickerData = {
 type TickerFetch =
   | { status: "ok"; data: TickerData }
   | { status: "missing" }
+  // A 404 whose detail says the symbol stopped trading (lib/retired.ts).
+  | { status: "retired"; message: string }
   | { status: "error" };
 
 // Two attempts with a short backoff clears the overwhelming majority of
@@ -179,7 +182,19 @@ async function fetchTicker(symbol: string): Promise<TickerFetch> {
       });
       // The ONLY case that should ever 404: the backend definitively says
       // this symbol isn't in the scanner universe.
-      if (res.status === 404) return { status: "missing" };
+      if (res.status === 404) {
+        // One 404 carries a reason worth showing: a symbol retired as no
+        // longer trading. Any other 404, or a body that will not parse, is
+        // the ordinary "not in universe" answer.
+        let body: unknown = null;
+        try {
+          body = await res.json();
+        } catch {
+          body = null;
+        }
+        const message = retiredDetail(body);
+        return message ? { status: "retired", message } : { status: "missing" };
+      }
       if (res.ok) return { status: "ok", data: (await res.json()) as TickerData };
       // 429 = WE exhausted the shared SSR budget, not a broken ticker. It is
       // the single likeliest non-ok status here (all SSR shares one per-IP
@@ -502,6 +517,14 @@ export async function generateMetadata({ params }: { params: Promise<{ symbol: s
     };
   }
   const result = await fetchTicker(sym);
+  if (result.status === "retired") {
+    return {
+      title: `${sym} — No longer trading · Tapeline`,
+      description: result.message,
+      alternates: { canonical: `https://tapeline.io/t/${sym}` },
+      robots: { index: false, follow: true },
+    };
+  }
   if (result.status !== "ok") {
     // `missing` → the noindex "not in universe" stub is correct. `error`
     // (transient) → the page body throws a 500 below, so this metadata is
@@ -671,6 +694,33 @@ function buildFaq(sym: string, name: string, score: string, signal: string, sect
   ];
 }
 
+/**
+ * The page for a ticker retired as no longer trading (lib/retired.ts). noindex
+ * via generateMetadata. Renders from the 404's own sentence and nothing else:
+ * no related tickers, no news, no score, since none of it describes a listing
+ * that still exists.
+ */
+function RetiredPage({ sym, message }: { sym: string; message: string }) {
+  return (
+    <main id="main" className="min-h-screen">
+      <MarketingNav />
+      <article className="mx-auto max-w-2xl px-4 sm:px-6 py-16">
+        <p className="eyebrow">No longer trading</p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight">{sym}</h1>
+        <p className="mt-4 text-muted leading-relaxed">{message}</p>
+        <p className="mt-8 text-sm text-subtle">
+          Any entry this symbol already has on the{" "}
+          <Link href="/scorecard" className="underline hover:text-fg">
+            public record
+          </Link>{" "}
+          stays there unchanged.
+        </p>
+      </article>
+      <MarketingFooter />
+    </main>
+  );
+}
+
 export default async function PublicTickerPage({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol } = await params;
   const sym = symbol.toUpperCase();
@@ -693,6 +743,9 @@ export default async function PublicTickerPage({ params }: { params: Promise<{ s
   // would let a momentary backend blip de-index a valid page. Throw instead:
   // Next renders the branded error boundary and returns 500, which Google
   // retries (keeping the URL indexed) rather than dropping like a 404.
+  // A retired symbol renders its own short page from the 404's sentence,
+  // before any other fetch (lib/retired.ts).
+  if (result.status === "retired") return <RetiredPage sym={sym} message={result.message} />;
   if (result.status === "missing") notFound();
   if (result.status === "error") {
     throw new Error(`ticker_fetch_unavailable:${sym}`);

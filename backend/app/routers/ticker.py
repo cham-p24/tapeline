@@ -596,6 +596,16 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         # that then 404s. A genuinely-current ticker can never trip this.
         if t.score is not None and t.score > 100:
             raise HTTPException(404, f"Ticker {symbol} not in scanner universe")
+        # Retired as no longer trading (2026-09-19): the row is kept for
+        # watchlists and the record, but its price is the last close and its
+        # score no longer moves, so a page built from it would present a dead
+        # listing as a live one. The reason is the detail string, so every
+        # client can show it as is; answered before any look-up is charged.
+        # See services/delisting.py.
+        if t.delisted_at is not None:
+            from app.services.delisting import retired_message
+
+            raise HTTPException(404, retired_message(t.symbol, t.delisted_at))
 
         # ── Freemium daily-lookup metering ──────────────────────────────────
         # Only NOW that the symbol is confirmed to be a real, servable ticker do

@@ -442,6 +442,8 @@ async def public_top_tickers(limit: int = 500) -> dict[str, object]:
     from app.services.coverage import covered_clauses
 
     capped = max(1, min(limit, 1000))
+    from app.services.ticker_freshness import listed_clause
+
     async with session_scope() as session:
         # Deliberately do NOT apply the FULL freshness/factor floor here: the
         # sitemap wants breadth (every real /t/{symbol} page Google should know
@@ -463,6 +465,11 @@ async def public_top_tickers(limit: int = 500) -> dict[str, object]:
         #     See services/coverage.py.
         result = await session.execute(
             select(Ticker.symbol)
+            # Not retired (2026-09-19): a symbol no longer trading answers 404
+            # "No longer trading" at routers.ticker, so a sitemap URL for it
+            # would be the same crawled-not-indexed problem. See
+            # services/delisting.py.
+            .where(listed_clause())
             .where(Ticker.score.is_not(None))
             .where(Ticker.score <= 100)
             .where(Ticker.symbol.notlike("% %"))
