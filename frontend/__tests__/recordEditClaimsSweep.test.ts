@@ -68,6 +68,10 @@ const BANNED_RECORD_CLAIMS: RegExp[] = [
   /re-ranked, edited or removed/i,
   /every call we(?:'|’)?ve (?:ever )?made/i,
   /It never paused/i,
+  // daily_scorecard ids 1-80 were deleted around 10 May 2026, and until #861
+  // (17 Sep 2026) an admin endpoint could delete rows. /verify said "Nothing
+  // is deleted after the fact".
+  /nothing is deleted/i,
 ];
 
 /** Stale counts. */

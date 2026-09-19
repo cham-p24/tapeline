@@ -5,10 +5,13 @@
  *
  *   - Targets commercial-investigation queries like "free daily stock picks",
  *     "daily top 10 stocks", "stock newsletter daily picks".
- *   - Shows exactly what the email digest delivers — 10 highest-scoring US
- *     tickers with score / signal / one-sentence read — using the same data
- *     anyone can see on /scorecard, just framed as "what you'd get in your
- *     inbox tomorrow."
+ *   - Shows the shape of what the email digest delivers — 10 highest-scoring
+ *     US tickers with score / signal / one-sentence read. It is NOT the same
+ *     list as the email or the /scorecard record: the three are separate
+ *     selections (this page = the anonymous scanner's top 10 from an ISR
+ *     snapshot; the email = newsletter.run_daily_digest's own query; the
+ *     record = the freeze's gated pool). One shared selection was never
+ *     approved, so copy here must never say they are the same list.
  *   - Newsletter capture form is the primary CTA (no trial-or-bounce
  *     pressure).
  *   - Trial CTA is secondary, below the picks.
@@ -20,7 +23,8 @@
  *   placement, different content.
  *
  * Data source: /api/scanner anonymously (returns the FREE tier — the
- * top-scoring rows, live). We take 10. Same data we put in the email.
+ * top-scoring rows). We take 10. The email runs its own query, so the two
+ * can differ.
  *
  * Caching: 30-min ISR so we're not hammering the backend on every crawler
  * hit, but the page stays fresh enough to feel "today's picks."
@@ -63,7 +67,7 @@ type ScannerRow = {
 async function fetchTopTen(): Promise<ScannerRow[]> {
   try {
     // Anonymous request returns FREE tier — the top-scoring rows, live.
-    // We slice to 10 to match the email digest exactly.
+    // We slice to 10, the email digest's length (not its list).
     const res = await fetch(`${API_BASE}/api/scanner?limit=20`, {
       next: { revalidate: 1800 },
       headers: ssrInternalHeaders(),
@@ -99,7 +103,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "How is this different from the public scorecard?",
-    a: "The scorecard is the back-checked TRACK RECORD — every picks day logged with next-day returns vs SPY at tapeline.io/scorecard. The daily email is TODAY'S PICKS in your inbox before the open. Different surface, same composite.",
+    a: "The scorecard at tapeline.io/scorecard is the back-checked record: a daily top 10 chosen at each close under the record's own rules, each entry set beside SPY's move over the next session, and any trading day with no list is named on the page. The daily email is today's top 10 by composite score, in your inbox before the open. Both rank by the same composite score, but each list is chosen separately, so the lists can differ.",
   },
 ];
 
@@ -253,7 +257,7 @@ export default async function DailyPicksPage() {
         <div className="mx-auto max-w-3xl px-6">
           <p className="eyebrow text-accent">What you get</p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
-            One email. One minute. Same composite as the public scorecard.
+            One email. One minute. Ten names, ranked by the composite score.
           </h2>
 
           <div className="mt-8 grid gap-6 sm:grid-cols-3">
@@ -262,7 +266,10 @@ export default async function DailyPicksPage() {
               <h3 className="mt-2 font-semibold text-fg">Picks per day</h3>
               <p className="mt-1 text-sm text-muted leading-relaxed">
                 The 10 highest-scoring US tickers from the composite,
-                ranked. Same set, ranked by composite, every morning.
+                ranked by score, each US market morning. The email&rsquo;s
+                list, the preview on this page and the daily top 10 on the
+                public record are each chosen separately, so the lists can
+                differ.
               </p>
             </div>
             <div>

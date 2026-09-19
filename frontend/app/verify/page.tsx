@@ -95,7 +95,7 @@ const VERIFY_FAQ = [
   },
   {
     q: "Does the scorecard keep the days the picks lost?",
-    a: "Yes. Losing sessions are published in the same styling as winning ones, with the sample size shown next to the summary. Nothing is deleted after the fact. Publishing only the good days would make the record a marketing asset instead of a checkable one.",
+    a: "Yes. Losing sessions are published in the same styling as winning ones, with the sample size shown next to the summary. Since 17 September 2026 nothing on the site or its API can delete a recorded entry. Publishing only the good days would make the record a marketing asset instead of a checkable one.",
   },
   {
     q: "How is each pick checked against SPY?",

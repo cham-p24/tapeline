@@ -86,6 +86,20 @@ def test_touch1_reports_system_activity_with_counts():
     assert "/scorecard" in html        # public scorecard link
 
 
+@pytest.mark.parametrize("kwargs", [{}, {"trading_days_away": 10, "scorecard_rows_appended": 10}])
+def test_touch1_says_corrections_are_dated_not_that_nothing_is_deleted(kwargs):
+    """Touch 1 said "Winning days and losing days are recorded the same way,
+    and nothing is deleted." Not true: daily_scorecard ids 1-80 were deleted
+    around 10 May 2026, and until #861 (17 Sep 2026) an admin endpoint could
+    delete rows. The true statement is that corrections are dated."""
+    html = render_re_engagement_email("Alice", **kwargs)
+    assert "nothing is deleted" not in html.lower()
+    assert (
+        "Winning days and losing days are recorded the same way, and corrections "
+        "to recorded values are dated on the public changelog."
+    ) in html
+
+
 def test_touch2_is_founder_signed_single_question():
     """Touch 2 is a plain founder note: Christian introduces himself, asks one
     open question, offers a plain return link, thanks the reader."""

@@ -44,6 +44,11 @@ BANNED = [
     r"re-ranked, edited or removed",
     r"nothing is pruned",
     r"it never paused",
+    # The re-engagement email said "Winning days and losing days are recorded
+    # the same way, and nothing is deleted." daily_scorecard ids 1-80 were
+    # deleted around 10 May 2026, before the record's first surviving session,
+    # and until #861 (17 Sep 2026) an admin endpoint could delete rows.
+    r"nothing is deleted",
 ]
 BANNED_RE = re.compile("|".join(f"(?:{p})" for p in BANNED), re.IGNORECASE)
 

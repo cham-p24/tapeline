@@ -450,7 +450,9 @@ export default function CardGateStartPage() {
               Today&rsquo;s picks
             </Link>
             <span className="text-muted">
-              {" "}&mdash; today&rsquo;s top 10, the same list the morning email carries.
+              {" "}&mdash; today&rsquo;s top 10 by composite score, from a saved
+              snapshot. The morning email chooses its list separately, so the
+              two can differ.
             </span>
           </li>
         </ul>
