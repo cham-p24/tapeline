@@ -48,6 +48,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models import Ticker
 from app.services.leverage import is_leveraged_fund
+from app.services.non_common import non_common_on_write
 from app.services.score import compute_tapeline_composite
 
 # Symbol-shape validation is shared with the serving layer (routers.ticker),
@@ -881,6 +882,14 @@ async def upsert_tickers(
         # a newly-reclassified geared fund would put it back in the default
         # ranked view — the exact failure this flag exists to stop.
         t.is_leveraged = is_leveraged_fund(t.name, t.asset_class)
+        # The non-common flag is NOT a pure function of this row: its
+        # fifth-letter rules need the whole universe, which this upsert cannot
+        # see. So it is raised or cleared-by-reclassification here, never
+        # recomputed blind; this runs every five minutes and would otherwise
+        # unflag PTACU on every pass. See services/non_common.py.
+        t.is_non_common = non_common_on_write(
+            t.symbol, t.name, t.asset_class, t.is_non_common,
+        )
         t.price = r["price"]
         if r.get("confidence_pct") is not None:
             t.confidence_pct = r["confidence_pct"]
@@ -1519,6 +1528,11 @@ async def upsert_etfs(
         # the flag from them. Same rule everywhere: whoever writes the name
         # owns the flag. See services/leverage.py.
         t.is_leveraged = is_leveraged_fund(t.name, t.asset_class)
+        # An ETF is never flagged non-common, so this clears a row the sheet
+        # has just moved out of the equity bucket. See services/non_common.py.
+        t.is_non_common = non_common_on_write(
+            t.symbol, t.name, t.asset_class, t.is_non_common,
+        )
 
         # Score and signal are NOT written. The tab's Score column is the
         # signal-system's own number, and Ticker.score is Tapeline's
@@ -1959,6 +1973,12 @@ async def repair_dirty_asset_classes(session: AsyncSession) -> dict[str, int]:
             continue
         if clean != t.asset_class:
             t.asset_class = clean
+            # A repaired class can move a row into or out of the equity
+            # bucket; the non-common flag moves with it (raised, or cleared on
+            # leaving the bucket). See services/non_common.py.
+            t.is_non_common = non_common_on_write(
+                t.symbol, t.name, clean, t.is_non_common,
+            )
             repaired += 1
 
     if repaired or unclassifiable:

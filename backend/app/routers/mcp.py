@@ -247,6 +247,7 @@ async def _tool_ticker_score(args: dict, session: AsyncSession) -> dict:
 async def _tool_daily_picks(args: dict, session: AsyncSession) -> dict:
     from app.routers.scanner import (
         SCANNER_INCLUDE_LEVERAGED_DEFAULT,
+        SCANNER_INCLUDE_NON_COMMON_DEFAULT,
         SCANNER_MIN_DOLLAR_VOLUME,
         list_scanner,
     )
@@ -284,6 +285,9 @@ async def _tool_daily_picks(args: dict, session: AsyncSession) -> dict:
         # handler the Query object, which is truthy, and the assistant would
         # be citing "today's picks" that the website does not show.
         include_leveraged=SCANNER_INCLUDE_LEVERAGED_DEFAULT,
+        # Notes, preferreds, warrants, rights and units stay out for the same
+        # reason, and must be passed explicitly for the same reason.
+        include_non_common=SCANNER_INCLUDE_NON_COMMON_DEFAULT,
         q=None,
         sort="score",
         order="desc",

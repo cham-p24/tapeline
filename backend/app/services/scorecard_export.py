@@ -261,7 +261,16 @@ KNOWN_LIMITATIONS: list[dict[str, str]] = [
             "stock, and nothing made one ineligible to be listed. Checked on "
             "2026-09-17 across all 439 symbols ever listed; it is the only one."
         ),
-        "status": "Stated, not corrected; the list stands as recorded.",
+        "status": (
+            "Stated, not corrected; the list stands as recorded. From "
+            "2026-09-19 (PR #875) listings detected as not common stock "
+            "(notes, preferred and depositary shares, warrants, rights and "
+            "units) can no longer be listed. Detection is by name and symbol "
+            "and does not catch every one. Two preferred listings stay "
+            "eligible on purpose, PBR.A and CIG, each its company's main "
+            "traded share; exchange-traded notes, which are held as funds, "
+            "are not covered."
+        ),
     },
     {
         "date": "2026-06-15",

@@ -216,6 +216,12 @@ export type ScannerRow = {
   // Optional in the type only so a response from a backend deployed before
   // this column existed still parses; the live API always sends it.
   is_leveraged?: boolean;
+  // Same kind of fact: true for a listing that trades like a stock but is
+  // not the company's common shares (an exchange-listed note, a preferred or
+  // depositary share, a warrant, right or unit). Derived server-side from the
+  // listing name and symbol (backend/app/services/non_common.py). Optional for
+  // the same reason as is_leveraged.
+  is_non_common?: boolean;
   score: number;
   signal: string;
   price: number;

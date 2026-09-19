@@ -73,7 +73,9 @@ ACTIVE_UNIVERSE_SIZE = int(_os.environ.get("ACTIVE_UNIVERSE_SIZE", "12000"))
 # 11,546 non-crypto rows carry a score. Matches the founder-approved product
 # update email ("about 11,500 stocks and ETFs"). Mirrors ACTIVE_SCORED_TICKERS
 # in frontend/lib/universe.ts; frontend/__tests__/universeSizeIsSingleSourced
-# asserts the two agree. Re-measure before changing either.
+# asserts the two agree. Re-measure before changing either, and since
+# 2026-09-19 (#875) add &include_non_common=true: the default now also leaves
+# out notes, preferreds, warrants, rights and units, which the 11,501 counts.
 SCORED_TICKERS_IN_COPY = 11_500
 
 # Extra slots handed to NEVER-SCORED tickers on every refresh, on top of

@@ -54,6 +54,11 @@ from app.services.mock_feed import (
     universe,
 )
 from app.services.news_feed import fetch_latest_news
+from app.services.non_common import (
+    is_non_common_equity,
+    non_common_on_write,
+    reconcile_non_common_flags,
+)
 from app.services.polygon_feed import fetch_regime, fetch_snapshots
 from app.services.pubsub import broker
 from app.services.scorecard_backcheck import backcheck_all_pending, is_trading_day
@@ -1686,6 +1691,39 @@ Set to False to restore the old behaviour; the scanner default is separate
 (routers/scanner.SCANNER_INCLUDE_LEVERAGED_DEFAULT) and unaffected."""
 
 
+_EXCLUDE_NON_COMMON_FROM_SCORECARD = True
+"""⚠️ CHANGES WHAT ENTERS THE PERMANENT PUBLIC RECORD, from 2026-09-19 forward.
+
+Notes, preferreds, warrants, rights and units stored as stocks no longer
+qualify for the daily top-10 freeze. See services/non_common.py for what is
+flagged, what deliberately is not (ETNs, CIG, PBR.A) and how.
+
+This changes only what is added from here on; no recorded entry is changed.
+Exactly one such row is on the record: BHFAO, a Brighthouse 6.75%
+non-cumulative preferred, listed fourth on 2026-06-23 and disclosed on
+2026-09-18 (#873). It stays as recorded, and a comparison spanning this date
+crosses two definitions of what could enter, as one across 2026-09-07 does.
+
+WHY. The same consistency argument as _EXCLUDE_LEVERAGED_FROM_SCORECARD: the
+ranked scanner now leaves these out by default
+(routers/scanner.SCANNER_INCLUDE_NON_COMMON_DEFAULT), and the record is the
+auditable record of what the scanner said. Second, the composite reads a price
+series, and on a note anchored to par or a preferred anchored to its coupon a
+high reading describes that structure. Freezing it into a permanent record
+labelled STRONG SETUP asserts something the model was not measuring about a
+company's shares. The risk was live, not hypothetical: GREEL, a Greenidge
+8.50% senior note, scored above the day's cutoff on 2026-09-14 and tied it on
+2026-09-17, and only the liquidity floor kept it out.
+
+Do NOT justify this with the record's returns. Exactly one such row was ever
+listed, which says nothing either way about how they perform.
+
+The freeze re-derives the flag for its own candidates against the whole
+universe rather than trusting the stored column alone, so a row a blind writer
+has not flagged yet still cannot enter. Set to False to restore the old
+behaviour; the scanner default is separate and unaffected."""
+
+
 def _macro_gate_active() -> bool:
     """The macro gate only applies when Ticker.sub_macro is the Tapeline
     composite's regime-derived value (set by sheet_feed.refresh_from_workbook).
@@ -1768,6 +1806,8 @@ async def _ensure_daily_scorecard(today: date) -> None:
     Since 2026-09-07 leveraged/inverse funds are also skipped, which CHANGED
     what enters this permanent record — see _EXCLUDE_LEVERAGED_FROM_SCORECARD
     for the argument and for the measurement that rules out the obvious one.
+    Since 2026-09-19 so are notes, preferreds, warrants, rights and units
+    stored as stocks — see _EXCLUDE_NON_COMMON_FROM_SCORECARD.
 
     Concentration controls (2026-06-01, fix 3 of SCORING_AUDIT_2026-06-01.md):
     - At most _MAX_PER_SECTOR picks from any single sector
@@ -1830,6 +1870,12 @@ async def _ensure_daily_scorecard(today: date) -> None:
         candidates = await session.execute(
             _cand_stmt.order_by(desc(Ticker.score), Ticker.symbol.asc()).limit(80)
         )
+        # Every stored symbol, for the non-common gate's fifth-letter rules
+        # (PTACU is a unit only because PTAC is listed). Read once, here, so
+        # the gate below does not depend on the stored flag being current.
+        _universe = frozenset(
+            (await session.execute(select(Ticker.symbol))).scalars().all()
+        )
 
         sector_counts: dict[str, int] = {}
         skipped_zero_price = 0
@@ -1837,6 +1883,7 @@ async def _ensure_daily_scorecard(today: date) -> None:
         skipped_sector_cap = 0
         skipped_illiquid = 0
         skipped_leveraged = 0
+        skipped_non_common = 0
         rank = 0
 
         for t in candidates.scalars().all():
@@ -1849,6 +1896,17 @@ async def _ensure_daily_scorecard(today: date) -> None:
             # would guess.
             if _EXCLUDE_LEVERAGED_FROM_SCORECARD and t.is_leveraged:
                 skipped_leveraged += 1
+                continue
+
+            # Notes, preferreds, warrants, rights and units. READ
+            # _EXCLUDE_NON_COMMON_FROM_SCORECARD first: this also changes what
+            # enters the permanent record. The stored flag OR the live
+            # predicate, so a row no writer has flagged yet cannot slip in.
+            if _EXCLUDE_NON_COMMON_FROM_SCORECARD and (
+                t.is_non_common
+                or is_non_common_equity(t.symbol, t.name, t.asset_class, _universe)
+            ):
+                skipped_non_common += 1
                 continue
 
             if not t.price or t.price <= 0:
@@ -1952,9 +2010,11 @@ async def _ensure_daily_scorecard(today: date) -> None:
         logger.info(
             "scorecard.snapshot saved for %s rows=%d "
             "skipped_zero_price=%d skipped_macro_hostile=%d skipped_sector_cap=%d "
-            "skipped_illiquid=%d skipped_leveraged=%d sector_mix=%s",
+            "skipped_illiquid=%d skipped_leveraged=%d skipped_non_common=%d "
+            "sector_mix=%s",
             today, rank, skipped_zero_price, skipped_macro_hostile,
-            skipped_sector_cap, skipped_illiquid, skipped_leveraged, sector_counts,
+            skipped_sector_cap, skipped_illiquid, skipped_leveraged,
+            skipped_non_common, sector_counts,
         )
 
 
@@ -4193,6 +4253,15 @@ async def _backfill_sectors(cap: int = 2500) -> None:
                         values["is_leveraged"] = is_leveraged_fund(
                             name, asset_class,
                         )
+                        # Same moment for notes, preferreds and warrants: a
+                        # placeholder "GREEL" says nothing, its real name
+                        # does. Only ever RAISED here, never cleared: this
+                        # pass cannot see the universe, so it cannot tell
+                        # whether a fifth-letter rule set the flag. The
+                        # reconcile at the end of the pass settles the rest.
+                        # See services/non_common.py.
+                        if non_common_on_write(sym, name, asset_class, False):
+                            values["is_non_common"] = True
                     # A name or sector is reference data, not a refresh of
                     # the row's live numbers: hold updated_at still. See the
                     # comment on Ticker.updated_at.
@@ -4243,6 +4312,9 @@ async def _backfill_sectors(cap: int = 2500) -> None:
 
     logger.info("sector_backfill.done backfilled=%d candidates=%d cap=%d",
                 backfilled, len(rows), cap)
+    # Names this pass repaired can change the non-common flag either way;
+    # settle it against the whole universe. See services/non_common.py.
+    await reconcile_non_common_flags()
 
 
 _MARKET_CAP_BACKFILL_BATCH = 20
@@ -4529,6 +4601,9 @@ async def _refresh_universe() -> None:
     inserts: list[dict[str, object]] = []
     edits: list[dict[str, object]] = []
     added = renamed = retyped = 0
+    # Everything stored plus everything discovered: the non-common flag's
+    # fifth-letter rules need it (PTACU is a unit because PTAC is listed).
+    universe = frozenset(existing) | frozenset(r["symbol"] for r in new_rows)
     for row in new_rows:
         sym = row["symbol"]
         if sym not in existing:
@@ -4540,6 +4615,11 @@ async def _refresh_universe() -> None:
                 **row,
                 "is_leveraged": is_leveraged_fund(
                     row.get("name"), row.get("asset_class"),
+                ),
+                # Same reason: discovery writes every field this depends on,
+                # and is the one writer that can see the whole universe.
+                "is_non_common": is_non_common_equity(
+                    sym, row.get("name"), row.get("asset_class"), universe,
                 ),
             })
             added += 1
@@ -4584,6 +4664,14 @@ async def _refresh_universe() -> None:
             updates["is_leveraged"] = is_leveraged_fund(
                 updates.get("name", stored_name),
                 updates.get("asset_class", stored_class),
+            )
+            # And the non-common flag, for the mirror-image case: a row
+            # reclassified etf -> equity, or a placeholder given its real name.
+            updates["is_non_common"] = is_non_common_equity(
+                sym,
+                updates.get("name", stored_name),
+                updates.get("asset_class", stored_class),
+                universe,
             )
             edits.append({"symbol": sym, **updates})
 
@@ -4652,6 +4740,10 @@ async def _refresh_universe() -> None:
         "universe.write_detail planned_inserts=%d applied=%d planned_edits=%d applied=%d",
         added, applied_i, len(edits), applied_e,
     )
+    # Rows this pass did not touch can still change: a new listing is the
+    # four-letter base that makes an existing fifth-letter symbol a unit,
+    # right or warrant. See services/non_common.py.
+    await reconcile_non_common_flags()
 
 
 async def _seed_calendar() -> None:
@@ -4795,6 +4887,11 @@ async def main() -> None:
 
     # Seed universe on first boot (idempotent)
     await seed_universe()
+
+    # Settle the non-common flag against the whole universe before the first
+    # tick: writers that cannot see the universe only ever raise it. Never
+    # raises. See services/non_common.py.
+    await reconcile_non_common_flags()
 
     # Restore the two Finnhub factor caches from the DB BEFORE the first tick.
     #

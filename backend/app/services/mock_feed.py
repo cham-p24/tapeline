@@ -156,9 +156,13 @@ def universe() -> list[dict[str, object]]:
     the same reason every other writer of `name`/`asset_class` derives it: the
     flag is a function of those two fields, and a seed row that skipped it
     would be the one place in the codebase where they disagree.
+    `is_non_common` is derived for the same reason, against the seed's own
+    symbols (see services/non_common.py).
     """
     from app.services.leverage import is_leveraged_fund
+    from app.services.non_common import is_non_common_equity
 
+    seed_symbols = frozenset(sym for sym, _, _ in TICKER_UNIVERSE)
     return [
         {
             "symbol": sym,
@@ -166,6 +170,7 @@ def universe() -> list[dict[str, object]]:
             "sector": sector,
             "asset_class": (ac := "etf" if sector == "ETF" else "equity"),
             "is_leveraged": is_leveraged_fund(name, ac),
+            "is_non_common": is_non_common_equity(sym, name, ac, seed_symbols),
         }
         for sym, name, sector in TICKER_UNIVERSE
     ]
