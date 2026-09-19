@@ -183,12 +183,6 @@
     {
       "file": "frontend/app/blog/posts.ts",
       "rule": "performance-claim",
-      "phrase": "beat the market",
-      "reason": "Editorial critique quoting what competitors claim ('Every stock scanner claims to beat the market. Almost none publish a track record you can audit'). The phrase is used to attack the claim, not make it. Low risk; left in place pending an editorial pass."
-    },
-    {
-      "file": "frontend/app/blog/posts.ts",
-      "rule": "performance-claim",
       "phrase": "strong buy",
       "reason": "Names Zacks' own published rating label ('Strong Buy') in a comparison. Naming a competitor's product feature is not Tapeline rating a security."
     },

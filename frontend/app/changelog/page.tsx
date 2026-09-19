@@ -56,6 +56,25 @@ const METHODOLOGY_LOG: LogEntry[] = [
       "From 19 September 2026 these surfaces, which need no account and no key, no longer carry current market data: the public signals, ticker and sector-heatmap JSON endpoints, the MCP server, the embeddable score widget and the image shown when a ticker page is shared. The signals and ticker endpoints and the MCP server still give the score, the signal label, the six factor readings and the order tickers are ranked in; the heatmap endpoint gives each sector's name and ticker count; the widget and the shared image show the score and its label. Prices, daily moves, day and 52-week ranges, volume and market capitalisation are left out, and the JSON endpoints say so in their responses. The MCP server's record tool still returns the recorded closes each listed pick was measured on, as the record downloads do. Ticker pages on the site and everything in the app are unchanged. The licence note on the embed page no longer offers the widget for free commercial use; it now says the widget shows the score and label only. Separately, 27 continuous commodity futures, such as CL=F, and two duplicate Berkshire Hathaway listings spelled BRK-A and BRK-B are no longer covered. None of the 29 had a price, yet each still carried a score. The futures had none because our market data covers US stocks and ETFs, not futures, and two of the six factors cannot be measured for a future. The two Berkshire rows had none because they spell Berkshire's share classes with a hyphen, while our data vendor spells them BRK.A and BRK.B, and those two rows are priced. None of them had a daily move, so none appeared in the scanner, search or site map before this change either; that exclusion is now explicit, our system no longer requests prices for them, and their pages say they are not covered. Berkshire Hathaway stays covered as BRK.A and BRK.B, and commodities through the USO, GLD, SLV, CPER and CORN funds. One recorded entry names a future, PA=F on 26 June 2026, and it stays on the record as it is. No recorded entry was changed.",
     ref: "#889",
   },
+  // Corrects the 2026-08-24 entry (#643) below; rule 1: a new entry, the old
+  // wording stays. #821's 2026-09-14 correction fixed that entry's row count
+  // (684 of 688) but not its "append-only throughout" sentence. The 684 rows
+  // were rewritten in place by rederive_scorecard (see RESTATEMENTS in
+  // backend/app/services/scorecard_export.py, 2026-08-25: fields_changed).
+  // "No entry was deleted" is kept only for the restatement itself: production
+  // read-only on 2026-09-18 (#861) found daily_scorecard ids 81..930 with no
+  // gaps, first row 2026-05-11, so no entry recorded from 11 May on has been
+  // deleted. Rows recorded before 11 May (ids 1-80) are out of this entry's
+  // scope. The #861 facts are pinned by
+  // backend/tests/test_record_cannot_be_reset.py.
+  {
+    date: "2026-09-19",
+    kind: "correction",
+    title: "The 24 August entry said the archive stayed append-only throughout. It did not",
+    body:
+      "Added on 19 September 2026. The 2026-08-24 entry below, titled \"The published record was measured against an after-hours price, and has been restated\", says \"The archive stayed append-only throughout\". That was not true when it was written. The restatement that entry describes changed the prices and next-session results of 684 recorded entries in place; it did not add corrected rows beside the originals. And on 15 June 2026 every recorded score above 100 had already been set to 100, and the originals were not kept (see the 2026-06-15 entry). The 2026-09-14 entry titled \"Entries on this page said no recorded value had ever been changed. That was wrong\" corrected the 2026-08-24 entry's count of rebased rows but did not name this sentence. The next clause of that sentence, that no entry was deleted, holds for the restatement itself, which removed no entry. We have left the 2026-08-24 entry's wording in place. Since 17 September 2026 (#861) no endpoint on the site or its API can delete a recorded entry or change a recorded value. The script we use to correct recorded values now refuses to write unless a dated restatement naming every column it changes is already in the list of restatements that the scorecard downloads carry, and it can only reach entries recorded before that restatement's date. No recorded entry was changed.",
+    ref: "#890",
+  },
   // #878 changed what the Fundamentals factor reads (rule 4: the factor page
   // changed in the same PR). Measured read-only against production on
   // 2026-09-18: 99 of the 120 flagged listings held an issuer's reading.

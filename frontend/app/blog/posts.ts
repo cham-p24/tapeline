@@ -1835,13 +1835,13 @@ RSI = 100 - (100 / (1 + RS))</pre>
     title: "How to evaluate a stock scanner you can actually trust (5 criteria most fail).",
     metaTitle: "How to evaluate a stock scanner you can trust",
     excerpt:
-      "Every stock scanner claims to beat the market. Almost none publish a daily, back-checked track record you can audit. Here are the five tests we'd put any scanner through before paying — and how to read between the lines when the answers get vague.",
+      "Many stock scanners advertise outperformance. Almost none publish a daily, back-checked track record you can audit. Here are the five tests we'd put any scanner through before paying — and how to read between the lines when the answers get vague.",
     publishedAt: "2026-05-21",
     author: "Tapeline",
     body: `
       <p>Choosing a stock scanner is mostly an exercise in detecting
-      what isn't said. Every product claims to "beat the market" or
-      "outperform" or "deliver signals." Almost none publish the data
+      what isn't said. Many products claim to "outperform" or to
+      "deliver signals." Almost none publish the data
       that would let you verify those claims. The asymmetry is the
       whole story: the products with real records publish them
       prominently; the products without real records hide behind

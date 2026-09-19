@@ -1866,6 +1866,7 @@ RE_TOUCH2_TOKEN = "re24"
 _RE_UTM_BASE = "utm_source=email&utm_campaign=re_engagement&utm_medium=transactional"
 _RE_APP_URL = f"https://tapeline.io/app/scanner?{_RE_UTM_BASE}&utm_content=re14"
 _RE_SCORECARD_URL = f"https://tapeline.io/scorecard?{_RE_UTM_BASE}&utm_content=re14"
+_RE_CHANGELOG_URL = f"https://tapeline.io/changelog?{_RE_UTM_BASE}&utm_content=re14"
 _RE_TOUCH2_APP_URL = f"https://tapeline.io/app/scanner?{_RE_UTM_BASE}&utm_content=re24"
 
 # How far back the sunset scan reaches past the touch-2 window. A user who
@@ -1936,7 +1937,8 @@ def render_re_engagement_email(
          if rows else "The public scorecard kept adding dated rows")
         + " — each day's top 10 is back-checked against SPY the next session and left on "
         "the page whether the day went well or badly. Winning days and losing days are "
-        "recorded the same way, and nothing is deleted."
+        "recorded the same way, and corrections to recorded values are dated on the "
+        f'public <a href="{_RE_CHANGELOG_URL}" style="color:{ACCENT};">changelog</a>.'
     )
     lookup_line = (
         f"On your side, your free daily look-ups have reset — the full {daily_lookups} are "

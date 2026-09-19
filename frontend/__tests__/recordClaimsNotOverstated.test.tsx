@@ -58,6 +58,9 @@ const OWNED_ROUTE_FILES = [
   "app/transparent-stock-screener/page.tsx",
   "app/daily-picks/page.tsx",
   "app/daily-picks/opengraph-image.tsx",
+  // Links /daily-picks from the card gate; said it was "the same list the
+  // morning email carries".
+  "app/app/start/page.tsx",
   "app/verify/page.tsx",
   "app/verify/opengraph-image.tsx",
   "app/best-finviz-alternatives/page.tsx",
@@ -96,7 +99,15 @@ const BANNED_RECORD_CLAIMS: RegExp[] = [
   // /daily-picks and the email are not the record's list (T-10 not approved):
   // never describe the record as this page's past lists.
   /Past daily lists/i,
-  /\bsame (daily )?(list|lists|picks|top 10)\b/i,
+  // "set(?! of)": "Same set, ranked by composite" is the claim; "the same set
+  // of six factors" is not.
+  /\bsame (daily )?(list|lists|picks|top 10|top ten|set(?! of))\b/i,
+  /same composite as the (public )?scorecard/i,
+  // Four trading days have no top 10 on the record.
+  /every picks? day logged/i,
+  // daily_scorecard ids 1-80 were deleted around 10 May 2026, and until #861
+  // (17 Sep 2026) an admin endpoint could delete rows.
+  /nothing is deleted/i,
   // Completeness claim the limitations block cannot back.
   /everything else we know/i,
   // Overstated certainty about the 15 June 2026 cap.
