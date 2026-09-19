@@ -83,11 +83,34 @@ def _grouped_path(on: date) -> str:
     return f"/v2/aggs/grouped/locale/global/market/crypto/{on.isoformat()}"
 
 
-def _row_from_bar(bar: dict[str, Any]) -> dict[str, Any] | None:
+def daily_close_time(on: date | None, *, now: datetime | None = None) -> datetime | None:
+    """When the daily close of UTC day `on` was struck: the end of that day.
+
+    Taken from the DAY the vendor returned the bar for, not from the bar's own
+    `t`: the vendor documents grouped-bar `t` as the window's start while its
+    crypto examples carry the window's end (23:59:59.999), and an off-by-a-day
+    quote time is the exact error this column exists to prevent. A day that
+    has not ended yet has no close, so a bar for it gets None (its "close" is
+    an intraday reading of unknown time). `now` only bounds; it is never
+    returned.
+    """
+    if on is None:
+        return None
+    end = datetime(on.year, on.month, on.day, tzinfo=UTC) + timedelta(days=1)
+    if end > (now or datetime.now(UTC)):
+        return None
+    return end
+
+
+def _row_from_bar(bar: dict[str, Any], on: date | None = None) -> dict[str, Any] | None:
     """One grouped-bar entry -> a normalized row, or None to skip it.
 
     Mirrors `polygon_feed._to_scanner_row`'s contract: return None rather than
     a half-built row, so a caller can never publish a partial reading.
+
+    `on` is the UTC day the grouped request asked for. It sets `quote_at` —
+    the time of the close this row's price is — so a crypto price shows its
+    real age (a day or more) instead of the time we wrote it.
     """
     # MUST be the namespaced form, not merely "a valid symbol".
     #
@@ -126,6 +149,10 @@ def _row_from_bar(bar: dict[str, Any]) -> dict[str, Any] | None:
         "volume": int(volume) if isinstance(volume, int | float) else None,
         "change_pct_1d": change_pct_1d,
         "dollar_volume": dollar_volume,
+        # The end of the UTC day whose close `price` is. No timeframe flag:
+        # the grouped endpoint sends none, and inventing one is not ours to do.
+        "quote_at": daily_close_time(on),
+        "quote_timeframe": None,
     }
 
 
@@ -167,7 +194,7 @@ async def fetch_crypto_universe(
         if not results:
             continue
 
-        rows = [r for r in (_row_from_bar(b) for b in results) if r is not None]
+        rows = [r for r in (_row_from_bar(b, target) for b in results) if r is not None]
         kept = [r for r in rows if r["dollar_volume"] >= floor]
         logger.info(
             "crypto.universe on=%s pairs=%d parsed=%d above_floor=%d floor=%s",

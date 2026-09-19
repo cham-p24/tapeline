@@ -39,6 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import Ticker, User
 from app.services.auth import current_user_required
+from app.services.quote_time import iso_utc
 from app.services.sector import CANONICAL_ORDER, canonical_sector
 from app.services.tier import Tier, has_feature
 
@@ -134,6 +135,18 @@ async def get_heatmap(
     # next to the LiveBadge without needing to compute it client-side.
     newest_update = max((t.updated_at for t in tickers if t.updated_at), default=None)
     oldest_update = min((t.updated_at for t in tickers if t.updated_at), default=None)
+    # The vendor's own times for the tiles' prices (Ticker.quote_at). The two
+    # write times above say when Tapeline last wrote a tile, not how old its
+    # price is. Both null when no tile carries a vendor time. Crypto tiles are
+    # left out: their quote_at is the end of a daily close's UTC day, a day or
+    # more old by construction, and would otherwise stand in for the stock
+    # tiles' age whenever those carry no vendor time.
+    quote_times = [
+        t.quote_at for t in tickers
+        if t.quote_at is not None and t.asset_class != "crypto"
+    ]
+    newest_quote = max(quote_times, default=None)
+    oldest_quote = min(quote_times, default=None)
 
     return {
         "sectors": [
@@ -146,6 +159,8 @@ async def get_heatmap(
         "freshness": {
             "newest_updated_at": newest_update.isoformat() if newest_update else None,
             "oldest_updated_at": oldest_update.isoformat() if oldest_update else None,
+            "newest_quote_at": iso_utc(newest_quote),
+            "oldest_quote_at": iso_utc(oldest_quote),
             "max_stale_minutes": HEATMAP_MAX_STALE_MIN,
             "ticker_count": len(tickers),
         },

@@ -239,6 +239,10 @@ export type ScannerRow = {
   confidence_pct?: number | null;
   reason?: string | null;
   updated_at: string | null;
+  // The VENDOR's time for `price` (backend Ticker.quote_at), UTC ISO; null
+  // when the vendor gave none. `updated_at` is Tapeline's write time, not the
+  // price's age. Optional so a response from an older backend still parses.
+  quote_at?: string | null;
 };
 
 export type TickerDetail = {
@@ -277,6 +281,11 @@ export type TickerDetail = {
     sentiment: number | null;
   }>;
   updated_at: string | null;
+  // The VENDOR's time for `price` (backend Ticker.quote_at), UTC ISO; null
+  // when the vendor gave none. `updated_at` is Tapeline's write time, not the
+  // price's age. Optional so a response from an older backend still parses.
+  quote_at?: string | null;
+  quote_timeframe?: string | null;
 };
 
 export type WatchlistItem = {
@@ -294,6 +303,8 @@ export type WatchlistItem = {
   current_score: number | null;
   signal: string | null;
   price: number | null;
+  /** The vendor's time for `price` (Ticker.quote_at); null when none. */
+  quote_at?: string | null;
   change_pct_1d: number | null;
   reason: string | null;
   score_delta: number | null;
@@ -825,6 +836,10 @@ export const api = {
       freshness?: {
         newest_updated_at: string | null;
         oldest_updated_at: string | null;
+        // The vendor's own times for the tiles' prices (Ticker.quote_at);
+        // null when no tile carries one. The two above are write times.
+        newest_quote_at?: string | null;
+        oldest_quote_at?: string | null;
         max_stale_minutes: number;
         ticker_count: number;
       };

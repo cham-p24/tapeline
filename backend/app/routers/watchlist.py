@@ -13,6 +13,7 @@ from app.models import Ticker, User, Watchlist, WatchlistItem, WatchlistTrackRec
 from app.services.auth import current_user_required
 from app.services.cap_events import record_cap_hit
 from app.services.funnel_events import record_funnel_event
+from app.services.quote_time import iso_utc
 from app.services.tier import Tier, effective_limit, has_feature
 from app.services.watchlist_trackrecord import summary_for_rows
 
@@ -125,6 +126,8 @@ async def list_watchlist(
             "signal": t.signal if t else None,
             "price": t.price if t else None,
             "change_pct_1d": t.change_pct_1d if t else None,
+            # The vendor's time for `price` (Ticker.quote_at); null = none.
+            "quote_at": iso_utc(t.quote_at) if t else None,
             "reason": t.reason if t else None,
             "score_delta": delta,
             "alert_triggered": alert_triggered,

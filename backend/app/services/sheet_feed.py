@@ -891,6 +891,11 @@ async def upsert_tickers(
             t.symbol, t.name, t.asset_class, t.is_non_common,
         )
         t.price = r["price"]
+        # The price above is the SHEET's, which carries no vendor time, so any
+        # vendor quote time on the row no longer describes it. NULL makes the
+        # UI state the plan's delay rather than a time (see Ticker.quote_at).
+        t.quote_at = None
+        t.quote_timeframe = None
         if r.get("confidence_pct") is not None:
             t.confidence_pct = r["confidence_pct"]
         # 1M approximated from 3M / 3 — leave existing change_pct_5d untouched

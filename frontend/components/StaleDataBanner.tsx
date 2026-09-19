@@ -14,6 +14,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { PRICE_DELAY_PHRASE } from "@/lib/freshness";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 // Match the threshold in /api/status (300s) so the banner appears the moment
@@ -23,13 +24,27 @@ const STALE_THRESHOLD_SECONDS = 300;
 type StatusResponse = {
   status: "ok" | "degraded";
   checks: {
-    worker_last_tick?: { status: string; age_seconds?: number; updated_at?: string };
+    worker_last_tick?: {
+      status: string;
+      age_seconds?: number;
+      updated_at?: string;
+      // The newest VENDOR time on any price (backend Ticker.quote_at), and its
+      // age. Null when no price carries a vendor time.
+      newest_quote_at?: string | null;
+      newest_quote_age_seconds?: number | null;
+    };
     database?: { status: string };
   };
 };
 
 export function StaleDataBanner() {
-  const [warn, setWarn] = useState<{ kind: "stale" | "degraded" | "down"; minutes: number } | null>(null);
+  const [warn, setWarn] = useState<{
+    kind: "stale" | "degraded" | "down";
+    minutes: number;
+    // Age of the newest vendor quote, in minutes; null when the vendor gave
+    // no time for any price.
+    quoteMinutes?: number | null;
+  } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -48,7 +63,15 @@ export function StaleDataBanner() {
         }
         const tick = body.checks.worker_last_tick;
         if (tick?.age_seconds && tick.age_seconds > STALE_THRESHOLD_SECONDS) {
-          setWarn({ kind: "stale", minutes: Math.round(tick.age_seconds / 60) });
+          const quoteAge = tick.newest_quote_age_seconds;
+          setWarn({
+            kind: "stale",
+            minutes: Math.round(tick.age_seconds / 60),
+            quoteMinutes:
+              typeof quoteAge === "number" && Number.isFinite(quoteAge)
+                ? Math.max(0, Math.round(quoteAge / 60))
+                : null,
+          });
           return;
         }
         // Healthy — clear any prior warning.
@@ -72,7 +95,12 @@ export function StaleDataBanner() {
       ? "API unreachable. Data on this page may be out of date."
       : warn.kind === "degraded"
       ? "System is in a degraded state. Some data may be stale."
-      : `The worker last wrote scanner data ~${warn.minutes} min ago (it hasn't run recently), on top of the usual ~15-minute price delay.`;
+      : // With a vendor time, say how old the newest PRICE is — the worker's
+        // write age is not that. Without one, state the plan's delay; never a
+        // write time dressed as a quote time.
+        warn.quoteMinutes != null
+        ? `The worker last wrote scanner data ~${warn.minutes} min ago (it hasn't run recently). The newest price quote is ~${warn.quoteMinutes} min old.`
+        : `The worker last wrote scanner data ~${warn.minutes} min ago (it hasn't run recently), and prices are ${PRICE_DELAY_PHRASE} on top of that.`;
 
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warn/30 bg-warn/5 px-4 py-2 text-sm text-warn">

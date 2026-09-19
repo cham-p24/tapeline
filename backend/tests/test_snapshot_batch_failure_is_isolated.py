@@ -58,6 +58,8 @@ def _vendor_row(t: dict[str, Any]) -> dict[str, Any]:
         "symbol": sym, "price": 42.0, "change_pct_1d": 1.5, "volume": 1000,
         "previous_close": 41.0, "day_close": 42.0, "day_open": 41.5,
         "day_high": 42.5, "day_low": 41.2,
+        # Part of _to_scanner_row's contract since migration 0075.
+        "quote_at": None, "quote_timeframe": None,
     }
 
 

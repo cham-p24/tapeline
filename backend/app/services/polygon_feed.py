@@ -5,27 +5,34 @@ Single file is the ONLY place the codebase talks to Polygon. Swapping
 `app.services.mock_feed` → `app.services.polygon_feed` in the worker is
 the complete "go live with real data" change.
 
-Starter tier ($29/mo):
-    - 5 requests/min rate limit — handled by the built-in retry/sleep
-    - 15-minute delayed quotes
-    - Commercial redistribution rights
-    - Aggregates API: end-of-day bars
+Plan in use: Massive (formerly Polygon.io) Stocks Starter, $29/mo.
+    - 15-minute delayed prices. Measured 14 Sep 2026 during the US session:
+      the AAPL snapshot 899 s old, its newest minute bar 961 s old, and no
+      last-trade or last-quote keys in the response (apparently not
+      entitled on this plan; inferred from their absence, not confirmed).
+    - Licensed for individual, non-business use. Displaying its data to
+      Tapeline's customers is not licensed on this plan; whether, and on which
+      plan, it can be is an open question with the vendor (docs/LICENSE_AUDIT.md,
+      docs/DATA_SOURCES.md). This docstring used to say Starter carried
+      "commercial redistribution rights" and that the next tier up gave
+      "real-time quotes"; neither was true of the plans as sold.
+    - Aggregates API: daily bars.
 
-Developer tier ($79/mo):
-    - Unlimited req/min, real-time quotes
-
-Tapeline MVP uses Starter. Upgrade to Developer once MRR > $500/mo.
+Moving to a faster or business-licensed plan is a founder decision, not an
+assumption anything in this module may make. Each price's own time is carried
+separately from our write time: see services/quote_time.py and Ticker.quote_at.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 
 import httpx
 
 from app.config import get_settings
+from app.services.quote_time import describe_quote_fields, extract_quote_time
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -436,6 +443,10 @@ async def fetch_snapshots(
             r["day_open"] = real["day_open"]
             r["day_high"] = real["day_high"]
             r["day_low"] = real["day_low"]
+            # The vendor's own time for this price (None when it priced the
+            # row but sent no usable time). See services/quote_time.py.
+            r["quote_at"] = real["quote_at"]
+            r["quote_timeframe"] = real["quote_timeframe"]
         else:
             # The vendor call SUCCEEDED but returned nothing for this symbol.
             # Every row here started life as a _mock_snapshots() row, so leaving
@@ -451,6 +462,13 @@ async def fetch_snapshots(
             r["day_open"] = None
             r["day_high"] = None
             r["day_low"] = None
+            # The price is NULLed above, so its time goes with it. Keeping the
+            # previous quote_at would describe a price the row no longer
+            # holds: review of this change found the ticker page showing "-"
+            # for the price beside "Quote as of 3h ago". Same reasoning as the
+            # tape fields: a vendor "no read" is NULL, never a kept stale value.
+            r["quote_at"] = None
+            r["quote_timeframe"] = None
 
         # Real fundamentals from Finnhub cache (pre-fetched daily by worker)
         # ASSIGN UNCONDITIONALLY — a cache miss must leave the factor NULL.
@@ -655,6 +673,9 @@ def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
     score = _naive_score_from_move(change_1d) if change_1d is not None else None
     signal = _signal_from_score(score) if score is not None else None
 
+    quote_at, quote_timeframe, quote_source = extract_quote_time(snap)
+    _log_quote_fields_once(snap, quote_source, quote_timeframe)
+
     return {
         "symbol": ticker,
         "score": round(score, 1) if score is not None else None,
@@ -674,8 +695,44 @@ def _to_scanner_row(snap: dict[str, Any]) -> dict[str, Any] | None:
         "day_open": day_open,
         "day_high": day_high,
         "day_low": day_low,
-        "last_timestamp": datetime.now(UTC).isoformat(),
+        # The vendor's own time for this price, and its DELAYED / REAL-TIME
+        # flag. This used to be `"last_timestamp": datetime.now(UTC)` — our
+        # clock, in a key nothing persisted — while the vendor's timestamp
+        # fields were dropped. None when the vendor sent no usable time; the
+        # UI then states the plan's delay instead of a time. See
+        # services/quote_time.py for which fields count and which never do.
+        "quote_at": quote_at,
+        "quote_timeframe": quote_timeframe,
     }
+
+
+#: Set once the snapshot's field names have been logged in this process.
+_quote_fields_logged = False
+
+
+def _log_quote_fields_once(
+    snap: dict[str, Any], source: str | None, timeframe: str | None,
+) -> None:
+    """Record, once per process, which timestamp fields the plan returns.
+
+    Nobody may call the vendor from a dev machine to find out, and the
+    14 Sep 2026 measurement found no last-trade or last-quote keys at all, so
+    production is where this gets answered. Field NAMES only (plus the chosen
+    source and the timeframe flag): no values, no URL, no key.
+    """
+    global _quote_fields_logged
+    if _quote_fields_logged:
+        return
+    _quote_fields_logged = True
+    fields = describe_quote_fields(snap)
+    logger.info(
+        "polygon_feed.quote_time_fields source=%s timeframe=%s top=%s "
+        "session=%s last_minute=%s last_trade=%s last_quote=%s",
+        source or "none", timeframe or "none",
+        ",".join(fields["top"]), ",".join(fields["session"]),
+        ",".join(fields["last_minute"]), ",".join(fields["last_trade"]),
+        ",".join(fields["last_quote"]),
+    )
 
 
 # =====================================================================

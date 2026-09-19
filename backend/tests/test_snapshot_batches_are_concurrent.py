@@ -159,6 +159,8 @@ async def test_a_failing_batch_withholds_only_its_own_symbols(monkeypatch):
         "price", "change_pct_1d", "volume", "previous_close", "day_close",
         "day_open", "day_high", "day_low",
     ), 1.0)
+    # Part of _to_scanner_row's contract since migration 0075.
+    quote |= {"quote_at": None, "quote_timeframe": None}
     monkeypatch.setattr(
         pf, "_to_scanner_row", lambda t: {"symbol": t["ticker"], **quote}, raising=True
     )
