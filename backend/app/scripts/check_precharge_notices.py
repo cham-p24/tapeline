@@ -37,11 +37,15 @@ customer — the only outbound message is a founder alert.
 
 Exit 0 when healthy, 1 when something needs attention, so a scheduler can act
 on the code alone. No customer email is read or printed anywhere — these logs
-are world-readable on this public repo, and Stripe ids are enough to act on.
+are world-readable on this public repo. Stripe subscription and customer ids
+are printed only as a one-way hash (`sub#…`, `cus#…`); the founder alert,
+which is private, carries the raw ids to act on.
 """
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import logging
 import os
 from datetime import UTC, datetime, timedelta
 
@@ -52,6 +56,13 @@ from app.config import get_settings
 from app.db import session_scope
 from app.models import StripeWebhookEvent
 from app.services.stripe_compat import stripe_field
+
+# stripe-python logs every request at INFO on the "stripe" logger, and a
+# request URL can carry a customer id (".../v1/customers/cus_…"). This job's
+# output is the public Actions log, so that logger is held at WARNING here
+# rather than trusting the process's logging setup to keep it quiet. A failed
+# Stripe call still raises into this script.
+logging.getLogger("stripe").setLevel(logging.WARNING)
 
 settings = get_settings()
 
@@ -78,6 +89,25 @@ LOOKBACK_DAYS = min(int(os.environ.get("PRECHARGE_LOOKBACK_DAYS", "10")), 21)
 LIVE_STATUSES = {"active", "trialing", "past_due"}
 
 NOTICE_EVENTS = ("invoice.upcoming", "customer.subscription.trial_will_end")
+
+
+def _mask_stripe_id(obj_id: str | None) -> str:
+    """A Stripe object id as a short one-way hash, e.g. `cus#1a2b3c4d5e`.
+
+    Stable, so one subscription can be followed from one daily run to the
+    next, and the operator can match a row by hashing the ids they can already
+    read in the database. One-way, so the public log never carries an id that
+    works in the Stripe dashboard or API.
+
+    The same algorithm as `_mask_stripe_id` in billing_audit.py (added there
+    by the billing-audit PR), so one account hashes the same in both jobs'
+    logs. Kept as a local copy because that PR was not merged when this was
+    written; the two can be folded into one shared helper once it is.
+    """
+    if not obj_id:
+        return "(none)"
+    prefix = obj_id.split("_", 1)[0] if "_" in obj_id else "id"
+    return f"{prefix}#{hashlib.sha256(obj_id.encode()).hexdigest()[:10]}"
 
 
 def _period_end(sub: object) -> int | None:
@@ -208,17 +238,25 @@ async def gather() -> dict:
     }
 
 
-def render(d: dict) -> tuple[str, str, bool]:
-    """(subject, text, alert_worthy)."""
+def render(d: dict, *, public: bool = True) -> tuple[str, str, bool]:
+    """(subject, text, alert_worthy).
+
+    `public` (the default) is the text that gets printed, and so lands in the
+    public Actions log: subscription and customer ids appear only as their
+    one-way hash. `public=False` is for the founder alert, which is private
+    and keeps the raw ids, because that is where a finding is acted on. The
+    subject never carries an id either way.
+    """
     lines: list[str] = []
     alert = False
+    ref = _mask_stripe_id if public else (lambda obj_id: obj_id or "(none)")
 
     if d["missed"]:
         alert = True
         lines.append("MISSED — charged with no pre-charge notice:")
         for r in d["missed"]:
             lines.append(
-                f"  {r['sub']} {r['customer']} status={r['status']} "
+                f"  {ref(r['sub'])} {ref(r['customer'])} status={r['status']} "
                 f"renewed {r['renews']} ({abs(r['days_out'])}d ago) — NO notice event"
             )
         lines.append("")
@@ -228,7 +266,7 @@ def render(d: dict) -> tuple[str, str, bool]:
         lines.append("DROPPED — Stripe emitted the notice, we never recorded it:")
         for r in d["dropped"]:
             lines.append(
-                f"  {r['sub']} {r['customer']} renews {r['renews']} "
+                f"  {ref(r['sub'])} {ref(r['customer'])} renews {r['renews']} "
                 f"emitted={r['notices']} unrecorded={r['unrecorded']}"
             )
         lines.append("  => the endpoint is dropping deliveries: check signature,")
@@ -239,7 +277,7 @@ def render(d: dict) -> tuple[str, str, bool]:
         lines.append("PENDING — renewal near, notice not emitted yet (informational):")
         for r in d["pending"]:
             lines.append(
-                f"  {r['sub']} {r['customer']} renews {r['renews']} "
+                f"  {ref(r['sub'])} {ref(r['customer'])} renews {r['renews']} "
                 f"(in {r['days_out']}d)"
             )
         lines.append("")
@@ -248,7 +286,7 @@ def render(d: dict) -> tuple[str, str, bool]:
         lines.append("OK — notice sent and recorded:")
         for r in d["healthy"]:
             lines.append(
-                f"  {r['sub']} {r['customer']} renews {r['renews']} {r['notices']}"
+                f"  {ref(r['sub'])} {ref(r['customer'])} renews {r['renews']} {r['notices']}"
             )
         lines.append("")
 
@@ -288,7 +326,10 @@ async def main() -> int:
     if alert:
         from app.services.telegram import deliver_founder_alert
 
-        await deliver_founder_alert(subject=subject, text=text)
+        # The alert is private, so it carries the raw ids; only the printed
+        # copy above is hashed.
+        _, private_text, _ = render(d, public=False)
+        await deliver_founder_alert(subject=subject, text=private_text)
         print("precharge.alert_delivered")
     return 1 if alert else 0
 

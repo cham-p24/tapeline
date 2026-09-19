@@ -24,6 +24,7 @@ from app.services.billing import (
     tier_from_price,
 )
 from app.services.stripe_compat import stripe_field
+from app.services.telegram import PAYMENT_NOTE_LATCHED, PAYMENT_NOTE_STRIPE_HISTORY
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -452,7 +453,7 @@ async def _tell_founder_paid_on_started_subscription(
     amount_paid: int,
     currency: str,
     sub_id: str,
-    why: str,
+    path: str,
 ) -> None:
     """Founder-only: money arrived on a subscription that is not starting now.
 
@@ -470,7 +471,14 @@ async def _tell_founder_paid_on_started_subscription(
     The event-id dedup at the top of the handler stops a redelivery of one
     event; this stops a second, distinct event for the same invoice. Read
     before the dunning branch clears the account's `dun{n}` tokens, so their
-    count can be reported. Internal only: no customer email. Never raises.
+    count can be reported. That count is ACCOUNT-WIDE: a token is `dun{attempt}`
+    and records neither the subscription nor the invoice that failed, so this
+    subscription's share cannot be read from it. The note says so; the
+    invoice's own `attempt_count` is the per-invoice figure.
+
+    `path` (PAYMENT_NOTE_LATCHED or PAYMENT_NOTE_STRIPE_HISTORY) tells the note
+    what it may say: only a latched subscription can be receiving its first
+    real payment here. Internal only: no customer email. Never raises.
     """
     try:
         inv_id = inv.get("id")
@@ -507,7 +515,7 @@ async def _tell_founder_paid_on_started_subscription(
         from app.services.telegram import notify_founder_payment_received
 
         await notify_founder_payment_received(
-            why=why,
+            path=path,
             amount=amount_paid / 100,
             currency=currency,
             email=email,
@@ -609,13 +617,13 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> bo
             select(StripeWebhookEvent).where(StripeWebhookEvent.id == latch_id)
         )
         if claimed.scalar_one_or_none() is not None:
-            # Already started: a renewal, or the first charge of a trial the
-            # old status trigger latched before it was paid. No welcome, no
-            # new-subscription alert — but the founder hears the money arrived.
+            # Already started: a renewal, a plan-change charge, or the first
+            # charge of a trial the old status trigger latched before it was
+            # paid. No welcome, no new-subscription alert — but the founder
+            # hears the money arrived.
             await _tell_founder_paid_on_started_subscription(
                 session, inv=inv, amount_paid=amount_paid, currency=currency,
-                sub_id=sub_id,
-                why="this subscription was already marked as started",
+                sub_id=sub_id, path=PAYMENT_NOTE_LATCHED,
             )
             return False
 
@@ -649,8 +657,7 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> bo
                 logger.info("stripe.paid_welcome_skipped_established sub=%s", sub_id)
                 await _tell_founder_paid_on_started_subscription(
                     session, inv=inv, amount_paid=amount_paid, currency=currency,
-                    sub_id=sub_id,
-                    why="Stripe shows an earlier paid invoice on this subscription",
+                    sub_id=sub_id, path=PAYMENT_NOTE_STRIPE_HISTORY,
                 )
                 return False
 
