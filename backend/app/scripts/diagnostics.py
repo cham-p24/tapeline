@@ -62,8 +62,11 @@ async def main() -> None:
             .limit(10)
         )).all()
 
-        # ---- Subscriptions (paying customers)
-        paid_subs = (await s.execute(
+        # ---- Subscriptions, by Stripe status. NOT paying customers: a status
+        # string is not proof of a charge (card trials and failed first
+        # charges live here too). Money collected = paid invoices, which only
+        # billing_audit reads.
+        active_subs = (await s.execute(
             select(func.count(Subscription.id)).where(Subscription.status == "active")
         )).scalar_one()
         total_subs = (await s.execute(select(func.count(Subscription.id)))).scalar_one()
@@ -129,7 +132,8 @@ async def main() -> None:
         last_seen_str = f"  last_seen={last_seen.isoformat()}" if last_seen else "  never-seen-again"
         print(f"  {created.isoformat()}  [{tier:7s}]  {email}{last_seen_str}")
 
-    print(f"\n[PAID]    subscriptions: active={paid_subs}  total={total_subs}")
+    print(f"\n[SUBS]    subscriptions: active={active_subs}  total={total_subs}"
+          "  (Stripe status, not proof of payment)")
     print(f"          stripe_webhook_events_total={total_webhooks}")
     print("          recent webhooks:")
     for evt, ts in recent_webhooks:

@@ -119,7 +119,7 @@ async def gather() -> dict:
             ).all()
         ]
 
-        # Hot leads: engaged (activated, has a watchlist) but never paid.
+        # Hot leads: engaged (activated, has a watchlist) but no card on file.
         leads = []
         for r in (
             await s.execute(
@@ -217,12 +217,19 @@ def render(d: dict) -> str:
     this is an internal status readout, just counts and names."""
     today = datetime.now(UTC).strftime("%b %d, %Y")
 
+    # `cards` counts accounts with a Stripe customer, which Checkout creates
+    # when a card is entered and a trial starts. That is NOT a payment: a
+    # trial is not charged until it ends, and the charge can still fail. Only
+    # a paid invoice is money, and nothing here reads invoices, so never
+    # describe this count as paying or paid.
     if d["cards"]:
         signal = (
             f'<div style="background:#052e16;border:1px solid #16a34a;border-radius:8px;'
             f'padding:14px 16px;color:#bbf7d0;font-size:15px;">'
-            f'<strong>💳 {d["cards"]} card(s) on file.</strong> Someone is paying or '
-            f'has entered payment: {_esc(", ".join(d["card_emails"]))}. Reply personally today.'
+            f'<strong>💳 {d["cards"]} card(s) on file.</strong> A card on file is not '
+            f'a payment: trials are not charged until they end, and a charge can '
+            f'still fail. Entered a card: {_esc(", ".join(d["card_emails"]))}. '
+            f'Reply personally today.'
             f"</div>"
         )
     elif d["checkouts"]:
@@ -247,8 +254,8 @@ def render(d: dict) -> str:
     ch_rows = "".join(
         f'<tr><td style="padding:4px 12px 4px 0;">{_esc(c)}</td>'
         f'<td style="padding:4px 12px;text-align:right;">{n}</td>'
-        f'<td style="padding:4px 0;text-align:right;color:#16a34a;">{paid}</td></tr>'
-        for c, n, paid in d["channels"]
+        f'<td style="padding:4px 0;text-align:right;color:#16a34a;">{carded}</td></tr>'
+        for c, n, carded in d["channels"]
     )
 
     new_rows = (
@@ -294,7 +301,7 @@ margin:0 auto;color:#111;line-height:1.5;">
     Tapeline weekly pulse · {today}
   </div>
   <h1 style="font-size:22px;margin:6px 0 16px;">
-    {d["total"]} users · {d["cards"]} paying · {len(d["leads"])} hot leads
+    {d["total"]} users · {d["cards"]} card(s) on file · {len(d["leads"])} hot leads
   </h1>
 
   {signal}
@@ -313,7 +320,7 @@ margin:0 auto;color:#111;line-height:1.5;">
   <table style="font-size:14px;border-collapse:collapse;">
     <tr style="color:#6b7280;"><td style="padding:0 12px 4px 0;">channel</td>
     <td style="padding:0 12px 4px;text-align:right;">signups</td>
-    <td style="padding:0 0 4px;text-align:right;">paid</td></tr>
+    <td style="padding:0 0 4px;text-align:right;">card on file</td></tr>
     {ch_rows}
   </table>
 
@@ -336,7 +343,7 @@ margin:0 auto;color:#111;line-height:1.5;">
   </p>
 
   <h2 style="font-size:14px;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;
-  margin:22px 0 6px;">Hot leads — engaged, never paid</h2>
+  margin:22px 0 6px;">Hot leads — engaged, no card on file</h2>
   <table style="font-size:14px;border-collapse:collapse;">{lead_rows}</table>
 
   <p style="font-size:12px;color:#9ca3af;margin-top:24px;">
@@ -350,7 +357,7 @@ async def main() -> None:
     d = await gather()
     html = render(d)
     subject = (
-        f"Tapeline pulse — {d['total']} users, {d['cards']} paying, "
+        f"Tapeline pulse — {d['total']} users, {d['cards']} card(s) on file, "
         f"{len(d['leads'])} hot leads"
     )
     res = await send_email(
