@@ -41,6 +41,18 @@ class Ticker(Base):
         Boolean, default=False, server_default=text("false"), nullable=False,
     )
 
+    # True for a row stored as a stock that is not the company's common
+    # shares: a note, preferred, warrant, right or SPAC unit (GREEL, a
+    # Greenidge 8.50% senior note, read STRONG SETUP on 2026-09-18). Same
+    # shape and the same job as `is_leveraged` above: out of the scorecard
+    # freeze and the default ranked view, `include_non_common=true` puts them
+    # back, and the fact ships on the row. Derived from symbol, name and
+    # asset_class by services/non_common.py, which also says why CIG and PBR.A
+    # are not flagged and how the column is kept right.
+    is_non_common: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False,
+    )
+
     # Latest score snapshot (denormalized for fast scanner reads)
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     signal: Mapped[str | None] = mapped_column(String(30), nullable=True)
