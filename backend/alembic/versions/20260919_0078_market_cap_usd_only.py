@@ -7,7 +7,8 @@ filers were published in their home currency with a "$" in front. Measured
 read-only on production 2026-09-19: a Korean filer at $1,230T (won), TSM at
 $61.6T (new Taiwan dollars), TM at $36.3T (yen), 33 foreign filers above $5T,
 and more below that line where the error looks plausible (rupees, reais,
-Canadian dollars). Three funds read $0, and not-common listings read their
+Canadian dollars). Some rows read exactly $0 (5 funds and 12 equities on
+2026-09-19), and not-common listings read their
 issuer's cap (two note classes showed their parent's $4.2T).
 
 The application now keeps only USD figures
