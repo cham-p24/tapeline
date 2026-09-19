@@ -201,7 +201,7 @@ def _is_trusted_ssr(request: Request) -> bool:
     an anonymous JSON caller does not), and one definition means the rate
     limiter and the price gate can never disagree about which caller is us.
     """
-    return is_trusted_ssr(request)
+    return is_trusted_ssr(request, token=settings.internal_ssr_token)
 
 
 @app.middleware("http")

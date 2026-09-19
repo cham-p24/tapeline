@@ -100,7 +100,11 @@ def _row(symbol: str, **over) -> Ticker:
 
 @pytest.fixture
 async def seeded(monkeypatch):
-    monkeypatch.setattr("app.main.settings.internal_ssr_token", TOKEN)
+    # get_settings(), not app.main.settings: other tests clear its cache, after
+    # which the two are different objects and the price gate reads this one.
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "internal_ssr_token", TOKEN)
     async with session_scope() as s:
         await s.execute(delete(Ticker).where(Ticker.symbol.in_(_SEEDED)))
         # The never-priced rows are seeded WITH a price and a daily move on

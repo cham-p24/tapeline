@@ -83,15 +83,20 @@ KEY_STATS_PRICE_FIELDS: tuple[str, ...] = (
 )
 
 
-def is_trusted_ssr(request: Request) -> bool:
+def is_trusted_ssr(request: Request, *, token: str | None = None) -> bool:
     """True when this request carries our own SSR shared secret.
 
     Constant-time compare, and an unset token disables the trust entirely, so a
     missing or mis-set secret degrades to "treat as an anonymous caller" rather
     than opening anything. The token is server-only on the frontend (never
     NEXT_PUBLIC_*), so it is not reachable from a browser bundle.
+
+    `token` lets main.py's rate limiter pass the value from its own settings
+    object; everyone else reads it from get_settings(). In production they are
+    the same object.
     """
-    token = get_settings().internal_ssr_token
+    if token is None:
+        token = get_settings().internal_ssr_token
     if not token:
         return False
     presented = request.headers.get(INTERNAL_SSR_HEADER)

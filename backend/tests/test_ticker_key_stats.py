@@ -47,7 +47,11 @@ def client(monkeypatch):
     payload without its market-data fields — tests/test_keyless_no_prices.py
     pins that. The contract here is the block the public page receives.
     """
-    monkeypatch.setattr("app.main.settings.internal_ssr_token", _SSR_TOKEN)
+    # get_settings(), not app.main.settings: other tests clear its cache, after
+    # which the two are different objects and the price gate reads this one.
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "internal_ssr_token", _SSR_TOKEN)
     transport = httpx.ASGITransport(app=app)
     return httpx.AsyncClient(
         transport=transport,
