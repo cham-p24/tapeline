@@ -1973,6 +1973,12 @@ async def repair_dirty_asset_classes(session: AsyncSession) -> dict[str, int]:
             continue
         if clean != t.asset_class:
             t.asset_class = clean
+            # A repaired class can move a row into or out of the equity
+            # bucket; the non-common flag moves with it (raised, or cleared on
+            # leaving the bucket). See services/non_common.py.
+            t.is_non_common = non_common_on_write(
+                t.symbol, t.name, clean, t.is_non_common,
+            )
             repaired += 1
 
     if repaired or unclassifiable:

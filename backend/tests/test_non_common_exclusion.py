@@ -155,6 +155,14 @@ def test_real_non_common_listings_are_flagged(symbol, name, asset_class):
     ("TSM", "Taiwan Semiconductor Manufacturing Co Ltd American Depositary Shares",
      "equity"),
     ("GOOGL", "Alphabet Inc. Class A Common Stock", "equity"),
+    # Partnerships and royalty trusts whose units ARE the equity, with the
+    # names production stores for them on 2026-09-19.
+    ("IEP", "Icahn Enterprises L.P", "equity"),
+    ("AB", "AllianceBernstein Holding, L.P.", "equity"),
+    ("BIP", "Brookfield Infrastructure Partners L.P. Limited Partnership Units", "equity"),
+    ("KRP", "Kimbell Royalty Partners, LP Common Units representing Limited Partner "
+     "Interests", "equity"),
+    ("PBT", "Permian Basin Royalty Trust", "equity"),
     ("MSTR", "Strategy Inc", "equity"),
     # Brazilian preferred ADRs: each is its company's main traded equity line.
     ("PBR.A", "Petroleo Brasileiro SA Petrobras", "equity"),
@@ -523,9 +531,19 @@ async def test_the_sheet_upsert_flags_a_new_row_whose_symbol_says_so() -> None:
         await _cleanup(extra=[sym])
 
 
+async def _no_reconcile() -> int:
+    return 0
+
+
 @pytest.mark.asyncio
 async def test_discovery_flags_on_insert_with_the_universe(monkeypatch) -> None:
+    """The insert itself carries the flag. The closing reconcile is switched
+    off here so this pins the insert, not the reconcile (which has its own
+    test below)."""
+    from app.workers import signal_publisher as sp
     from app.workers.signal_publisher import _refresh_universe
+
+    monkeypatch.setattr(sp, "reconcile_non_common_flags", _no_reconcile)
 
     async def fake_discover(*_a, **_k):
         return [
@@ -550,14 +568,45 @@ async def test_discovery_flags_on_insert_with_the_universe(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_discovery_settles_a_row_it_did_not_touch(monkeypatch) -> None:
+    """A new listing can be the four-letter base that makes an EXISTING
+    fifth-letter symbol a unit. Only the reconcile at the end of discovery
+    can see that: the unit's own row is not in this batch."""
+    from app.workers.signal_publisher import _refresh_universe
+
+    async def fake_discover(*_a, **_k):
+        return [{"symbol": _BASE, "name": "Zebra Quantum Corp", "sector": "Unknown",
+                 "asset_class": "equity"}]
+
+    monkeypatch.setattr(
+        "app.services.polygon_feed.discover_active_us_tickers", fake_discover
+    )
+    try:
+        async with session_scope() as s:
+            s.add(Ticker(symbol=_UNIT, name=_UNIT, asset_class="equity",
+                         is_non_common=False))
+            await s.commit()
+        await _refresh_universe()
+        async with session_scope() as s:
+            assert (await s.get(Ticker, _UNIT)).is_non_common is True, (
+                "discovery added the base and left its unit unflagged"
+            )
+    finally:
+        await _cleanup(extra=[_BASE, _UNIT])
+
+
+@pytest.mark.asyncio
 async def test_the_sector_backfill_flags_a_placeholder_once_it_learns_the_name(
     monkeypatch,
 ) -> None:
     """A placeholder "ZQNG" says nothing; its real name does. The backfill is
-    the writer that fills it, so the flag must move with the name."""
+    the writer that fills it, so the flag must move with the name, in the same
+    statement: the pass runs for ~46 minutes before its closing reconcile,
+    which is switched off here so this pins the write itself."""
     from app.workers import signal_publisher
 
     sym = "ZQNG"
+    monkeypatch.setattr(signal_publisher, "reconcile_non_common_flags", _no_reconcile)
 
     async def fake_profile(symbol: str):
         if symbol == sym:
@@ -578,6 +627,29 @@ async def test_the_sector_backfill_flags_a_placeholder_once_it_learns_the_name(
         async with session_scope() as s:
             t = await s.get(Ticker, sym)
             assert t.name.startswith("Zebra Gas"), "the backfill did not run for the row"
+            assert t.is_non_common is True
+    finally:
+        await _cleanup(extra=[sym])
+
+
+@pytest.mark.asyncio
+async def test_the_asset_class_repair_flags_a_row_it_moves_into_the_equity_bucket() -> None:
+    """A dirty class ("📈 stock") is in no bucket, so the row is never flagged.
+    The repair pass moving it to "equity" would otherwise put a note into the
+    default ranked view until the next reconcile."""
+    from app.services.sheet_feed import repair_dirty_asset_classes
+
+    sym = "ZQNH"
+    try:
+        async with session_scope() as s:
+            s.add(Ticker(symbol=sym, name="Zebra Holdings Corp. 7.00% Notes due 2030",
+                         asset_class="📈 stock", is_non_common=False))
+            await s.commit()
+        async with session_scope() as s:
+            await repair_dirty_asset_classes(s)
+        async with session_scope() as s:
+            t = await s.get(Ticker, sym)
+            assert t.asset_class == "equity", "the repair did not run for the row"
             assert t.is_non_common is True
     finally:
         await _cleanup(extra=[sym])

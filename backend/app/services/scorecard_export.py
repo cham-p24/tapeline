@@ -266,7 +266,10 @@ KNOWN_LIMITATIONS: list[dict[str, str]] = [
             "2026-09-19 (PR #875) listings detected as not common stock "
             "(notes, preferred and depositary shares, warrants, rights and "
             "units) can no longer be listed. Detection is by name and symbol "
-            "and does not catch every one."
+            "and does not catch every one. Two preferred listings stay "
+            "eligible on purpose, PBR.A and CIG, each its company's main "
+            "traded share; exchange-traded notes, which are held as funds, "
+            "are not covered."
         ),
     },
     {

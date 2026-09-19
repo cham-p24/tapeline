@@ -37,6 +37,7 @@ import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import type { CitableSummary } from "@/lib/scorecardCitation";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+import { CRYPTO_PAIRS } from "@/lib/universe";
 
 // Same fallback chain as app/scorecard/page.tsx.
 const API_BASE =
@@ -159,7 +160,7 @@ const sections = (summary: CitableSummary | null): Section[] => [
     heading: "Coverage and product gaps",
     lede: "Things people reasonably expect that Tapeline does not currently do.",
     points: [
-      "US-listed equities and ETFs only. No international listings, no options, no futures, no crypto, and no bond coverage: the exchange-listed notes that are scored are there because they list like stocks (see below).",
+      `US-listed equities and ETFs, plus about ${CRYPTO_PAIRS} crypto pairs scored separately from daily closes. No international listings, no options, no futures, and no bond coverage: the exchange-listed notes that are scored are there because they list like stocks (see below).`,
       "The scored universe is the actively-maintained liquid set, not every listed security. Illiquid and micro-cap names may be uncovered. The ranked scanner and the scorecard apply a liquidity floor and leave out leveraged and inverse funds and listings that are not common stock, such as exchange-listed notes, preferred shares, warrants, rights and units. Those listings are still scored, and the scanner can include them.",
       "ETFs and funds have no comparable company fundamentals, so that factor is unavailable for them and their scores rest on fewer inputs.",
       "There is no backtesting feature, no portfolio tracking, and no execution. Tapeline does not connect to a broker and cannot place a trade.",

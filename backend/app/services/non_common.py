@@ -53,7 +53,8 @@ its four-letter base is listed too (PTACU, BTSGU, CORZW). So:
   * Discovery sees every symbol and derives the flag exactly on insert and on
     reclassification.
   * A writer that sets `name` or `asset_class` without seeing the universe (the
-    sheet upserts, the sector backfill's name repair) uses
+    sheet upserts, the asset-class repair, the sector backfill's name repair)
+    uses
     `non_common_on_write()`: it raises the flag when the row's own name or
     symbol says so and clears it when the row leaves the equity bucket, but
     never clears it otherwise, because it cannot tell whether a universe rule

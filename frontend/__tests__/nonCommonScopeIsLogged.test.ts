@@ -44,6 +44,10 @@ describe("the #875 scope change is on the changelog", () => {
   it("settles BHFAO without changing it, and says the series crosses two definitions", () => {
     const e = entry("#875");
     expect(e).toMatch(/BHFAO stays on the record as listed on 23 June 2026/);
+    // #873 left open whether these listings should be scored at all. They
+    // still are; the entry must not claim that question closed.
+    expect(e).toMatch(/whether these listings should be scored at all\. They still are/);
+    expect(e).not.toMatch(/settles/i);
     expect(e).toMatch(/No recorded entry was changed/);
     expect(e).toMatch(/crosses two definitions/);
   });
@@ -63,5 +67,24 @@ describe("the #875 scope change is on the changelog", () => {
     ]) {
       expect(e).not.toMatch(banned);
     }
+  });
+});
+
+describe("/limitations states the exclusion and nothing it contradicts", () => {
+  const page = shippedCopy("app/limitations/page.tsx");
+
+  it("names what the scanner and the scorecard leave out", () => {
+    expect(page).toMatch(
+      /leave out leveraged and inverse funds and listings that are not common stock/,
+    );
+    expect(page).toMatch(/Those listings are still scored, and the scanner can include them/);
+  });
+
+  it("does not say there is no crypto or no fixed income while both are scored", () => {
+    // About 100 crypto pairs are scored in their own bucket, and exchange-
+    // listed notes are scored because they list like stocks.
+    expect(page).not.toMatch(/no crypto/i);
+    expect(page).not.toMatch(/no fixed income/i);
+    expect(page).toMatch(/crypto pairs scored separately/);
   });
 });
