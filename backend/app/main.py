@@ -487,11 +487,12 @@ async def public_signals(
     signal: str | None = None,
     sector: str | None = None,
     max_price: float | None = None,
-    # Liquidity floor, mirroring /api/scanner's SCANNER_MIN_DOLLAR_VOLUME.
-    # Defaults to 0 (disabled) so every existing caller of this endpoint —
-    # /signals, the sitemap, the ticker page — is completely unaffected; the
-    # SEO pages that moved off the row-capped scanner pass the scanner's own
-    # value so their ranked lists keep excluding near-untradeable names.
+    # Liquidity floor, measured as /api/scanner measures it (see below).
+    # Defaults to 0 (disabled) so the breadth callers of this endpoint
+    # (/signals, /stocks, /sectors' counts, the sitemap) are unaffected. The
+    # ranked SEO pages pass $50,000, the floor they always used against the
+    # scanner: lower on purpose than the scanner's own $1M default
+    # (SCANNER_MIN_DOLLAR_VOLUME), so those lists keep a longer tail.
     # Rows with an UNKNOWN price or volume are kept either way, so the filter
     # can only remove obvious junk, never hide a name we lack a read for.
     min_dollar_volume: float = 0,
@@ -502,7 +503,8 @@ async def public_signals(
     # its callers want breadth, not a ranking: /signals, /stocks, /sectors'
     # counts, the sitemap and the status probe publish or depend on how many
     # scored tickers exist. The ranked SEO pages (/signal/*, /sector/*,
-    # /best-stocks-for/*) pass both, so their lists match the scanner's. Found
+    # /best-stocks-for/*) pass both, so they leave out what the scanner's
+    # default view leaves out (their liquidity floor is their own). Found
     # 2026-09-19: GREEL, a Greenidge senior note, could top /signal/strong-setup.
     exclude_leveraged: bool = False,
     exclude_non_common: bool = False,

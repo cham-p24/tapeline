@@ -56,6 +56,9 @@ type SignalRow = {
   change_pct_5d: number | null;
   change_pct_1m: number | null;
   confidence_pct: number | null;
+  // Optional so a response from a backend deployed before these still parses.
+  is_leveraged?: boolean;
+  is_non_common?: boolean;
   sub_trend: number | null;
   sub_rs: number | null;
   sub_fundamentals: number | null;
@@ -145,7 +148,13 @@ export default async function SignalsPage() {
   // visible here. We don't validate the JWT — that's the backend's job
   // on the actual /api/* calls. Presence is enough to decide the gate.
   const isSignedIn = !!(await cookies()).get("tapeline_session")?.value;
-  const visibleItems = isSignedIn ? items : items.slice(0, PREVIEW_ROWS);
+  // The anonymous preview is a ranked "top 10", so it leaves out what the
+  // scanner's anonymous top 10 leaves out: leveraged/inverse funds and
+  // listings that are not common stock (notes, preferreds, warrants). The
+  // signed-in list below keeps every row it was sent.
+  const visibleItems = isSignedIn
+    ? items
+    : items.filter((r) => !r.is_leveraged && !r.is_non_common).slice(0, PREVIEW_ROWS);
   const hiddenCount = Math.max(0, items.length - visibleItems.length);
 
   // Bucket the universe by signal tier for the headline counts row.

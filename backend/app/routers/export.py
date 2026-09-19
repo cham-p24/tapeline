@@ -24,7 +24,7 @@ import io
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import desc, or_, select, text
+from sqlalchemy import desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session, is_sqlite
@@ -191,11 +191,17 @@ async def export_scanner_csv(
     # Same liquidity floor semantics as the scanner: drop rows whose KNOWN
     # dollar-volume is under the floor; keep rows missing price/volume.
     if min_dollar_volume > 0:
+        # The scanner's basis (routers/scanner.py): the 30-day average volume,
+        # falling back to the session's running volume only when the average
+        # is missing. This read the running volume alone, so an export could
+        # hold rows the on-screen scanner dropped (and the reverse), and which
+        # ones depended on the time of day.
+        liquidity = func.coalesce(Ticker.avg_volume_30d, Ticker.volume)
         stmt = stmt.where(
             or_(
                 Ticker.price.is_(None),
-                Ticker.volume.is_(None),
-                Ticker.price * Ticker.volume >= min_dollar_volume,
+                liquidity.is_(None),
+                Ticker.price * liquidity >= min_dollar_volume,
             )
         )
 
