@@ -7,8 +7,8 @@
  *
  * Desktop links: Product ▾ (dropdown) · Track record · Compare · Pricing.
  * The Product ▾ dropdown opens on click and closes on outside-click, Esc, or
- * route change. It groups the product/education pages (how-it-works, scorecard,
- * verify, signals, sectors, stocks) with a one-line description each. The panel
+ * route change. It holds three pages (how-it-works, signals, sectors) with a
+ * one-line description each; see PRODUCT_ITEMS for why only three. The panel
  * is a FLOATING overlay, so it uses the SOLID `bg-surface` token (never the
  * translucent bg-panel), per the `.card` note in app/globals.css.
  *
@@ -31,21 +31,25 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useUser } from "@/components/UserContext";
 
-// Product/education pages grouped under the "Product ▾" dropdown (desktop) and
-// the "Product" labeled group (mobile sheet). Each carries a one-line blurb.
-const PRODUCT_ITEMS = [
-  { href: "/how-it-works", label: "How it works", desc: "The method behind every signal" },
-  { href: "/scorecard", label: "Public scorecard", desc: "Every call, scored and public" },
-  { href: "/verify", label: "Verify the record", desc: "Audit the track record yourself" },
-  { href: "/limitations", label: "Limitations", desc: "What it is bad at, in its own words" },
-  { href: "/signals", label: "All signals", desc: "Browse the full signal feed" },
-  { href: "/sectors", label: "Sectors", desc: "Signals grouped by sector" },
-  { href: "/stocks", label: "Stock directory", desc: "Every ticker we cover" },
+// Product pages under the "Product ▾" dropdown (desktop) and the "Product"
+// labeled group (mobile sheet). Each carries a one-line blurb.
+//
+// Cut from seven to three on 2026-09-19 (founder: "way too much going on in
+// the product section"). What left, and where it still lives:
+//   Public scorecard  — the same page as "Track record" right next to it
+//   Verify the record — linked from the scorecard's transparency strip
+//   Limitations       — linked from every transparency page and the footer
+//   Stock directory   — /signals already lists every scored ticker; footer
+// Keep this list short: a new page earns a place here only by replacing one.
+export const PRODUCT_ITEMS = [
+  { href: "/how-it-works", label: "How it works", desc: "How every score is built" },
+  { href: "/signals", label: "All signals", desc: "Every scored stock, ranked" },
+  { href: "/sectors", label: "Sectors", desc: "Scores grouped by sector" },
 ];
 
 // Top-level content links shown after the Product ▾ trigger. "Track record"
 // points at the public scorecard; Compare + Pricing are standalone pages.
-const TOP_LINKS = [
+export const TOP_LINKS = [
   { href: "/scorecard", label: "Track record" },
   { href: "/compare", label: "Compare" },
   { href: "/pricing", label: "Pricing" },
