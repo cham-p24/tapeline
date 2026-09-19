@@ -1857,10 +1857,24 @@ async def _ensure_daily_scorecard(today: date) -> None:
         # corrupt (score>100 / emoji-symbol / <2-factor) row into the permanent
         # public scorecard record. (score IS NOT NULL is part of the floor.)
         # See app.services.ticker_freshness.
+        from app.services.asset_class import asset_bucket_clause
         from app.services.ticker_freshness import live_clauses
         _cand_stmt = select(Ticker)
         for _clause in await live_clauses(session):
             _cand_stmt = _cand_stmt.where(_clause)
+        # Same universe as the scanner's default view: no crypto. A coin's score
+        # is built from four readings where a stock's is built from six (see
+        # asset_class.DEFAULT_EXCLUDED_CLASSES), and this record is the auditable
+        # account of what that default view ranked. Until 2026-09-19 the rule
+        # went unstated here because a scale bug in crypto_feed._near_high_pct
+        # held every coin to 68.75 or below, under the ~77 the tenth pick needs
+        # (tenth-place score 77.0-78.3 on 8-18 Sep 2026). With it fixed a coin
+        # can reach 81.25, and all 116 scored pairs carry every column the live
+        # clauses require (1-day change, confidence, a clean class). Measured
+        # read-only on 2026-09-19: no crypto row has ever been frozen.
+        _default_view = asset_bucket_clause(None)
+        if _default_view is not None:
+            _cand_stmt = _cand_stmt.where(_default_view)
         # Deterministic ordering (GAP #8): score alone is not a total order —
         # tickers tie on score every day, and the candidate pool cutoff at 80
         # (and the top-10 freeze below) then depended on whatever order the
