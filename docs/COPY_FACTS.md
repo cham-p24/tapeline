@@ -64,7 +64,10 @@ Do not write copy that assumes it.
 - **About 11,500 US stocks and ETFs.** An unfiltered scan
   (`/api/scanner?min_dollar_volume=0&include_leveraged=true`) returned 11,501 on
   13 September 2026 at 22:33 UTC. The default view applies a liquidity floor
-  (about $1M a day) that the user can switch off, so it shows fewer.
+  (about $1M a day) and leaves out leveraged and inverse funds and, since
+  19 September 2026 (#875), listings that are not common stock (notes,
+  preferred shares, warrants, rights and units), so it shows fewer. To
+  reproduce the unfiltered count now, add `&include_non_common=true`.
 - **About 100 crypto pairs** (103 on the same date), in their own bucket,
   updated once a day, scored on four readings instead of six.
 - **Not** "~2,500", "every US-listed stock", "~6,900" or "5,757". 2,500 was a

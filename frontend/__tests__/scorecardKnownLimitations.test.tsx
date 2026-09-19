@@ -82,6 +82,10 @@ describe("/scorecard server render — gaps, the June cap, limitations", () => {
     expect(text).toMatch(/BHFAO[\s\S]{0,200}preferred depositary shares/);
     expect(text).toMatch(/listed fourth/);
     expect(text).toMatch(/all 439 symbols ever listed/);
+    // Since #875 such listings can no longer be listed, and detection is
+    // stated as imperfect rather than complete.
+    expect(text).toMatch(/From 19 September 2026 \(#875\)[\s\S]{0,200}can no longer be listed/);
+    expect(text).toMatch(/does not catch every one/);
   });
 
   it("still lists the verified gaps when the summary API is down", async () => {

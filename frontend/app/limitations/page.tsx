@@ -159,8 +159,8 @@ const sections = (summary: CitableSummary | null): Section[] => [
     heading: "Coverage and product gaps",
     lede: "Things people reasonably expect that Tapeline does not currently do.",
     points: [
-      "US-listed equities and ETFs only. No international listings, no options, no futures, no crypto, no fixed income.",
-      "The scored universe is the actively-maintained liquid set, not every listed security. Illiquid and micro-cap names may be uncovered, and a liquidity floor is applied to the ranked scanner and the scorecard.",
+      "US-listed equities and ETFs only. No international listings, no options, no futures, no crypto, and no bond coverage: the exchange-listed notes that are scored are there because they list like stocks (see below).",
+      "The scored universe is the actively-maintained liquid set, not every listed security. Illiquid and micro-cap names may be uncovered. The ranked scanner and the scorecard apply a liquidity floor and leave out leveraged and inverse funds and listings that are not common stock, such as exchange-listed notes, preferred shares, warrants, rights and units. Those listings are still scored, and the scanner can include them.",
       "ETFs and funds have no comparable company fundamentals, so that factor is unavailable for them and their scores rest on fewer inputs.",
       "There is no backtesting feature, no portfolio tracking, and no execution. Tapeline does not connect to a broker and cannot place a trade.",
       "It is one person's product. Support is one person's inbox, and the release cadence is one person's week.",

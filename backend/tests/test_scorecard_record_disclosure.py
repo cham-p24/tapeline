@@ -180,6 +180,9 @@ def test_known_limitations_are_dated_and_cover_the_verified_defects():
         # download a reader cites carries the same fact.
         "2026-06-23", "BHFAO", "preferred depositary shares",
         "all 439 symbols ever listed",
+        # From 2026-09-19 (#875) such listings can no longer be listed; the
+        # download must say the question BHFAO raised is settled, and how.
+        "PR #875", "can no longer be listed", "does not catch every one",
     ):
         assert must in blob, f"known_limitations does not mention {must!r}"
     smart = next(k for k in lims if "#824" in k["status"])

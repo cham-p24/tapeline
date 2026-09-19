@@ -41,6 +41,18 @@ type LogEntry = {
 };
 
 const METHODOLOGY_LOG: LogEntry[] = [
+  // #875 changed what may enter the record, the same kind of change as #761
+  // (2026-09-06). Counts measured read-only against production on 2026-09-18:
+  // 120 of the 6,012 rows stored as stocks are one of these listings, 118 of
+  // them scored. Not restated below: rule 3.
+  {
+    date: "2026-09-19",
+    kind: "scope",
+    title: "Notes, preferred shares and warrants no longer qualify for the daily record",
+    body:
+      "Some listings trade on a stock exchange without being a company's common shares: exchange-listed notes, preferred and depositary shares, warrants, rights and SPAC units. They reach our universe the way stocks do, and each is scored on the same six factors. From this date they can no longer be listed on the daily record, and the ranked scanner, its CSV export and the daily picks our MCP server returns leave them out by default. They can still be browsed: the scanner has a control that includes them, every row says whether the listing is one of them, and each keeps its own page. A saved screen now leaves them out unless that control is on. The reason is what their price follows. A note's price is anchored to its face value and a preferred share's to its dividend; a warrant is an option on the common stock, and a unit is tied to a trust. A trend or momentum reading on one of them describes that structure, not a company's shares. Detection is by listing name and symbol, plus a short list of symbols whose names say nothing, such as Strategy's four preferred listings. It is written to under-claim, so some of these listings will not be caught and can still be listed. Exchange-traded notes, which we hold as funds, are not covered by this change, and neither are PBR.A and CIG, the Petrobras and CEMIG preferred shares that are each company's main traded share. This settles the question left open in the entry below titled \"An entry added on 17 September said no preferred listing had ever been on the record. One has\": BHFAO stays on the record as listed on 23 June 2026. No recorded entry was changed, so a comparison spanning this date crosses two definitions of what could enter the record, as one spanning 6 September 2026 already does.",
+    ref: "#875",
+  },
   // Corrects the 2026-09-17 entry below. The original check was scoped
   // to the 179 symbols in the attribution fan-out and did not cover the record
   // as a whole, which is what the sentence claimed. Re-checked on 2026-09-17 by
