@@ -81,13 +81,14 @@ LATEST_PROTOCOL = SUPPORTED_PROTOCOLS[0]
 
 SERVER_INFO = {"name": "tapeline", "title": "Tapeline", "version": "1.0.0"}
 
-# This server is keyless, so it serves no market data (2026-09-19). Our price
+# This server is keyless, so it serves no current market data (2026-09-19). Our price
 # vendor's plan is individual-use; re-serving its prices through an open API
 # that any agent can call is redistribution that plan does not cover. Scores,
 # labels, ranks, sub-scores and the record are Tapeline's own and stay.
 PRICES_NOT_SERVED = (
-    "Prices, daily moves and other market data are not served through this "
-    "endpoint."
+    "Current prices, daily moves and other current market data are not served "
+    "through this endpoint. The record tool still returns the recorded closes "
+    "each listed pick was measured on."
 )
 
 INSTRUCTIONS = (

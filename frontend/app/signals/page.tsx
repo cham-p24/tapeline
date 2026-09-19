@@ -121,14 +121,16 @@ function signalBadge(signal: string | null): string {
   }
 }
 
-function fmtPct(v: number | null): string {
-  if (v === null || Number.isNaN(v)) return "—";
+function fmtPct(v: number | null | undefined): string {
+  // `== null`, not `=== null`: a keyless response (no SSR token, e.g. a PR
+  // preview) omits the field, and undefined.toFixed would 500 the page.
+  if (v == null || Number.isNaN(v)) return "—";
   const sign = v > 0 ? "+" : "";
   return `${sign}${v.toFixed(2)}%`;
 }
 
-function fmtPrice(v: number | null): string {
-  if (v === null || Number.isNaN(v)) return "—";
+function fmtPrice(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return "—";
   if (v >= 1000) return `$${v.toFixed(0)}`;
   return `$${v.toFixed(2)}`;
 }

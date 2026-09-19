@@ -101,7 +101,7 @@ const RESPONSE_EXAMPLE = `{
 const FAQ = [
   {
     q: "What is the Tapeline API?",
-    a: "A read-only, versioned REST API that returns the same scores you see in the app as JSON: one 0-100 composite score, a descriptive signal label, price action, a confidence percentage, and the six sub-scores (trend, relative strength, fundamentals, momentum, macro, smart money) for the full scored US universe. It's the same data as the in-app surfaces, as a stable contract with an SLA-able daily quota. The keyless public surfaces (the MCP server and the public JSON endpoints) carry the scores and sub-scores but no prices.",
+    a: "A read-only, versioned REST API that returns the same scores you see in the app as JSON: one 0-100 composite score, a descriptive signal label, price action, a confidence percentage, and the six sub-scores (trend, relative strength, fundamentals, momentum, macro, smart money) for the full scored US universe. It's the same data as the in-app surfaces, as a stable contract with an SLA-able daily quota. The MCP server and the public signals and ticker JSON endpoints, which need no key, carry the scores and sub-scores but no current prices.",
   },
   {
     q: "How do I authenticate?",

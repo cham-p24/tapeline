@@ -2,8 +2,7 @@
  * Symbols Tapeline does not cover, because nothing we hold can ever price them.
  *
  * Mirrors backend/app/services/coverage.py; the message text is pinned to the
- * backend's by __tests__/coverage.test.ts (frontend side) and
- * backend/tests/test_keyless_no_prices.py (backend side).
+ * backend's by backend/tests/test_keyless_no_prices.py (it reads this file).
  *
  * Measured in production on 2026-09-19: 27 continuous-futures rows (CL=F,
  * GC=F, ...) and the hyphen-spelled Berkshire twins BRK-A / BRK-B carried a

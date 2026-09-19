@@ -222,6 +222,10 @@ export const TICKER_PREFIX_RE = /^\/(t|scorecard|blog\/ticker)\/([^/]+)$/;
  *   /t/BRK-B → 308 /search?q=BRK-B      (api /api/ticker/BRK-B → 200)
  *   /t/CL=F  → 308 /search?q=CL%3DF     (api /api/ticker/CL=F  → 200)
  *
+ * Since 2026-09-19 those two shapes are "Not covered" (lib/coverage.ts): the
+ * API answers 404 with the reason and /t renders a noindex page saying so. They
+ * must still pass this regex, so that page (and PA=F's record link) can render.
+ *
  * `/` is omitted from the class: TICKER_PREFIX_RE captures a single segment
  * ([^/]+), so a symbol containing a slash can never reach here anyway.
  * Symbols containing a dot never reach the middleware at all — the matcher

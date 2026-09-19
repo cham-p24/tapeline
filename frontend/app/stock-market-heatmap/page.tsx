@@ -3,7 +3,13 @@ import { SeoFeaturePage } from "@/components/SeoFeaturePage";
 import { pageMeta } from "@/lib/seo";
 import { ssrInternalHeaders } from "@/lib/ssrHeaders";
 
-export const revalidate = 3600;
+// Rendered per request, not prerendered at build (2026-09-19). The sector
+// moves come from /api/public/heatmap, which serves them only to a signed-in
+// user or to our own SSR (INTERNAL_SSR_TOKEN). `next build` has no token, so a
+// build-time render got the keyless shape (names and counts, no moves) and
+// would have been cached for an hour after every frontend deploy. The fetch
+// below keeps its own hourly revalidate, so the API is not called per view.
+export const dynamic = "force-dynamic";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -47,8 +53,13 @@ async function fetchHeatmap(): Promise<{ sectors: SectorTile[]; live: boolean }>
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return { sectors: SHOWCASE_SECTORS, live: false };
-    const body = (await res.json()) as { sectors?: SectorTile[] };
-    const sectors = body.sectors ?? [];
+    const body = (await res.json()) as { sectors?: SectorTile[]; prices_served?: boolean };
+    // A keyless answer has no moves. Treat it like a failed fetch rather than
+    // render undefined.toFixed (which throws) or blank tiles.
+    if (body.prices_served === false) return { sectors: SHOWCASE_SECTORS, live: false };
+    const sectors = (body.sectors ?? []).filter(
+      (s) => typeof s.change_pct_1d === "number" && Number.isFinite(s.change_pct_1d),
+    );
     return sectors.length > 0
       ? { sectors, live: true }
       : { sectors: SHOWCASE_SECTORS, live: false };

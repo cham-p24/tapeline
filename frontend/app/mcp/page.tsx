@@ -27,7 +27,7 @@ export const metadata = pageMeta({
 const TOOLS: { name: string; does: string }[] = [
   {
     name: "get_ticker_score",
-    does: "The current six-factor score, signal, confidence and one-line reason for any covered US ticker. No price or daily move: this server serves no market data.",
+    does: "The current six-factor score, signal, confidence and one-line reason for any covered US ticker. No current price or daily move: this server serves no current market data. The record tool still returns the recorded closes each pick was measured on.",
   },
   {
     name: "get_daily_picks",
