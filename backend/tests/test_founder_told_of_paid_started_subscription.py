@@ -118,7 +118,7 @@ async def test_a_retry_clearing_on_a_latched_trial_tells_the_founder_once(monkey
     assert u["email"] in text
     assert "billing reason: subscription_cycle" in text
     assert "paid on attempt 3" in text
-    assert "failed-payment emails sent before this payment: 2" in text
+    assert "failed-payment emails sent to this account before this payment: 2" in text
     assert "already marked as started" in text
     assert sub_id in text and paid["id"] in text and u["customer"] in text
     # It is not reported as a new sale, and the new-sale path did not run.
@@ -258,7 +258,7 @@ async def test_the_note_never_calls_itself_a_new_subscription_or_a_first_payment
 
     monkeypatch.setattr(telegram, "deliver_founder_alert", _capture, raising=True)
     await telegram.notify_founder_payment_received(
-        why="this subscription was already marked as started",
+        path=telegram.PAYMENT_NOTE_LATCHED,
         amount=19.99, currency="usd", email=None, billing_reason=None,
         attempt_count=None, failed_payment_emails=0,
         customer=None, subscription=None, invoice=None,

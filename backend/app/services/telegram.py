@@ -262,9 +262,87 @@ async def notify_founder_paid_invoice_unannounced(
     )
 
 
+#: The two paths to a payment-received note. They know different things, so
+#: they may say different things:
+#:
+#: LATCHED         the subscription's `paid_start:` row was already held, so
+#:                 Stripe's invoice history was never read. A cycle payment
+#:                 here can be a renewal OR the first real payment of a trial
+#:                 the old status trigger marked as started before it was paid.
+#: STRIPE_HISTORY  no latch, but Stripe returned an earlier paid invoice on the
+#:                 subscription. This payment cannot be its first.
+PAYMENT_NOTE_LATCHED = "latched"
+PAYMENT_NOTE_STRIPE_HISTORY = "stripe_history"
+
+_PAYMENT_NOTE_WHY = {
+    PAYMENT_NOTE_LATCHED: "this subscription was already marked as started",
+    PAYMENT_NOTE_STRIPE_HISTORY: "Stripe shows an earlier paid invoice on this subscription",
+}
+
+_PLAN_CHANGE = (
+    "a charge from a change to the subscription (an upgrade, a plan or "
+    "quantity change, or a proration)"
+)
+
+
+def payment_note_reading(path: str, billing_reason: str | None) -> str:
+    """The closing line of the payment-received note: what this payment can
+    be, given only what the path and the invoice's billing_reason establish.
+
+    Never claims more than is known. An unrecognised path reads as LATCHED,
+    the path that claims least.
+    """
+    reason = billing_reason or ""
+    if path == PAYMENT_NOTE_STRIPE_HISTORY:
+        known = "Not a first payment: Stripe has an earlier paid invoice on this subscription."
+        if reason == "subscription_cycle":
+            return f"{known} This is a renewal for a new billing period."
+        if reason == "subscription_update":
+            return f"{known} This is {_PLAN_CHANGE}, not a renewal."
+        return (
+            f"{known} Billing reason {reason or 'not given'}: "
+            "the invoice in Stripe shows what it was for."
+        )
+
+    maybe_first = (
+        "the first real payment on a trial that was marked as started before "
+        "its first charge went through"
+    )
+    if reason == "subscription_cycle":
+        return (
+            f"This can be a renewal, or {maybe_first}. "
+            "The subscription's invoices in Stripe show which."
+        )
+    if reason == "subscription_update":
+        return (
+            f"This is {_PLAN_CHANGE}, not a renewal. If the subscription had "
+            "never been paid for before, it is also its first real payment; "
+            "the subscription's invoices in Stripe show which."
+        )
+    if reason == "subscription_create":
+        return (
+            "This is the subscription's first invoice, so this is its first "
+            "payment. The subscription was already marked as started when this "
+            "note was sent, so a new-subscription alert may already have gone "
+            "out for this payment: check before counting it as a new sale."
+        )
+    if reason:
+        return (
+            f"Billing reason {reason}: the invoice in Stripe shows what it was "
+            "for. It can also be the first real payment on a subscription "
+            "marked as started before it was paid; the subscription's invoices "
+            "in Stripe show which."
+        )
+    return (
+        "No billing reason on the invoice: this can be a renewal, "
+        f"{_PLAN_CHANGE}, or {maybe_first}. "
+        "The subscription's invoices in Stripe show which."
+    )
+
+
 async def notify_founder_payment_received(
     *,
-    why: str,
+    path: str,
     amount: float,
     currency: str | None,
     email: str | None,
@@ -286,12 +364,16 @@ async def notify_founder_payment_received(
     trigger latched before its first charge was declined (2026-09-12 and
     2026-09-14), when a Stripe retry finally clears.
 
-    It cannot tell a renewal from that late first payment without asking
-    Stripe, so it says both are possible and never calls itself a new
-    subscription. A retried invoice (`attempt_count` > 1) and the failed-payment
-    emails the customer was sent are printed when present.
+    `path` is PAYMENT_NOTE_LATCHED or PAYMENT_NOTE_STRIPE_HISTORY. The closing
+    line (`payment_note_reading`) says only what that path and the invoice's
+    billing_reason establish, and the note never calls itself a new
+    subscription. A retried invoice (`attempt_count` > 1) is printed when
+    present. `failed_payment_emails` counts the account's `dun{n}` tokens,
+    which do not record which subscription failed, so it is printed as an
+    account-wide figure.
     """
     cur = (currency or "usd").upper()
+    why = _PAYMENT_NOTE_WHY.get(path, _PAYMENT_NOTE_WHY[PAYMENT_NOTE_LATCHED])
     lines = [
         "💰 Tapeline payment received on a subscription already marked as started",
         email or "not matched to a Tapeline account",
@@ -304,15 +386,17 @@ async def notify_founder_payment_received(
             "attempts did not go through"
         )
     if failed_payment_emails > 0:
-        lines.append(f"failed-payment emails sent before this payment: {failed_payment_emails}")
+        lines.append(
+            "failed-payment emails sent to this account before this payment: "
+            f"{failed_payment_emails} (counted across the whole account, not "
+            "only this subscription)"
+        )
     lines += [
         f"no welcome email and no new-subscription alert: {why}",
         f"stripe customer: {customer or '-'}",
         f"stripe subscription: {subscription or '-'}",
         f"stripe invoice: {invoice or '-'}",
-        "This can be a renewal, or the first real payment on a trial that was "
-        "marked as started before its first charge went through. The "
-        "subscription's invoices in Stripe show which.",
+        payment_note_reading(path, billing_reason),
     ]
     await deliver_founder_alert(
         subject=(

@@ -21,8 +21,12 @@ name: Pre-charge notice check
 #
 # READ-ONLY and input-free: it cannot become an arbitrary-command runner, and
 # `backend/tests/test_precharge_notice_check.py` enforces the read-only property
-# at the AST level. No customer email is read or printed — these logs are
-# world-readable on this public repo.
+# at the AST level. No customer email is read or printed, subscription and
+# customer ids are printed only as a one-way hash, and stripe-python's own
+# request logging is held at WARNING — these logs are world-readable on this
+# public repo. The founder alert is private and carries the raw ids. NOTE: this
+# runs the DEPLOYED backend's copy of the script, so a change to
+# check_precharge_notices.py only reaches this job after the backend deploy.
 
 on:
   schedule:
