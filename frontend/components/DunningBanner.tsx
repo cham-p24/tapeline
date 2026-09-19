@@ -1,8 +1,14 @@
 /**
- * Dunning banner — appears when the user's subscription is past_due: a renewal
- * charge failed and Stripe is mid-retry. During this grace window the customer
+ * Dunning banner — appears when the user's subscription is past_due: a charge
+ * failed and Stripe is mid-retry. During this grace window the customer
  * keeps their paid tier (see webhooks.py), so the banner is the primary nudge
  * to fix the card before retries exhaust and the account drops to Free.
+ *
+ * The failed charge may be a renewal OR the first charge at the end of a
+ * card-required trial, and nothing /api/me returns says which. So the copy
+ * says "Your payment", never "your last payment" or "renewal": true for both
+ * readers, including one who has never paid.
+ * Guarded by __tests__/neverPaidDunningCopy.test.tsx.
  *
  * Self-contained: reads billing.past_due from /api/me directly. The shared
  * UserContext hydrates from /api/auth/session, which doesn't carry billing
@@ -68,7 +74,7 @@ export function DunningBanner() {
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-50" />
           <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-current" />
         </span>
-        Your last payment didn&apos;t go through. Update your card to keep full
+        Your payment didn&apos;t go through. Update your card to keep full
         access — your plan drops to Free if it isn&apos;t fixed.
       </span>
       <button

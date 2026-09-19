@@ -128,7 +128,7 @@ export default function BillingPage() {
   const [trialFirstCharge] = useState(
     () => new Date(Date.now() + TRIAL_DAYS * 86_400_000),
   );
-  // Failed-renewal state from GET /api/billing/retention-options (mirrors the
+  // Failed-charge state from GET /api/billing/retention-options (mirrors the
   // billing.past_due that /api/me feeds the global DunningBanner). Drives the
   // in-page recovery panel and suppresses the "Next charge" quote, which is
   // actively misleading while a charge is failing.
@@ -634,18 +634,22 @@ export default function BillingPage() {
         />
       )}
 
-      {/* ── Failed-renewal recovery ────────────────────────────────────────
-          A card declined on renewal. Stripe is mid-retry and the customer
-          keeps their tier for the duration of that grace window, so the honest
-          framing is "this needs a fix", not "your account is suspended". The
-          global DunningBanner says the same thing in one line from the app
-          shell; this panel is the destination version — it explains what
-          happens next and what happens if nothing changes, because an
-          involuntary failure the user never understood is how a payment
-          problem quietly becomes a cancellation. */}
+      {/* ── Failed-charge recovery ─────────────────────────────────────────
+          A card declined: on renewal, or on the first charge at the end of a
+          card-required trial. Neither endpoint this page reads says which, so
+          nothing here may say "renewal" or "last payment" (false for someone
+          who has never paid; see __tests__/neverPaidDunningCopy.test.tsx).
+          Stripe is mid-retry and the customer keeps their tier for the
+          duration of that grace window, so the honest framing is "this needs
+          a fix", not "your account is suspended". The global DunningBanner
+          says the same thing in one line from the app shell; this panel is
+          the destination version — it explains what happens next and what
+          happens if nothing changes, because an involuntary failure the user
+          never understood is how a payment problem quietly becomes a
+          cancellation. */}
       {pastDue && (
         <div className="rounded-lg border border-warn/40 bg-warn/5 p-5">
-          <div className="font-semibold text-fg">Your last renewal payment didn&rsquo;t go through.</div>
+          <div className="font-semibold text-fg">Your payment didn&rsquo;t go through.</div>
           <p className="mt-1.5 text-sm text-muted leading-relaxed">
             This is usually an expired card or a bank declining an online
             charge, not a problem with your account. Stripe will retry it
@@ -810,14 +814,14 @@ export default function BillingPage() {
               : "Next charge"}
           </div>
 
-          {/* A failing renewal makes "Next charge $99/year" a statement the
+          {/* A failing charge makes "Next charge $99/year" a statement the
               user has already seen fail. Say what's actually true instead —
               the recovery panel above carries the detail and the fix. */}
           {pastDue && !isCardlessTrial && tier !== "free" ? (
             <>
               <div className="mt-2 text-lg font-semibold text-warn">Retrying your card</div>
               <p className="mt-2 text-xs text-muted leading-relaxed">
-                The last renewal charge didn&rsquo;t complete. Your next charge date
+                The charge on your subscription didn&rsquo;t complete. Your next charge date
                 depends on when it succeeds, so there isn&rsquo;t a reliable one to
                 show yet.
               </p>
