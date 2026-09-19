@@ -315,3 +315,27 @@ def test_the_fifth_letter_rules_need_the_root_in_the_universe() -> None:
     assert is_non_common_listing("ABCDW", "ABCDW", {"ABCD"})
     assert not is_non_common_listing("ABCDW", "ABCD Widgets Inc", {"ABCD"})
     assert not is_non_common_listing("ABCDW", "ABCDW", set())
+
+
+@pytest.mark.parametrize(
+    ("symbol", "name"),
+    [
+        ("IEP", "Icahn Enterprises L.P. Depositary Units"),
+        ("AB", "AllianceBernstein Holding L.P. Units"),
+        ("PBT", "PermRock Royalty Trust Trust Units"),
+    ],
+)
+def test_an_lp_or_trusts_own_units_are_its_equity(symbol: str, name: str) -> None:
+    """The units rule used to spare only "common units", "partner" and
+    "beneficial interest", so an LP renamed to its exchange title ("... L.P.
+    Units") would have lost its own insider filings. None is stored this way
+    on 2026-09-19; the rule is for the next rename.
+
+    Mutation: the pre-2026-09-19 _UNITS_EQUITY pattern."""
+    assert not is_non_common_listing(symbol, name)
+    assert is_common_stock(symbol, name, "equity")
+
+
+def test_a_spac_unit_is_still_a_unit() -> None:
+    """Sparing LP and trust units must not spare a SPAC's units."""
+    assert is_non_common_listing("OIMAU", "Oak Woods Acquisition Corp. Units")

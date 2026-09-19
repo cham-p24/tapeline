@@ -93,7 +93,16 @@ _DEPOSITARY = re.compile(r"\bdeposit[ao]ry shares\b", re.I)
 _ADR = re.compile(r"\b(american|global) deposit[ao]ry\b", re.I)
 _WARRANT_RIGHT = re.compile(r"\bwarrants?\b|\brights?\b(?! to\b)", re.I)
 _UNITS = re.compile(r"\bunits?\b", re.I)
-_UNITS_EQUITY = re.compile(r"common units|partner|beneficial interest", re.I)
+# An LP's or royalty trust's only equity line is also named "Units": "Icahn
+# Enterprises L.P. Depositary Units", "AllianceBernstein Holding L.P. Units",
+# "PermRock Royalty Trust Trust Units". None is stored under those names on
+# 2026-09-19 (IEP is "Icahn Enterprises L.P"), so this spares the next rename,
+# not a row today. A SPAC unit reads "... Acquisition Corp. Units" and is still
+# caught.
+_UNITS_EQUITY = re.compile(
+    r"common units|partner|beneficial interest|\bl\.?p\.?\b|deposit[ao]ry units|trust units",
+    re.I,
+)
 
 
 def _is_placeholder(symbol: str, name: str) -> bool:
