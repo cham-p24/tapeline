@@ -195,10 +195,16 @@ async def notify_founder_new_subscription(
     price per billing period. They are printed on separate, labelled lines. The
     old single line ("tier: premium (monthly) · 10.00 USD") read a discounted
     first charge as the monthly price.
+
+    The title says "first payment on this subscription", not "first payment
+    received": the latch is per subscription, so a customer who paid on an
+    earlier subscription and came back on a new one triggers this too. It is
+    the first payment on THIS subscription, not necessarily the customer's
+    first. Same reason the customer's welcome says "Your payment" (#855).
     """
     cur = (currency or "usd").upper()
     lines = [
-        "💰 New Tapeline subscription — first payment received",
+        "💰 New Tapeline subscription — first payment on this subscription",
         email or "(no email on the account)",
         f"tier: {tier}" + (f" ({billing_period})" if billing_period else ""),
     ]

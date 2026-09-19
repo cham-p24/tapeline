@@ -128,7 +128,7 @@ async def _all_clear_for_a_trial_already_welcomed(monkeypatch) -> dict:
     return at_the_charge[0]
 
 
-async def _welcome_for_a_trial_whose_retry_cleared(monkeypatch) -> dict:
+async def _trial_whose_retry_cleared(monkeypatch) -> tuple[Harness, dict]:
     """No latch (a trial started under #834): the welcome replaces the all-clear."""
     h = Harness(monkeypatch)
     u = await _user()
@@ -142,10 +142,14 @@ async def _welcome_for_a_trial_whose_retry_cleared(monkeypatch) -> dict:
     at_the_charge = h.sent[before:]
     assert [m["subject"] for m in at_the_charge] == ["You're in — welcome to Tapeline Premium"]
     assert all(t is stripe.Event for t in h.verified_event_types)
-    return at_the_charge[0]
+    return h, at_the_charge[0]
 
 
-async def _welcome_for_a_returning_payer(monkeypatch) -> dict:
+async def _welcome_for_a_trial_whose_retry_cleared(monkeypatch) -> dict:
+    return (await _trial_whose_retry_cleared(monkeypatch))[1]
+
+
+async def _returning_payer(monkeypatch) -> Harness:
     """A customer who paid on an earlier subscription, cancelled, and came back
     on a win-back discount. The new subscription's first paid invoice is a
     `subscription_create`, so the once-per-subscription welcome fires."""
@@ -169,7 +173,18 @@ async def _welcome_for_a_returning_payer(monkeypatch) -> dict:
     ))
     assert len(h.welcomes) == 1
     assert all(t is stripe.Event for t in h.verified_event_types)
-    return h.welcomes[0]
+    return h
+
+
+async def _welcome_for_a_returning_payer(monkeypatch) -> dict:
+    return (await _returning_payer(monkeypatch)).welcomes[0]
+
+
+def _revenue_alert(h: Harness) -> dict:
+    """The one founder revenue alert, as the real formatter worded it."""
+    alerts = [m for m in h.founder_messages if "New Tapeline subscription" in m["subject"]]
+    assert len(alerts) == 1, h.founder_messages
+    return alerts[0]
 
 
 # ── invoice.payment_failed on a trial's first charge ────────────────────────
@@ -241,3 +256,31 @@ async def test_a_returning_payer_welcome_preheader_does_not_say_first_payment(mo
     pre = _preheader((await _welcome_for_a_returning_payer(monkeypatch))["html"])
     assert "first payment" not in pre
     assert pre == "welcome to tapeline premium — your payment went through."
+
+
+# ── the founder's revenue alert ──────────────────────────────────────────────
+# Internal, but it is the only place the founder learns a sale happened, and
+# it used to open "first payment received". The latch that sends it is per
+# SUBSCRIPTION, so a win-back subscription's first invoice triggers it for a
+# customer who paid on an earlier one — the same error #855 took out of the
+# customer's welcome. What the handler does know is that this is the first
+# payment on THIS subscription.
+
+@pytest.mark.asyncio
+async def test_a_returning_payer_revenue_alert_does_not_say_first_payment(monkeypatch):
+    alert = _revenue_alert(await _returning_payer(monkeypatch))
+    first_line = alert["text"].splitlines()[0]
+    assert "first payment received" not in first_line.lower(), (
+        "they paid on an earlier subscription"
+    )
+    assert first_line == "💰 New Tapeline subscription — first payment on this subscription"
+    assert "charged today: 11.99 USD" in alert["text"]
+
+
+@pytest.mark.asyncio
+async def test_a_trial_first_charge_revenue_alert_is_worded_the_same_way(monkeypatch):
+    """The never-paid trialist whose retry cleared: "first payment on this
+    subscription" is true for them too, so one wording serves both."""
+    h, _welcome = await _trial_whose_retry_cleared(monkeypatch)
+    first_line = _revenue_alert(h)["text"].splitlines()[0]
+    assert first_line == "💰 New Tapeline subscription — first payment on this subscription"
