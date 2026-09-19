@@ -80,6 +80,11 @@ KEY_STATS_FIELDS = (
     "ex_dividend_date",
 )
 
+# Not a statistic: whether the listing is a note, preferred, warrant, right or
+# unit rather than common stock (#898). The block ships it so the page can say
+# why the company-wide figures above are blank for one. Always a boolean.
+KEY_STATS_FLAGS = ("is_non_common",)
+
 # Fields we have no honest source for. Their absence is the point.
 UNSOURCEABLE_FIELDS = (
     "bid",
@@ -179,7 +184,7 @@ async def test_key_stats_block_is_present_with_every_field(client):
         assert r.status_code == 200, r.text
         stats = r.json()["key_stats"]
         assert stats is not None, "the summary block must always be present"
-        assert set(stats) == set(KEY_STATS_FIELDS), (
+        assert set(stats) == set(KEY_STATS_FIELDS) | set(KEY_STATS_FLAGS), (
             "key_stats must carry exactly the promised fields — no more, no less"
         )
 
@@ -253,9 +258,11 @@ async def test_ticker_with_no_history_returns_nulls_not_zeros(client):
         await _seed_bare()
 
         stats = (await client.get(f"/api/ticker/{BARE}")).json()["key_stats"]
-        assert set(stats) == set(KEY_STATS_FIELDS)
+        assert set(stats) == set(KEY_STATS_FIELDS) | set(KEY_STATS_FLAGS)
         for field in KEY_STATS_FIELDS:
             assert stats[field] is None, f"{field} must be null, not a stand-in value"
+        # The flag is a fact about the listing, never a null.
+        assert stats["is_non_common"] is False
 
 
 @pytest.mark.asyncio
