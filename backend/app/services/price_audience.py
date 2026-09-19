@@ -43,11 +43,27 @@ from app.config import get_settings
 #: Header our own frontend's server runtime sends (frontend/lib/ssrHeaders.ts).
 INTERNAL_SSR_HEADER = "x-tapeline-internal"
 
-#: What a keyless response says instead of carrying prices. Factual, and it
-#: names the two ways a price IS available rather than implying there is none.
+#: What a keyless /api/public/signals response says instead of carrying
+#: prices. Each endpoint has its own note, because each keeps different fields:
+#: a note must describe the response it rides on (pinned per endpoint by
+#: tests/test_keyless_no_prices.py).
 KEYLESS_PRICE_NOTE = (
     "Prices, daily moves, volume and market cap are not served through this "
     "endpoint without a signed-in session. Scores, labels and sub-scores are."
+)
+
+#: /api/public/heatmap for a keyless caller: sector names and counts only.
+HEATMAP_KEYLESS_NOTE = (
+    "Sector moves are not served without a signed-in session; this response "
+    "lists sectors and ticker counts."
+)
+
+#: /api/ticker/{symbol} for a keyless caller. The record rows it embeds
+#: (flag_record) keep their recorded closes, like the record downloads.
+TICKER_KEYLESS_NOTE = (
+    "Current prices, daily moves, ranges, volume and market cap are not served "
+    "without a signed-in session. Scores, labels and sub-scores are, and "
+    "flag_record keeps the recorded closes each listed pick was measured on."
 )
 
 #: Root-level fields on a ticker row that are vendor market data (or a move

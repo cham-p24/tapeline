@@ -810,7 +810,7 @@ async def public_heatmap(request: Request) -> dict[str, object]:
 
     from app.db import session_scope
     from app.models import Ticker
-    from app.services.price_audience import KEYLESS_PRICE_NOTE, may_see_prices
+    from app.services.price_audience import HEATMAP_KEYLESS_NOTE, may_see_prices
     from app.services.sector import canonical_sector
     from app.services.ticker_freshness import live_clauses
 
@@ -863,7 +863,7 @@ async def public_heatmap(request: Request) -> dict[str, object]:
             "count": len(keyless),
             "sectors": keyless,
             "prices_served": False,
-            "price_note": KEYLESS_PRICE_NOTE,
+            "price_note": HEATMAP_KEYLESS_NOTE,
         }
     return {"count": len(out), "sectors": out, "prices_served": True}
 

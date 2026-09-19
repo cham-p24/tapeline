@@ -248,7 +248,10 @@ export default function HeatmapPage() {
             ) : (
               <div className="flex flex-wrap gap-1">
                 {previewSectors.map((s) => {
-                  const change = s.change_pct_1d ?? 0;
+                  // No move served (no recognised session): show a dash, never
+                  // `?? 0`, which painted every sector "+0.00%", a flat market
+                  // nobody measured.
+                  const change = typeof s.change_pct_1d === "number" ? s.change_pct_1d : null;
                   // Tile size tracks how many live tickers the sector holds —
                   // a real proportion, not a decorative one.
                   const n = s.ticker_count || 0;
@@ -257,18 +260,20 @@ export default function HeatmapPage() {
                     : n > 100 ? "min-w-[170px] py-7"
                     : n > 40 ? "min-w-[150px] py-6"
                     : "min-w-[130px] py-5";
-                  const strong = Math.abs(change) > 1;
+                  const strong = change != null && Math.abs(change) > 1;
                   const textCls = strong ? (change > 0 ? "text-up" : "text-down") : "text-fg";
+                  const moveText =
+                    change == null ? "—" : `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`;
                   return (
                     <div
                       key={s.sector}
-                      style={tileBackground(change)}
-                      title={`${s.sector} · ${change >= 0 ? "+" : ""}${change.toFixed(2)}% · ${n.toLocaleString()} tickers`}
-                      className={`${size} flex flex-1 flex-col items-center justify-center rounded-md px-3 text-center`}
+                      style={change == null ? undefined : tileBackground(change)}
+                      title={`${s.sector} · ${moveText} · ${n.toLocaleString()} tickers`}
+                      className={`${size} flex flex-1 flex-col items-center justify-center rounded-md px-3 text-center${change == null ? " bg-panel" : ""}`}
                     >
                       <span className="text-xs font-semibold uppercase tracking-wide">{s.sector}</span>
                       <span className={`nums mt-1 text-lg font-bold leading-tight ${textCls}`}>
-                        {change >= 0 ? "+" : ""}{change.toFixed(2)}%
+                        {moveText}
                       </span>
                       <span className="nums mt-0.5 text-[10px] text-muted">
                         {n.toLocaleString()} {n === 1 ? "ticker" : "tickers"}
@@ -281,8 +286,9 @@ export default function HeatmapPage() {
           </div>
 
           <p className="mt-2 text-[11px] text-subtle">
-            Each sector tile is the dollar-volume-weighted average 1-day move of the scored
-            tickers in that sector, from prices delayed about 15 minutes.
+            {previewSectors.some((s) => typeof s.change_pct_1d !== "number")
+              ? "Sector moves are shown to signed-in users. Your session was not recognised, so only sectors and ticker counts are listed; sign in again to see the moves."
+              : "Each sector tile is the dollar-volume-weighted average 1-day move of the scored tickers in that sector, from prices delayed about 15 minutes."}
           </p>
 
           {/* Locked section — states what the paid view adds and the REAL

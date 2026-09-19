@@ -40,7 +40,13 @@ from app.main import app
 from app.models import DailyScorecardEntry, Ticker
 from app.routers import mcp as mcp_module
 from app.services.coverage import NOT_COVERED_FUTURES_MESSAGE
-from app.services.price_audience import KEY_STATS_PRICE_FIELDS, PRICE_FIELDS
+from app.services.price_audience import (
+    HEATMAP_KEYLESS_NOTE,
+    KEY_STATS_PRICE_FIELDS,
+    KEYLESS_PRICE_NOTE,
+    PRICE_FIELDS,
+    TICKER_KEYLESS_NOTE,
+)
 
 TOKEN = "keyless-test-ssr-token"
 SSR = {"x-tapeline-internal": TOKEN}
@@ -237,6 +243,35 @@ async def test_heatmap_serves_no_daily_move_to_a_keyless_caller(seeded, client):
     assert {"sector", "ticker_count"} <= set(sectors[0])
     assert anon.json()["prices_served"] is False
     assert all("change_pct_1d" in s for s in ssr.json()["sectors"])
+
+
+# ── each keyless note describes the response it rides on ────────────────────
+
+@pytest.mark.asyncio
+async def test_each_keyless_note_describes_its_own_response(seeded, client):
+    """One shared note was wrong on two endpoints: it promised "scores, labels
+    and sub-scores" on the heatmap, which returns sector names and counts, and
+    said prices "are not served" on the ticker payload, whose flag_record keeps
+    recorded closes. Each endpoint now carries its own note; this pins the note
+    to the fields actually present.
+
+    Mutation: any endpoint back on the shared KEYLESS_PRICE_NOTE."""
+    async with client:
+        signals = (await client.get("/api/public/signals")).json()
+        heatmap = (await client.get("/api/public/heatmap")).json()
+        ticker = (await client.get(f"/api/ticker/{PRICED}")).json()
+
+    assert signals["price_note"] == KEYLESS_PRICE_NOTE
+    assert "sub-scores" in KEYLESS_PRICE_NOTE
+    assert {"score", "signal", "sub_trend"} <= set(signals["items"][0])
+
+    assert heatmap["price_note"] == HEATMAP_KEYLESS_NOTE
+    assert "score" not in HEATMAP_KEYLESS_NOTE.lower()
+    assert all(set(s) == {"sector", "ticker_count"} for s in heatmap["sectors"])
+
+    assert ticker["price_note"] == TICKER_KEYLESS_NOTE
+    assert "flag_record" in TICKER_KEYLESS_NOTE and "flag_record" in ticker
+    assert {"score", "signal", "breakdown"} <= set(ticker)
 
 
 # ── MCP ─────────────────────────────────────────────────────────────────────

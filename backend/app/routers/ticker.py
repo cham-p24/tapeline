@@ -37,7 +37,7 @@ from app.services.finnhub_feed import (
 from app.services.news_feed import fetch_news_for_ticker
 from app.services.percentile import peer_percentiles
 from app.services.price_audience import (
-    KEYLESS_PRICE_NOTE,
+    TICKER_KEYLESS_NOTE,
     is_trusted_ssr,
     strip_price_fields,
 )
@@ -939,7 +939,7 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
     if user is None and not is_trusted_ssr(request):
         payload = strip_price_fields(payload)
         payload["prices_served"] = False
-        payload["price_note"] = KEYLESS_PRICE_NOTE
+        payload["price_note"] = TICKER_KEYLESS_NOTE
     else:
         payload["prices_served"] = True
     return payload
