@@ -180,6 +180,67 @@ SNAPSHOT_BATCH_SIZE = 250
 #: retry storm from turning into a thundering herd.
 SNAPSHOT_CONCURRENCY = int(os.environ.get("SNAPSHOT_CONCURRENCY", "6"))
 
+#: Consecutive snapshot passes in which at least one batch failed, and the
+#: streak length at which that stops being a WARNING and pages.
+#:
+#: A failed batch withholds only its own symbols, so the healthy batches keep
+#: max(Ticker.updated_at) moving and /health's worker_last_tick stays "ok" (the
+#: old whole-pass abort tripped that check instead). That is right for a blip
+#: and wrong for a failure that REPEATS: `_request` retries only 429 and 5xx,
+#: so a 4xx, a timeout or a connect error fails the batch at once, and the
+#: batches are cut in the same order every tick, so one bad request could pin
+#: the same ~250 symbols to an old price for days while every health check
+#: read green. 5 passes is ~5 minutes at the 60s tick, the same 300s /health
+#: allows before it calls the worker stale. In-memory and per-process on
+#: purpose: a restart resets it, and a failure that survives the restart pages
+#: again five passes later.
+SNAPSHOT_FAILURE_STREAK_ALERT = 5
+#: While the streak lasts, repeat the page this often (~hourly) rather than on
+#: every pass, so a stuck batch is one Sentry issue, not 60 an hour.
+SNAPSHOT_FAILURE_STREAK_REPEAT = 60
+_snapshot_failure_streak = 0
+
+
+def _note_snapshot_failures(
+    failures: list[tuple[list[str], Exception]], total: int,
+) -> None:
+    """Advance or reset the failed-batch streak; page once it is a pattern.
+
+    Runs before the all-fail re-raise, so a full outage counts toward the
+    streak too. Logs counts and exception TYPES only, never str(exc): an
+    HTTPStatusError's message embeds the request URL.
+    """
+    global _snapshot_failure_streak
+    if not failures:
+        _snapshot_failure_streak = 0
+        return
+    _snapshot_failure_streak += 1
+    streak = _snapshot_failure_streak
+    if streak < SNAPSHOT_FAILURE_STREAK_ALERT or (
+        (streak - SNAPSHOT_FAILURE_STREAK_ALERT) % SNAPSHOT_FAILURE_STREAK_REPEAT
+    ):
+        return
+    types = ",".join(sorted({type(e).__name__ for _, e in failures}))
+    logger.error(
+        "polygon.snapshot_batches_failing_streak passes=%d failed=%d of=%d "
+        "types=%s — the same symbols may be sitting on an old price while "
+        "/health reads ok",
+        streak, len(failures), total, types,
+    )
+    # Mirrors tick.timeout_streak: capture explicitly so the streak pages, not
+    # just a log line. A no-op when SENTRY_DSN is unset (sentry_sdk.init never
+    # ran), and never allowed to break the pass.
+    try:
+        import sentry_sdk
+
+        sentry_sdk.capture_message(
+            f"snapshot batches failing {streak} passes in a row "
+            f"(failed={len(failures)} of {total}, types={types})",
+            level="error",
+        )
+    except Exception:
+        logger.exception("polygon.snapshot_streak.sentry_capture_failed")
+
 
 async def fetch_snapshots(
     symbols: list[str] | None = None,
@@ -323,6 +384,7 @@ async def fetch_snapshots(
                     naive = _to_scanner_row(t)
                     if naive is not None:
                         real_by_sym[naive["symbol"]] = naive
+            _note_snapshot_failures(failures, len(batches))
             if failures and len(failures) == len(batches):
                 # Every batch failed: a vendor outage, not a bad request.
                 # Re-raise into the handler below so the whole-pass contract

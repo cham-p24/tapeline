@@ -19,11 +19,17 @@ What each test here pins:
     it is not recorded as "one failed batch" and swallowed
   - the failure is logged at WARNING with counts and exception TYPES, never
     the exception's message (an HTTPStatusError's message embeds the URL)
+  - a failure that REPEATS pages: the healthy batches keep /health "ok", so
+    after SNAPSHOT_FAILURE_STREAK_ALERT consecutive failing passes it is
+    logged at ERROR and sent to Sentry, once, then ~hourly; a clean pass
+    resets the streak
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import sys
+import types
 from datetime import UTC, datetime
 from typing import Any
 
@@ -60,6 +66,8 @@ def small_batches(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(pf, "SNAPSHOT_BATCH_SIZE", 2)
     monkeypatch.setattr(pf, "_api_key", lambda: "test-key")
     monkeypatch.setattr(pf, "_to_scanner_row", _vendor_row)
+    # The failed-batch streak is module state; every test starts from zero.
+    monkeypatch.setattr(pf, "_snapshot_failure_streak", 0)
     monkeypatch.setattr(
         universe_mod, "active_universe",
         lambda: [(s, f"{s} Corp", "Information Technology") for s in SYMS],
@@ -171,6 +179,94 @@ async def test_the_failure_is_logged_without_the_url(
     assert "http" not in msg.lower().replace("httpstatuserror", ""), (
         f"the warning carries a URL: {msg}"
     )
+
+
+def _streak_errors(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [
+        r for r in caplog.records
+        if "snapshot_batches_failing_streak" in r.getMessage()
+    ]
+
+
+async def test_a_repeating_batch_failure_pages_once_it_is_a_streak(
+    small_batches: None, monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The healthy batches keep max(updated_at) fresh, so /health cannot see a
+    batch that fails every tick. The streak is the only thing that can."""
+    captured: list[tuple[str, str]] = []
+    # A stand-in module, not a patch of the real one: sentry-sdk is a runtime
+    # dependency but need not be importable where the suite runs.
+    fake_sentry = types.ModuleType("sentry_sdk")
+    fake_sentry.capture_message = (  # type: ignore[attr-defined]
+        lambda msg, level=None, **_: captured.append((msg, level))
+    )
+    monkeypatch.setitem(sys.modules, "sentry_sdk", fake_sentry)
+    monkeypatch.setattr(pf, "_request", _vendor(FAILED, _http_503()))
+    monkeypatch.setattr(pf, "_is_production", lambda: True)
+
+    alert = pf.SNAPSHOT_FAILURE_STREAK_ALERT
+    with caplog.at_level(logging.WARNING, logger=pf.logger.name):
+        for _ in range(alert - 1):
+            await pf.fetch_snapshots(macro_score=50.0)
+        assert _streak_errors(caplog) == [] and captured == [], (
+            "paged before the failure was a streak"
+        )
+
+        await pf.fetch_snapshots(macro_score=50.0)
+        hits = _streak_errors(caplog)
+        assert len(hits) == 1 and hits[0].levelno == logging.ERROR, [
+            r.getMessage() for r in caplog.records
+        ]
+        msg = hits[0].getMessage()
+        assert f"passes={alert}" in msg and "failed=1 of=3" in msg, msg
+        assert "HTTPStatusError" in msg, msg
+        assert "http" not in msg.lower().replace("httpstatuserror", ""), msg
+        assert len(captured) == 1 and captured[0][1] == "error", captured
+        assert "http" not in captured[0][0].lower().replace("httpstatuserror", "")
+
+        # Still failing: no page on every pass...
+        for _ in range(pf.SNAPSHOT_FAILURE_STREAK_REPEAT - 1):
+            await pf.fetch_snapshots(macro_score=50.0)
+        assert len(_streak_errors(caplog)) == 1 and len(captured) == 1
+        # ...but a reminder once the repeat interval has elapsed.
+        await pf.fetch_snapshots(macro_score=50.0)
+        assert len(_streak_errors(caplog)) == 2 and len(captured) == 2
+
+
+async def test_a_clean_pass_resets_the_streak(
+    small_batches: None, monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Intermittent blips that never repeat back to back must not page."""
+    monkeypatch.setattr(pf, "_is_production", lambda: True)
+    failing = _vendor(FAILED, _http_503())
+    clean = _vendor(set(), _http_503())
+
+    with caplog.at_level(logging.WARNING, logger=pf.logger.name):
+        for _ in range(3):
+            for fn in [failing] * (pf.SNAPSHOT_FAILURE_STREAK_ALERT - 1) + [clean]:
+                monkeypatch.setattr(pf, "_request", fn)
+                await pf.fetch_snapshots(macro_score=50.0)
+
+    assert _streak_errors(caplog) == [], [r.getMessage() for r in caplog.records]
+    assert pf._snapshot_failure_streak == 0
+
+
+async def test_a_full_outage_counts_toward_the_streak(
+    small_batches: None, monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The all-fail pass re-raises into the old handler; it must still count,
+    or a partial failure alternating with full outages would never page."""
+    monkeypatch.setattr(pf, "_request", _vendor(set(SYMS), _http_503()))
+    monkeypatch.setattr(pf, "_is_production", lambda: True)
+
+    with caplog.at_level(logging.WARNING, logger=pf.logger.name):
+        for _ in range(pf.SNAPSHOT_FAILURE_STREAK_ALERT):
+            assert await pf.fetch_snapshots(macro_score=50.0) == []
+
+    assert len(_streak_errors(caplog)) == 1
 
 
 # ---------------------------------------------------------------------------
