@@ -495,6 +495,17 @@ async def public_signals(
     # Rows with an UNKNOWN price or volume are kept either way, so the filter
     # can only remove obvious junk, never hide a name we lack a read for.
     min_dollar_volume: float = 0,
+    # The scanner's two structural exclusions, OPT-IN here. /api/scanner leaves
+    # out leveraged/inverse funds (#761) and listings that are not common stock
+    # (notes, preferreds, warrants, rights, units: #875) by default. This
+    # endpoint defaults both OFF, like min_dollar_volume above, because most of
+    # its callers want breadth, not a ranking: /signals, /stocks, /sectors'
+    # counts, the sitemap and the status probe publish or depend on how many
+    # scored tickers exist. The ranked SEO pages (/signal/*, /sector/*,
+    # /best-stocks-for/*) pass both, so their lists match the scanner's. Found
+    # 2026-09-19: GREEL, a Greenidge senior note, could top /signal/strong-setup.
+    exclude_leveraged: bool = False,
+    exclude_non_common: bool = False,
     sort: str = Query("score", pattern=SORT_PATTERN),
     order: str = Query("desc", pattern=ORDER_PATTERN),
 ) -> dict[str, object]:
@@ -569,17 +580,27 @@ async def public_signals(
         # un-gated endpoint and still get their price bound applied in SQL.
         stmt = stmt.where(Ticker.price <= max_price)
     if min_dollar_volume > 0:
-        # Byte-for-byte the scanner's clause: keep rows whose price or volume
-        # is UNKNOWN, drop only those with a KNOWN dollar-volume below the
-        # floor. Any divergence here would show up as the SEO page and the
-        # in-app scanner disagreeing about which names qualify.
+        # The scanner's clause (routers/scanner.py): keep rows whose price or
+        # liquidity is UNKNOWN, drop only those with a KNOWN dollar-volume below
+        # the floor, measured on the 30-day average volume and falling back to
+        # the session's running volume only when the average is missing. This
+        # comment used to say "byte-for-byte the scanner's clause" while the
+        # code read the running `volume` alone, so the same name could pass
+        # here and fail in the scanner (or the reverse) depending on the time
+        # of day. Any divergence shows up as the SEO page and the in-app
+        # scanner disagreeing about which names qualify.
+        liquidity = func.coalesce(Ticker.avg_volume_30d, Ticker.volume)
         stmt = stmt.where(
             or_(
                 Ticker.price.is_(None),
-                Ticker.volume.is_(None),
-                Ticker.price * Ticker.volume >= min_dollar_volume,
+                liquidity.is_(None),
+                Ticker.price * liquidity >= min_dollar_volume,
             )
         )
+    if exclude_leveraged:
+        stmt = stmt.where(Ticker.is_leveraged.is_(False))
+    if exclude_non_common:
+        stmt = stmt.where(Ticker.is_non_common.is_(False))
 
     async with session_scope() as session:
         prices_ok = await may_see_prices(request, session)
@@ -616,6 +637,11 @@ async def public_signals(
             "name": r.name,
             "sector": r.sector,
             "asset_class": r.asset_class,
+            # The same two structural facts /api/scanner ships, so a breadth
+            # caller can label or skip a row without a second request
+            # (/signals' anonymous preview skips them this way).
+            "is_leveraged": r.is_leveraged,
+            "is_non_common": r.is_non_common,
             "score": r.score,
             "signal": r.signal,
             "price": r.price,

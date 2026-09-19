@@ -207,7 +207,15 @@ async def test_public_and_scanner_agree_on_ordering(client):
     """Anti-drift pin for services/ticker_ordering. An anonymous /api/scanner
     call is row-capped, but the rows it DOES return must be the same prefix the
     public endpoint returns for the same sort — otherwise the marketing page and
-    the in-app scanner would publish different "top N" lists."""
+    the in-app scanner would publish different "top N" lists.
+
+    Still true as written, because this seed holds no leveraged fund and no
+    non-common listing. With such rows ranking high, the DEFAULT public list
+    deliberately starts with them (its breadth callers must see every scored
+    row) while the scanner hides them; the prefix then holds only when the
+    public call passes exclude_leveraged and exclude_non_common, which is what
+    the ranked SEO pages do. That case is pinned in
+    test_public_signals_exclusions.py."""
     await _clear()
     await _seed()
     try:

@@ -49,20 +49,28 @@ type ScannerRow = {
 async function fetchStrategyTickers(params: Record<string, string | number>): Promise<ScannerRow[]> {
   try {
     const qs = new URLSearchParams({
-      // The scanner applied SCANNER_MIN_DOLLAR_VOLUME by default; the public
-      // endpoint defaults it OFF so its existing callers are unaffected. Pass
-      // the scanner's value explicitly so moving endpoints doesn't quietly
-      // admit near-untradeable names into these ranked lists. A strategy may
-      // override it via apiParams (the spread below wins).
+      // The public endpoint defaults its liquidity floor OFF so its breadth
+      // callers are unaffected. These listicles pass the $50k floor they always
+      // used against /api/scanner (lower on purpose than the scanner's $1M
+      // default, to keep their long tail), so moving endpoints doesn't quietly
+      // admit near-untradeable names. A strategy may override it via apiParams
+      // (the spread below wins).
       min_dollar_volume: "50000",
+      // Likewise the scanner's two structural exclusions, which the public
+      // endpoint defaults OFF: leveraged/inverse funds and listings that are
+      // not common stock (notes, preferreds, warrants) stay out of every
+      // "best stocks for" list, as they do in the scanner's default view.
+      exclude_leveraged: "true",
+      exclude_non_common: "true",
       ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
     }).toString();
     // /api/public/signals, NOT /api/scanner. This is anonymous SSR, and the
     // scanner tier-gates row count: an anonymous caller is clamped to the Free
     // cap (10), so every strategy listicle asked for 30 and published 10. The
-    // public endpoint now accepts the same sort/order/min_score/max_price/
-    // sector filters and shares the scanner's ORDER BY (backend
-    // services/ticker_ordering), so the ranking is identical — just not capped.
+    // public endpoint accepts the same sort/order/min_score/max_price/sector
+    // filters, applies the scanner's liquidity clause and (when asked, as
+    // above) its exclusions, and shares its ORDER BY (backend
+    // services/ticker_ordering), so the ranking is the scanner's, not capped.
     const url = `${API_BASE}/api/public/signals?${qs}`;
     // 1-hour cache so search-engine crawls don't hammer the API (or Vercel CPU).
     const res = await fetch(url, {

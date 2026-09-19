@@ -10,8 +10,11 @@
  *   /signal/{slug}          live tickers at that signal level
  *   /best-stocks-for/{s}    every strategy listicle (limit: 30 in apiParams)
  *
- * They now read /api/public/signals, which applies the same filters and the
- * same ORDER BY (backend services/ticker_ordering) with no row cap.
+ * They now read /api/public/signals, which shares the scanner's ORDER BY
+ * (backend services/ticker_ordering) and liquidity clause with no row cap. It
+ * defaults the scanner's two structural exclusions (leveraged funds, listings
+ * that are not common stock) OFF for its breadth callers, so these pages ask
+ * for them; seoListsMatchTheScanner.test.tsx pins that for every slug.
  *
  * Pages deliberately left on /api/scanner, because the Free cap IS the intent:
  *   /daily-picks, /feed.xml   — "Daily Top 10", they slice to 10 anyway

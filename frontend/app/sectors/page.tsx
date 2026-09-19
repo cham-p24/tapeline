@@ -38,6 +38,10 @@ type SignalRow = {
   sector: string | null;
   score: number | null;
   signal: string | null;
+  // Structural facts the endpoint ships on every row (optional so a response
+  // from a backend deployed before them still parses).
+  is_leveraged?: boolean;
+  is_non_common?: boolean;
 };
 
 type SectorStat = {
@@ -76,12 +80,17 @@ function buildSectorStats(rows: SignalRow[]): SectorStat[] {
       .filter((n) => Number.isFinite(n));
     const avg =
       scored.length > 0 ? scored.reduce((a, b) => a + b, 0) / scored.length : null;
-    // Top ticker = highest score in the sector. public/signals is already
-    // sorted desc by score, so the first match is the top — but sort
-    // defensively in case the upstream ordering ever changes.
+    // Top ticker = highest score in the sector, among what the ranked
+    // scanner would show: not a leveraged/inverse fund and not a listing that
+    // is not common stock (a note, preferred or warrant). The count and the
+    // average above still cover every scored row in the sector, which is what
+    // they describe. public/signals is already sorted desc by score, so the
+    // first match is the top — but sort defensively in case the upstream
+    // ordering ever changes.
+    const rankable = inSector.filter((r) => !r.is_leveraged && !r.is_non_common);
     const top =
-      inSector.length > 0
-        ? inSector
+      rankable.length > 0
+        ? rankable
             .slice()
             .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0]
         : null;

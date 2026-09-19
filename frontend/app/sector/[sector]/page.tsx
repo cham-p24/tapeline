@@ -47,17 +47,23 @@ async function fetchSectorTickers(apiSector: string): Promise<ScannerRow[]> {
   try {
     // /api/public/signals, NOT /api/scanner. This is anonymous SSR, and the
     // scanner tier-gates row count: an anonymous caller is clamped to the Free
-    // cap (10), so this "Top {sector} Stocks Ranked" page asked for 30 and
-    // silently published 10. The public endpoint applies the same filters and
-    // the same ORDER BY (shared via backend services/ticker_ordering) with no
-    // row cap. min_dollar_volume mirrors the scanner's default so the same
-    // near-untradeable names stay out of the ranked list.
+    // cap (10), so this "Top {sector} Stocks Ranked" page asked for 30 and silently published 10. The public
+    // endpoint uses the scanner's ORDER BY (backend services/ticker_ordering),
+    // its liquidity clause and, when asked, its two structural exclusions, with
+    // no row cap. It defaults those exclusions OFF for its breadth callers, so
+    // this page passes them: leveraged/inverse funds and listings that are not
+    // common stock (notes, preferreds, warrants) stay out, as they do in the
+    // scanner's default view. min_dollar_volume is the $50k floor these SEO
+    // pages always used, lower on purpose than the scanner's $1M default so the
+    // ranked list keeps its long tail.
     const url = `${API_BASE}/api/public/signals?${new URLSearchParams({
       sector: apiSector,
       limit: "30",
       sort: "score",
       order: "desc",
       min_dollar_volume: "50000",
+      exclude_leveraged: "true",
+      exclude_non_common: "true",
     }).toString()}`;
     const res = await fetch(url, {
       next: { revalidate: 3600 },
