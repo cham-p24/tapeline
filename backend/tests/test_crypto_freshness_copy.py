@@ -77,6 +77,9 @@ _SURFACES = (
     "frontend/app/app/scanner/page.tsx",
     "frontend/app/press/page.tsx",
     "backend/app/routers/mcp.py",
+    # The file AI assistants read about us. It still said "updated once a day"
+    # twice after #872, because it was not in this list (found 2026-09-19).
+    "frontend/public/llms.txt",
 )
 
 #: NOT fixed here, and deliberately so. The product-update email carrying
