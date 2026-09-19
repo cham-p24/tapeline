@@ -308,6 +308,9 @@ async def _tool_daily_picks(args: dict, session: AsyncSession) -> dict:
         order="desc",
         limit=limit,
         offset=0,
+        # This server is keyless; with no price filter or price sort above
+        # the gate never fires, and saying so keeps it that way.
+        keyless=True,
     )
     # The scanner returns its rows under "items" — NOT "rows". Reading the
     # wrong key fails silently as an empty list rather than raising, which is
