@@ -130,9 +130,14 @@ async def reconcile_non_common_flags() -> int:
     numbers (see the comment on Ticker.updated_at). Returns the number of rows
     changed. Never raises: a failure is logged and the column is left as it
     was, to be settled on the next run.
+
+    Also hands the flagged set to finnhub_feed, whose fundamentals cache
+    refuses those symbols: a note's or a preferred's "fundamentals" are its
+    issuer's. See finnhub_feed._NO_FUNDAMENTALS.
     """
     from app.db import session_scope
     from app.models import Ticker
+    from app.services.finnhub_feed import set_no_fundamentals_symbols
 
     try:
         async with session_scope() as session:
@@ -143,8 +148,11 @@ async def reconcile_non_common_flags() -> int:
             universe = frozenset(r[0] for r in rows)
             to_true: list[str] = []
             to_false: list[str] = []
+            flagged: set[str] = set()
             for symbol, name, asset_class, stored in rows:
                 want = is_non_common_equity(symbol, name, asset_class, universe)
+                if want:
+                    flagged.add(symbol)
                 if want and not stored:
                     to_true.append(symbol)
                 elif stored and not want:
@@ -156,6 +164,9 @@ async def reconcile_non_common_flags() -> int:
                         .where(Ticker.symbol.in_(symbols))
                         .values(is_non_common=value, updated_at=Ticker.updated_at)
                     )
+        # These listings take no fundamentals reading: the vendor's figures for
+        # them are the issuer's. This process's caches learn it here.
+        set_no_fundamentals_symbols(flagged)
         changed = len(to_true) + len(to_false)
         if changed:
             logger.info(

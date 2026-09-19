@@ -170,10 +170,23 @@ def configured() -> bool:
 # happens 60×/min during market hours.
 _FUND_SCORE_CACHE: dict[str, float] = {}
 
+#: Symbols that take NO fundamentals reading: listings stored as stocks that
+#: are not the company's common shares (notes, preferreds, warrants, rights,
+#: units; services/non_common.py). The vendor answers such a symbol with its
+#: ISSUER's financials, so a reading is the company's, not the security's:
+#: GREEL, a Greenidge 8.50% senior note, held 60.2 and its reason called
+#: fundamentals one of its strengths (measured 2026-09-18, 99 such rows).
+#: Filled by `set_no_fundamentals_symbols` from the non-common reconcile. While
+#: a symbol is in it, the cache neither returns nor stores a value for it, and
+#: its pass reading is None, which the sheet ingest writes as a NULL.
+_NO_FUNDAMENTALS: set[str] = set()
+
 
 def get_cached_score(symbol: str) -> float | None:
     """Per-tick lookup. Returns None if the symbol hasn't been refreshed yet
-    or had no Finnhub fundamentals (e.g. ETFs, foreign ADRs)."""
+    or had no Finnhub fundamentals (e.g. ETFs, foreign ADRs), and for a symbol
+    that takes no reading: `set_no_fundamentals_symbols` drops its entry and
+    `set_cached_score` refuses a new one (see `_NO_FUNDAMENTALS`)."""
     return _FUND_SCORE_CACHE.get(symbol.upper())
 
 
@@ -181,12 +194,35 @@ def set_cached_score(symbol: str, score: float | None, *, from_row: bool = False
     """Worker-side setter — call after each fetch_basic_financials + compute.
 
     `from_row=True` for a value loaded from the Ticker row (the cache warm),
-    which is not a new reading; see `_PASS_READINGS`."""
+    which is not a new reading; see `_PASS_READINGS`. Ignored for a symbol
+    that takes no reading (see `_NO_FUNDAMENTALS`)."""
     if score is not None:
         sym = symbol.upper()
+        if sym in _NO_FUNDAMENTALS:
+            return
         _FUND_SCORE_CACHE[sym] = score
         if not from_row:
             _PASS_READINGS[("sub_fundamentals", sym)] = score
+
+
+def set_no_fundamentals_symbols(symbols: frozenset[str] | set[str]) -> None:
+    """Replace the set of symbols that take no fundamentals reading.
+
+    A symbol entering it loses any cached value, and its pass reading becomes
+    None: an answer ("this listing has no fundamentals of its own"), not a
+    missing one, so a row's owner writes NULL rather than keeping the
+    issuer's value. A symbol leaving it drops that None, so it is read again
+    like any other symbol.
+    """
+    wanted = {s.upper() for s in symbols}
+    for sym in _NO_FUNDAMENTALS - wanted:
+        if _PASS_READINGS.get(("sub_fundamentals", sym), 0.0) is None:
+            del _PASS_READINGS[("sub_fundamentals", sym)]
+    for sym in wanted:
+        _FUND_SCORE_CACHE.pop(sym, None)
+        _PASS_READINGS[("sub_fundamentals", sym)] = None
+    _NO_FUNDAMENTALS.clear()
+    _NO_FUNDAMENTALS.update(wanted)
 
 
 #: What THIS process's factor passes last learned, by (column, SYMBOL): a
@@ -474,12 +510,13 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
             rows = (await session.execute(
                 select(
                     Ticker.symbol, Ticker.sub_fundamentals, Ticker.sub_smart_money,
+                    Ticker.is_non_common,
                 ).where(
                     Ticker.sub_fundamentals.is_not(None)
                     | Ticker.sub_smart_money.is_not(None)
                 )
             )).all()
-            on_row = {sym for sym, _, sm in rows if sm is not None}
+            on_row = {sym for sym, _, sm, _ in rows if sm is not None}
             unbacked = [s for s in _SMART_MONEY_SCORE_CACHE if s not in on_row]
             with_form4: set[str] = set()
             if unbacked:
@@ -488,8 +525,11 @@ async def warm_factor_caches_from_db() -> tuple[int, int]:
                     .where(InsiderTransaction.symbol.in_(unbacked))
                     .distinct()
                 )).scalars().all())
-        for sym, fund, sm in rows:
-            if fund is not None:
+        for sym, fund, sm, non_common in rows:
+            # A non-common listing's stored value is its issuer's, not its own
+            # (see _NO_FUNDAMENTALS); never warm it back. This runs in the API
+            # process too, where the reconcile that fills that set never runs.
+            if fund is not None and not non_common:
                 set_cached_score(sym, float(fund), from_row=True)
                 funds += 1
             if sm is not None:
