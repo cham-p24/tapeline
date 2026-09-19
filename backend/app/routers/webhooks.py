@@ -445,6 +445,87 @@ async def _tell_founder_paid_invoice_unannounced(
         logger.exception("stripe.founder_unannounced_alert_failed sub=%s", sub_id)
 
 
+async def _tell_founder_paid_on_started_subscription(
+    session: AsyncSession,
+    *,
+    inv: dict,
+    amount_paid: int,
+    currency: str,
+    sub_id: str,
+    why: str,
+) -> None:
+    """Founder-only: money arrived on a subscription that is not starting now.
+
+    `_welcome_on_first_paid_invoice` sends nothing when the subscription's
+    `paid_start:` latch is already held, or when Stripe's history shows it was
+    paid for before. That is right for the customer, but it left the founder
+    with no word that money arrived. The case that mattered: the old
+    `status == "active"` trigger latched two card-required trials before their
+    first charge, the charge was declined, and a retry that finally clears is
+    the first money either has paid — the customer gets the dunning all-clear
+    and the founder heard nothing. Renewals were just as silent.
+
+    Once per INVOICE, via a `paid_invoice_alert:{invoice}` row in
+    stripe_webhook_events, claimed before sending (at most once, never twice).
+    The event-id dedup at the top of the handler stops a redelivery of one
+    event; this stops a second, distinct event for the same invoice. Read
+    before the dunning branch clears the account's `dun{n}` tokens, so their
+    count can be reported. Internal only: no customer email. Never raises.
+    """
+    try:
+        inv_id = inv.get("id")
+        latch_id = f"paid_invoice_alert:{inv_id}"[:80] if inv_id else None
+        if latch_id is not None:
+            existing = await session.execute(
+                select(StripeWebhookEvent).where(StripeWebhookEvent.id == latch_id)
+            )
+            if existing.scalar_one_or_none() is not None:
+                logger.info("stripe.paid_invoice_alert_already_sent invoice=%s", inv_id)
+                return
+
+        user, _ = await _resolve_invoice_account(session, inv, sub_id)
+        email = user.email if user is not None else None
+        failed_payment_emails = (
+            sum(1 for t in (user.drip_state or "").split(",") if t.startswith("dun"))
+            if user is not None
+            else 0
+        )
+        attempt_count = inv.get("attempt_count")
+        if not isinstance(attempt_count, int) or isinstance(attempt_count, bool):
+            attempt_count = None
+
+        if latch_id is not None:
+            try:
+                session.add(StripeWebhookEvent(id=latch_id, event_type="paid_invoice_alert"))
+                await session.commit()
+            except Exception:
+                # A concurrent delivery claimed it first — it will do the send.
+                await session.rollback()
+                logger.info("stripe.paid_invoice_alert_claim_lost invoice=%s", inv_id)
+                return
+
+        from app.services.telegram import notify_founder_payment_received
+
+        await notify_founder_payment_received(
+            why=why,
+            amount=amount_paid / 100,
+            currency=currency,
+            email=email,
+            billing_reason=inv.get("billing_reason"),
+            attempt_count=attempt_count,
+            failed_payment_emails=failed_payment_emails,
+            customer=inv.get("customer"),
+            subscription=sub_id,
+            invoice=inv_id,
+        )
+        logger.info(
+            "stripe.paid_invoice_founder_alert sub=%s invoice=%s amount=%d",
+            sub_id, inv_id, amount_paid,
+        )
+    except Exception:
+        logger.exception("stripe.paid_invoice_founder_alert_failed sub=%s", sub_id)
+
+
 async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> bool:
     """Welcome-to-paid email + founder revenue alert, once per subscription,
     when the subscription's FIRST invoice with money on it succeeds.
@@ -489,6 +570,12 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> bo
       is then claimed with no alert and the first sale is never announced.
       So the founder is told at once, with the amount charged, that a paid
       invoice went unannounced and why.
+    * Not a first charge is not the same as not money either. A paid invoice
+      on a latched or already-paying subscription gets no welcome and no
+      new-subscription alert, but the founder still gets one internal
+      payment-received note per invoice
+      (`_tell_founder_paid_on_started_subscription`). Without it, the first
+      real payment of a trial the old trigger latched early was silent.
     * TWO AMOUNTS. The welcome states `amount_paid` as "Charged today" and the
       plan's price per period (the paid line's unit amount) separately. A
       discounted first charge (a win-back or trial-save coupon, a founder
@@ -517,12 +604,20 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> bo
             return False
 
         latch_id = f"paid_start:{sub_id}"[:80]
+        currency = str(inv.get("currency") or "usd").lower()
         claimed = await session.execute(
             select(StripeWebhookEvent).where(StripeWebhookEvent.id == latch_id)
         )
         if claimed.scalar_one_or_none() is not None:
+            # Already started: a renewal, or the first charge of a trial the
+            # old status trigger latched before it was paid. No welcome, no
+            # new-subscription alert — but the founder hears the money arrived.
+            await _tell_founder_paid_on_started_subscription(
+                session, inv=inv, amount_paid=amount_paid, currency=currency,
+                sub_id=sub_id,
+                why="this subscription was already marked as started",
+            )
             return False
-        currency = str(inv.get("currency") or "usd").lower()
 
         if (inv.get("billing_reason") or "") != "subscription_create":
             prior_paid = await subscription_has_other_paid_invoice(sub_id, inv.get("id"))
@@ -552,6 +647,11 @@ async def _welcome_on_first_paid_invoice(session: AsyncSession, inv: dict) -> bo
                 except Exception:
                     await session.rollback()
                 logger.info("stripe.paid_welcome_skipped_established sub=%s", sub_id)
+                await _tell_founder_paid_on_started_subscription(
+                    session, inv=inv, amount_paid=amount_paid, currency=currency,
+                    sub_id=sub_id,
+                    why="Stripe shows an earlier paid invoice on this subscription",
+                )
                 return False
 
         user, sub_row = await _resolve_invoice_account(session, inv, sub_id)
@@ -1671,8 +1771,11 @@ async def stripe_webhook(
 
     elif evt_type == "invoice.payment_succeeded":
         # A charge cleared. Most of these are routine — every monthly renewal
-        # lands here — and stay silent (we don't email every successful charge;
-        # Stripe's own receipt covers that). Two exceptions:
+        # lands here — and stay silent to the customer (we don't email every
+        # successful charge; Stripe's own receipt covers that). The founder
+        # gets one internal note per paid invoice that is not a first charge
+        # (`_tell_founder_paid_on_started_subscription`). Two customer-facing
+        # exceptions:
         #
         # 1. The subscription's FIRST invoice with money on it: welcome-to-paid
         #    + the founder revenue alert (`_welcome_on_first_paid_invoice`).

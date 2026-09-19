@@ -150,8 +150,10 @@ class TestPaidStartLatch:
     def test_dunning_recovery_on_an_established_sub_does_not_fire(self):
         """past_due -> paid on an old subscription: the latch was claimed long
         ago, or Stripe's history shows it paid before. This is the error a naive
-        fix introduces: a fresh receipt and a founder revenue ping every time an
-        old subscriber's card recovers."""
+        fix introduces: a fresh receipt and a founder NEW-SALE alert every time
+        an old subscriber's card recovers. (The founder still gets a separate
+        payment-received note, which never calls itself a new subscription —
+        test_founder_told_of_paid_started_subscription.py.)"""
         assert self._fires(1999, "subscription_cycle", True, None) is False
         assert self._fires(1999, "subscription_cycle", False, True) is False
 

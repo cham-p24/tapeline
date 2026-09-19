@@ -256,6 +256,67 @@ async def notify_founder_paid_invoice_unannounced(
     )
 
 
+async def notify_founder_payment_received(
+    *,
+    why: str,
+    amount: float,
+    currency: str | None,
+    email: str | None,
+    billing_reason: str | None,
+    attempt_count: int | None,
+    failed_payment_emails: int,
+    customer: str | None,
+    subscription: str | None,
+    invoice: str | None,
+) -> None:
+    """A subscription invoice was PAID on a subscription that is not starting
+    now, so neither the customer welcome nor `notify_founder_new_subscription`
+    fired for it. Internal only.
+
+    Called from `routers/webhooks.py:_tell_founder_paid_on_started_subscription`,
+    once per invoice. Before it existed a paid invoice on a subscription whose
+    `paid_start:` latch was already held said nothing to the founder — and that
+    includes the first real payment of a trial the old `status == "active"`
+    trigger latched before its first charge was declined (2026-09-12 and
+    2026-09-14), when a Stripe retry finally clears.
+
+    It cannot tell a renewal from that late first payment without asking
+    Stripe, so it says both are possible and never calls itself a new
+    subscription. A retried invoice (`attempt_count` > 1) and the failed-payment
+    emails the customer was sent are printed when present.
+    """
+    cur = (currency or "usd").upper()
+    lines = [
+        "💰 Tapeline payment received on a subscription already marked as started",
+        email or "not matched to a Tapeline account",
+        f"charged: {amount:.2f} {cur}",
+        f"billing reason: {billing_reason or '-'}",
+    ]
+    if attempt_count is not None and attempt_count > 1:
+        lines.append(
+            f"paid on attempt {attempt_count} of this invoice; the earlier "
+            "attempts did not go through"
+        )
+    if failed_payment_emails > 0:
+        lines.append(f"failed-payment emails sent before this payment: {failed_payment_emails}")
+    lines += [
+        f"no welcome email and no new-subscription alert: {why}",
+        f"stripe customer: {customer or '-'}",
+        f"stripe subscription: {subscription or '-'}",
+        f"stripe invoice: {invoice or '-'}",
+        "This can be a renewal, or the first real payment on a trial that was "
+        "marked as started before its first charge went through. The "
+        "subscription's invoices in Stripe show which.",
+    ]
+    await deliver_founder_alert(
+        subject=(
+            f"💰 Tapeline payment received — {amount:.2f} {cur} — "
+            f"{email or 'unmatched account'}"
+        ),
+        text="\n".join(lines),
+    )
+
+
 async def answer_callback_query(callback_query_id: str, text: str = "") -> bool:
     """Acknowledge a callback_query (button tap). Required by Telegram —
     without it the user sees a loading spinner on the button forever."""
