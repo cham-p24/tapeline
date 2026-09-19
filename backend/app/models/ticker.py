@@ -63,10 +63,13 @@ class Ticker(Base):
     # BigInteger: 32-bit INTEGER overflowed on high-turnover names (e.g. ADTX
     # ~5.28B shares > 2.147B int max), failing the whole scan-tick bulk write.
     volume: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    # Absolute market cap in dollars (nullable — many rows have no read yet).
-    # Sourced from the Finnhub company profile, which reports it in MILLIONS,
-    # so the populator multiplies by 1e6 before storing. Displayed compactly in
-    # the scanner ("Mkt Cap" column); an em-dash renders when null.
+    # Absolute market cap in US DOLLARS (nullable — many rows have no read yet).
+    # Sourced from the Finnhub company profile, which reports it in MILLIONS of
+    # the company's filing currency; only a USD figure is kept, multiplied by
+    # 1e6 (finnhub_feed._seed_market_cap_from_profile). A foreign filer, a
+    # not-common listing and a vendor zero stay NULL. Displayed compactly in
+    # the scanner ("Mkt Cap" column) and the ticker page's key statistics; an
+    # em-dash renders when null.
     market_cap: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Key statistics — the summary block a reader expects on a ticker page.

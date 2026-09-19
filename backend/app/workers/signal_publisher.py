@@ -4565,12 +4565,28 @@ async def _backfill_market_cap(cap: int = 2500) -> None:
     unrelated one. (The cache also had a second hole on its cached-profile
     path — fixed in finnhub_feed._seed_market_cap_from_profile.)
 
-    Selection is `market_cap IS NULL`, liquid first, capped — so each run
-    fills the next slice and the candidate set converges to ~zero once the
-    universe is covered, the same shape as _backfill_sectors. Ordering uses
-    the coalesce(...) NULLS-LAST idiom (see _refresh_fundamentals_cache) so
-    the names users actually look at are filled on day one rather than
-    thousands of NULL-volume microcaps.
+    Selection is `market_cap IS NULL`, EQUITIES FIRST, then liquid first,
+    capped — so each run fills the next slice and the candidate set shrinks
+    by what the last run achieved, the same shape as _backfill_sectors.
+    Ordering uses the coalesce(...) NULLS-LAST idiom (see
+    _refresh_fundamentals_cache) so the names users actually look at are
+    filled on day one rather than thousands of NULL-volume microcaps.
+
+    Why equities first. A row the vendor never gives a cap for stays NULL, so
+    it stays a candidate, at its dollar-volume rank, on every run. Measured on
+    production 2026-09-19: of the 2,500 rows a dollar-volume-only order took,
+    2,318 were funds and 123 crypto pairs, none of which receive a cap. With
+    the equity caps cleared by migration 0078, that order would have stalled
+    with about 1,700 of 6,012 equities never reached. Equities first reaches
+    all of them in three runs, plus about one more for the slots the foreign
+    filers keep taking, and gives funds the budget that is left. The same
+    `case` the factor passes use (_select_factor_symbols).
+
+    Not-common listings (notes, preferreds, warrants) are skipped: their
+    profile is the issuer's, so the seed refuses them and a call would teach
+    nothing. USD only: a foreign filer's profile states its cap in its own
+    currency and seeds nothing (see
+    finnhub_feed._seed_market_cap_from_profile), so it keeps its NULL.
 
     FRESHNESS: a cap is price × shares and moves daily, but
     fetch_company_profile caches 7 days, so this can only ever be as fresh as
@@ -4582,9 +4598,13 @@ async def _backfill_market_cap(cap: int = 2500) -> None:
     async with session_scope() as session:
         result = await session.execute(
             select(Ticker.symbol)
-            .where(Ticker.market_cap.is_(None))
-            # NULLS LAST across dialects — see _refresh_fundamentals_cache.
-            .order_by(desc(func.coalesce(Ticker.volume * Ticker.price, -1)))
+            .where(Ticker.market_cap.is_(None), Ticker.is_non_common.is_(False))
+            .order_by(
+                case((Ticker.asset_class == "equity", 0), else_=1),
+                # NULLS LAST across dialects — see _refresh_fundamentals_cache.
+                desc(func.coalesce(Ticker.volume * Ticker.price, -1)),
+                Ticker.symbol.asc(),
+            )
             .limit(cap)
         )
         symbols = [row[0] for row in result.all()]
@@ -4627,9 +4647,10 @@ async def _backfill_market_cap(cap: int = 2500) -> None:
             cap_usd = get_cached_market_cap(sym)
             if cap_usd is not None:
                 pending.append((sym, cap_usd))
-            # No else branch on purpose: a symbol Finnhub has no cap for keeps
-            # its NULL and renders an em-dash. A 0 would be a number nobody
-            # gave us.
+            # No else branch on purpose: a symbol Finnhub has no USD cap for
+            # keeps its NULL and renders an em-dash. A 0 would be a number
+            # nobody gave us, and a foreign filer's figure is in its own
+            # currency.
         except Exception:
             logger.exception("market_cap_backfill.fetch_failed symbol=%s", sym)
         await asyncio.sleep(1.1)  # stay well under 60/min
