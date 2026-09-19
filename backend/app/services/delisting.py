@@ -38,6 +38,16 @@ from every surface at once:
   raised by hand, the same contract as polygon_feed.DISCOVERY_MAX_TICKERS.
 * Equity and ETF rows only. Crypto (X: pairs) is priced by another feed and is
   not on this list at all; neither are the continuous-futures rows.
+* VENDOR SPELLING only. Absence from the vendor's list means something only
+  for a symbol spelled the way the vendor spells it. On 2026-09-19 production
+  held 13 equity/etf rows that are not: BRK-A and BRK-B (the vendor writes
+  BRK.A / BRK.B, which are separate, priced rows), FFH.TO (a Toronto listing)
+  and ten preferreds written BAC.PRL, NEE.PRT ... (the vendor writes BACpL).
+  All are still trading, and none can ever appear on the list under that
+  spelling, so retiring them would publish "No longer trading" about Berkshire
+  Hathaway. `is_vendor_spelling` keeps them out; what to do with a row the
+  vendor cannot price under its stored spelling is services/coverage.py's
+  question, not this one.
 
 A stamped symbol that reappears on ANY walk, complete or not, is un-retired:
 presence is positive evidence, absence is not.
@@ -50,6 +60,7 @@ listing: see ticker_freshness.listed_clause for the one predicate.
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -66,18 +77,30 @@ RETIRABLE_CLASSES: frozenset[str] = frozenset({"equity", "etf"})
 MIN_PLAUSIBLE_ACTIVE = 10_000
 
 #: The per-run cap on NEW retirements: the larger of an absolute floor and a
-#: fraction of the stored equity+etf rows (11,828 on 2026-09-19, so ~591).
+#: fraction of the stored equity+etf rows (11,828 on 2026-09-19, so 592).
 #:
 #: Sizing. Ordinary US delistings (mergers, SPAC liquidations, renames) run to
 #: tens a week, and the walk runs weekly and on every worker boot, so a normal
 #: run retires a handful. The FIRST run carries the whole backlog: rows the
-#: vendor never listed (sheet and legacy rows: TOI, PXD, LTHM, FFH.TO ...) plus
+#: vendor never listed (sheet and legacy rows: TOI, PXD, LTHM, DCP ...) plus
 #: every delisting since the walk was widened on 2026-08-28, estimated at a few
 #: hundred. The failure the cap exists for is far larger: one dropped page is
 #: 1,000 symbols (~8.5% of the stored rows) and a missing instrument type is
 #: thousands (5,816 stored ETFs). 5% sits between the two.
 MAX_NEW_RETIREMENT_FRACTION = 0.05
 MAX_NEW_RETIREMENTS_FLOOR = 400
+
+#: How the vendor spells a US stock or ETF symbol: a letter, up to five more
+#: letters or digits, and optionally a one-letter share class after a dot
+#: (BRK.B). Anything else (BRK-B, FFH.TO, BAC.PRL, CL=F) is a spelling the
+#: vendor's list never contains, so its absence there is not evidence.
+_VENDOR_SPELLING_RE = re.compile(r"^[A-Z][A-Z0-9]{0,5}(\.[A-Z])?$")
+
+
+def is_vendor_spelling(symbol: str) -> bool:
+    """True when the vendor's active list could contain `symbol` as written."""
+    return bool(_VENDOR_SPELLING_RE.match(symbol.upper()))
+
 
 #: How many symbols a log line names.
 LOG_SAMPLE = 25
@@ -144,7 +167,9 @@ def plan_delistings(
 
     retirable = {
         sym: row for sym, row in stored.items()
-        if row.asset_class in RETIRABLE_CLASSES and not sym.upper().startswith("X:")
+        if row.asset_class in RETIRABLE_CLASSES
+        and not sym.upper().startswith("X:")
+        and is_vendor_spelling(sym)
     }
     candidates = sorted(
         sym for sym, row in retirable.items()
@@ -165,7 +190,7 @@ def retired_message(symbol: str, delisted_at: datetime) -> str:
     day = f"{delisted_at.day} {delisted_at:%B %Y}"
     return (
         f"No longer trading: {symbol} was not in our data vendor's list of "
-        f"active US listings on {day}. Its last score is no longer updated."
+        f"active US listings on {day}, so Tapeline no longer ranks it."
     )
 
 

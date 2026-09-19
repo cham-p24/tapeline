@@ -18,7 +18,12 @@ What is pinned here:
   search, /api/public/signals, the sitemap list), the insider/fundamentals
   pass selection and the daily score archive, while /api/ticker answers 404
   with the reason;
-* the sheet ingest does not un-retire a row by rewriting it.
+* the sheet ingest does not un-retire a row by rewriting it;
+* a stored symbol the vendor never spells that way (BRK-B, FFH.TO, BAC.PRL) is
+  never retired, since its absence from the vendor's list proves nothing;
+* the by-symbol lookups that skip the ranked floor (the public MCP
+  get_ticker_score tool, the browser extension), the heatmap and both alert
+  evaluators treat a retired row as gone too.
 
 Every test here was watched failing against the pre-change code.
 """
@@ -376,7 +381,7 @@ async def test_ticker_endpoint_answers_404_with_the_reason(seeded_pair, client):
     assert r.status_code == 404
     assert r.json()["detail"] == (
         "No longer trading: ZZDEAD was not in our data vendor's list of active "
-        "US listings on 19 September 2026. Its last score is no longer updated."
+        "US listings on 19 September 2026, so Tapeline no longer ranks it."
     )
     assert r.json()["detail"].startswith(delisting.RETIRED_PREFIX)
 
@@ -396,3 +401,127 @@ async def test_record_rows_for_a_retired_symbol_still_render(client):
     assert r.status_code == 200
     assert [row["as_of"] for row in r.json()["rows"]] == ["2026-06-01"]
     assert whole.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Review round (2026-09-19): spelling, and the surfaces that skip the floor
+# ---------------------------------------------------------------------------
+
+
+def test_a_symbol_the_vendor_spells_differently_is_never_retired():
+    """Production held BRK-A/BRK-B (vendor: BRK.A/BRK.B), FFH.TO and ten
+    preferreds written BAC.PRL (vendor: BACpL) on 2026-09-19. All trade; none
+    can be on the vendor's list as spelled, so none may be called retired."""
+    stored = {
+        sym: delisting.StoredListing("equity", None)
+        for sym in ("BRK-B", "BRK.B", "FFH.TO", "BAC.PRL", "ZZGONE")
+    }
+    plan = delisting.plan_delistings(
+        stored,
+        active_symbols=_PAD | {"BRK.B", "BRK.A", "FFH", "BACpL"},
+        discovered_symbols=[],
+        complete=True,
+    )
+    assert plan.skipped is None
+    assert plan.retire == ["ZZGONE"], plan.retire
+
+
+async def test_mcp_ticker_score_refuses_a_retired_row(seeded_pair):
+    from app.routers import mcp
+
+    async with session_scope() as s:
+        dead = await mcp._tool_ticker_score({"symbol": "ZZDEAD"}, s)
+        live = await mcp._tool_ticker_score({"symbol": "ZZLIVE"}, s)
+    assert live.get("score") == 70.0, "control row not served, test is void"
+    assert "score" not in dead and "price" not in dead, dead
+    assert dead["error"] == delisting.retired_message("ZZDEAD", _STAMP)
+
+
+async def test_extension_ticker_refuses_a_retired_row(seeded_pair, client):
+    from app.models import User
+    from app.routers.extension import extension_user
+
+    app.dependency_overrides[extension_user] = lambda: User(
+        id="u_ext", email="ext@example.com", tier="pro", password_hash="x"
+    )
+    try:
+        async with client:
+            dead = await client.get("/api/extension/ticker/ZZDEAD")
+            live = await client.get("/api/extension/ticker/ZZLIVE")
+    finally:
+        app.dependency_overrides.pop(extension_user, None)
+    assert live.status_code == 200, live.text
+    assert dead.status_code == 404, dead.text
+    assert dead.json()["detail"].startswith(delisting.RETIRED_PREFIX)
+
+
+async def test_heatmap_drops_a_retired_row(seeded_pair, client):
+    async with client:
+        r = await client.get("/api/heatmap", headers={"Authorization": "Bearer dev-bypass"})
+    assert r.status_code == 200, r.text
+    syms = {t["symbol"] for sec in r.json()["sectors"] for t in sec["tickers"]}
+    assert "ZZLIVE" in syms, "control row missing, test is void"
+    assert "ZZDEAD" not in syms
+
+
+async def _alert_user(tier: str) -> str:
+    import uuid
+
+    from app.models import User
+
+    uid = f"u_{uuid.uuid4().hex}"
+    async with session_scope() as s:
+        s.add(User(id=uid, email=f"{uid}@example.com", tier=tier, password_hash="x",
+                   email_prefs=15, stripe_customer_id="cus_test"))
+    return uid
+
+
+async def _set(symbol: str, score: float, **kw) -> None:
+    async with session_scope() as s:
+        t = await s.get(Ticker, symbol)
+        if t is None:
+            s.add(Ticker(symbol=symbol, name=f"{symbol} Co", score=score,
+                         signal="WATCH", **kw))
+        else:
+            t.score = score
+
+
+async def _events_for(uid: str, symbol: str) -> int:
+    from app.models import AlertEvent
+
+    async with session_scope() as s:
+        return len((await s.execute(
+            select(AlertEvent).where(AlertEvent.user_id == uid, AlertEvent.symbol == symbol)
+        )).scalars().all())
+
+
+async def test_alerts_do_not_fire_on_a_retired_row(monkeypatch):
+    """The sheet ingest can still move a retired row's score; a crossing on a
+    listing that no longer exists must not be sent."""
+    from datetime import timedelta
+
+    from app.models import AlertRule, WatchlistItem
+    from app.services import alerts
+
+    monkeypatch.setattr(alerts, "MIN_FIRE_INTERVAL", timedelta(0))
+    uid = await _alert_user("pro")
+    await _set("ZZALIVE", 75.0)
+    await _set("ZZADEAD", 75.0, delisted_at=_STAMP)
+    async with session_scope() as s:
+        for sym in ("ZZALIVE", "ZZADEAD"):
+            s.add(AlertRule(user_id=uid, name="score rule", rule_type="score",
+                            symbol=sym, threshold=80.0, channel="web_push", enabled=True))
+            s.add(WatchlistItem(user_id=uid, symbol=sym, baseline_score=65.0,
+                                alert_threshold_delta=10.0))
+
+    async with session_scope() as s:
+        await alerts.evaluate_score_rules(s)      # first sight: records "below"
+    for sym in ("ZZALIVE", "ZZADEAD"):
+        await _set(sym, 83.0)
+    async with session_scope() as s:
+        await alerts.evaluate_score_rules(s)
+    async with session_scope() as s:
+        await alerts.evaluate_watchlist_alerts(s)
+
+    assert await _events_for(uid, "ZZALIVE") == 2, "control fired neither alert, test is void"
+    assert await _events_for(uid, "ZZADEAD") == 0

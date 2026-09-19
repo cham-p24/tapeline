@@ -227,6 +227,13 @@ async def _tool_ticker_score(args: dict, session: AsyncSession) -> dict:
             "error": f"{symbol} is not in Tapeline's covered universe.",
             "note": "Coverage is limited to actively traded US names.",
         }
+    # Retired as no longer trading (2026-09-19): the ranked tools drop the row
+    # through valid_composite_clauses, but this lookup reads it by symbol, so
+    # without this it would still hand out GREE's frozen 75.8. services/delisting.py.
+    if ticker.delisted_at is not None:
+        from app.services.delisting import retired_message
+
+        return {"error": retired_message(ticker.symbol, ticker.delisted_at)}
     return {
         "symbol": ticker.symbol,
         "name": ticker.name,

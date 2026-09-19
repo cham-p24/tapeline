@@ -41,6 +41,7 @@ from app.models import Ticker, User
 from app.services.auth import current_user_required
 from app.services.quote_time import iso_utc
 from app.services.sector import CANONICAL_ORDER, canonical_sector
+from app.services.ticker_freshness import listed_clause
 from app.services.tier import Tier, has_feature
 
 # Hard freshness floor: a ticker that hasn't been re-snapshotted in this
@@ -91,6 +92,10 @@ async def get_heatmap(
             Ticker.volume.isnot(None),
             Ticker.volume > LIQUIDITY_FLOOR,
             Ticker.updated_at >= fresh_cutoff,
+            # Not retired as no longer trading (2026-09-19). The sheet ingest
+            # still re-prices a retired row it carries, which moves updated_at,
+            # so the freshness floor above does not catch it.
+            listed_clause(),
         )
     )
     tickers = result.scalars().all()

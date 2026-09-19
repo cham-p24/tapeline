@@ -100,6 +100,7 @@ from app.services.congress_integrity import is_publishable
 from app.services.dblock import LOCK_ALERT_RULES, one_machine_at_a_time
 from app.services.email import render_alert_email, render_watchlist_alert_email, send_email
 from app.services.squeeze_integrity import publishable_clause as squeeze_publishable
+from app.services.ticker_freshness import listed_clause
 
 logger = logging.getLogger(__name__)
 
@@ -425,6 +426,9 @@ async def evaluate_watchlist_alerts(session: AsyncSession) -> int:
         .join(User, User.id == WatchlistItem.user_id)
         .join(Ticker, Ticker.symbol == WatchlistItem.symbol)
         .where(Ticker.score.isnot(None))
+        # Retired as no longer trading (2026-09-19): the sheet may still move
+        # its score, but a crossing on a dead listing is not news.
+        .where(listed_clause())
         .where(WatchlistItem.baseline_score.isnot(None))
     )
     rows = list(rows_r.all())
@@ -569,7 +573,11 @@ async def evaluate_score_rules(session: AsyncSession) -> int:
     if not rules:
         return 0
 
-    tickers_result = await session.execute(select(Ticker).where(Ticker.score.isnot(None)))
+    # listed_clause: a retired row (2026-09-19) counts as "no scored row this
+    # tick", so a rule on it keeps its stored side instead of firing.
+    tickers_result = await session.execute(
+        select(Ticker).where(Ticker.score.isnot(None), listed_clause())
+    )
     tickers = {t.symbol: t for t in tickers_result.scalars().all()}
     states = await _load_states(session, [rule.id for rule, _ in rules])
 

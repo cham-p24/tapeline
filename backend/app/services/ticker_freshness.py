@@ -131,10 +131,13 @@ def listed_clause() -> ColumnElement[bool]:
     must not be ranked, searched, priced, snapshotted, archived or asked about
     again. It rides in valid_composite_clauses, so every ranked surface that
     already applies that floor (scanner, search, /api/public/signals, the keyed
-    API, the scorecard freeze, the newsletter, MCP) drops retired rows with no
-    change of its own; the few readers that do not apply the floor (the
-    snapshot universe, the sitemap's symbol list, the factor passes, the score
-    archive) call this directly.
+    API, the scorecard freeze, the newsletter, MCP's ranked tools) drops
+    retired rows with no change of its own; the few readers that do not apply
+    the floor (the snapshot universe, the sitemap's symbol list, the factor
+    passes, the score archive, the heatmap, the score and watchlist alert
+    evaluators) call this directly. The by-symbol lookups (/api/ticker, MCP
+    get_ticker_score, the extension's /ticker) read `delisted_at` themselves so
+    they can answer with the reason.
 
     Before it existed nothing retired a ticker: GREE, renamed VIP on 24 Jul
     2026, still read 75.8 STRONG SETUP on 19 Sep.

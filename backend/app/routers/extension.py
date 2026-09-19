@@ -116,6 +116,11 @@ async def ticker(
     ).scalar_one_or_none()
     if row is None or row.score is None:
         raise HTTPException(404, "Not in Tapeline's covered universe.")
+    # Retired as no longer trading (2026-09-19); same answer as /api/ticker.
+    if row.delisted_at is not None:
+        from app.services.delisting import retired_message
+
+        raise HTTPException(404, retired_message(row.symbol, row.delisted_at))
     return {
         "symbol": row.symbol,
         "name": row.name,

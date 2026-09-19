@@ -31,7 +31,7 @@ import { RETIRED_PREFIX, retiredDetail } from "@/lib/retired";
 
 const RETIRED =
   "No longer trading: GREE was not in our data vendor's list of active US " +
-  "listings on 19 September 2026. Its last score is no longer updated.";
+  "listings on 19 September 2026, so Tapeline no longer ranks it.";
 
 function stub404(detail: string) {
   const spy = vi.fn(async () => ({
