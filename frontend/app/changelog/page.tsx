@@ -41,6 +41,21 @@ type LogEntry = {
 };
 
 const METHODOLOGY_LOG: LogEntry[] = [
+  // Two scope changes in one PR (fix/keyless-no-prices). Counts measured
+  // read-only against production on 2026-09-19: 27 rows ending "=F" and the
+  // two hyphen rows BRK-A/BRK-B, price and change_pct_1d NULL on all 29;
+  // BRK.A/BRK.B priced; one daily_scorecard row names a future (PA=F,
+  // 2026-06-26). The reason for the keyless change (the market-data licence)
+  // is deliberately not stated here: this log describes what changed. The ref
+  // must be this PR's number: set it when the PR is opened (rule 2).
+  {
+    date: "2026-09-19",
+    kind: "scope",
+    title: "Data feeds that need no account no longer carry prices, and futures and duplicate Berkshire listings are no longer covered",
+    body:
+      "From 19 September 2026 the surfaces that need no account and no key carry Tapeline's scores and no market data: the public JSON endpoints, the MCP server, the embeddable score widget and the image shown when a ticker page is shared. Each still gives the score, the signal label, the six factor readings and the order tickers are ranked in. Prices, daily moves, day and 52-week ranges, volume and market capitalisation are left out, and the public JSON endpoints say so in their responses. Ticker pages on the site and everything in the app are unchanged. The licence note on the embed page no longer offers the widget for free commercial use; it now says the widget shows the score and label only. Separately, 27 continuous commodity futures, such as CL=F, and two duplicate Berkshire Hathaway listings spelled BRK-A and BRK-B are no longer covered. Our market data covers US stocks and ETFs, so none of the 29 had a price, yet each still carried a score, and two of the six factors cannot be measured for a future. None of them had a daily move, so none appeared in the scanner, search or site map before this change either; that exclusion is now explicit, our system no longer requests prices for them, and their pages say they are not covered. Berkshire Hathaway stays covered as BRK.A and BRK.B, and commodity exposure through USO, GLD, SLV, CPER and CORN. One recorded entry names a future, PA=F on 26 June 2026, and it stays on the record as it is. No recorded entry was changed.",
+    ref: "#TBD",
+  },
   // #878 changed what the Fundamentals factor reads (rule 4: the factor page
   // changed in the same PR). Measured read-only against production on
   // 2026-09-18: 99 of the 120 flagged listings held an issuer's reading.
