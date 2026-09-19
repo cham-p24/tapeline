@@ -7,66 +7,14 @@ import { AnonSignupNudge } from "@/components/AnonSignupNudge";
 import { pageMeta } from "@/lib/seo";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 import { parseMatchup, canonicalMatchup, relatedMatchups } from "@/lib/comparePairs";
-import { ssrInternalHeaders } from "@/lib/ssrHeaders";
+// The ticker read, its types and the factor list are shared with the /compare
+// index's featured preview, so the two surfaces can never disagree on a number.
+import { COMPARE_FACTORS as FACTORS, fetchCompareTicker as fetchTicker } from "@/lib/compareTicker";
 
 // Ticker pages are the crawl surface; a page-level revalidate keeps every
 // comparison fresh hourly without a rebuild, and (unlike the fetch-level
 // revalidate) it isn't inherited short.
 export const revalidate = 3600;
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "https://api.tapeline.io";
-
-// No `weight`: the unauthenticated ticker API no longer returns the factor
-// weight vector (see backend/app/routers/ticker.py).
-type FactorEntry = { value: number | null; label: string };
-type TickerData = {
-  symbol: string;
-  name: string;
-  sector: string | null;
-  price: number | null;
-  score: number | null;
-  signal: string | null;
-  change_pct_1d: number | null;
-  reason: string | null;
-  breakdown?: {
-    trend?: FactorEntry;
-    rs?: FactorEntry;
-    fundamentals?: FactorEntry;
-    smart_money?: FactorEntry;
-    macro?: FactorEntry;
-    momentum?: FactorEntry;
-  };
-};
-type Fetch = { status: "ok"; data: TickerData } | { status: "missing" } | { status: "error" };
-
-const FACTORS: { key: keyof NonNullable<TickerData["breakdown"]>; label: string }[] = [
-  { key: "trend", label: "Trend" },
-  { key: "rs", label: "Relative Strength" },
-  { key: "fundamentals", label: "Fundamentals" },
-  { key: "smart_money", label: "Smart Money" },
-  { key: "macro", label: "Macro" },
-  { key: "momentum", label: "Momentum" },
-];
-
-async function fetchTicker(symbol: string): Promise<Fetch> {
-  const url = `${API_BASE}/api/ticker/${symbol.toUpperCase()}`;
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      const res = await fetch(url, {
-        next: { revalidate: 1800 },
-        headers: ssrInternalHeaders(),
-        signal: AbortSignal.timeout(7000),
-      });
-      if (res.status === 404) return { status: "missing" };
-      if (res.ok) return { status: "ok", data: (await res.json()) as TickerData };
-    } catch {
-      /* transient — retry */
-    }
-    if (attempt < 2) await new Promise((r) => setTimeout(r, 500));
-  }
-  return { status: "error" };
-}
 
 function fmtScore(s: number | null): string {
   return s == null ? "—" : s.toFixed(0);

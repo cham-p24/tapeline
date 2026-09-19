@@ -4,6 +4,10 @@ import {
   canonicalMatchup,
   allComparePairs,
   relatedMatchups,
+  comparePairsByGroup,
+  normalizeSymbol,
+  COMPARE_GROUPS,
+  COMPARE_NAMES,
 } from "@/lib/comparePairs";
 
 describe("comparePairs", () => {
@@ -36,5 +40,38 @@ describe("comparePairs", () => {
     expect(r.length).toBeGreaterThan(0);
     expect(r.length).toBeLessThanOrEqual(3);
     for (const p of r) expect(p.a === "AAPL" || p.b === "AAPL").toBe(true);
+  });
+
+  it("comparePairsByGroup partitions allComparePairs exactly — same set, same order", () => {
+    // The /compare index prints pairs by theme; the sitemap emits
+    // allComparePairs. If these ever diverge, a page is advertised but not
+    // linked (or linked twice).
+    const grouped = comparePairsByGroup();
+    expect(grouped.map((g) => g.id)).toEqual(COMPARE_GROUPS.map((g) => g.id));
+    expect(grouped.flatMap((g) => g.pairs)).toEqual(allComparePairs());
+    for (const g of grouped) {
+      for (const p of g.pairs) {
+        expect(g.symbols).toContain(p.a);
+        expect(g.symbols).toContain(p.b);
+      }
+    }
+  });
+
+  it("every theme has a unique anchor id and every curated symbol has a display name", () => {
+    const ids = COMPARE_GROUPS.map((g) => g.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids) expect(id).toMatch(/^[a-z0-9-]+$/);
+    const missing = COMPARE_GROUPS.flatMap((g) => g.symbols).filter((s) => !COMPARE_NAMES[s]);
+    expect(missing).toEqual([]);
+  });
+
+  it("normalizeSymbol keeps only what a matchup slug can carry", () => {
+    expect(normalizeSymbol(" brk.b ")).toBe("BRK.B");
+    expect(normalizeSymbol("$nvda")).toBe("NVDA");
+    expect(normalizeSymbol("X:BTCUSD")).toBe("XBTCUSD");
+    expect(normalizeSymbol("   ")).toBe("");
+    // round-trips through the slug parser
+    const slug = canonicalMatchup(normalizeSymbol("brk.b"), normalizeSymbol("aapl"));
+    expect(parseMatchup(slug)).toEqual({ a: "AAPL", b: "BRK.B" });
   });
 });
