@@ -66,7 +66,7 @@ type ScannerRow = {
 
 async function fetchTopTen(): Promise<ScannerRow[]> {
   try {
-    // Anonymous request returns FREE tier — the top-scoring rows, live.
+    // Anonymous request returns FREE tier — the top-scoring rows.
     // We slice to 10, the email digest's length (not its list).
     const res = await fetch(`${API_BASE}/api/scanner?limit=20`, {
       next: { revalidate: 1800 },

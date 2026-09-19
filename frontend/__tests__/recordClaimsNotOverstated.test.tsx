@@ -99,7 +99,9 @@ const BANNED_RECORD_CLAIMS: RegExp[] = [
   // /daily-picks and the email are not the record's list (T-10 not approved):
   // never describe the record as this page's past lists.
   /Past daily lists/i,
-  /\bsame (daily )?(list|lists|picks|top 10|top ten|set)\b/i,
+  // "set(?! of)": "Same set, ranked by composite" is the claim; "the same set
+  // of six factors" is not.
+  /\bsame (daily )?(list|lists|picks|top 10|top ten|set(?! of))\b/i,
   /same composite as the (public )?scorecard/i,
   // Four trading days have no top 10 on the record.
   /every picks? day logged/i,

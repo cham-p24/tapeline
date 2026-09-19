@@ -34,6 +34,7 @@
  * can neither satisfy nor trip a check.
  */
 import { describe, it, expect } from "vitest";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -55,7 +56,9 @@ function shippedCopy(rel: string): string {
 
 describe("/daily-picks and /app/start do not say the page, the email and the record are one list", () => {
   const SAME_LIST = [
-    /\bsame (daily )?(list|lists|picks|top 10|top ten|set)\b/i,
+    // "set(?! of)" so that harmless copy such as "the same set of six factors"
+    // does not trip it; "Same set, ranked by composite" still does.
+    /\bsame (daily )?(list|lists|picks|top 10|top ten|set(?! of))\b/i,
     /same composite as the (public )?scorecard/i,
     /every picks? day logged/i,
   ];
@@ -131,10 +134,15 @@ describe("the 2026-08-24 append-only sentence is corrected by a new dated entry"
     expect(e).toMatch(/No recorded entry was changed\./);
   });
 
-  it("sits above every older entry (the log is newest first)", () => {
-    const first = changelog.indexOf("const METHODOLOGY_LOG");
-    const titles = [...changelog.slice(first).matchAll(/title: "([^"]+)"/g)].map((m) => m[1]);
-    expect(titles[0]).toBe(TITLE);
+  it("scopes 'no entry was deleted' to the clause that says it, not the whole sentence", () => {
+    // The 24 Aug sentence goes on to say the restatement is disclosed on the
+    // scorecard page and in the export, so "the rest of that sentence" would
+    // misdescribe it.
+    const e = correction();
+    expect(e).toMatch(
+      /The next clause of that sentence, that no entry was deleted, holds for the restatement itself, which removed no entry\./,
+    );
+    expect(e).not.toMatch(/The rest of that sentence/);
   });
 
   it("makes no unscoped claim that nothing was ever deleted", () => {
@@ -148,6 +156,149 @@ describe("the 2026-08-24 append-only sentence is corrected by a new dated entry"
       /never[\s-]+(?:been\s+)?edit/i,
     ]) {
       expect(e).not.toMatch(banned);
+    }
+  });
+});
+
+/**
+ * METHODOLOGY_LOG parsed from the shipped source. Full-line comments between
+ * entries are dropped; the string literals are kept exactly as written.
+ */
+type ParsedEntry = { date: string; kind: string; title: string; body: string; ref: string };
+
+function methodologyLog(): ParsedEntry[] {
+  const src = readFileSync(join(ROOT, "app/changelog/page.tsx"), "utf8");
+  const start = src.indexOf("const METHODOLOGY_LOG");
+  expect(start, "METHODOLOGY_LOG not found").toBeGreaterThan(-1);
+  const block = src.slice(start, src.indexOf("\n];", start)).replace(/^\s*\/\/.*$/gm, "");
+  const entries = [
+    ...block.matchAll(
+      /\{\s*date: "(\d{4}-\d{2}-\d{2})",\s*kind: "(\w+)",\s*title: "((?:[^"\\]|\\.)*)",\s*body:\s*"((?:[^"\\]|\\.)*)",\s*ref: "([^"]*)",?\s*\}/g,
+    ),
+  ].map(([, date, kind, title, body, ref]) => ({ date, kind, title, body, ref }));
+  // If an entry is ever written in another shape, fail here rather than
+  // silently checking fewer entries.
+  expect(entries.length, "an entry in METHODOLOGY_LOG could not be parsed").toBe(
+    (block.match(/\bdate: "/g) ?? []).length,
+  );
+  return entries;
+}
+
+function fingerprint(e: ParsedEntry): string {
+  return createHash("sha256")
+    .update(JSON.stringify([e.date, e.kind, e.title, e.body, e.ref]))
+    .digest("hex")
+    .slice(0, 16);
+}
+
+/**
+ * Every entry that was on the log before this correction was added (origin/main
+ * at dc24108), as [date, fingerprint of date+kind+title+body+ref, title].
+ * Rule 1 of the changelog: a published entry is never edited. Newer entries do
+ * not belong here and do not affect this check, wherever they are inserted.
+ */
+const ENTRIES_BEFORE_THIS_CORRECTION: ReadonlyArray<readonly [string, string, string]> = [
+  ["2026-09-19", "80c20843487794b2", "Notes, preferred shares and warrants no longer borrow their issuer's fundamentals"],
+  ["2026-09-19", "768923c254174fde", "Notes, preferred shares and warrants no longer qualify for the daily record"],
+  ["2026-09-19", "8ec15e0a11dc8e1b", "Coins could not reach STRONG SETUP because one of the two Trend measurements was on the wrong scale"],
+  ["2026-09-18", "406ebab20942639b", "An entry added on 17 September said no preferred listing had ever been on the record. One has"],
+  ["2026-09-17", "150802ee091e0801", "Insider filings counted for every security listed under the same SEC filer"],
+  ["2026-09-17", "5b889a90decd2c9e", "Release notes further down overstated how fresh the data is"],
+  ["2026-09-15", "316d8384f00c2d35", "The app's Insider tab now lists the filings we read from SEC EDGAR"],
+  ["2026-09-14", "118396b592ee644a", "Corrections to the entry on the switch to SEC EDGAR"],
+  ["2026-09-14", "6ffb5b376b00825a", "Some tickers held a Smart Money value with no insider filing behind it, and daily lists were ranked with it"],
+  ["2026-09-14", "e8f13204fe282250", "Insider Form 4 filings now come from SEC EDGAR instead of a data vendor"],
+  ["2026-09-14", "bfd2eec1eab06bee", "Entries on this page said no recorded value had ever been changed. That was wrong"],
+  ["2026-09-14", "20f54581c0551f99", "Release notes described congressional-trade and squeeze features that did not work as described"],
+  ["2026-09-14", "9038eca0d1844d45", "Two known problems with the record that were not stated before"],
+  ["2026-09-14", "2dd9787fba034fd5", "Four US trading days have no top 10 on the record"],
+  ["2026-09-10", "826aa3d3e591781d", "Three of the six factors were not refreshed from 6 to 10 September"],
+  ["2026-09-06", "ee5a462f56173d47", "Renamed spreadsheet columns made many scores too high until 7 September"],
+  ["2026-09-06", "fa8d38935744a66c", "Leveraged and inverse funds no longer qualify for the daily record"],
+  ["2026-09-06", "8719276514e053c7", "Most tickers were being scored on four of the six factors, and now are not"],
+  ["2026-08-24", "9e05ebcc035d7610", "The published record was measured against an after-hours price, and has been restated"],
+  ["2026-08-23", "8c2311e58c6a029a", "Before this fix, some tickers could be scored from random placeholder numbers"],
+  ["2026-08-23", "53654db54688a9be", "Per-ticker pick history now applies the same 7-day publication delay"],
+  ["2026-07-18", "6c1466d01fa6b31c", "Stopped collecting investing experience and portfolio size"],
+  ["2026-07-18", "50218352aee5835e", "Free tier restated to match what the product actually enforces"],
+  ["2026-07-12", "6c295594beef9cc4", "Exact factor weights, the scoring equation and indicator lists removed from the site"],
+  ["2026-07-11", "6fd26f08fa285076", "Prescriptive advice and performance claims removed from live pages"],
+  ["2026-07-09", "e173b7f1690e2269", "Liquidity floor applied to the ranked scanner and the scorecard"],
+  ["2026-06-15", "fad5e8639787c13a", "Recorded scores above 100 were set to 100, and the originals were not kept"],
+  ["2026-05-17", "1d0965c24aa9c0a3", "Smart Money was described as 13F holdings; it reads SEC Form 4"],
+];
+
+describe("the append-only correction's date and place in the log", () => {
+  const TITLE = "The 24 August entry said the archive stayed append-only throughout. It did not";
+  const CORRECTED = "The published record was measured against an after-hours price, and has been restated";
+  const MONTHS = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  /** The parsed log and the correction's index in it; fails if it is missing. */
+  function located(): { log: ParsedEntry[]; at: number; entry: ParsedEntry } {
+    const log = methodologyLog();
+    const at = log.findIndex((x) => x.title === TITLE);
+    expect(at, "no correction entry for the 2026-08-24 append-only sentence").toBeGreaterThan(-1);
+    return { log, at, entry: log[at] };
+  }
+
+  it("exists, as a correction with this PR as its ref", () => {
+    const { entry } = located();
+    expect(entry.kind).toBe("correction");
+    expect(entry.ref).toBe("#890");
+  });
+
+  it("is dated on its merge date (rule 2): 19 September 2026 or later, never in the future", () => {
+    // The PR was opened on 19 September 2026, so it cannot merge earlier. If
+    // it merges later, the date and the "Added on" sentence move together.
+    const { entry } = located();
+    expect(entry.date >= "2026-09-19", `dated ${entry.date}, before the PR existed`).toBe(true);
+    const today = new Date().toISOString().slice(0, 10);
+    expect(entry.date <= today, `dated ${entry.date}, after today (${today})`).toBe(true);
+  });
+
+  it("says it was added on the same day as its date", () => {
+    const { entry } = located();
+    const [y, m, d] = entry.date.split("-").map(Number);
+    expect(entry.body.startsWith(`Added on ${d} ${MONTHS[m - 1]} ${y}.`), entry.body.slice(0, 40)).toBe(
+      true,
+    );
+  });
+
+  it("is in date order with its neighbours (the log is newest first)", () => {
+    const { log, at, entry } = located();
+    const prev = log[at - 1];
+    const next = log[at + 1];
+    if (prev) {
+      expect(prev.date >= entry.date, `"${prev.title}" (${prev.date}) is above it`).toBe(true);
+    }
+    expect(next, "nothing below the correction").toBeDefined();
+    expect(next.date <= entry.date, `"${next.title}" (${next.date}) is below it`).toBe(true);
+  });
+
+  it("sits above the 2026-08-24 entry it corrects, with nothing older above it or newer below it", () => {
+    const { log, at, entry } = located();
+    const corrected = log.findIndex((x) => x.title === CORRECTED);
+    expect(corrected, "the 2026-08-24 entry is gone").toBeGreaterThan(-1);
+    expect(at).toBeLessThan(corrected);
+    for (const x of log.slice(0, at)) {
+      expect(x.date >= entry.date, `"${x.title}" (${x.date}) is above it`).toBe(true);
+    }
+    for (const x of log.slice(at + 1)) {
+      expect(x.date <= entry.date, `"${x.title}" (${x.date}) is below it`).toBe(true);
+    }
+  });
+
+  it("leaves every entry that was already on the log exactly as it was (rule 1)", () => {
+    const log = methodologyLog();
+    for (const [date, sha, title] of ENTRIES_BEFORE_THIS_CORRECTION) {
+      const e = log.find((x) => x.title === title);
+      expect(e, `the ${date} entry "${title}" was removed or retitled`).toBeDefined();
+      expect(
+        fingerprint(e!),
+        `the ${date} entry "${title}" was edited; rule 1: correct it with a new dated entry instead`,
+      ).toBe(sha);
     }
   });
 });

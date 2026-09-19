@@ -91,13 +91,18 @@ def test_touch1_says_corrections_are_dated_not_that_nothing_is_deleted(kwargs):
     """Touch 1 said "Winning days and losing days are recorded the same way,
     and nothing is deleted." Not true: daily_scorecard ids 1-80 were deleted
     around 10 May 2026, and until #861 (17 Sep 2026) an admin endpoint could
-    delete rows. The true statement is that corrections are dated."""
+    delete rows. The true statement is that corrections are dated, with a link
+    so the reader can check it."""
     html = render_re_engagement_email("Alice", **kwargs)
     assert "nothing is deleted" not in html.lower()
     assert (
         "Winning days and losing days are recorded the same way, and corrections "
-        "to recorded values are dated on the public changelog."
+        "to recorded values are dated on the public <a "
     ) in html
+    link = re.search(r'<a href="([^"]+)"[^>]*>changelog</a>\.', html)
+    assert link, "the changelog is named but not linked"
+    assert link.group(1).startswith("https://tapeline.io/changelog?")
+    assert "utm_campaign=re_engagement" in link.group(1)
 
 
 def test_touch2_is_founder_signed_single_question():
