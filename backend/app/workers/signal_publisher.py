@@ -179,6 +179,20 @@ def _score_upsert_params(
     ]
 
 
+def _split_by_column_set(rows: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    """`rows` grouped by their exact key set, first-seen order kept.
+
+    tick()'s score upsert binds every column of a batch from every row
+    (`_score_upsert_params`), so a batch must share one key set. Rows differ
+    only in whether they carry the quote-time pair: a row the vendor did not
+    price this tick leaves quote_at out so its stored value survives.
+    """
+    groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    for row in rows:
+        groups.setdefault(tuple(row), []).append(row)
+    return list(groups.values())
+
+
 #: Ceiling on ONE whole tick before the watchdog kills it. See the watchdog in
 #: main() for why this moved off 60 and why raising it is safe.
 TICK_TIMEOUT_SECONDS: int = int(os.environ.get("TICK_TIMEOUT_SECONDS", "240"))
@@ -622,6 +636,26 @@ async def tick() -> None:
                 "avg_volume_30d": snap.get("avg_volume_30d"),
             }
             is_sheet_owned = snap["symbol"] in sheet_owned
+            # The vendor's own time for the price (services/quote_time.py).
+            #
+            # Written only when the vendor priced this row on this tick —
+            # fetch_snapshots sets the key on exactly those rows, None when it
+            # priced the row but sent no usable time. A row it skipped carries
+            # no key, so the column is left out of its UPDATE and keeps the
+            # old quote_at: its age keeps growing honestly while updated_at
+            # (our write time, re-stamped below) moves. Writing None there
+            # would erase the one record of how old that row's data really is.
+            #
+            # Sheet-governed rows get an explicit None every tick. Their price
+            # is also written by sheet_feed from the Google Sheet (which clears
+            # these two columns itself), so no vendor time can be vouched for
+            # on them; the UI states the plan's delay instead.
+            if is_sheet_owned:
+                market_only["quote_at"] = None
+                market_only["quote_timeframe"] = None
+            elif "quote_at" in snap:
+                market_only["quote_at"] = snap["quote_at"]
+                market_only["quote_timeframe"] = snap.get("quote_timeframe")
             if is_sheet_owned:
                 # Sheet-governed: price/volume/changes come from the market feed,
                 # but the composite, the six sub-scores and confidence stay
@@ -687,7 +721,14 @@ async def tick() -> None:
         tickers_table = Ticker.__table__
         _upsert_started = monotonic()
         _rows_written = 0
-        for batch in (full_updates, market_updates):
+        # Split each batch by column set: a row the vendor skipped carries no
+        # quote_at key (see above), and one statement needs one key set. With
+        # no quote keys anywhere this is the same two batches as before.
+        for batch in (
+            group
+            for rows_ in (full_updates, market_updates)
+            for group in _split_by_column_set(rows_)
+        ):
             if not batch:
                 continue
             columns = [k for k in batch[0] if k != "symbol"]

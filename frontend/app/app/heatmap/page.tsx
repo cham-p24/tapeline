@@ -5,11 +5,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorMessage, type HeatmapSector } from "@/lib/api";
 import { heatmapPreview, type PublicHeatmapSector } from "@/lib/previews";
 import { useLiveStream } from "@/lib/useLiveStream";
-import { LiveBadge } from "@/components/LiveBadge";
+import { LiveBadge, formatBadgeTime } from "@/components/LiveBadge";
 import { useUser } from "@/components/UserContext";
 import { canUse } from "@/lib/auth";
 import { PRICING } from "@/lib/pricing";
-import { PASS_CADENCE_PHRASE, PRICE_DELAY_NOTE } from "@/lib/freshness";
+import { PASS_CADENCE_PHRASE, PRICE_DELAY_NOTE, parseQuoteAt } from "@/lib/freshness";
 
 /**
  * Market Heatmap — per-ticker tiles are Pro+.
@@ -45,7 +45,7 @@ export default function HeatmapPage() {
   const [previewSectors, setPreviewSectors] = useState<PublicHeatmapSector[]>([]);
   const [availableSectors, setAvailableSectors] = useState<string[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [freshness, setFreshness] = useState<{ newest: string | null; oldest: string | null; count: number } | null>(null);
+  const [freshness, setFreshness] = useState<{ newest: string | null; oldest: string | null; newestQuote: string | null; count: number } | null>(null);
   // Search state for the symbol input. We debounce the API call (250ms) so a
   // user typing "TSLA" doesn't fire 4 requests — but the input updates
   // instantly for responsive feel.
@@ -81,6 +81,7 @@ export default function HeatmapPage() {
         setFreshness({
           newest: r.freshness.newest_updated_at,
           oldest: r.freshness.oldest_updated_at,
+          newestQuote: r.freshness.newest_quote_at ?? null,
           count: r.freshness.ticker_count,
         });
       }
@@ -170,6 +171,22 @@ export default function HeatmapPage() {
             <span className="text-muted nums">{freshness.count}{" "}tickers shown</span>
             <span className="text-subtle">·</span>
             <span className="text-muted" data-testid="price-delay-note">{PRICE_DELAY_NOTE}</span>
+            {/* The vendor's own time for the newest tile price (quote_at). The
+                "write" figures above are Tapeline's write times, which move
+                every pass whether or not the vendor sent anything. Shown only
+                when the vendor gave a time; otherwise the delay note stands
+                alone rather than a write time posing as a quote time. */}
+            {parseQuoteAt(freshness.newestQuote) && (
+              <>
+                <span className="text-subtle">·</span>
+                <span className="text-muted" data-testid="newest-quote">
+                  Newest quote:{" "}
+                  <span className="font-semibold text-fg nums">
+                    {formatBadgeTime(parseQuoteAt(freshness.newestQuote) as Date)}
+                  </span>
+                </span>
+              </>
+            )}
           </div>
         );
       })()}

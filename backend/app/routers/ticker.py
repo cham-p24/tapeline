@@ -35,6 +35,7 @@ from app.services.finnhub_feed import (
 )
 from app.services.news_feed import fetch_news_for_ticker
 from app.services.percentile import peer_percentiles
+from app.services.quote_time import iso_utc
 from app.services.symbols import clean_symbol
 from app.services.tier import Tier, has_feature
 
@@ -904,6 +905,11 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         # anonymous callers (not metered here, nothing to prove).
         "lookup_receipt": receipt_payload,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+        # The vendor's own time for `price` — see Ticker.quote_at. Null means
+        # no vendor time; the page states the plan's delay instead, never
+        # updated_at (our write time) dressed as a quote time.
+        "quote_at": iso_utc(t.quote_at),
+        "quote_timeframe": t.quote_timeframe,
     }
 
 

@@ -124,3 +124,33 @@ export const IN_APP_REFRESH_SENTENCE =
   "During the US session (04:00-20:00 ET on trading days) this page refreshes " +
   `itself about once per pass (a pass lands ${PASS_CADENCE_PHRASE}), so you do ` +
   "not need to reload.";
+
+/**
+ * The VENDOR's own time for a price — `quote_at` on the scanner, ticker,
+ * watchlist and heatmap payloads (backend Ticker.quote_at, migration 0075) —
+ * as a Date, or null when there is none.
+ *
+ * Why it exists: every in-app "As of" used to read `updated_at`, which is
+ * Tapeline's write time. The worker re-stamps it on every pass, even on a row
+ * the vendor returned nothing for, so a price about 15 minutes old read as
+ * seconds old. Null means the vendor gave no time for this price (the plan
+ * may send none, and sheet-owned rows never carry one): show
+ * PRICE_DELAY_NOTE, never `updated_at` dressed up as a quote time.
+ */
+export function parseQuoteAt(quoteAt: string | null | undefined): Date | null {
+  if (!quoteAt) return null;
+  const d = new Date(quoteAt);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * "Quote as of 14:32" when the vendor gave a time, else the plan's delay
+ * ("Prices delayed about 15 minutes") — never a time we made up.
+ */
+export function quoteTimeNote(
+  quoteAt: string | null | undefined,
+  format: (d: Date) => string,
+): string {
+  const d = parseQuoteAt(quoteAt);
+  return d ? `Quote as of ${format(d)}` : PRICE_DELAY_NOTE;
+}

@@ -11,6 +11,7 @@ Every data source used in production must be documented here with license terms,
 - **Note:** Polygon.io rebranded to Massive on 2025-10-30. Same API, same auth, same endpoint shapes — adapter `polygon_feed.py` only needed a hostname change to `api.massive.com`. Legacy `api.polygon.io` still resolves during grace period.
 - **Feeds used:**
   - Snapshot API (`/v3/snapshot`) — prices, **delayed about 15 minutes on Stocks Starter** (measured 14 September 2026 13:59 UTC: AAPL snapshot 899 s old, latest minute bar 961 s old, no last-trade or last-quote keys; SPY, AAPL, NVDA and MSFT 15.0 min old at 13:41 UTC). The `last_updated` fields read ~0 s old but are the response time, not the trade time
+  - Price age (migration 0075): `tickers.quote_at` stores the vendor's own time for a price (last trade, then last quote, then minute-bar end, never a `last_updated` field and never our clock) and `tickers.quote_timeframe` its DELAYED / REAL-TIME flag, via `services/quote_time.py`. Both stay NULL when the plan sends no such field, and the UI then states the delay instead of a time. The worker logs `polygon_feed.quote_time_fields` once per process with the field names the plan actually returned. `tickers.updated_at` is our write time, not the price's age
   - Aggregates API (`/v2/aggs/ticker/{symbol}/range/...`) — historical bars for scoring
   - Reference data — ticker lists, splits, dividends
 - **Populates:** `tickers`, `snapshots`, `scores` (via aggregates)

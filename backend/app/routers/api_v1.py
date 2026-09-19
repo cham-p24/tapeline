@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models import ApiKey, RegimeState, Ticker, User
 from app.services.api_keys import api_key_context, api_key_header, api_key_user
+from app.services.quote_time import iso_utc
 from app.services.ticker_freshness import live_clauses
 from app.services.ticker_ordering import deterministic_order_by
 from app.services.tier import effective_limit
@@ -70,7 +71,13 @@ def _ticker_dict(r: Ticker) -> dict:
         "sub_momentum": r.sub_momentum,
         "sub_macro": r.sub_macro,
         "sub_smart_money": r.sub_smart_money,
+        # When Tapeline last wrote the row — NOT the price's age.
         "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+        # The vendor's own time for `price` (Ticker.quote_at), and its
+        # DELAYED / REAL-TIME flag when it sends one. Null = no vendor time;
+        # prices are delayed about 15 minutes on the current plan.
+        "quote_at": iso_utc(r.quote_at),
+        "quote_timeframe": r.quote_timeframe,
     }
 
 

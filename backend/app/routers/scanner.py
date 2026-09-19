@@ -16,6 +16,7 @@ from app.services.auth import current_user_optional
 from app.services.cap_events import record_cap_hit
 from app.services.freshness import data_delayed_minutes
 from app.services.funnel_events import record_funnel_event
+from app.services.quote_time import iso_utc
 from app.services.scan_log import record_scan_log
 from app.services.ticker_freshness import live_clauses
 from app.services.ticker_ordering import (
@@ -556,6 +557,13 @@ async def list_scanner(
                     if r.updated_at and tier_delay_minutes
                     else (r.updated_at.isoformat() if r.updated_at else None)
                 ),
+                # The VENDOR's time for `price` (Ticker.quote_at), unshifted:
+                # updated_at above is when Tapeline wrote the row, which the
+                # tick re-stamps every minute and which is not the price's
+                # age. Null = no vendor time (sheet-owned row, or the plan sent
+                # none); state the delay, never updated_at, in its place.
+                "quote_at": iso_utc(r.quote_at),
+                "quote_timeframe": r.quote_timeframe,
             }
             for r in rows
         ],

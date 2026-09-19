@@ -192,6 +192,30 @@ class Ticker(Base):
     last_smart_money_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
+    # The time the VENDOR attached to `price`, and the vendor's own timeframe
+    # flag ("DELAYED" / "REAL-TIME") when it sends one. Migration 0075.
+    #
+    # `updated_at` below is OUR write time, and the tick re-stamps it every
+    # minute on every row it writes, even a row the vendor returned nothing
+    # for. Every in-app "As of" used to read it, so on the 15-minute-delayed
+    # Stocks Starter plan (measured 14 Sep 2026: AAPL's snapshot 899 s old) a
+    # quarter-hour-old price read as seconds old.
+    #
+    # Written only from vendor-provided fields
+    # (services/quote_time.extract_quote_time: last trade, then last quote,
+    # then minute-bar end — never our clock), and only on a tick where the
+    # vendor returned a price for the row. A row the vendor skipped keeps its
+    # previous quote_at, so its age grows honestly while updated_at moves.
+    # NULL means "no vendor time": sheet-owned rows (the Google Sheet wrote or
+    # may have written the price), rows never priced, and every equity row
+    # whenever the plan sends no timestamp field at all — the UI then states
+    # the plan's delay, never a time. Crypto rows carry the end of the daily
+    # bar their close came from.
+    quote_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    quote_timeframe: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     # When this row's LIVE DATA — price, score, factors — was last refreshed.
     #
     # Readers depend on exactly that meaning: services/ticker_freshness.py

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { quoteTimeNote } from "@/lib/freshness";
 import { AUTO_REFRESH_WINDOW_MS, type LiveStatus } from "@/lib/useLiveStream";
 
 /**
@@ -23,7 +24,12 @@ import { AUTO_REFRESH_WINDOW_MS, type LiveStatus } from "@/lib/useLiveStream";
  * the worker's off-hours writes) and only on pages that leave auto-refresh on.
  *
  * The delay disclosure ("prices delayed about 15 minutes") belongs to page
- * copy, not to this badge.
+ * copy, not to this badge — EXCEPT that "Updated HH:MM" beside a single price
+ * reads as the price's time, which it is not (it is when this page last
+ * loaded). A page that shows one price passes `quoteAt`, the vendor's own time
+ * for it (backend Ticker.quote_at), and the badge adds " · Quote as of HH:MM",
+ * or " · Prices delayed about 15 minutes" when the vendor gave no time. Pages
+ * that do not pass it are unchanged.
  */
 
 type BadgeStatus = LiveStatus;
@@ -36,6 +42,19 @@ export function badgeLabel(
   status: BadgeStatus,
   lastUpdate: Date | null,
   now: number = Date.now(),
+  quoteAt?: string | null,
+): { text: string; tone: "auto" | "connected" | "connecting" | "offline" } {
+  const base = baseLabel(status, lastUpdate, now);
+  // `undefined` = the page did not say (unchanged badge); null = the vendor
+  // gave no time for this price, so state the delay, never a time.
+  if (quoteAt === undefined) return base;
+  return { ...base, text: `${base.text} · ${quoteTimeNote(quoteAt, formatBadgeTime)}` };
+}
+
+function baseLabel(
+  status: BadgeStatus,
+  lastUpdate: Date | null,
+  now: number,
 ): { text: string; tone: "auto" | "connected" | "connecting" | "offline" } {
   const time = lastUpdate ? formatBadgeTime(lastUpdate) : null;
   // Defensive: "auto" is only honest while updates are recent. The hook
@@ -74,9 +93,12 @@ const TITLE: Record<ReturnType<typeof badgeLabel>["tone"], string> = {
 export function LiveBadge({
   status,
   lastUpdate,
+  quoteAt,
 }: {
   status: BadgeStatus;
   lastUpdate: Date | null;
+  /** The vendor's time for the one price this page shows; see badgeLabel. */
+  quoteAt?: string | null;
 }) {
   // Re-render periodically so a stale "auto" prop cannot linger on screen.
   const [now, setNow] = useState<number>(() => Date.now());
@@ -85,7 +107,7 @@ export function LiveBadge({
     return () => clearInterval(t);
   }, []);
 
-  const { text, tone } = badgeLabel(status, lastUpdate, now);
+  const { text, tone } = badgeLabel(status, lastUpdate, now, quoteAt);
   return (
     <span
       data-testid="live-badge"
