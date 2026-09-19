@@ -128,6 +128,19 @@ async def _one_issuer_groups(groups: dict[LineKey, list[dict[str, Any]]]) -> set
     return {key for key in candidates if len(issuers.get(key[:5], ())) == 1}
 
 
+def _listed_symbols(symbols: set[str]) -> list[str]:
+    """The classes a merged line is listed under, sorted, leaving out symbols we
+    do not cover when a covered one remains (2026-09-19). BRK-A sorts before
+    BRK.A, and BRK-A now answers "Not covered" (services/coverage.py), so a
+    merged Berkshire line was labelled, and linked, to a page with nothing on
+    it. A group made only of uncovered symbols keeps them, rather than vanish."""
+    from app.services.coverage import not_covered_message
+
+    ordered = sorted(symbols)
+    covered = [s for s in ordered if not_covered_message(s) is None]
+    return covered or ordered
+
+
 async def collapse_share_classes(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     """`rows` (insider_transactions as dicts, newest first, carrying `line_seq`
     and `source`) with every line that several classes of ONE issuer carry
@@ -145,7 +158,7 @@ async def collapse_share_classes(rows: Sequence[dict[str, Any]]) -> list[dict[st
             if key in emitted:
                 continue
             emitted.add(key)
-            symbols = sorted({r["symbol"] for r in groups[key]})
+            symbols = _listed_symbols({r["symbol"] for r in groups[key]})
             out.append({**row, "symbol": symbols[0], "symbols": symbols})
         else:
             out.append({**row, "symbols": [row["symbol"]]})

@@ -406,7 +406,9 @@ async def test_payloads_carry_quote_at_as_utc_iso(client) -> None:
             assert _parse(item["quote_at"]) == quote
             assert item["quote_timeframe"] == "DELAYED"
 
-            r = await client.get(f"/api/ticker/{sym}")
+            # Signed in: a keyless read of this endpoint carries no price, and
+            # so no quote time for it (services/price_audience.py).
+            r = await client.get(f"/api/ticker/{sym}", headers=headers)
             assert r.status_code == 200, r.text
             assert _parse(r.json()["quote_at"]) == quote
             assert r.json()["quote_timeframe"] == "DELAYED"

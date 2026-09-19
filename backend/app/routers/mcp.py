@@ -55,11 +55,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session, session_scope
 from app.models import McpToolCall, Ticker
+from app.services.coverage import not_covered_message
 from app.services.freshness import (
     CRYPTO_CADENCE_PHRASE,
     CRYPTO_CADENCE_SENTENCE,
-    PRICE_DELAY_MINUTES,
-    PRICE_DELAY_PHRASE,
+    SCORE_CADENCE_SENTENCE,
 )
 from app.services.symbols import clean_symbol
 
@@ -81,6 +81,16 @@ LATEST_PROTOCOL = SUPPORTED_PROTOCOLS[0]
 
 SERVER_INFO = {"name": "tapeline", "title": "Tapeline", "version": "1.0.0"}
 
+# This server is keyless, so it serves no current market data (2026-09-19). Our price
+# vendor's plan is individual-use; re-serving its prices through an open API
+# that any agent can call is redistribution that plan does not cover. Scores,
+# labels, ranks, sub-scores and the record are Tapeline's own and stay.
+PRICES_NOT_SERVED = (
+    "Current prices, daily moves and other current market data are not served "
+    "through this endpoint. The record tool still returns the recorded closes "
+    "each listed pick was measured on."
+)
+
 INSTRUCTIONS = (
     "Tapeline scores actively traded US stocks and ETFs on six published factors (trend, "
     "relative strength, fundamentals, smart money, macro, momentum) and logs "
@@ -91,9 +101,9 @@ INSTRUCTIONS = (
     "performance figure, and repeat the sample-size qualifier it returns. "
     "Tapeline's scores are descriptive readings, not investment advice, price "
     "targets or forecasts; present them that way. "
-    # Measured 14 Sep 2026 (integrity wave): vendor prices ~15 min delayed,
-    # worker passes about 60 s apart since #843, scores changing about once a day.
-    f"Prices are {PRICE_DELAY_PHRASE}; do not describe them as real-time or live. "
+    f"{PRICES_NOT_SERVED} "
+    # Measured 14 Sep 2026 (integrity wave): worker passes about 60 s apart
+    # since #843, scores changing about once a day.
     "Scores are recalculated through US market hours, but most of their inputs are "
     "daily readings, so a score usually changes about once a day. "
     f"{CRYPTO_CADENCE_SENTENCE} `as_of` is when Tapeline last wrote the row, not the "
@@ -132,8 +142,9 @@ TOOLS: list[dict[str, Any]] = [
         "title": "Get a ticker's Tapeline score",
         "description": (
             "Tapeline's current six-factor score (0-100), signal label, "
-            "confidence and one-line reason for a single US ticker, plus its "
-            f"price, which is {PRICE_DELAY_PHRASE} (crypto: {CRYPTO_CADENCE_PHRASE}). Use "
+            "confidence and one-line reason for a single US ticker. It does not "
+            "return a price or a daily move. Crypto scores come from "
+            f"{CRYPTO_CADENCE_PHRASE}. Use "
             "when asked what Tapeline says about a specific stock."
         ),
         "inputSchema": _symbol_schema("US ticker symbol, e.g. NVDA or BRK.B"),
@@ -203,6 +214,11 @@ async def _tool_ticker_score(args: dict, session: AsyncSession) -> dict:
     symbol = clean_symbol(args.get("symbol"), allow_crypto=True)
     if symbol is None:
         return {"error": "That is not a valid ticker symbol."}
+    # Futures and the hyphen-spelled Berkshire twins: never priced, so not
+    # covered (services/coverage.py). Same message the ticker endpoint gives.
+    uncovered = not_covered_message(symbol)
+    if uncovered is not None:
+        return {"error": uncovered}
     ticker = (
         await session.execute(select(Ticker).where(Ticker.symbol == symbol))
     ).scalar_one_or_none()
@@ -226,17 +242,16 @@ async def _tool_ticker_score(args: dict, session: AsyncSession) -> dict:
             for attr, label in FACTORS
             if getattr(ticker, attr) is not None
         },
-        "price": ticker.price,
-        "change_pct_1d": ticker.change_pct_1d,
-        # The price above is the vendor's delayed price, not a live quote
-        # (measured ~15 min behind on 14 Sep 2026). Crypto is a daily close,
-        # and on 2026-09-17 43% of pairs carried one written over 25h earlier,
-        # so the note says several days rather than "a daily price".
-        "price_delay_minutes": None if ticker.asset_class == "crypto" else PRICE_DELAY_MINUTES,
-        "price_note": (
+        # No price, no daily move (2026-09-19): see PRICES_NOT_SERVED. The
+        # note says so, so an agent does not read the absence as a zero.
+        "price_note": PRICES_NOT_SERVED,
+        # How fresh the SCORE is. Crypto scores come from a daily close, and on
+        # 2026-09-17 43% of pairs carried one written over 25h earlier, so the
+        # crypto note says several days rather than "once a day".
+        "score_note": (
             CRYPTO_CADENCE_SENTENCE
             if ticker.asset_class == "crypto"
-            else f"Price {PRICE_DELAY_PHRASE}; not a real-time quote."
+            else SCORE_CADENCE_SENTENCE
         ),
         "as_of": ticker.updated_at.isoformat() if ticker.updated_at else None,
         "url": f"{SITE}/t/{ticker.symbol}{UTM}",

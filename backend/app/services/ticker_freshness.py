@@ -33,9 +33,11 @@ This module enforces TWO independent floors, both required:
      - ``symbol`` has a space -> sheet annotations ("\U0001F3C6 IVV", "\U0001F3C6 SPY")
                               ingested as symbols; 0-factor dupes of real ETFs.
                               MUST be space-only (``notlike("% %")``), NOT a
-                              general non-alphanumeric test, because legitimate
-                              commodity-futures symbols contain ``=`` (CL=F,
-                              ZC=F, RB=F) and must be kept.
+                              general non-alphanumeric test: separators such as
+                              ``.`` are legitimate (BRK.B). Continuous futures
+                              (CL=F) were kept here until 2026-09-19; they are
+                              now dropped by the coverage clause below, on
+                              purpose and by name, not as symbol-shape junk.
      - < 2 of 6 factors populated -> the 6-factor composite cannot be meaningfully
                               "shown" with one factor; these are pre-composite
                               ghosts. Threshold 2 (not 6) tolerates the legit
@@ -59,6 +61,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.models import Ticker
+from app.services.coverage import covered_clauses
 from app.services.score import MIN_FACTORS_FOR_COMPOSITE
 
 # How far back from the latest refresh a row may be and still count as "live".
@@ -124,7 +127,13 @@ def valid_composite_clauses() -> list[ColumnElement[bool]]:
     No DB round-trip — these are pure column predicates, safe to apply on any
     ``Ticker`` query. Excludes the three corruption signatures (raw score >100,
     space/emoji-in-symbol annotations, <2 populated factors) while keeping
-    legitimate futures (``=F``) and lightly-covered names (2+ factors).
+    lightly-covered names (2+ factors).
+
+    Also excludes symbols we do not cover (services/coverage.py, 2026-09-19):
+    continuous futures (``=F``) and the hyphen-spelled BRK-A/BRK-B twins,
+    which nothing we hold can price. Measured the same day, all 29 already
+    failed the ``change_pct_1d`` clause below, so no surface listed them; the
+    explicit clause keeps that true if a stray write ever gives one a move.
 
     Also requires the core display fields (``change_pct_1d`` + ``confidence_pct``)
     be non-null: stale incomplete rows (e.g. crypto names that ingest a score but
@@ -151,6 +160,7 @@ def valid_composite_clauses() -> list[ColumnElement[bool]]:
         Ticker.change_pct_1d.isnot(None),
         Ticker.confidence_pct.isnot(None),
         *asset_class_clean_clauses(),
+        *covered_clauses(),
     ]
 
 

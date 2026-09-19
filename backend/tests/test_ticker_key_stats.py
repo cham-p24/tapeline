@@ -36,10 +36,28 @@ from app.main import app
 from app.models import EarningsEvent, Ticker
 
 
+_SSR_TOKEN = "key-stats-ssr-token"
+
+
 @pytest.fixture
-def client():
+def client(monkeypatch):
+    """Calls as our own SSR, which is who renders key_stats on /t/{symbol}.
+
+    Since 2026-09-19 a KEYLESS caller (no session, no SSR token) gets the
+    payload without its market-data fields — tests/test_keyless_no_prices.py
+    pins that. The contract here is the block the public page receives.
+    """
+    # get_settings(), not app.main.settings: other tests clear its cache, after
+    # which the two are different objects and the price gate reads this one.
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "internal_ssr_token", _SSR_TOKEN)
     transport = httpx.ASGITransport(app=app)
-    return httpx.AsyncClient(transport=transport, base_url="http://test")
+    return httpx.AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"x-tapeline-internal": _SSR_TOKEN},
+    )
 
 
 # Every field the block promises, in the order _key_stats_payload emits them.

@@ -38,6 +38,11 @@ from app.routers import ticker as ticker_router
 
 _SYM = "ZFIN"
 
+# The endpoint needs a signed-in session since 2026-09-19 (Finnhub's terms bar
+# sharing its data with third parties). The guard below still matters for a
+# signed-in caller, who can type URLs as freely as anyone else.
+_AUTH = {"Authorization": "Bearer dev-bypass"}
+
 
 @pytest.fixture
 def client():
@@ -97,7 +102,7 @@ async def test_unknown_symbol_never_reaches_the_vendor(client, spy):
     try:
         async with client:
             for i in range(5):
-                r = await client.get(f"/api/ticker/ZZZQ{i:04d}/financials")
+                r = await client.get(f"/api/ticker/ZZZQ{i:04d}/financials", headers=_AUTH)
                 assert r.status_code == 404, (
                     f"expected 404 for an unknown symbol, got {r.status_code}"
                 )
@@ -114,7 +119,7 @@ async def test_malformed_symbol_is_rejected_by_shape(client, spy):
     """clean_symbol() runs first, matching the sibling /{symbol} endpoint."""
     async with client:
         for bad in ["1BAD", "way-too-long-to-be-a-symbol"]:
-            r = await client.get(f"/api/ticker/{bad}/financials")
+            r = await client.get(f"/api/ticker/{bad}/financials", headers=_AUTH)
             assert r.status_code == 404, f"{bad} → {r.status_code}"
     assert spy == [], f"a malformed symbol reached the vendor: {spy}"
 
@@ -126,7 +131,7 @@ async def test_known_symbol_still_works(client, spy):
     await _seed()
     try:
         async with client:
-            r = await client.get(f"/api/ticker/{_SYM}/financials")
+            r = await client.get(f"/api/ticker/{_SYM}/financials", headers=_AUTH)
             assert r.status_code == 200, r.text
             body = r.json()
         assert body["symbol"] == _SYM
@@ -143,7 +148,7 @@ async def test_lowercase_known_symbol_is_normalised(client, spy):
     await _seed()
     try:
         async with client:
-            r = await client.get(f"/api/ticker/{_SYM.lower()}/financials")
+            r = await client.get(f"/api/ticker/{_SYM.lower()}/financials", headers=_AUTH)
             assert r.status_code == 200, r.text
             assert r.json()["symbol"] == _SYM
         assert spy == [_SYM]

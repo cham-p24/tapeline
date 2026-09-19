@@ -189,6 +189,7 @@ async def _refresh_active_universe(target_size: int | None = None) -> int:
 
         from app.db import session_scope
         from app.models import Ticker
+        from app.services.coverage import covered_clauses
 
         async with session_scope() as session:
             # 2026-05-24: was `WHERE volume IS NOT NULL AND price IS NOT NULL`.
@@ -225,11 +226,19 @@ async def _refresh_active_universe(target_size: int | None = None) -> int:
             # The predicate is `score IS NOT NULL`, so this only started once
             # crypto rows HAD scores. Nothing about crypto changed; giving them
             # a score is what let them into a pass that was never for them.
+            #
+            # Symbols we do not cover are EXCLUDED too (2026-09-19): the 27
+            # continuous-futures rows and the hyphen-spelled BRK-A/BRK-B. The
+            # stocks snapshot answers nothing for any of them, yet each pass
+            # upserted that nothing and re-stamped updated_at, so a row with a
+            # NULL price looked as fresh as a priced one. See
+            # services/coverage.py.
             sort_key = func.coalesce(Ticker.volume * Ticker.price, -1)
             r = await session.execute(
                 select(Ticker.symbol, Ticker.name, Ticker.sector)
                 .where(Ticker.score.is_not(None))
                 .where(func.coalesce(Ticker.asset_class, "") != "crypto")
+                .where(*covered_clauses())
                 .order_by(desc(sort_key))
                 .limit(size)
             )
@@ -289,6 +298,8 @@ async def _refresh_active_universe(target_size: int | None = None) -> int:
                     # Same exclusion as above: a never-scored crypto pair must
                     # not be handed to the equity snapshot either.
                     func.coalesce(Ticker.asset_class, "") != "crypto",
+                    # Nor a symbol we do not cover (futures, BRK-A/BRK-B).
+                    *covered_clauses(),
                 )
                 # Counted over EXACTLY the rows the window below reads. This
                 # count used to include never-scored crypto while the window

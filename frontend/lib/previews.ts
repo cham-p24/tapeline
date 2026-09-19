@@ -42,16 +42,23 @@ async function getJson<T>(path: string): Promise<T> {
  * One canonical sector's aggregate 1D move. `change_pct_1d` is the
  * dollar-volume-weighted average across `ticker_count` live tickers — both
  * computed server-side in GET /api/public/heatmap.
+ *
+ * `change_pct_1d` is ABSENT when the backend did not recognise a session
+ * (2026-09-19: the move is served only to signed-in users and our own SSR).
+ * A stale or revoked cookie still passes the middleware, so this page can get
+ * that shape; it must show no move rather than a made-up flat one.
  */
 export type PublicHeatmapSector = {
   sector: string;
-  change_pct_1d: number;
+  change_pct_1d?: number;
   ticker_count: number;
 };
 
 /** Sector-level heatmap aggregate — the Free/anon teaser for /app/heatmap. */
 export const heatmapPreview = () =>
-  getJson<{ count: number; sectors: PublicHeatmapSector[] }>("/api/public/heatmap");
+  getJson<{ count: number; sectors: PublicHeatmapSector[]; prices_served?: boolean }>(
+    "/api/public/heatmap",
+  );
 
 /** Mirrors backend routers/congress.FREE_CONGRESS_PREVIEW_LIMIT. */
 export const FREE_CONGRESS_PREVIEW_LIMIT = 3;

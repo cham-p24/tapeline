@@ -120,6 +120,29 @@ describe("HeatmapPage", () => {
     expect(screen.queryByPlaceholderText(/Search ticker/)).not.toBeInTheDocument();
   });
 
+  it("shows no move, not a flat +0.00% market, when the session was not recognised", async () => {
+    // 2026-09-19: /api/public/heatmap serves sector moves only to a signed-in
+    // user or our own SSR. A stale or revoked cookie passes the middleware and
+    // gets names and counts only; `?? 0` used to paint every tile "+0.00%".
+    setUser("free");
+    mockedPreview.mockResolvedValue({
+      count: 2,
+      prices_served: false,
+      sectors: [
+        { sector: "Technology", ticker_count: 312 },
+        { sector: "Energy", ticker_count: 96 },
+      ],
+    });
+    render(<HeatmapPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Technology")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("+0.00%")).not.toBeInTheDocument();
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/Sector moves are shown to signed-in users/)).toBeInTheDocument();
+    expect(screen.queryByText(/dollar-volume-weighted average 1-day move/)).not.toBeInTheDocument();
+  });
+
   it("omits the ticker count rather than inventing one when there is no data", async () => {
     setUser("free");
     mockedPreview.mockResolvedValue({ count: 0, sectors: [] });

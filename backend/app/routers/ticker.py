@@ -28,6 +28,7 @@ from app.models import (
 )
 from app.models.news import exclude_mock_clause, tickers_match_clause
 from app.services.auth import current_user_optional, current_user_required
+from app.services.coverage import not_covered_message
 from app.services.finnhub_feed import (
     fetch_analyst_ratings,
     fetch_basic_financials,
@@ -35,6 +36,11 @@ from app.services.finnhub_feed import (
 )
 from app.services.news_feed import fetch_news_for_ticker
 from app.services.percentile import peer_percentiles
+from app.services.price_audience import (
+    TICKER_KEYLESS_NOTE,
+    is_trusted_ssr,
+    strip_price_fields,
+)
 from app.services.quote_time import iso_utc
 from app.services.symbols import clean_symbol
 from app.services.tier import Tier, has_feature
@@ -559,6 +565,16 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         raise HTTPException(404, f"Ticker {symbol!r} is not a valid symbol")
     symbol = cleaned
 
+    # Symbols we do not cover (2026-09-19): continuous futures (CL=F) and the
+    # hyphen-spelled Berkshire twins. Their rows still exist, but nothing we
+    # hold can price them, so the page they used to render was a score of
+    # unknown age beside a dash. Answered before any DB read or look-up spend,
+    # with the reason as the detail string so every client can show it as is.
+    # See services/coverage.py.
+    uncovered = not_covered_message(symbol)
+    if uncovered is not None:
+        raise HTTPException(404, uncovered)
+
     # Single short read txn: core ticker + squeeze (both indexed point lookups).
     # The pooled connection is checked out only for these, then returned on
     # context exit. News is read separately afterward (its own bounded session)
@@ -831,7 +847,7 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
     # response (built from the DB read above) is never delayed by an upstream.
     _maybe_refresh_news(symbol)
 
-    return {
+    payload: dict = {
         "symbol": t.symbol,
         "name": t.name,
         "sector": t.sector,
@@ -912,6 +928,22 @@ async def ticker_detail(symbol: str, request: Request) -> dict:
         "quote_timeframe": t.quote_timeframe,
     }
 
+    # KEYLESS CALLERS GET NO PRICES (2026-09-19). This endpoint has no auth
+    # dependency, so anyone could read any ticker's vendor price, day range,
+    # 52-week range, volume, market cap and Finnhub valuation numbers as JSON,
+    # unmetered. Our own SSR (the public /t/{symbol} pages, the OG image, the
+    # embed, the badge) presents the INTERNAL_SSR_TOKEN and signed-in users
+    # present a session, so both are unchanged; everyone else gets the scores,
+    # label, reason, breakdown, percentiles and record, without the market
+    # data. See services/price_audience.py.
+    if user is None and not is_trusted_ssr(request):
+        payload = strip_price_fields(payload)
+        payload["prices_served"] = False
+        payload["price_note"] = TICKER_KEYLESS_NOTE
+    else:
+        payload["prices_served"] = True
+    return payload
+
 
 @router.get("/{symbol}/ratings")
 async def ticker_ratings(symbol: str, request: Request) -> dict:
@@ -942,12 +974,18 @@ async def ticker_ratings(symbol: str, request: Request) -> dict:
 
 
 @router.get("/{symbol}/financials")
-async def ticker_financials(symbol: str) -> dict:
+async def ticker_financials(symbol: str, request: Request) -> dict:
     """Per-ticker financial metrics from Finnhub.
 
     Returns P/E, net margin, ROE, EPS growth, revenue growth, debt-to-equity.
-    Public — same access surface as /{symbol} and /{symbol}/history. Cached
-    7 days at the adapter layer; fundamentals don't change tick-to-tick.
+    Cached 7 days at the adapter layer; fundamentals don't change tick-to-tick.
+
+    SIGNED-IN ONLY since 2026-09-19 (401 otherwise). It used to be public, so
+    any anonymous caller could read Finnhub's metrics for any covered symbol
+    through us, and Finnhub's terms bar sharing its data, or results derived
+    from it, with third parties without written approval. The only page that
+    calls it is the in-app Financials tab, which sends the session cookie; the
+    public /t/{symbol} page never did.
 
     Most ETFs and funds have no Finnhub fundamentals coverage. The response
     keeps a stable shape (`available: false`, empty `metrics`) so the
@@ -980,6 +1018,9 @@ async def ticker_financials(symbol: str) -> dict:
     sym = cleaned
 
     async with SessionLocal() as session:
+        # Auth first, in the same short session and before the vendor call, so
+        # an anonymous caller costs neither a Finnhub request nor a cache file.
+        await current_user_required(request, session)
         known = (
             await session.execute(select(Ticker.symbol).where(Ticker.symbol == sym))
         ).scalar_one_or_none()

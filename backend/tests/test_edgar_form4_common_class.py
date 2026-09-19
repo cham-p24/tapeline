@@ -506,7 +506,11 @@ async def test_the_public_list_shows_a_shared_purchase_once(client: httpx.AsyncC
     async with client:
         body = (await client.get("/api/public/insider-buys?limit=10")).json()
     assert body["count"] == 1
-    assert body["items"][0]["symbols"] == ["BRK-A", "BRK-B", "BRK.A", "BRK.B"]
+    # The hyphen twins are not covered since #889 (services/coverage.py), so
+    # the line is listed, and linked, under the covered spellings only.
+    # Mutation: plain sorted() puts BRK-A first and lists all four.
+    assert body["items"][0]["symbols"] == ["BRK.A", "BRK.B"]
+    assert body["items"][0]["symbol"] == "BRK.A"
     assert "line_seq" not in body["items"][0] and "source" not in body["items"][0]
 
 

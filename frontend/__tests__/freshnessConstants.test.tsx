@@ -110,7 +110,9 @@ describe("surfaces that show or sell prices state the delay", () => {
     "app/sector/[sector]/page.tsx",
     "app/sectors/page.tsx",
     "app/best-stocks-for/[strategy]/page.tsx",
-    "app/embed/score/[symbol]/page.tsx",
+    // app/embed/score/[symbol]/page.tsx left this list on 2026-09-19: the
+    // widget shows no price at all any more, so it has no delay to state.
+    // __tests__/keylessNoPrices.test.tsx pins that it reads no price.
   ])("%s imports lib/freshness", (rel) => {
     expect(read(rel)).toMatch(/from "@\/lib\/freshness"/);
   });
