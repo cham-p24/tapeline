@@ -853,7 +853,7 @@ async def status() -> dict[str, object]:
     import time as _time
     from datetime import UTC, datetime
 
-    from sqlalchemy import func, select
+    from sqlalchemy import func, or_, select
 
     from app.db import session_scope
     from app.models import NewsItem, RegimeState, Ticker
@@ -948,8 +948,16 @@ async def status() -> dict[str, object]:
                 # the prices are. Reported, not used for `stale` — outside US
                 # hours an hours-old quote is normal, not a fault. None when no
                 # row carries a vendor time (the plan may send none).
+                #
+                # Stocks and ETFs only. Crypto's quote_at is the end of the UTC
+                # day of its daily close, so it is always a day or more old;
+                # with equity rows NULL (the likely state on this plan) a max
+                # over every row would report crypto's age as "the newest price
+                # quote" and StaleDataBanner would print it about equities.
                 newest_quote = (await session.execute(
-                    select(func.max(Ticker.quote_at))
+                    select(func.max(Ticker.quote_at)).where(
+                        or_(Ticker.asset_class.is_(None), Ticker.asset_class != "crypto")
+                    )
                 )).scalar_one_or_none()
                 quote_age = None
                 if newest_quote is not None:

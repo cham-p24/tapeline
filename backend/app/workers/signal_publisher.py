@@ -184,8 +184,9 @@ def _split_by_column_set(rows: list[dict[str, Any]]) -> list[list[dict[str, Any]
 
     tick()'s score upsert binds every column of a batch from every row
     (`_score_upsert_params`), so a batch must share one key set. Rows differ
-    only in whether they carry the quote-time pair: a row the vendor did not
-    price this tick leaves quote_at out so its stored value survives.
+    only in whether they carry the quote-time pair: polygon_feed sets it on
+    every row it returns (None on a row the vendor skipped), while a row with
+    no such key at all (the dev mock feed's) leaves the column untouched.
     """
     groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
     for row in rows:
@@ -638,13 +639,12 @@ async def tick() -> None:
             is_sheet_owned = snap["symbol"] in sheet_owned
             # The vendor's own time for the price (services/quote_time.py).
             #
-            # Written only when the vendor priced this row on this tick —
-            # fetch_snapshots sets the key on exactly those rows, None when it
-            # priced the row but sent no usable time. A row it skipped carries
-            # no key, so the column is left out of its UPDATE and keeps the
-            # old quote_at: its age keeps growing honestly while updated_at
-            # (our write time, re-stamped below) moves. Writing None there
-            # would erase the one record of how old that row's data really is.
+            # polygon_feed.fetch_snapshots sets the key on every row it
+            # returns: the vendor's time when it priced the row, None when it
+            # priced it without a usable time, and None when it skipped the
+            # row, because the price is written NULL then too and a quote time
+            # must never outlive the price it describes. A row with no key at
+            # all (the dev mock feed's) leaves the column out of its UPDATE.
             #
             # Sheet-governed rows get an explicit None every tick. Their price
             # is also written by sheet_feed from the Google Sheet (which clears
@@ -721,9 +721,9 @@ async def tick() -> None:
         tickers_table = Ticker.__table__
         _upsert_started = monotonic()
         _rows_written = 0
-        # Split each batch by column set: a row the vendor skipped carries no
-        # quote_at key (see above), and one statement needs one key set. With
-        # no quote keys anywhere this is the same two batches as before.
+        # Split each batch by column set: a row with no quote_at key (see
+        # above) must not share a statement with one that has it. With the
+        # key on every row, or on none, this is the same two batches as before.
         for batch in (
             group
             for rows_ in (full_updates, market_updates)

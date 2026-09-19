@@ -135,7 +135,8 @@ export const IN_APP_REFRESH_SENTENCE =
  * the vendor returned nothing for, so a price about 15 minutes old read as
  * seconds old. Null means the vendor gave no time for this price (the plan
  * may send none, and sheet-owned rows never carry one): show
- * PRICE_DELAY_NOTE, never `updated_at` dressed up as a quote time.
+ * QUOTE_TIME_UNKNOWN_NOTE (or CRYPTO_QUOTE_UNKNOWN_NOTE for a crypto pair),
+ * never `updated_at` dressed up as a quote time.
  */
 export function parseQuoteAt(quoteAt: string | null | undefined): Date | null {
   if (!quoteAt) return null;
@@ -144,13 +145,39 @@ export function parseQuoteAt(quoteAt: string | null | undefined): Date | null {
 }
 
 /**
- * "Quote as of 14:32" when the vendor gave a time, else the plan's delay
- * ("Prices delayed about 15 minutes") — never a time we made up.
+ * A stock or ETF price with no vendor time. "or more" because with no time
+ * the age is not known: the plan's delay is the usual case, but a price the
+ * sheet ingest wrote (sheet-owned rows never carry a vendor time) can be
+ * older than that. Never a specific time.
+ */
+export const QUOTE_TIME_UNKNOWN_NOTE = `${PRICE_DELAY_NOTE} or more`;
+
+/**
+ * A crypto pair with no vendor time. Crypto's quote_at is written only by the
+ * once-a-day crypto job (the end of the UTC day of its close), so a pair that
+ * job missed, and every pair until it first runs after migration 0075, has
+ * none, while its close can be days old (CRYPTO_CADENCE_SENTENCE's
+ * measurement: 23 of 118 pairs more than four days old). The stock-and-ETF
+ * delay note would be false here; review of this change caught exactly that.
+ */
+export const CRYPTO_QUOTE_UNKNOWN_NOTE = `Crypto: ${CRYPTO_CADENCE_PHRASE}`;
+
+/**
+ * "Quote as of 15m ago" when the vendor gave a time (a crypto pair's reads
+ * "Daily close as of 1d ago", since its time is the end of its close's UTC
+ * day); with none, QUOTE_TIME_UNKNOWN_NOTE or CRYPTO_QUOTE_UNKNOWN_NOTE —
+ * never a time we made up.
+ *
+ * `format` should carry the date or the age (formatRelativeOrAbsolute), not
+ * a bare clock time: a Friday close or a day-old crypto close printed as
+ * "10:00" reads as today's.
  */
 export function quoteTimeNote(
   quoteAt: string | null | undefined,
   format: (d: Date) => string,
+  opts: { crypto?: boolean } = {},
 ): string {
   const d = parseQuoteAt(quoteAt);
-  return d ? `Quote as of ${format(d)}` : PRICE_DELAY_NOTE;
+  if (d) return `${opts.crypto ? "Daily close" : "Quote"} as of ${format(d)}`;
+  return opts.crypto ? CRYPTO_QUOTE_UNKNOWN_NOTE : QUOTE_TIME_UNKNOWN_NOTE;
 }

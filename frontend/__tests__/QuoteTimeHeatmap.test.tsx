@@ -30,7 +30,6 @@ import { api } from "@/lib/api";
 const mockedUseUser = useUser as ReturnType<typeof vi.fn>;
 const mockedHeatmap = api.heatmap as ReturnType<typeof vi.fn>;
 
-const QUOTE = "2026-09-18T14:32:00+00:00";
 
 function respond(newestQuote: string | null) {
   mockedHeatmap.mockResolvedValue({
@@ -59,12 +58,16 @@ describe("heatmap freshness chip", () => {
     });
   });
 
-  it("shows the vendor's newest quote time", async () => {
-    respond(QUOTE);
+  it("shows the vendor's newest quote time as an age, never a bare clock time", async () => {
+    // Two days old, relative to the real clock: e.g. Friday's close on a
+    // Sunday. "Newest quote: 14:32" would read as today's.
+    const old = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    respond(old);
     render(<HeatmapPage />);
     await waitFor(() => expect(screen.getByTestId("newest-quote")).toBeInTheDocument());
-    expect(screen.getByTestId("newest-quote")).toHaveTextContent(
-      `Newest quote: ${formatBadgeTime(new Date(QUOTE))}`,
+    expect(screen.getByTestId("newest-quote")).toHaveTextContent("Newest quote: 2d ago");
+    expect(screen.getByTestId("newest-quote")).not.toHaveTextContent(
+      formatBadgeTime(new Date(old)),
     );
     expect(screen.getByTestId("price-delay-note")).toHaveTextContent(PRICE_DELAY_NOTE);
   });

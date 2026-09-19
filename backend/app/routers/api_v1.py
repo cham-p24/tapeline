@@ -74,8 +74,10 @@ def _ticker_dict(r: Ticker) -> dict:
         # When Tapeline last wrote the row — NOT the price's age.
         "updated_at": r.updated_at.isoformat() if r.updated_at else None,
         # The vendor's own time for `price` (Ticker.quote_at), and its
-        # DELAYED / REAL-TIME flag when it sends one. Null = no vendor time;
-        # prices are delayed about 15 minutes on the current plan.
+        # DELAYED / REAL-TIME flag when it sends one. Null = no vendor time:
+        # for a stock or ETF, delayed about 15 minutes or more on the current
+        # plan; for a crypto row (a daily close, whose quote_at is the end of
+        # that close's UTC day), possibly several days old.
         "quote_at": iso_utc(r.quote_at),
         "quote_timeframe": r.quote_timeframe,
     }

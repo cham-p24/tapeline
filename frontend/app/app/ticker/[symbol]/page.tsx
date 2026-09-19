@@ -17,7 +17,7 @@ import { ScoreSparkline } from "@/components/ScoreSparkline";
 import { KeyStatistics, type KeyStats } from "@/components/KeyStatistics";
 import { useCountUp } from "@/lib/useCountUp";
 import { formatAbsolute, formatRelativeOrAbsolute } from "@/lib/datetime";
-import { PRICE_DELAY_NOTE, parseQuoteAt } from "@/lib/freshness";
+import { parseQuoteAt, quoteTimeNote } from "@/lib/freshness";
 import { EarningsPill } from "@/components/EarningsPill";
 import { useEarningsCalendar } from "@/lib/useEarningsCalendar";
 import { trackEvent, trackFirstTickerAdded, trackCapHit } from "@/lib/gtag";
@@ -381,7 +381,12 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
             {/* quoteAt: the vendor's time for the price below, so the
                 badge's "Updated HH:MM" (when this page loaded) is never read
                 as the price's time. */}
-            <LiveBadge status={status} lastUpdate={lastUpdate} quoteAt={data.quote_at ?? null} />
+            <LiveBadge
+              status={status}
+              lastUpdate={lastUpdate}
+              quoteAt={data.quote_at ?? null}
+              crypto={data.asset_class === "crypto"}
+            />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <h1 className="text-4xl font-bold tracking-tight font-mono">{data.symbol}</h1>
@@ -423,13 +428,18 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
               time for it (quote_at). It used to read updated_at, Tapeline's
               write time, which the worker re-stamps every pass even when the
               vendor returned nothing, so a price about 15 minutes old read as
-              "just now". With no vendor time it states the plan's delay, and
+              "just now". With no vendor time it states the no-time note, and
               the write time is only offered on hover, labelled as what it is.
+              Crypto gets its own wording both ways: its time is the end of a
+              daily close's UTC day, and a pair with none can be days old, so
+              the stock delay note would be false there.
               Relative in the flow, absolute on hover. */}
           <div className="mt-1 text-xs text-muted" data-testid="quote-as-of">
             {parseQuoteAt(data.quote_at) ? (
               <span title={formatAbsolute(data.quote_at as string)}>
-                Quote as of {formatRelativeOrAbsolute(data.quote_at as string)}
+                {quoteTimeNote(data.quote_at, (d) => formatRelativeOrAbsolute(d), {
+                  crypto: data.asset_class === "crypto",
+                })}
               </span>
             ) : (
               <span
@@ -439,7 +449,9 @@ export default function TickerPage({ params }: { params: Promise<{ symbol: strin
                     : undefined
                 }
               >
-                {PRICE_DELAY_NOTE}
+                {quoteTimeNote(null, (d) => formatRelativeOrAbsolute(d), {
+                  crypto: data.asset_class === "crypto",
+                })}
               </span>
             )}
           </div>

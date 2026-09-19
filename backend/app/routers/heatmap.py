@@ -137,8 +137,14 @@ async def get_heatmap(
     oldest_update = min((t.updated_at for t in tickers if t.updated_at), default=None)
     # The vendor's own times for the tiles' prices (Ticker.quote_at). The two
     # write times above say when Tapeline last wrote a tile, not how old its
-    # price is. Both null when no tile carries a vendor time.
-    quote_times = [t.quote_at for t in tickers if t.quote_at is not None]
+    # price is. Both null when no tile carries a vendor time. Crypto tiles are
+    # left out: their quote_at is the end of a daily close's UTC day, a day or
+    # more old by construction, and would otherwise stand in for the stock
+    # tiles' age whenever those carry no vendor time.
+    quote_times = [
+        t.quote_at for t in tickers
+        if t.quote_at is not None and t.asset_class != "crypto"
+    ]
     newest_quote = max(quote_times, default=None)
     oldest_quote = min(quote_times, default=None)
 

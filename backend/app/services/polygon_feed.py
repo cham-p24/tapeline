@@ -8,7 +8,8 @@ the complete "go live with real data" change.
 Plan in use: Massive (formerly Polygon.io) Stocks Starter, $29/mo.
     - 15-minute delayed prices. Measured 14 Sep 2026 during the US session:
       the AAPL snapshot 899 s old, its newest minute bar 961 s old, and no
-      last-trade or last-quote keys in the response (not on the plan).
+      last-trade or last-quote keys in the response (apparently not
+      entitled on this plan; inferred from their absence, not confirmed).
     - Licensed for individual, non-business use. Displaying its data to
       Tapeline's customers is not licensed on this plan; whether, and on which
       plan, it can be is an open question with the vendor (docs/LICENSE_AUDIT.md,
@@ -442,11 +443,8 @@ async def fetch_snapshots(
             r["day_open"] = real["day_open"]
             r["day_high"] = real["day_high"]
             r["day_low"] = real["day_low"]
-            # Present ONLY on rows the vendor priced this tick (None when it
-            # priced the row but sent no usable time). The tick writes these
-            # keys only when they are present, so a row the vendor skipped
-            # keeps its previous quote_at and its age grows honestly while
-            # updated_at is re-stamped. See signal_publisher's score upsert.
+            # The vendor's own time for this price (None when it priced the
+            # row but sent no usable time). See services/quote_time.py.
             r["quote_at"] = real["quote_at"]
             r["quote_timeframe"] = real["quote_timeframe"]
         else:
@@ -464,6 +462,13 @@ async def fetch_snapshots(
             r["day_open"] = None
             r["day_high"] = None
             r["day_low"] = None
+            # The price is NULLed above, so its time goes with it. Keeping the
+            # previous quote_at would describe a price the row no longer
+            # holds: review of this change found the ticker page showing "-"
+            # for the price beside "Quote as of 3h ago". Same reasoning as the
+            # tape fields: a vendor "no read" is NULL, never a kept stale value.
+            r["quote_at"] = None
+            r["quote_timeframe"] = None
 
         # Real fundamentals from Finnhub cache (pre-fetched daily by worker)
         # ASSIGN UNCONDITIONALLY — a cache miss must leave the factor NULL.

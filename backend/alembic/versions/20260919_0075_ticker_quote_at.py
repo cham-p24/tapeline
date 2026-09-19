@@ -9,7 +9,8 @@ seconds old.
 `quote_at` holds the time the VENDOR attached to the price (trade, then quote,
 then minute-bar end; never our clock), and `quote_timeframe` the vendor's own
 DELAYED / REAL-TIME flag when it sends one. Both NULL means "no vendor time",
-which the UI states as the plan's delay rather than as a time.
+which the UI states as the plan's delay (for a crypto pair, its daily-close
+cadence) rather than as a time.
 
 Additive: two nullable columns, no backfill (there is no honest value to
 backfill with).

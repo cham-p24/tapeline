@@ -16,13 +16,16 @@ WHAT IS PINNED
    in preference order (trade, quote, minute-bar END), records the timeframe
    flag, ignores every `last_updated` field (measured to be the RESPONSE time
    on this plan), and never returns our clock.
-2. The tick writes quote_at only for rows the vendor priced this tick: a row it
-   skipped keeps its old quote_at while updated_at moves; a sheet-governed row
-   is NULL.
+2. The tick writes the vendor's quote_at for a row the vendor priced. A row it
+   skipped has its price NULLed, and its quote_at goes with it (review found
+   "Quote as of 3h ago" beside a "-" price when the old time was kept). A
+   sheet-governed row is NULL. A row with no quote key at all (the dev mock
+   feed's) leaves the column alone.
 3. The sheet ingest clears quote_at when it writes a sheet price.
 4. A crypto row carries the end of the UTC day its close came from.
 5. The signed-in / keyed payloads (scanner, ticker, watchlist, heatmap, /api/v1,
-   /api/status) carry quote_at, as UTC ISO.
+   /api/status) carry quote_at, as UTC ISO; the two aggregate "newest quote"
+   figures (heatmap, /api/status) never take it from a crypto row.
 """
 from __future__ import annotations
 
@@ -199,7 +202,7 @@ def _snap(sym: str, **extra: Any) -> dict[str, Any]:
     return snap | extra
 
 
-async def test_tick_writes_quote_at_only_for_rows_the_vendor_priced(monkeypatch) -> None:
+async def test_tick_writes_the_snapshot_quote_time_and_nulls_sheet_rows(monkeypatch) -> None:
     async with session_scope() as s:
         for sym in SEEDED:
             s.add(Ticker(
@@ -212,8 +215,9 @@ async def test_tick_writes_quote_at_only_for_rows_the_vendor_priced(monkeypatch)
             monkeypatch,
             [
                 _snap(PRICED, quote_at=T, quote_timeframe="REAL-TIME"),
-                # fetch_snapshots sets no quote key on a row the vendor skipped.
-                _snap(SKIPPED, price=None, change_pct_1d=None, volume=None),
+                # No quote key at all: the dev mock feed's rows. The column
+                # is left out of this row's UPDATE.
+                _snap(SKIPPED),
                 # A sheet-governed row: even a vendor time must not be written.
                 _snap(SHEET, quote_at=T, quote_timeframe="DELAYED"),
             ],
@@ -228,7 +232,7 @@ async def test_tick_writes_quote_at_only_for_rows_the_vendor_priced(monkeypatch)
         assert _naive(rows[PRICED].quote_at) == _naive(T)
         assert rows[PRICED].quote_timeframe == "REAL-TIME"
 
-        # Skipped: our write time moved, the vendor's time did not.
+        # No key: our write time moved, the stored vendor time was not touched.
         assert _naive(rows[SKIPPED].updated_at) > _naive(OLD_WRITE)
         assert _naive(rows[SKIPPED].quote_at) == _naive(OLD_QUOTE)
         assert rows[SKIPPED].quote_timeframe == "DELAYED"
@@ -240,6 +244,81 @@ async def test_tick_writes_quote_at_only_for_rows_the_vendor_priced(monkeypatch)
     finally:
         async with session_scope() as s:
             await s.execute(delete(Ticker).where(Ticker.symbol.in_(SEEDED)))
+
+
+async def test_a_row_the_vendor_skipped_loses_its_quote_time_with_its_price(
+    monkeypatch,
+) -> None:
+    """Real fetch_snapshots merge, then the real tick upsert.
+
+    fetch_snapshots NULLs the price of a symbol the vendor returned nothing
+    for. Before this was fixed it left quote_at off that row, so the tick kept
+    the old vendor time beside a NULL price, and the ticker page read "-" next
+    to "Quote as of 3h ago": a time for a price that no longer exists.
+    """
+    from app.services import finnhub_feed, universe
+    from app.services.mock_feed import TICKER_UNIVERSE
+
+    for mod, name in (
+        (finnhub_feed, "get_cached_score"),
+        (finnhub_feed, "get_cached_smart_money_score"),
+        (finnhub_feed, "get_cached_market_cap"),
+        (polygon_feed, "get_cached_trend"),
+        (polygon_feed, "get_cached_rs"),
+        (polygon_feed, "get_cached_momentum"),
+        (polygon_feed, "get_cached_bar_stats"),
+    ):
+        monkeypatch.setattr(mod, name, lambda _sym: None, raising=True)
+    monkeypatch.setattr(polygon_feed, "_quote_fields_logged", True)
+    monkeypatch.setattr(polygon_feed, "_api_key", lambda: "test-key", raising=True)
+
+    # Pin the universe: fetch_snapshots builds its rows from the cached active
+    # universe, which other tests in the suite leave holding one symbol.
+    monkeypatch.setattr(universe, "_active_universe", list(TICKER_UNIVERSE[:2]))
+    priced_sym, skipped_sym = TICKER_UNIVERSE[0][0], TICKER_UNIVERSE[1][0]
+
+    async def _fake_request(_client, _path, params=None):
+        # The vendor answers for ONE symbol and says nothing about the other.
+        return {"results": [{
+            "ticker": priced_sym,
+            "session": {"price": 200.0, "previous_close": 199.0, "change_percent": 0.5},
+            "last_trade": {"sip_timestamp": T_NS, "timeframe": "DELAYED"},
+        }]}
+
+    monkeypatch.setattr(polygon_feed, "_request", _fake_request, raising=True)
+    rows = {r["symbol"]: r for r in await polygon_feed.fetch_snapshots(macro_score=50.0)}
+    priced, skipped = rows[priced_sym], rows[skipped_sym]
+    assert priced["quote_at"] == T and priced["quote_timeframe"] == "DELAYED"
+    assert skipped["price"] is None
+    assert "quote_at" in skipped, "a skipped row must carry an explicit NULL quote time"
+    assert skipped["quote_at"] is None and skipped["quote_timeframe"] is None
+
+    # Through the real tick, under this test's own seeded symbols.
+    async with session_scope() as s:
+        for sym in (PRICED, SKIPPED):
+            s.add(Ticker(
+                symbol=sym, name=f"{sym} Co", sector="Information Technology",
+                price=9.0, updated_at=OLD_WRITE,
+                quote_at=OLD_QUOTE, quote_timeframe="DELAYED",
+            ))
+    try:
+        await run_tick_through_score_upsert(
+            monkeypatch,
+            [priced | {"symbol": PRICED}, skipped | {"symbol": SKIPPED}],
+        )
+        async with session_scope() as s:
+            got = {
+                r.symbol: r for r in (await s.execute(
+                    select(Ticker).where(Ticker.symbol.in_((PRICED, SKIPPED)))
+                )).scalars()
+            }
+        assert _naive(got[PRICED].quote_at) == _naive(T)
+        assert got[SKIPPED].price is None
+        assert got[SKIPPED].quote_at is None, "quote time outlived its price"
+        assert got[SKIPPED].quote_timeframe is None
+    finally:
+        async with session_scope() as s:
+            await s.execute(delete(Ticker).where(Ticker.symbol.in_((PRICED, SKIPPED))))
 
 
 async def test_sheet_ingest_clears_the_vendor_quote_time() -> None:
@@ -296,6 +375,14 @@ def _parse(value: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
+def _fresh_status() -> None:
+    """Drop /api/status's TTL cache so the next call reads the test's rows."""
+    import app.main as main_module
+
+    main_module._STATUS_CACHE["payload"] = None
+    main_module._STATUS_CACHE["ts"] = 0.0
+
+
 async def test_payloads_carry_quote_at_as_utc_iso(client) -> None:
     from app.routers.api_v1 import _ticker_dict
 
@@ -344,6 +431,7 @@ async def test_payloads_carry_quote_at_as_utc_iso(client) -> None:
                     s.add(RegimeState(id=1, regime="NEUTRAL", vix=20.0, dxy=100.0,
                                       yield_10y=4.1, rate_direction="FLAT",
                                       breadth_pct=50.0))
+            _fresh_status()
             r = await client.get("/api/status")
             if made_regime:
                 async with session_scope() as s:
@@ -363,6 +451,55 @@ async def test_payloads_carry_quote_at_as_utc_iso(client) -> None:
 
             await s.execute(delete(WatchlistItem).where(WatchlistItem.symbol == sym))
             await s.execute(delete(Ticker).where(Ticker.symbol == sym))
+
+
+async def test_newest_quote_figures_never_come_from_a_crypto_row(client) -> None:
+    """Crypto's quote_at is the end of a daily close's UTC day, so it is a day
+    or more old by construction. On this plan stock rows most likely carry no
+    vendor time; a max over every row would then report crypto's age as "the
+    newest price quote" on /api/status (printed by StaleDataBanner about the
+    scanner's stocks) and as the heatmap's "Newest quote". Here the crypto row
+    is the NEWER one, so a max that includes it is caught."""
+    tag = uuid.uuid4().hex[:4].upper()
+    stock_sym, crypto_sym = f"QN{tag}", f"X:QN{tag}USD"
+    sector = f"QuoteNewest{tag}"
+    stock_quote = datetime.now(UTC).replace(microsecond=0) - timedelta(minutes=20)
+    crypto_quote = datetime.now(UTC).replace(microsecond=0) - timedelta(seconds=5)
+    async with session_scope() as s:
+        for sym, klass, quote in (
+            (stock_sym, "stock", stock_quote), (crypto_sym, "crypto", crypto_quote),
+        ):
+            s.add(Ticker(
+                symbol=sym, name=f"{sym} Co", sector=sector, asset_class=klass,
+                score=60.0, signal="CONSTRUCTIVE", price=10.0, change_pct_1d=1.0,
+                volume=5_000_000, updated_at=datetime.now(UTC), quote_at=quote,
+            ))
+    headers = {"Authorization": "Bearer dev-bypass"}
+    try:
+        async with client:
+            r = await client.get("/api/heatmap", headers=headers)
+            assert r.status_code == 200, r.text
+            assert _parse(r.json()["freshness"]["newest_quote_at"]) == stock_quote
+
+            from app.models import RegimeState
+
+            async with session_scope() as s:
+                made_regime = await s.get(RegimeState, 1) is None
+                if made_regime:
+                    s.add(RegimeState(id=1, regime="NEUTRAL", vix=20.0, dxy=100.0,
+                                      yield_10y=4.1, rate_direction="FLAT",
+                                      breadth_pct=50.0))
+            _fresh_status()
+            r = await client.get("/api/status")
+            if made_regime:
+                async with session_scope() as s:
+                    await s.execute(delete(RegimeState).where(RegimeState.id == 1))
+            tick = r.json()["checks"]["worker_last_tick"]
+            assert _parse(tick["newest_quote_at"]) < crypto_quote
+            assert _parse(tick["newest_quote_at"]) >= stock_quote
+    finally:
+        async with session_scope() as s:
+            await s.execute(delete(Ticker).where(Ticker.symbol.in_((stock_sym, crypto_sym))))
 
 
 def test_iso_utc_marks_a_naive_value_as_utc() -> None:

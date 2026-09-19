@@ -203,14 +203,16 @@ class Ticker(Base):
     #
     # Written only from vendor-provided fields
     # (services/quote_time.extract_quote_time: last trade, then last quote,
-    # then minute-bar end — never our clock), and only on a tick where the
-    # vendor returned a price for the row. A row the vendor skipped keeps its
-    # previous quote_at, so its age grows honestly while updated_at moves.
+    # then minute-bar end — never our clock). A row the vendor skipped on a
+    # tick has its price written NULL, and its quote_at goes NULL with it: a
+    # quote time must never outlive the price it describes.
     # NULL means "no vendor time": sheet-owned rows (the Google Sheet wrote or
     # may have written the price), rows never priced, and every equity row
     # whenever the plan sends no timestamp field at all — the UI then states
-    # the plan's delay, never a time. Crypto rows carry the end of the daily
-    # bar their close came from.
+    # the plan's delay ("or more"), never a time. Crypto rows carry the end of
+    # the UTC day their daily close came from, written only by the daily
+    # crypto job; a crypto row with none is described by its daily-close
+    # cadence, never by the stock delay.
     quote_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatRelativeOrAbsolute } from "@/lib/datetime";
 import { quoteTimeNote } from "@/lib/freshness";
 import { AUTO_REFRESH_WINDOW_MS, type LiveStatus } from "@/lib/useLiveStream";
 
@@ -27,9 +28,11 @@ import { AUTO_REFRESH_WINDOW_MS, type LiveStatus } from "@/lib/useLiveStream";
  * copy, not to this badge — EXCEPT that "Updated HH:MM" beside a single price
  * reads as the price's time, which it is not (it is when this page last
  * loaded). A page that shows one price passes `quoteAt`, the vendor's own time
- * for it (backend Ticker.quote_at), and the badge adds " · Quote as of HH:MM",
- * or " · Prices delayed about 15 minutes" when the vendor gave no time. Pages
- * that do not pass it are unchanged.
+ * for it (backend Ticker.quote_at), and the badge adds " · Quote as of 15m ago"
+ * (an AGE or a date, never a bare clock time: a Friday or day-old crypto close
+ * printed "10:00" reads as today's), or the no-time note from lib/freshness
+ * when the vendor gave none. `crypto` switches both to the crypto wording.
+ * Pages that do not pass `quoteAt` are unchanged.
  */
 
 type BadgeStatus = LiveStatus;
@@ -43,12 +46,14 @@ export function badgeLabel(
   lastUpdate: Date | null,
   now: number = Date.now(),
   quoteAt?: string | null,
+  crypto: boolean = false,
 ): { text: string; tone: "auto" | "connected" | "connecting" | "offline" } {
   const base = baseLabel(status, lastUpdate, now);
   // `undefined` = the page did not say (unchanged badge); null = the vendor
-  // gave no time for this price, so state the delay, never a time.
+  // gave no time for this price, so state the no-time note, never a time.
   if (quoteAt === undefined) return base;
-  return { ...base, text: `${base.text} · ${quoteTimeNote(quoteAt, formatBadgeTime)}` };
+  const note = quoteTimeNote(quoteAt, (d) => formatRelativeOrAbsolute(d), { crypto });
+  return { ...base, text: `${base.text} · ${note}` };
 }
 
 function baseLabel(
@@ -94,11 +99,14 @@ export function LiveBadge({
   status,
   lastUpdate,
   quoteAt,
+  crypto = false,
 }: {
   status: BadgeStatus;
   lastUpdate: Date | null;
   /** The vendor's time for the one price this page shows; see badgeLabel. */
   quoteAt?: string | null;
+  /** The price is a crypto pair's daily close; see badgeLabel. */
+  crypto?: boolean;
 }) {
   // Re-render periodically so a stale "auto" prop cannot linger on screen.
   const [now, setNow] = useState<number>(() => Date.now());
@@ -107,7 +115,7 @@ export function LiveBadge({
     return () => clearInterval(t);
   }, []);
 
-  const { text, tone } = badgeLabel(status, lastUpdate, now, quoteAt);
+  const { text, tone } = badgeLabel(status, lastUpdate, now, quoteAt, crypto);
   return (
     <span
       data-testid="live-badge"

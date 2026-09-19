@@ -5,7 +5,9 @@
  *
  * The line used to read `updated_at`, which the worker re-stamps every pass
  * even when the vendor returned nothing, so a price about 15 minutes old read
- * as "just now". With no vendor time the line states the plan's delay instead.
+ * as "just now". With no vendor time the line states the no-time note instead,
+ * and a crypto pair gets crypto wording: its close can be days old, so the
+ * stock delay note would be false there (review found exactly that).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
@@ -42,8 +44,11 @@ vi.mock("@/lib/api", async (importOriginal) => {
 import TickerPage from "@/app/app/ticker/[symbol]/page";
 import { useUser } from "@/components/UserContext";
 import { api } from "@/lib/api";
-import { formatBadgeTime } from "@/components/LiveBadge";
-import { PRICE_DELAY_NOTE } from "@/lib/freshness";
+import {
+  CRYPTO_QUOTE_UNKNOWN_NOTE,
+  PRICE_DELAY_PHRASE,
+  QUOTE_TIME_UNKNOWN_NOTE,
+} from "@/lib/freshness";
 
 class QuietEventSource {
   static CONNECTING = 0;
@@ -118,9 +123,7 @@ describe("ticker page as-of line", () => {
     const line = screen.getByTestId("quote-as-of");
     expect(line).toHaveTextContent("Quote as of 15m ago");
     expect(line).not.toHaveTextContent("just now");
-    expect(screen.getByTestId("live-badge")).toHaveTextContent(
-      `Quote as of ${formatBadgeTime(new Date(QUOTE))}`,
-    );
+    expect(screen.getByTestId("live-badge")).toHaveTextContent("Quote as of 15m ago");
   });
 
   it("states the delay, never the write time, when the vendor gave no time", async () => {
@@ -129,8 +132,38 @@ describe("ticker page as-of line", () => {
     await flush();
     await flush();
     const line = screen.getByTestId("quote-as-of");
-    expect(line).toHaveTextContent(PRICE_DELAY_NOTE);
+    expect(line).toHaveTextContent(QUOTE_TIME_UNKNOWN_NOTE);
     expect(line).not.toHaveTextContent(/just now|ago|As of/);
-    expect(screen.getByTestId("live-badge")).toHaveTextContent(PRICE_DELAY_NOTE);
+    expect(screen.getByTestId("live-badge")).toHaveTextContent(QUOTE_TIME_UNKNOWN_NOTE);
+  });
+
+  it("never tells a crypto pair with no vendor time it is 15 minutes delayed", async () => {
+    // A pair the daily crypto job has not rewritten since migration 0075, or
+    // one that dropped out of its fetch: no quote_at, and a close that can be
+    // days old (23 of 118 pairs were more than four days old on 17 Sep).
+    mockedTicker.mockResolvedValue(payload({
+      symbol: "X:BTCUSD", asset_class: "crypto", quote_at: null,
+      updated_at: "2026-09-14T00:10:00+00:00",
+    }));
+    render(<TickerPage params={params("X:BTCUSD")} />);
+    await flush();
+    await flush();
+    const line = screen.getByTestId("quote-as-of");
+    expect(line).toHaveTextContent(CRYPTO_QUOTE_UNKNOWN_NOTE);
+    expect(line).not.toHaveTextContent(PRICE_DELAY_PHRASE);
+    const badge = screen.getByTestId("live-badge");
+    expect(badge).toHaveTextContent(CRYPTO_QUOTE_UNKNOWN_NOTE);
+    expect(badge).not.toHaveTextContent(PRICE_DELAY_PHRASE);
+  });
+
+  it("gives a crypto close its age as a daily close", async () => {
+    mockedTicker.mockResolvedValue(payload({
+      symbol: "X:BTCUSD", asset_class: "crypto", quote_at: "2026-09-18T00:00:00+00:00",
+    }));
+    render(<TickerPage params={params("X:BTCUSD")} />);
+    await flush();
+    await flush();
+    expect(screen.getByTestId("quote-as-of")).toHaveTextContent("Daily close as of 15h ago");
+    expect(screen.getByTestId("live-badge")).toHaveTextContent("Daily close as of 15h ago");
   });
 });

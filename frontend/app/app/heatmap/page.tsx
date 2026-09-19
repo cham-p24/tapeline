@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorMessage, type HeatmapSector } from "@/lib/api";
 import { heatmapPreview, type PublicHeatmapSector } from "@/lib/previews";
 import { useLiveStream } from "@/lib/useLiveStream";
-import { LiveBadge, formatBadgeTime } from "@/components/LiveBadge";
+import { LiveBadge } from "@/components/LiveBadge";
+import { formatRelativeOrAbsolute } from "@/lib/datetime";
 import { useUser } from "@/components/UserContext";
 import { canUse } from "@/lib/auth";
 import { PRICING } from "@/lib/pricing";
@@ -175,14 +176,16 @@ export default function HeatmapPage() {
                 "write" figures above are Tapeline's write times, which move
                 every pass whether or not the vendor sent anything. Shown only
                 when the vendor gave a time; otherwise the delay note stands
-                alone rather than a write time posing as a quote time. */}
+                alone rather than a write time posing as a quote time. An age
+                or a date, never a bare clock time, so a Friday close does
+                not read as today's. */}
             {parseQuoteAt(freshness.newestQuote) && (
               <>
                 <span className="text-subtle">·</span>
                 <span className="text-muted" data-testid="newest-quote">
                   Newest quote:{" "}
                   <span className="font-semibold text-fg nums">
-                    {formatBadgeTime(parseQuoteAt(freshness.newestQuote) as Date)}
+                    {formatRelativeOrAbsolute(parseQuoteAt(freshness.newestQuote) as Date)}
                   </span>
                 </span>
               </>

@@ -19,9 +19,11 @@ Only a field the vendor attached to the price, in this order:
    when the last trade printed. The truest answer to "how old is this price".
 2. ``last_quote.sip_timestamp``, then ``last_quote.participant_timestamp``.
 3. The END of the last minute bar: ``last_minute.window_start`` (v3 naming) or
-   ``last_minute.t`` (v2 naming) plus one minute. A bar is stamped with its
-   start; the close inside it can be as late as the end, so the end is the
-   honest bound.
+   ``last_minute.t`` (a bar-style fallback name) plus one minute. A bar is
+   stamped with its start and its close printed somewhere inside it, so the
+   end is the LATEST the price can be from: an upper bound on the trade time.
+   An age measured from it can be understated by up to 60 seconds, small
+   beside the plan's ~15-minute delay.
 
 Deliberately NOT used:
 
@@ -54,7 +56,7 @@ _EARLIEST = datetime(2000, 1, 1, tzinfo=UTC)
 #: unit error. Bounds the value; it is never used AS the value.
 _FUTURE_SLACK = timedelta(minutes=5)
 
-#: A minute bar is stamped with its start; its close is as of its end.
+#: A minute bar is stamped with its start; its close is no later than its end.
 MINUTE_BAR = timedelta(minutes=1)
 
 #: (object, field, offset added to the instant), in preference order.

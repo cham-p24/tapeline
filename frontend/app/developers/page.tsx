@@ -7,7 +7,7 @@ import { faqJsonLd, jsonLdScript } from "@/lib/jsonld";
 // out here — the free plan is a real self-serve tier again (2026-08-30), so
 // this page has to describe it accurately while saying the API isn't in it.
 import { FREE_LIMITS, freeHasWatchlist } from "@/lib/pricing";
-import { PRICE_DELAY_PHRASE } from "@/lib/freshness";
+import { CRYPTO_CADENCE_PHRASE, PRICE_DELAY_PHRASE } from "@/lib/freshness";
 
 // Developer/API landing page. The public API (/api/v1/*) shipped 2026-06-01
 // (PR #247) but had no public marketing/docs surface — only the in-app key
@@ -117,7 +117,7 @@ const FAQ = [
   },
   {
     q: "How old are the prices, and what do updated_at and quote_at mean?",
-    a: `Prices are ${PRICE_DELAY_PHRASE}. updated_at is when Tapeline last wrote the row, not the age of the price. quote_at is the price vendor's own time for the price (with quote_timeframe, the vendor's own delay flag) when the vendor sends one, and null when it does not; treat a null as "${PRICE_DELAY_PHRASE}", never as the updated_at time.`,
+    a: `Prices are ${PRICE_DELAY_PHRASE}. updated_at is when Tapeline last wrote the row, not the age of the price. quote_at is the price vendor's own time for the price (with quote_timeframe, the vendor's own delay flag) when the vendor sends one, and null when it does not; never read a null as the updated_at time. For a stock or ETF, treat a null as "${PRICE_DELAY_PHRASE} or more". A crypto row (asset_class "crypto") is a daily close: its quote_at is the end of the UTC day of that close, and a null there means ${CRYPTO_CADENCE_PHRASE}, not the stock delay.`,
   },
   {
     q: "Is there a free tier for the API?",
