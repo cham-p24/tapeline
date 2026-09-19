@@ -307,7 +307,7 @@ export default async function LimitationsPage() {
         </div>
       </section>
 
-      <TransparencyStrip />
+      <TransparencyStrip current="/limitations" />
       <MarketingFooter />
     </main>
   );

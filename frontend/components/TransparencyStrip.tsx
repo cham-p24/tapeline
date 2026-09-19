@@ -10,7 +10,7 @@ import Link from "next/link";
  */
 type Item = { slug: string; title: string; desc: string; emoji: string };
 
-const ITEMS: Item[] = [
+export const TRANSPARENCY_ITEMS: Item[] = [
   { slug: "/how-it-works",  title: "The methodology", desc: "Six named factors, public methodology.", emoji: "🧮" },
   { slug: "/data-sources",  title: "Data sources",   desc: "Every feed that powers a score. Named, dated, linked.", emoji: "🗂️" },
   { slug: "/scorecard",     title: "Public scorecard", desc: "Each recorded daily top 10, back-checked vs SPY next session.", emoji: "📈" },
@@ -23,7 +23,7 @@ const ITEMS: Item[] = [
 ];
 
 export function TransparencyStrip({ current }: { current?: string }) {
-  const others = ITEMS.filter((i) => i.slug !== current);
+  const others = TRANSPARENCY_ITEMS.filter((i) => i.slug !== current);
   return (
     <section className="mt-8">
       <div className="mx-auto max-w-5xl px-6 py-8">
