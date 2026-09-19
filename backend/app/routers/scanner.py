@@ -5,7 +5,7 @@ import logging
 import time
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +16,7 @@ from app.services.auth import current_user_optional
 from app.services.cap_events import record_cap_hit
 from app.services.freshness import data_delayed_minutes
 from app.services.funnel_events import record_funnel_event
+from app.services.price_audience import is_trusted_ssr
 from app.services.quote_time import iso_utc
 from app.services.scan_log import record_scan_log
 from app.services.ticker_freshness import live_clauses
@@ -168,6 +169,21 @@ async def popular_tickers(
     return {"items": items, "cached": False}
 
 
+#: Sorts that publish the ordering of a vendor market-data column.
+_PRICE_SORTS = frozenset({"change_pct_1d", "change_pct_5d", "change_pct_1m", "volume"})
+
+
+async def _keyless_caller(
+    request: Request,
+    user: User | None = Depends(current_user_optional),
+) -> bool:
+    """True for a caller that is neither signed in nor our own SSR.
+
+    A dependency rather than a `request` parameter so routers/mcp.py, which
+    calls list_scanner as a plain function, can pass the answer explicitly."""
+    return user is None and not is_trusted_ssr(request)
+
+
 @router.get("")
 async def list_scanner(
     session: AsyncSession = Depends(get_session),
@@ -228,7 +244,25 @@ async def list_scanner(
     # rejects anything outside the closed set, so a stray value degrades to
     # "unknown" instead of poisoning the column.
     src: str | None = None,
+    # Whether the caller is keyless (see _keyless_caller). Only an explicit True
+    # gates: a plain-function caller that omits it gets the Depends object.
+    keyless: bool = Depends(_keyless_caller),
 ) -> dict:
+    # A PRICE ORACLE IS REFUSED TO A KEYLESS CALLER (2026-09-19). The anonymous
+    # response is capped at 10 rows, but `min_price` / `max_price` let anyone
+    # bisect a ticker's price from membership alone, and a sort on a daily move
+    # or on volume publishes the ranking of those vendor numbers across the
+    # whole universe, 10 rows at a time. Same rule as /api/public/signals
+    # (main.py). Signed-in users and our own SSR are unchanged; no public page
+    # passes these anonymously (the /t related-tickers strip sorts by score).
+    if keyless is True and (
+        min_price is not None or max_price is not None or sort in _PRICE_SORTS
+    ):
+        raise HTTPException(
+            403,
+            "Price filters and sorts on price, daily move or volume are not "
+            "available without a signed-in session.",
+        )
     # Handler-body wall time, for the scan log. Measures OUR work only — no
     # network, no render — so it answers "was the backend slow", nothing more.
     _t0 = time.perf_counter()
