@@ -333,9 +333,15 @@ async def run_daily_digest(
     # Freshness + data-quality floor — don't email subscribers stale ghost
     # picks or corrupt (score>100 / emoji-symbol / <2-factor) artifacts.
     # (score IS NOT NULL is part of the floor.) See app.services.ticker_freshness.
+    #
+    # No price-feed columns. Anyone can join this list without an account, and
+    # the market-data plan covers personal use only, so the email shows score,
+    # label and reason and nothing else (founder decision, 2026-09-19). Price and
+    # daily move used to be selected here and never rendered; leaving them out
+    # of the picks keeps a template edit from surfacing them.
+    # Pinned by tests/test_no_account_email_carries_no_prices.py.
     _top_stmt = select(
-        Ticker.symbol, Ticker.name, Ticker.score, Ticker.signal,
-        Ticker.reason, Ticker.price, Ticker.change_pct_1d,
+        Ticker.symbol, Ticker.name, Ticker.score, Ticker.signal, Ticker.reason,
     )
     for _clause in await live_clauses(session):
         _top_stmt = _top_stmt.where(_clause)
@@ -356,10 +362,8 @@ async def run_daily_digest(
             "score": score,
             "signal": signal,
             "reason": reason,
-            "price": price,
-            "change_pct_1d": change_pct_1d,
         }
-        for (symbol, name, score, signal, reason, price, change_pct_1d) in top_q.all()
+        for (symbol, name, score, signal, reason) in top_q.all()
     ]
 
     if not picks:
